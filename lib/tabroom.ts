@@ -30,6 +30,24 @@ export async function fetchApiRounds(tournId: number): Promise<ApiRound[] | null
   }
 }
 
+/** The event id that owns a published result set (e.g. the bracket), from the public API. Null if unknown. */
+export async function eventIdForResult(tournId: number, resultId: number): Promise<number | null> {
+  try {
+    const res = await fetch(`${API}/rest/tourns/${tournId}/results`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as Record<string, { id: number; ResultSets?: { id: number }[] }>;
+    for (const ev of Object.values(j || {})) {
+      if ((ev.ResultSets || []).some((r) => r.id === resultId)) return ev.id;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export class TabroomSession {
   private cookies = new Map<string, string>();
   private loggedIn = false;
@@ -140,13 +158,15 @@ export function parseBracketSlots(html: string): string[] {
 
 export interface RoundRow { aff: string; neg: string; win: string }
 
-/** Rows of a round_results page: Aff / Neg / Win ("2-1 NEG"). */
+/** Rows of a round_results page: Aff / Neg / Win ("2-1 NEG"), under whatever side labels the event uses. */
 export function parseRoundRows(html: string): RoundRow[] {
   const $ = cheerio.load(html);
   const table = $("table").first();
   if (!table.length) return [];
   const head = table.find("tr").first().find("th,td").toArray().map((c) => $(c).text().trim().toLowerCase());
-  const ai = head.indexOf("aff"), ni = head.indexOf("neg"), wi = head.indexOf("win");
+  // Events label sides differently: Aff/Neg, Pro/Con (Public Forum), Gov/Opp (Parli).
+  const col = (...names: string[]) => head.findIndex((h) => names.includes(h));
+  const ai = col("aff", "pro", "gov", "prop"), ni = col("neg", "con", "opp"), wi = col("win", "winner", "decision");
   if (ai < 0 || ni < 0) return [];
   return table.find("tr").toArray().slice(1).map((tr) => {
     const c = $(tr).find("td").toArray().map((x) => $(x).text().replace(/\s+/g, " ").trim());
@@ -233,6 +253,21 @@ export async function syncTournament(session: TabroomSession, cfg: SyncInput): P
     return { ids: Array.from({ length: 8 }, (_, k) => start + k + 1), via: "probe" };
   };
 
+  // No round ids at all (the first elim round's link was never given): find the
+  // event that owns this bracket and try its elim rounds, the one whose depth
+  // matches the bracket size first.
+  const firstElimCandidates = async (): Promise<number[]> => {
+    if (apiRounds === undefined) apiRounds = await fetchApiRounds(cfg.tournId);
+    const eventId = await eventIdForResult(cfg.tournId, cfg.resultId);
+    if (!eventId || !apiRounds) return [];
+    const elims = apiRounds
+      .filter((x) => x.eventId === eventId && (x.type === "elim" || x.type === "final"))
+      .sort((a, b) => Number(a.name) - Number(b.name));
+    if (!elims.length) return [];
+    const pref = elims.length >= rounds ? elims.length - rounds : 0;
+    return [elims[pref], ...elims.filter((_, i) => i !== pref)].map((x) => x.id);
+  };
+
   const readRound = async (id: number): Promise<RoundRow[]> =>
     parseRoundRows(await session.page(`${base}round_results.mhtml?tourn_id=${cfg.tournId}&round_id=${id}`));
 
@@ -299,12 +334,18 @@ export async function syncTournament(session: TabroomSession, cfg: SyncInput): P
       rows = await readRound(id);
     } else {
       const known = Object.values(out.roundIds).map(Number).filter(Boolean);
-      if (!known.length) { out.log.push("no round ids known yet — add the first elim round's results link"); break; }
       // A closeout default can put the wrong team in round r's field, so also accept a
       // page whose pairings are drawn from teams that played in round r - 1.
       const prevNames = new Set(field(r - 1).filter((x): x is Team => !!x).map((x) => x.name));
       const fromPrevRound = (rows2: RoundRow[]) => rows2.some((row) => prevNames.has(row.aff) && prevNames.has(row.neg));
-      const { ids, via } = await nextCandidates();
+      let ids: number[], via: string;
+      if (!known.length) {
+        ids = await firstElimCandidates();
+        via = "api, first elim of the bracket's event";
+        if (!ids.length) { out.log.push("no elim rounds published on Tabroom for this event yet"); break; }
+      } else {
+        ({ ids, via } = await nextCandidates());
+      }
       for (const cand of ids) {
         const rr2 = await readRound(cand);
         if (!rr2.length) continue;
@@ -321,9 +362,10 @@ export async function syncTournament(session: TabroomSession, cfg: SyncInput): P
       const rr = (out.results[String(r)] = out.results[String(r)] || {});
       let fresh = 0;
       for (const h of hits) {
-        const mm = String(h.row.win).match(/^(\d+-\d+)\s+(AFF|NEG)/i);
+        // "2-1 NEG", "3-0 Pro", "2-1 Con" …; the first side label is the Aff side in our model
+        const mm = String(h.row.win).match(/^(\d+-\d+)\s+(AFF|NEG|PRO|CON|GOV|OPP|PROP)\b/i);
         if (!mm) continue;
-        const side = mm[2].toUpperCase() as "AFF" | "NEG";
+        const side: "AFF" | "NEG" = /^(AFF|PRO|GOV|PROP)$/i.test(mm[2]) ? "AFF" : "NEG";
         const w = side === "AFF" ? h.A : h.N;
         const next: Result = [w.seed, mm[1], side];
         if (!rr[String(h.idx)]) fresh++;

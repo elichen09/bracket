@@ -46,7 +46,7 @@ export default function NewTournament() {
         <section className="view enter">
           <div className="thead">
             <h1 className="reveal">Add a <em style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontWeight: 400 }}>tournament</em></h1>
-            <p className="prose reveal">Paste the Tabroom bracket link. The bracket is pulled in on the next automatic update — usually within the hour. Add the first elim round&rsquo;s results link too, if it exists yet: that is what lets results start flowing. If you have the bracket in front of you, paste the seeded list to open it for picks right away.</p>
+            <p className="prose reveal">Paste the Tabroom bracket link. The bracket is pulled in on the next automatic update — usually within the hour. The elim rounds are found automatically from Tabroom; the first elim round&rsquo;s results link is only a fallback if that ever fails. If you have the bracket in front of you, paste the seeded list to open it for picks right away.</p>
           </div>
           <form className="form reveal" onSubmit={submit}>
             <h2 className="sec">Open a pool <span className="mono">this weekend&rsquo;s bracket</span></h2>
@@ -54,7 +54,7 @@ export default function NewTournament() {
             <label><span className="mono">Tabroom bracket link</span><input name="url" placeholder="https://www.tabroom.com/index/tourn/results/bracket.mhtml?tourn_id=…&result_id=…" /></label>
             <label><span className="mono">Tournament name</span><input name="name" placeholder="e.g. Glenbrooks" maxLength={60} /></label>
             <label><span className="mono">Event · division</span><input name="event" placeholder="e.g. Public Forum · Varsity" maxLength={60} /></label>
-            <label><span className="mono">First elim round results link (optional)</span><input name="round" placeholder="https://www.tabroom.com/index/tourn/results/round_results.mhtml?tourn_id=…&round_id=…" /></label>
+            <label><span className="mono">First elim round results link (optional fallback)</span><input name="round" placeholder="https://www.tabroom.com/index/tourn/results/round_results.mhtml?tourn_id=…&round_id=…" /></label>
             <label><span className="mono">Bracket list (optional)</span><textarea name="slots" placeholder={"One team per line, in bracket order, exactly as Tabroom lists them:\n1. Emory GY\n32. Kentucky SR\n…\nLeave a blank line for a bye."} /></label>
             <div className="row">
               <button type="submit" className="primary" disabled={busy}>{busy ? "Creating…" : "Create tournament"}</button>

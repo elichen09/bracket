@@ -103,9 +103,10 @@ and is cached for 12 hours in `student_records`
 ## Adding a tournament
 
 Open `/new`, enter the admin key, and paste the Tabroom **bracket** link
-(`…/bracket.mhtml?tourn_id=…&result_id=…`). Also paste the first elim round's
-**results** link (`…/round_results.mhtml?…&round_id=…`) if it exists yet — that's
-the anchor the updater walks forward from to find later rounds. The bracket fills
+(`…/bracket.mhtml?tourn_id=…&result_id=…`). The updater finds that event's elim
+rounds on Tabroom's API by itself and walks forward from the first one, so the
+first elim round's **results** link (`…/round_results.mhtml?…&round_id=…`) is only
+a fallback for the rare event whose rounds it can't work out. The bracket fills
 in on the next update, or paste the seeded team list to open it for picks
 immediately.
 
@@ -114,8 +115,10 @@ immediately.
 `/api/update` logs into Tabroom, and for each unfinished tournament:
 
 - pulls the opening-round bracket if it's still empty;
-- reads each round's results page (walking forward from the last known
-  `round_id`), matching pairings against the bracket;
+- finds the event's first elim round on Tabroom's API when no `round_id` is known
+  yet, then reads each round's results page walking forward from the last known
+  one, matching pairings against the bracket (side columns may be labelled
+  Aff/Neg, Pro/Con or Gov/Opp);
 - records the winner and ballot count per match;
 - infers advances for closeouts / undecided matches from the next round's
   pairings (marked `ADV`, never guessed);
