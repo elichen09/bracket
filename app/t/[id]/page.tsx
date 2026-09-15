@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nav from "@/components/Nav";
+import TeamDossier, { type PoolContext } from "@/components/stats/TeamDossier";
 import {
-  useTournament, useEntries, getMine, setMine, getName, setName,
-  apiCreateEntry, apiUpdateEntry,
+  useTournament, useEntries, useUser, useMyEntry, apiCreateEntry, apiUpdateEntry,
 } from "@/lib/useBreak";
 import {
   model, build, progress, eliminated, score, prune, bonusFor, entriesClosed,
-  type Model, type Match,
+  type Model, type Match, type Team,
 } from "@/lib/bracket";
 import type { Tournament, Entry, Picks } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
@@ -36,32 +36,29 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
 }
 
 function Loaded({ t }: { t: Tournament }) {
+  const user = useUser();
   const { entries, reload } = useEntries(t.id);
+  const { mine: my, reloadMine, setMineId } = useMyEntry(t.id, user);
   const M = useMemo(() => model(t), [t]);
 
   const [view, setView] = useState<string>("mine");    // "mine" | "real" | bracket id
   const [query, setQuery] = useState("");
   const [zoom, setZoom] = useState(1);
-  const [mine, setMineState] = useState<{ id: string; token: string } | null>(null);
-  const [name, setNameState] = useState("");
   const [myPicks, setMyPicks] = useState<Picks>({});
   const [justKey, setJustKey] = useState<string | null>(null);
+  const [dossier, setDossier] = useState<Team | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWrite = useRef(0);
 
-  // load identity once
-  useEffect(() => {
-    setMineState(getMine(t.id));
-    setNameState(getName());
-  }, [t.id]);
+  const mine = my?.id ? { id: my.id } : null;
+  const name = my?.name || "";
 
   // adopt my picks from the pool (locks, other devices) unless I just wrote
   const myEntry: Entry | undefined = mine ? entries[mine.id] : undefined;
   useEffect(() => {
     if (myEntry && Date.now() - lastWrite.current > 2500) setMyPicks(myEntry.picks || {});
-    if (mine && Object.keys(entries).length && !entries[mine.id]) { setMine(t.id, null); setMineState(null); }
-  }, [myEntry, entries, mine, t.id]);
+  }, [myEntry]);
 
   const myLocked = !!myEntry?.locked;
   const editable = view === "mine" && !!mine && !myLocked;
@@ -80,7 +77,7 @@ function Loaded({ t }: { t: Tournament }) {
     if (!mine) return;
     lastWrite.current = Date.now();
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    const doSave = () => apiUpdateEntry(t.id, mine.id, mine.token, {
+    const doSave = () => apiUpdateEntry(t.id, mine.id, {
       picks: nextPicks, ...(lock ? { lock: true } : {}), ...(nextName ? { name: nextName } : {}),
     }).then(reload).catch(() => {});
     if (lock || nextName) doSave(); else saveTimer.current = setTimeout(doSave, 350);
@@ -103,14 +100,22 @@ function Loaded({ t }: { t: Tournament }) {
   async function start(nm: string) {
     const clean = nm.trim().slice(0, 24);
     if (!clean) return;
-    setNameState(clean); setName(clean);
     try {
       const created = await apiCreateEntry(t.id, clean, myPicks);
-      setMine(t.id, created); setMineState(created);
+      setMineId(created.id);
       setView("mine");
-      reload();
+      reload(); reloadMine();
     } catch (e: any) { alert(e.message); }
   }
+
+  const openDossier = useCallback((team: Team) => setDossier(team), []);
+  useEffect(() => {
+    const want = new URLSearchParams(window.location.search).get("team");
+    if (!want || !M.entries.length) return;
+    const hit = M.entries.find((e) => e && e.name.toLowerCase() === want.toLowerCase());
+    if (hit) setDossier(hit);
+  }, [M]);
+  const pool = useMemo<PoolContext | null>(() => dossier ? poolContext(M, real, dead, P, entries, dossier) : null, [M, real, dead, P, entries, dossier]);
 
   return (
     <>
@@ -127,11 +132,10 @@ function Loaded({ t }: { t: Tournament }) {
         <div>
           <h2 className="sec">Pool <span className="mono">{poolNote(entries, mine)}</span></h2>
           <Me
-            M={M} mine={mine} name={name} myLocked={myLocked} myEntry={myEntry} myPicks={myPicks}
+            M={M} mine={mine} ready={my !== undefined} lookupError={my?.error} name={name} myLocked={myLocked} myEntry={myEntry} myPicks={myPicks}
             onStart={start}
-            onRename={(nm: string) => { setNameState(nm); setName(nm); persist(myPicks, false, nm); }}
+            onRename={(nm: string) => persist(myPicks, false, nm)}
             onLock={() => persist(myPicks, true)}
-            onClear={() => { setMyPicks({}); persist({}); }}
             entries={entries}
             onOpen={(id: string) => setView(id === mine?.id ? "mine" : id)}
           />
@@ -141,7 +145,7 @@ function Loaded({ t }: { t: Tournament }) {
             onView={(id: string) => setView(id)}
           />
         </div>
-        <Results M={M} real={real} />
+        <Results M={M} real={real} onTeam={openDossier} />
       </div>
 
       <div className="controls">
@@ -163,18 +167,45 @@ function Loaded({ t }: { t: Tournament }) {
         {mine && !myLocked && view === "mine" && <button onClick={() => { setMyPicks({}); persist({}); }}>Clear picks</button>}
       </div>
 
-      <Hint M={M} view={view} editable={editable} mine={mine} myLocked={myLocked} viewedName={viewedName} P={P} t={t} />
+      <Hint M={M} view={view} editable={editable} mine={mine} myLocked={myLocked} viewedName={viewedName} P={P} t={t} signedIn={!!user} />
 
       <Board
         M={M} tree={tree} real={real} dead={dead} view={view} editable={editable}
         query={query.trim().toLowerCase()} justKey={justKey} zoom={zoom}
-        boardRef={boardRef} onClick={clickSlot}
+        boardRef={boardRef} onClick={clickSlot} onInfo={openDossier}
       />
+
+      {dossier && pool && <TeamDossier tid={t.id} team={dossier} pool={pool} onClose={() => setDossier(null)} />}
     </>
   );
 }
 
 // ---------------------------------------------------------------------------
+/** What this pool thinks of a team: how many brackets carry them through each round, and where they really stand. */
+function poolContext(M: Model, real: Match[][], dead: Record<number, true>, P: ReturnType<typeof progress>, entries: Record<string, Entry>, team: Team): PoolContext {
+  const list = Object.values(entries);
+  const trees = list.map((e) => build(M, "picks", e.picks || {}));
+  const rows: PoolContext["rows"] = [];
+  let outRound = -1;
+  for (let r = 0; r < M.rounds; r++) {
+    const lost = real[r].some((mt) => mt.loser?.seed === team.seed);
+    if (lost && outRound < 0) outRound = r;
+  }
+  for (let r = M.locked; r < M.rounds; r++) {
+    const count = trees.filter((tr) => tr[r].some((mt) => mt.winner?.seed === team.seed && !mt.bye)).length;
+    const won = real[r].some((mt) => mt.winner?.seed === team.seed && !mt.bye);
+    const truth: "yes" | "no" | null = won ? "yes" : (outRound >= 0 && outRound <= r) ? "no" : null;
+    rows.push({ label: M.names[r], count, truth });
+  }
+  const champCount = M.rounds ? trees.filter((tr) => tr[M.rounds - 1][0].winner?.seed === team.seed).length : 0;
+  let status: string;
+  if (P.champ && P.champ.seed === team.seed) status = "Tournament champion";
+  else if (dead[team.seed]) status = `Out in ${M.names[outRound] || "elims"}`;
+  else if (P.complete) status = "Did not win";
+  else status = "Still alive in this bracket";
+  return { total: list.length, rows, champCount, status };
+}
+
 function poolNote(entries: Record<string, Entry>, mine: { id: string } | null) {
   let n = Object.keys(entries).length;
   if (mine && !entries[mine.id]) n += 1;
@@ -240,7 +271,7 @@ function Ledger({ M, s }: { M: Model; s: ReturnType<typeof score> }) {
   );
 }
 
-function Me({ M, mine, name, myLocked, myEntry, myPicks, onStart, onRename, onLock, onClear, entries, onOpen }: any) {
+function Me({ M, mine, ready, lookupError, name, myLocked, myEntry, myPicks, onStart, onRename, onLock, entries, onOpen }: any) {
   const [draft, setDraft] = useState(name);
   const [renaming, setRenaming] = useState(false);
   const [armed, setArmed] = useState(false);
@@ -249,6 +280,8 @@ function Me({ M, mine, name, myLocked, myEntry, myPicks, onStart, onRename, onLo
   useEffect(() => setDraft(name), [name]);
 
   if (!M.size) return <div className="me"><span className="mono" style={{ color: "var(--muted)" }}>Picks open once the bracket is in.</span></div>;
+  if (!ready) return <div className="me"><span className="mono" style={{ color: "var(--muted)" }}>Finding your bracket…</span></div>;
+  if (lookupError) return <div className="me"><span style={{ color: "var(--bad)", fontSize: 13 }}>Couldn&rsquo;t look up your bracket: {lookupError}</span></div>;
 
   if (!mine && entriesClosed(M)) {
     return <div className="me"><span className="mono" style={{ color: "var(--muted)" }}>Brackets are closed — first-round results are in.</span></div>;
@@ -257,9 +290,9 @@ function Me({ M, mine, name, myLocked, myEntry, myPicks, onStart, onRename, onLo
   if (!mine) {
     return (
       <div className="me">
-        <input value={draft} maxLength={24} placeholder="Your name" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onStart(draft); }} />
+        <input value={draft} maxLength={24} placeholder="Name on the leaderboard" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onStart(draft); }} />
         <button className="primary" onClick={() => onStart(draft)}>Start my bracket</button>
-        <span className="grow" /><span className="mono" style={{ color: "var(--muted)" }}>joins the pool</span>
+        <span className="grow" /><span className="mono" style={{ color: "var(--muted)" }}>one per person</span>
       </div>
     );
   }
@@ -274,12 +307,12 @@ function Me({ M, mine, name, myLocked, myEntry, myPicks, onStart, onRename, onLo
           </>
         ) : (
           <>
-            <span className="who">{name || "You"}<small>{mine.id}</small></span>
+            <span className="who">{myEntry?.name || name || "You"}<small>{mine.id}</small></span>
             <span className="grow" />
             {myLocked
               ? <span className="locked">Locked {fmtDate(myEntry?.locked_at)}</span>
               : <>
-                  <button onClick={() => { setDraft(name); setRenaming(true); }}>Rename</button>
+                  <button onClick={() => { setDraft(myEntry?.name || name); setRenaming(true); }}>Rename</button>
                   <button className={"lock" + (armed ? " armed" : "")} onClick={() => { if (!armed) { setArmed(true); setTimeout(() => setArmed(false), 5000); } else { setArmed(false); onLock(); } }}>
                     {armed ? (left ? `Lock with ${left} blank — no undo?` : "Lock it in — no undo?") : "Lock in my bracket"}
                   </button>
@@ -336,45 +369,47 @@ function Leaderboard({ M, real, dead, entries, mine, myName, myPicks, myLocked, 
   );
 }
 
-function Results({ M, real }: { M: Model; real: Match[][] }) {
+function Results({ M, real, onTeam }: { M: Model; real: Match[][]; onTeam: (t: Team) => void }) {
   let r = -1;
   for (let i = M.rounds - 1; i >= 0; i--) if (real[i].some((mt) => mt.official)) { r = i; break; }
   if (r < 0) return <div id="t-side"><h2 className="sec">Results <span className="mono">none yet</span></h2><div className="lbempty">Nothing has been reported yet. Picks stay open in every round until a result lands.</div></div>;
   const decided = real[r].filter((mt) => mt.official).length;
+  const T = ({ t }: { t: Team }) => <button className="teamlink" onClick={() => onTeam(t)}>{t.seed} {t.name}</button>;
   return (
     <div id="t-side">
       <h2 className="sec">{M.names[r]} <span className="mono">{decided} of {real[r].length} reported</span></h2>
       <table className="lb plain"><tbody>
         {real[r].map((mt, i) => {
-          if (!mt.official) return <tr key={i}><td className="cr">{i + 1}</td><td className="ch" colSpan={3}>{mt.a && mt.b ? <>{mt.a.seed} {mt.a.name} <span style={{ color: "var(--dim)" }}>vs</span> {mt.b.seed} {mt.b.name} — pending</> : "waiting on the round before"}</td></tr>;
+          if (!mt.official) return <tr key={i}><td className="cr">{i + 1}</td><td className="ch" colSpan={3}>{mt.a && mt.b ? <><T t={mt.a} /> <span style={{ color: "var(--dim)" }}>vs</span> <T t={mt.b} /> — pending</> : "waiting on the round before"}</td></tr>;
           const w = mt.winner!, l = mt.loser!, up = w.seed > l.seed;
-          return <tr key={i}><td className="cr">{i + 1}</td><td className="who" style={{ fontWeight: 500 }}>{w.seed} {w.name}{up && <span className="tag lk">upset</span>}</td><td className="ch">over {l.seed} {l.name}</td><td className="cr">{mt.official.margin}</td></tr>;
+          return <tr key={i}><td className="cr">{i + 1}</td><td className="who" style={{ fontWeight: 500 }}><T t={w} />{up && <span className="tag lk">upset</span>}</td><td className="ch">over <T t={l} /></td><td className="cr">{mt.official.margin}</td></tr>;
         })}
       </tbody></table>
     </div>
   );
 }
 
-function Hint({ M, view, editable, mine, myLocked, viewedName, P, t }: any) {
+function Hint({ M, view, editable, mine, myLocked, viewedName, P, t, signedIn }: any) {
   let content: React.ReactNode;
+  const stats = <> Hover any team and hit <b>◔</b> for its full Tabroom dossier.</>;
   if (view === "real") {
     const notes = Object.values(t.notes || {}) as string[];
-    content = <><b>Actual results as reported on Tabroom</b>, ballot count beside each winner. {P.total ? `${P.done} of ${P.total} matches decided.` : ""} {notes.join(" ")}</>;
+    content = <><b>Actual results as reported on Tabroom</b>, ballot count beside each winner. {P.total ? `${P.done} of ${P.total} matches decided.` : ""} {notes.join(" ")} Click any team for its dossier.</>;
   } else if (editable) {
-    content = <><span className="key"><i className="chip p" /> your pick</span><span className="key"><i className="chip c" /> correct</span><span className="key"><i className="chip x" /> missed</span><span className="key"><i className="chip d" /> already knocked out</span><br /><b>Click the team that wins</b> to advance them; click again to undo. Matches lock as real results land. Lock the whole bracket when you&rsquo;re done.</>;
+    content = <><span className="key"><i className="chip p" /> your pick</span><span className="key"><i className="chip c" /> correct</span><span className="key"><i className="chip x" /> missed</span><span className="key"><i className="chip d" /> already knocked out</span><br /><b>Click the team that wins</b> to advance them; click again to undo. Matches lock as real results land. Lock the whole bracket when you&rsquo;re done.{stats}</>;
   } else if (view === "mine" && mine && myLocked) {
-    content = <><b>Your bracket is locked.</b> It scores itself as results come in — click any name in the pool to see what they went with.</>;
+    content = <><b>Your bracket is locked.</b> It scores itself as results come in — click any name in the pool to see what they went with. Click any team for its dossier.</>;
   } else if (view === "mine" && entriesClosed(M)) {
-    content = <><b>Brackets are closed</b> — first-round results are in. Switch to Actual results, or click a name in the pool to see their picks.</>;
+    content = <><b>Brackets are closed</b> — first-round results are in. Switch to Actual results, or click a name in the pool to see their picks. Click any team for its dossier.</>;
   } else if (view === "mine") {
-    content = <><b>Enter a name above to start your bracket.</b> Anyone who opens this page gets one of their own; everyone scores on the same leaderboard.</>;
+    content = <><b>{signedIn ? "Start your bracket above." : "Sign in to start a bracket."}</b> One bracket per person per tournament; everyone scores on the same leaderboard. Click any team for its dossier.</>;
   } else {
-    content = <><b>Viewing {viewedName}&rsquo;s bracket</b> — read-only. Switch back to My bracket to change yours.</>;
+    content = <><b>Viewing {viewedName}&rsquo;s bracket</b> — read-only. Switch back to My bracket to change yours. Click any team for its dossier.</>;
   }
   return <p className="hint">{content}</p>;
 }
 
-function Board({ M, tree, real, dead, view, editable, query, justKey, zoom, boardRef, onClick }: any) {
+function Board({ M, tree, real, dead, view, editable, query, justKey, zoom, boardRef, onClick, onInfo }: any) {
   if (!M.rounds) return <div className="board"><div className="canvas"><div className="lbempty" style={{ padding: "28px 0" }}>The bracket hasn’t been pulled from Tabroom yet. It appears here on the next automatic update.</div></div></div>;
   return (
     <div className="board" ref={boardRef}>
@@ -390,7 +425,7 @@ function Board({ M, tree, real, dead, view, editable, query, justKey, zoom, boar
                 <div className="match" key={m}>
                   <div className="teams">
                     {[0, 1].map((side) => (
-                      <Slot key={side} M={M} r={r} m={m} side={side as 0 | 1} mt={mt} truth={real[r][m]} view={view} editable={editable} dead={dead} query={query} just={justKey === `${r}:${m}:${side}`} onClick={onClick} />
+                      <Slot key={side} M={M} r={r} m={m} side={side as 0 | 1} mt={mt} truth={real[r][m]} view={view} editable={editable} dead={dead} query={query} just={justKey === `${r}:${m}:${side}`} onClick={onClick} onInfo={onInfo} />
                     ))}
                   </div>
                 </div>
@@ -403,11 +438,11 @@ function Board({ M, tree, real, dead, view, editable, query, justKey, zoom, boar
   );
 }
 
-function Slot({ M, r, m, side, mt, truth, view, editable, dead, query, just, onClick }: any) {
-  const team = side === 0 ? mt.a : mt.b;
-  let cls = "slot", margin = "", tip = "", disabled = true;
+function Slot({ M, r, m, side, mt, truth, view, editable, dead, query, just, onClick, onInfo }: any) {
+  const team: Team | null = side === 0 ? mt.a : mt.b;
+  let cls = "slot", margin = "", tip = "", pickable = false;
   if (!team) {
-    return <button className="slot blank" disabled><span className="seed" /><span className="nm">{mt.bye ? "bye" : "—"}</span><span className="mg" /></button>;
+    return <div className="slotwrap"><button className="slot blank" disabled><span className="seed" /><span className="nm">{mt.bye ? "bye" : "—"}</span><span className="mg" /></button></div>;
   }
   const locked = !!truth.winner;
   tip = `${team.seed}. ${team.name}`;
@@ -420,7 +455,7 @@ function Slot({ M, r, m, side, mt, truth, view, editable, dead, query, just, onC
   } else {
     const isPick = mt.winner === team;
     if (!locked) {
-      if (mt.a && mt.b && editable) { disabled = false; cls += " live"; }
+      if (mt.a && mt.b && editable) { pickable = true; cls += " live"; }
       else if (!mt.a || !mt.b) cls += " await";
       if (isPick) { cls += dead[team.seed] ? " doomed" : " pick"; tip += dead[team.seed] ? " — picked, already eliminated" : " — picked to advance"; }
     } else if (isPick) {
@@ -432,9 +467,13 @@ function Slot({ M, r, m, side, mt, truth, view, editable, dead, query, just, onC
   }
   if (query && team.name.toLowerCase().includes(query)) cls += " hit";
   if (just) cls += " just";
+  // pickable slots pick on click and open stats from the ◔ button; everything else opens stats on click
   return (
-    <button className={cls} disabled={disabled} title={tip} onClick={() => onClick(r, m, side)}>
-      <span className="seed">{team.seed}</span><span className="nm">{team.name}</span><span className="mg">{margin}</span>
-    </button>
+    <div className="slotwrap">
+      <button className={cls + (pickable ? "" : " infoable")} title={pickable ? tip : tip + " — click for stats"} onClick={() => pickable ? onClick(r, m, side) : onInfo(team)}>
+        <span className="seed">{team.seed}</span><span className="nm">{team.name}</span><span className="mg">{margin}</span>
+      </button>
+      {pickable && <button className="info" title={`${team.name} — stats`} aria-label={`${team.name} statistics`} onClick={(e) => { e.stopPropagation(); onInfo(team); }}>◔</button>}
+    </div>
   );
 }

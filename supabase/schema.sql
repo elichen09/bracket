@@ -35,16 +35,22 @@ create table if not exists public.entries (
   picks          jsonb not null default '{}'::jsonb,    -- {"1:14": 29}
   locked         boolean not null default false,
   locked_at      timestamptz,
-  token          uuid not null default gen_random_uuid(), -- edit secret; only the API ever reads it
+  token          uuid not null default gen_random_uuid(), -- legacy edit secret (pre-accounts brackets)
+  user_id        uuid references auth.users(id) on delete cascade, -- owner; one bracket per user per tournament
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),
   primary key (tournament_id, id)
 );
 create index if not exists entries_tournament_idx on public.entries (tournament_id);
+create index if not exists entries_user_idx on public.entries (user_id);
+create unique index if not exists entries_one_per_user_per_tournament
+  on public.entries (tournament_id, user_id) where user_id is not null;
 
 -- Public projection of entries: everything except the edit token.
-create or replace view public.entries_public as
-  select id, tournament_id, name, picks, locked, locked_at, created_at, updated_at
+-- (drop first: "create or replace" can't insert a column into an existing view)
+drop view if exists public.entries_public;
+create view public.entries_public as
+  select id, tournament_id, user_id, name, picks, locked, locked_at, created_at, updated_at
   from public.entries;
 
 -- ---------------------------------------------------------------------------
@@ -90,3 +96,16 @@ create trigger tournaments_touch before update on public.tournaments
 drop trigger if exists entries_touch on public.entries;
 create trigger entries_touch before update on public.entries
   for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- career-record cache (the Career section of a dossier) — see migrations/003_career_cache.sql
+-- ---------------------------------------------------------------------------
+create table if not exists public.student_records (
+  student_id  integer primary key,
+  payload     jsonb not null,
+  fetched_at  timestamptz not null default now()
+);
+
+alter table public.student_records enable row level security;
+-- No policies: only the service role (API routes) reads or writes this table.
+revoke all on public.student_records from anon, authenticated;

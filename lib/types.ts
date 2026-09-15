@@ -27,6 +27,7 @@ export interface Tournament {
 export interface Entry {
   id: string;
   tournament_id: string;
+  user_id: string | null;   // null on brackets made before accounts existed
   name: string;
   picks: Picks;
   locked: boolean;
@@ -35,8 +36,7 @@ export interface Entry {
   updated_at: string;
 }
 
-/** What this browser remembers about its own bracket in a tournament. */
+/** The signed-in person's own bracket in a tournament. */
 export interface MyEntry {
   id: string;
-  token: string;
 }

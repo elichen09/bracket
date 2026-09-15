@@ -33,6 +33,7 @@ export async function fetchApiRounds(tournId: number): Promise<ApiRound[] | null
 export class TabroomSession {
   private cookies = new Map<string, string>();
   private loggedIn = false;
+  private loginInFlight: Promise<void> | null = null;
 
   constructor(private username: string, private password: string) {}
 
@@ -79,8 +80,16 @@ export class TabroomSession {
     throw new Error("too many redirects: " + path);
   }
 
+  /** Sign in once; concurrent callers share the same attempt instead of racing each other's cookies. */
   async login(): Promise<void> {
     if (this.loggedIn) return;
+    if (!this.loginInFlight) {
+      this.loginInFlight = this.doLogin().finally(() => { this.loginInFlight = null; });
+    }
+    return this.loginInFlight;
+  }
+
+  private async doLogin(): Promise<void> {
     const page = await this.get("/user/login/login.mhtml");
     const $ = cheerio.load(page.html);
     const form = $('form[action*="login_save"]').first();

@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { currentUser } from "@/lib/auth";
 import { model, cleanPicks, prune, illegalChanges } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// PATCH /api/entries/:id  { tournamentId, token, name?, picks?, lock? }
-// The token proves ownership. A locked bracket, and any match already decided,
-// can no longer be changed.
+// PATCH /api/entries/:id  { tournamentId, name?, picks?, lock? }
+// The signed-in user must own the bracket. A locked bracket, and any match
+// already decided, can no longer be changed.
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "sign in required" }, { status: 401 });
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const tournamentId = String(body?.tournamentId || "");
-  const token = String(body?.token || "");
-  if (!tournamentId || !token) return NextResponse.json({ error: "tournamentId and token are required" }, { status: 400 });
+  if (!tournamentId) return NextResponse.json({ error: "tournamentId is required" }, { status: 400 });
 
   const db = supabaseAdmin();
   const { data: entry } = await db.from("entries")
-    .select("id,picks,locked,token").eq("tournament_id", tournamentId).eq("id", params.id).single();
+    .select("id,picks,locked,user_id").eq("tournament_id", tournamentId).eq("id", params.id).single();
   if (!entry) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (entry.token !== token) return NextResponse.json({ error: "wrong token" }, { status: 403 });
+  if (entry.user_id !== user.id) return NextResponse.json({ error: "that bracket isn't yours" }, { status: 403 });
   if (entry.locked) return NextResponse.json({ error: "this bracket is locked" }, { status: 409 });
 
   const { data: t } = await db.from("tournaments").select("slots,results,locked_rounds").eq("id", tournamentId).single();

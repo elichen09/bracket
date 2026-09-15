@@ -5,9 +5,15 @@ it, and it scores itself as results post — a March-Madness-style pool with a
 leaderboard per tournament. Built with Next.js + Supabase; deploys to Vercel (or
 anywhere that runs Next).
 
+- **Accounts.** The landing page is public; everything else needs a sign-in
+  (email + password, no confirmation email). Each account gets **one bracket per
+  tournament** — enforced by the API and a unique index.
+- **Team dossiers.** Click any team in a bracket (or the ◔ that appears on a
+  pickable slot) for its Tabroom record, visualised: prelim form, speaker points
+  round by round, side balance, strength of schedule, elim ballots, where it sits in
+  the whole field, the judges it has drawn, and how this pool rates it.
 - **Multiple tournaments**, each with its own bracket, pool and leaderboard.
-- **Share by link** — anyone who opens a tournament gets their own bracket; each
-  bracket has a short 5-character id (no long share codes).
+- **Share by link** — each bracket has a short 5-character id (no long share codes).
 - **Lock** your bracket, or let each match lock itself when its result lands.
 - **Auto-updating** results pulled from Tabroom on a schedule.
 - **You add tournaments** from `/new` (guarded by an admin key).
@@ -24,8 +30,13 @@ added don't count. Full explanation lives at `/about`.
 1. Make a project at [supabase.com](https://supabase.com).
 2. In **SQL Editor**, run `supabase/schema.sql`, then `supabase/seed.sql`
    (the seed loads the two tournaments already tracked — delete those rows if you
-   want to start clean).
-3. From **Project Settings → API**, copy the Project URL, the `anon` public key,
+   want to start clean). **Already running an older copy?** Run
+   `supabase/migrations/002_accounts_and_stats.sql` (accounts) and
+   `supabase/migrations/003_career_cache.sql` (career cache) instead.
+3. In **Authentication → Providers**, leave Email enabled. Accounts are created
+   server-side with the service role and auto-confirmed, so the confirmation-email
+   setting doesn't matter and Supabase's mail rate limits never bite.
+4. From **Project Settings → API**, copy the Project URL, the `anon` public key,
    and the `service_role` secret key.
 
 ## 2. Configure environment
@@ -69,6 +80,25 @@ trigger a refresh by hand:
 ```bash
 curl -X POST https://YOUR-SITE/api/update -H "x-update-secret: YOUR_UPDATE_SECRET"
 ```
+
+## Team statistics
+
+The dossier is built from Tabroom's public REST API (`api.tabroom.com/v1`) — no
+login needed: the event's field, prelim seeds, speaker awards, final places, and the
+per-entry `records` document (every round with side, opponent, ballots, points and
+judges). Documents are cached in memory per server instance (5 minutes while a
+tournament is live, an hour once it's complete) so a busy pool page stays cheap for
+Tabroom. `GET /api/stats/:tournament?code=Emory%20GY` returns the compiled shape.
+
+## Careers (previous seasons)
+
+Every dossier ends with each debater's full Tabroom record: every tournament,
+season by season, with partners, prelim and elim records, deepest elim round,
+titles, speaker averages, and past meetings against teams in the current bracket.
+It comes from Tabroom's per-student results page (`team_results.mhtml?id1=…`), which
+needs a login — the app uses the same `TABROOM_USERNAME` account as the updater —
+and is cached for 12 hours in `student_records`
+(`supabase/migrations/003_career_cache.sql`; optional, memory cache otherwise).
 
 ## Adding a tournament
 

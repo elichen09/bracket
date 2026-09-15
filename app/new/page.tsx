@@ -49,6 +49,7 @@ export default function NewTournament() {
             <p className="prose reveal">Paste the Tabroom bracket link. The bracket is pulled in on the next automatic update — usually within the hour. Add the first elim round&rsquo;s results link too, if it exists yet: that is what lets results start flowing. If you have the bracket in front of you, paste the seeded list to open it for picks right away.</p>
           </div>
           <form className="form reveal" onSubmit={submit}>
+            <h2 className="sec">Open a pool <span className="mono">this weekend&rsquo;s bracket</span></h2>
             <label><span className="mono">Admin key</span><input name="admin" type="password" placeholder="the passphrase you set in ADMIN_KEY" autoComplete="off" /></label>
             <label><span className="mono">Tabroom bracket link</span><input name="url" placeholder="https://www.tabroom.com/index/tourn/results/bracket.mhtml?tourn_id=…&result_id=…" /></label>
             <label><span className="mono">Tournament name</span><input name="name" placeholder="e.g. Glenbrooks" maxLength={60} /></label>
