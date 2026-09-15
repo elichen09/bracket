@@ -8,11 +8,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // GET/POST /api/update — pulls fresh results from Tabroom into every unfinished
-// tournament. Vercel Cron calls this on a schedule (see vercel.json). Guarded by
-// UPDATE_SECRET: Vercel Cron sends it automatically as a Bearer token; you can
-// also pass ?secret= or an x-update-secret header when calling by hand. The
-// admin's "force update" button instead sends { adminKey } in a POST body,
-// checked against ADMIN_KEY.
+// tournament. The GitHub Action in .github/workflows/update.yml calls this hourly
+// (Vercel Hobby only allows daily crons). Guarded by UPDATE_SECRET, passed as a
+// Bearer token, an x-update-secret header, or ?secret=. The admin's "force update"
+// button instead sends { adminKey } in a POST body, checked against ADMIN_KEY.
 async function handle(req: Request) {
   const secret = process.env.UPDATE_SECRET;
   if (secret) {

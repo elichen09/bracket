@@ -1,5 +1,5 @@
-# Hourly results updater for hosts without built-in cron (Vercel Cron already
-# covers Vercel deploys via vercel.json — use one or the other, not both).
+# Hourly results updater. Vercel Hobby only allows daily crons, so the hourly
+# schedule lives here instead of in vercel.json.
 # Add two repository secrets: SITE_URL (e.g. https://the-break.vercel.app) and
 # UPDATE_SECRET (the same value as the app's UPDATE_SECRET env var).
 name: Update results

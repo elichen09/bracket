@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 // Lets an admin trigger /api/update by hand instead of waiting for the next
-// Vercel Cron run. Guarded by the same ADMIN_KEY used on /new.
+// scheduled run. Guarded by the same ADMIN_KEY used on /new.
 export default function AdminUpdate() {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");

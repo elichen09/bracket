@@ -56,13 +56,15 @@ npm run dev        # http://localhost:3000
 1. Push this folder to a GitHub repo and import it at
    [vercel.com/new](https://vercel.com/new).
 2. Add all the env vars above in **Project → Settings → Environment Variables**.
-3. Deploy. `vercel.json` registers an hourly Cron hit to `/api/update`; Vercel
-   sends `UPDATE_SECRET` as a Bearer token automatically.
+3. Deploy.
+4. Results update hourly through the included GitHub Action
+   (`.github/workflows/update.yml`), since Vercel's Hobby plan only allows daily
+   crons. In the GitHub repo, add **Settings → Secrets and variables → Actions**
+   secrets `SITE_URL` (your deployed URL) and `UPDATE_SECRET` (same value as the
+   app's env var), and it curls the updater every hour.
 
-Not on Vercel? Delete `vercel.json` and use the included GitHub Action
-(`.github/workflows/update.yml`) instead: add repo secrets `SITE_URL` and
-`UPDATE_SECRET`, and it curls the updater every hour. You can also trigger a
-refresh by hand:
+Admins can also use the "Admin: force update" button on the home page, or
+trigger a refresh by hand:
 
 ```bash
 curl -X POST https://YOUR-SITE/api/update -H "x-update-secret: YOUR_UPDATE_SECRET"
