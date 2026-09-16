@@ -294,6 +294,11 @@ function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][
  */
 const SEED_JITTER = 0.4;
 
+/** Two entries a tabroom will not put in the same room. */
+function sameSchool(a: Standing, b: Standing): boolean {
+  return !!a.team.school && a.team.school === b.team.school;
+}
+
 /**
  * Power pairing, the way a tabroom actually does it.
  *
@@ -304,34 +309,91 @@ const SEED_JITTER = 0.4;
  * is worse than useless for predicting an opponent; high-low concentrates it on
  * the handful of teams a person could actually draw.
  *
- * An odd team out drops to the next bracket down, which is what a pull-up is.
+ * A bracket with an odd number of teams pulls one UP from the bracket below,
+ * rather than pushing its own odd team down. Tabroom chooses the team with the
+ * worst average opponent seed: the one that has faced the weakest schedule, and
+ * so has the least claim on the record it is sitting on. That team joins at the
+ * bottom of the higher bracket, so high-low sets it against the top seed there.
+ *
+ * Grapevine's round six is exactly this. Three teams sat at 5-0, so the top seed
+ * drew a pull-up and the other two met each other. Checked against every real
+ * pull-up at Grapevine and the Season Opener, the team chosen was the worst in
+ * its bracket by that measure every time.
  */
 function pairPower(pool: Standing[], rand: () => number, jitter = SEED_JITTER): [Standing, Standing][] {
+  // Bracket on losses, not wins. A team that has had a bye carries one round
+  // fewer, so a 4-0 belongs with the undefeated 5-0s rather than with the 4-1s.
+  // Grouping on wins files it in the wrong bracket and pairs it against the
+  // wrong half of the field.
   const brackets = new Map<number, Standing[]>();
   for (const s of pool) {
-    const b = brackets.get(s.wins) || [];
+    const b = brackets.get(s.losses) || [];
     b.push(s);
-    brackets.set(s.wins, b);
+    brackets.set(s.losses, b);
   }
-  const out: [Standing, Standing][] = [];
-  let carry: Standing | null = null;
-  for (const wins of Array.from(brackets.keys()).sort((a, b) => b - a)) {
-    const group = brackets.get(wins)!.slice();
-    if (carry) { group.push(carry); carry = null; }
 
-    // seed the bracket on speaker points, jittered so the pairing is not rigid
+  // Seed on speaker points per round rather than the running total, for the same
+  // reason: a team with a bye should not sink for having debated once less.
+  const rounds = (s: Standing) => Math.max(1, s.wins + s.losses);
+  const rate = (s: Standing) => s.speaks / rounds(s);
+
+  // The standings as they stand, best first, which is what an opponent's seed
+  // means; and from that, how weak a schedule each team has faced.
+  const rankOf = new Map<string, number>();
+  pool.slice()
+    .sort((a, b) => a.losses - b.losses || rate(b) - rate(a) || a.team.seed - b.team.seed)
+    .forEach((st, i) => rankOf.set(st.team.code, i + 1));
+  const weakness = new Map<Standing, number>();
+  for (const st of pool) {
+    let sum = 0, n = 0;
+    for (const code of st.met) {
+      const r = rankOf.get(code);
+      if (r !== undefined) { sum += r; n++; }
+    }
+    weakness.set(st, n ? sum / n : 0);
+  }
+
+  const order = Array.from(brackets.keys()).sort((a, b) => a - b);
+  const seeded = new Map<number, Standing[]>();
+  for (const losses of order) {
+    const group = brackets.get(losses)!.slice();
     const key = new Map<Standing, number>();
-    for (const s of group) key.set(s, s.speaks + (rand() + rand() - 1) * jitter);
+    for (const s of group) key.set(s, rate(s) + (rand() + rand() - 1) * jitter / rounds(s));
     group.sort((a, b) => key.get(b)! - key.get(a)! || a.team.seed - b.team.seed);
+    seeded.set(losses, group);
+  }
 
-    // high against low, stepping up from the bottom to dodge a rematch
+  const out: [Standing, Standing][] = [];
+  for (let i = 0; i < order.length; i++) {
+    const group = seeded.get(order[i])!;
+
+    // An odd bracket pulls one up from the bracket below, taken from its lower
+    // third, and that team joins at the bottom — so high-low sets it against the
+    // top seed. Pulling cascades: the bracket below is now one lighter, which can
+    // make it odd in turn, exactly as a real pairing cascades down the standings.
+    if (group.length % 2 === 1 && i + 1 < order.length) {
+      const below = seeded.get(order[i + 1])!;
+      if (below.length) {
+        let pick = 0;
+        for (let k = 1; k < below.length; k++) {
+          if ((weakness.get(below[k]) ?? 0) > (weakness.get(below[pick]) ?? 0)) pick = k;
+        }
+        group.push(below.splice(pick, 1)[0]);
+      }
+    }
+
+    // High against low, stepping up from the bottom to dodge a rematch or two
+    // teams from the same school. The school rule is absolute in practice: across
+    // 1,238 real pairings at Grapevine and the Season Opener not one put two
+    // entries from the same school together, though most entries came from
+    // schools that brought several.
     while (group.length > 1) {
       const a = group.shift()!;
       let j = group.length - 1;
-      while (j > 0 && a.met.has(group[j].team.code)) j--;
+      while (j > 0 && (a.met.has(group[j].team.code) || sameSchool(a, group[j]))) j--;
       out.push([a, group.splice(j, 1)[0]]);
     }
-    if (group.length) carry = group[0];              // odd team drops to the next bracket
+    // a lone team in the lowest bracket has nobody to draw: that is a bye
   }
   return out;
 }

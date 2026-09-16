@@ -286,7 +286,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
           <p className="hint">
             {pred.nextRound.published
               ? "Tabroom has posted this pairing, so these are the real matchups rather than a guess."
-              : "Rounds already debated are counted as they stand, so this pairs from the real standings. A tabroom seeds each win bracket on speaker points and pairs the top against the bottom, which is what these odds follow."}
+              : "Rounds already debated are counted as they stand, so this pairs from the real standings. A tabroom seeds each bracket on speaker points, pairs the top against the bottom, keeps schools apart, and pulls up the weakest schedule when a bracket is odd. A high percentage means the model sees no other way to pair you, not that the pairing is settled: it is working from an estimate of the seed order, and a small difference there changes who you draw."}
           </p>
           <div className="tablewrap">
             <table className="lb rank">
@@ -306,7 +306,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
                           {m.opponents.slice(0, 5).map((o) => (
                             <span className="nextopp" key={o.opp}>
                               <b>{o.opp === "bye" ? "a bye" : o.opp}</b>
-                              <i>{o.pct >= 99.5 ? "certain" : `${o.pct.toFixed(0)}%`}</i>
+                              <i>{o.pct >= 99.5 ? "99%+" : `${o.pct.toFixed(0)}%`}</i>
                             </span>
                           ))}
                           {!m.opponents.length && <span className="nextopp"><b>nobody yet</b></span>}
