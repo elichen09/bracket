@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import EntryDossier from "./EntryDossier";
+import SimRecord from "./SimRecord";
 
 /**
  * What a tournament page shows before there is a bracket: who is entered, what
@@ -28,7 +29,7 @@ interface SimMatch { round: string; a: string | null; b: string | null; winner: 
 interface Prediction {
   odds: Odds[];
   sample: {
-    prelims: { code: string; wins: number; losses: number; rounds: { round: number; opp: string; won: boolean }[] }[];
+    prelims: { code: string; wins: number; losses: number; seed: number; rounds: { round: number; opp: string; won: boolean; recordBefore: string }[] }[];
     breakField: { code: string; wins: number; losses: number; seed: number }[];
     elims: SimMatch[][];
     champion: string | null;
@@ -38,6 +39,16 @@ interface Prediction {
   field: number; ratedField: number; ranAt: string;
 }
 
+/** Where a team's run ended: the elim round they lost, or that they won it. */
+function exitOf(pred: Prediction, code: string): string {
+  if (pred.sample.champion === code) return "won it";
+  for (const round of pred.sample.elims) {
+    const m = round.find((x) => x.a === code || x.b === code);
+    if (m && m.winner !== code) return m.round.toLowerCase();
+  }
+  return "—";
+}
+
 /** One team in the simulated bracket, drawn the same way the live brackets draw one. */
 function SimSlot({ code, winner, seeds, onOpen }: { code: string | null; winner: string | null; seeds: Map<string, number>; onOpen: (code: string) => void }) {
   if (!code) {
@@ -45,7 +56,7 @@ function SimSlot({ code, winner, seeds, onOpen }: { code: string | null; winner:
   }
   const won = winner === code;
   return (
-    <button className={"slot infoable " + (won ? "win" : "out")} title={`${code} — click for their record`} onClick={() => onOpen(code)}>
+    <button className={"slot infoable " + (won ? "win" : "out")} title={`${code} — click for their weekend in this run`} onClick={() => onOpen(code)}>
       <span className="seed">{seeds.get(code) ?? ""}</span>
       <span className="nm">{code}</span>
       <span className="mg" />
@@ -61,6 +72,8 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState<"field" | "odds" | "bracket">("field");
   const [openCode, setOpenCode] = useState<string | null>(null);
+  // a seed in the sample bracket opens that run, not the team's real history
+  const [openSim, setOpenSim] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [prelims, setPrelims] = useState(6);
   const [breakWins, setBreakWins] = useState(4);
@@ -150,6 +163,19 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
       {predErr && <div className="d-err">{predErr}</div>}
 
       {openCode && <EntryDossier tid={tid} code={openCode} onClose={() => setOpenCode(null)} />}
+      {openSim && pred && (
+        <SimRecord
+          code={openSim}
+          prelims={pred.sample.prelims}
+          elims={pred.sample.elims}
+          champion={pred.sample.champion}
+          breakWins={pred.config.breakWins}
+          totalPrelims={pred.config.prelims}
+          fieldSize={pred.field}
+          onClose={() => setOpenSim(null)}
+          onCareer={(c) => { setOpenSim(null); setOpenCode(c); }}
+        />
+      )}
 
       {tab === "field" && (
         !field ? <div className="lbempty">Loading the entry list…</div> : (
@@ -210,12 +236,18 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
       {tab === "bracket" && pred && (
         <div className="sample">
           <h3 className="sec">One way it could go <span className="mono">{pred.sample.breakField.length} broke · champion {pred.sample.champion || "—"}</span></h3>
+          <p className="hint">Click any seed to see how this run went for them, round by round, and who the model has beating them.</p>
           <div className="tablewrap">
             <table className="lb plain">
-              <thead><tr><th className="mono">Seed</th><th className="mono">Entry</th><th className="mono">Prelims</th></tr></thead>
+              <thead><tr><th className="mono">Seed</th><th className="mono">Entry</th><th className="mono">Prelims</th><th className="mono">Out</th></tr></thead>
               <tbody>
                 {pred.sample.breakField.slice(0, 32).map((b) => (
-                  <tr key={b.code}><td className="cr num">{b.seed}</td><td className="who">{b.code}</td><td className="cr">{b.wins}–{b.losses}</td></tr>
+                  <tr key={b.code}>
+                    <td className="cr num">{b.seed}</td>
+                    <td className="who"><button className="teamlink" onClick={() => setOpenSim(b.code)}>{b.code}</button></td>
+                    <td className="cr">{b.wins}–{b.losses}</td>
+                    <td className="cr">{exitOf(pred, b.code)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -232,8 +264,8 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
                     {round.map((m, j) => (
                       <div className="match" key={j}>
                         <div className="teams">
-                          <SimSlot code={m.a} winner={m.winner} seeds={seeds} onOpen={setOpenCode} />
-                          <SimSlot code={m.b} winner={m.winner} seeds={seeds} onOpen={setOpenCode} />
+                          <SimSlot code={m.a} winner={m.winner} seeds={seeds} onOpen={setOpenSim} />
+                          <SimSlot code={m.b} winner={m.winner} seeds={seeds} onOpen={setOpenSim} />
                         </div>
                       </div>
                     ))}

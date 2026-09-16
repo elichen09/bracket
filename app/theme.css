@@ -332,3 +332,35 @@ table.rank td.down { color: var(--bad); }
 .elimmatch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .elimmatch span.w { color: var(--ink); font-weight: 600; }
 .elimcol:last-child .elimmatch { border-left-color: var(--s3); }
+
+/* One team's simulated weekend, opened from the sample bracket. */
+.sim-panel { width: min(680px, 100%); }
+.sim-rounds { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sim-r {
+  display: grid; grid-template-columns: 54px 46px 58px minmax(0, 1fr);
+  gap: 10px; align-items: baseline; padding: 9px 10px;
+  background: var(--surface-2); border-left: 3px solid var(--line);
+}
+.sim-r .sim-rn { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.sim-r .sim-rec { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+.sim-r .sim-res { font-size: 12.5px; color: var(--muted); }
+.sim-r .sim-opp { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-r.w { border-left-color: var(--good); }
+.sim-r.w .sim-res { color: var(--good-ink); }
+.sim-r.l { border-left-color: var(--bad); }
+.sim-r.l .sim-res { color: var(--bad); }
+.sim-r.l .sim-opp { color: var(--bad); }
+.sim-note { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.sim-actions { margin-top: 20px; display: flex; gap: 16px; flex-wrap: wrap; }
+.sim-actions .teamlink { font-size: 13.5px; color: var(--muted); text-decoration-color: var(--line); }
+.sim-actions .teamlink:hover { color: var(--ink); text-decoration-color: var(--acc); }
+@media (max-width: 560px) {
+  .sim-r { grid-template-columns: 46px 44px 1fr; }
+  .sim-r .sim-opp { grid-column: 1 / -1; }
+}
+
+/* An elim row carries a round name instead of a round number and a record, so it
+   gets its own three-column measure: the four-column prelim grid squeezed the
+   opponent into a 58px cell and truncated it. */
+.sim-r.elim { grid-template-columns: 118px 58px minmax(0, 1fr); }
+@media (max-width: 560px) { .sim-r.elim { grid-template-columns: 96px 52px 1fr; } }

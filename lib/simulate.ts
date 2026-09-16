@@ -35,7 +35,8 @@ export interface SimConfig {
 }
 
 export interface SimRound { round: number; code: string; opp: string; won: boolean; recordBefore: string }
-export interface SimEntryResult { code: string; wins: number; losses: number; seed: number | null; rounds: SimRound[] }
+/** One entry's simulated weekend. `seed` is where they finished the prelims, 1 being first. */
+export interface SimEntryResult { code: string; wins: number; losses: number; seed: number; rounds: SimRound[] }
 export interface SimElimMatch { round: string; a: string | null; b: string | null; winner: string | null; bye: boolean }
 
 export interface SimSample {
@@ -289,7 +290,7 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
   // one full tournament to show underneath the odds
   const one = runOnce(teams, cfg, rand, true);
   const sample: SimSample = {
-    prelims: one.seeded.map((s) => ({ code: s.team.code, wins: s.wins, losses: s.losses, seed: null, rounds: s.rounds })),
+    prelims: one.seeded.map((s, i) => ({ code: s.team.code, wins: s.wins, losses: s.losses, seed: i + 1, rounds: s.rounds })),
     breakField: one.broke.map((s, i) => ({ code: s.team.code, wins: s.wins, losses: s.losses, seed: i + 1 })),
     elims: one.elims,
     champion: one.champion,
