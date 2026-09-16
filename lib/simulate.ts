@@ -217,8 +217,7 @@ const gauss = (rand: () => number) => (rand() + rand() + rand() - 1.5) * 2;
 function seedsFromBracket(broke: Standing[], stages: KnownElimStage[]): Map<string, number> | null {
   if (!stages.length || !broke.length) return null;
   const last = stages[stages.length - 1];
-  const root = last.matches.find((m) => m.a && m.b) ?? last.matches[0];
-  if (!root || (!root.a && !root.b)) return null;
+  if (!last.matches.length) return null;
 
   let width = 1;
   while (width < broke.length) width *= 2;
@@ -249,14 +248,39 @@ function seedsFromBracket(broke: Standing[], stages: KnownElimStage[]): Map<stri
     const kids: [Node, Node] = [build(m.a, stage - 1), build(m.b, stage - 1)];
     return { kids, size: kids[0].size + kids[1].size, best: Math.min(kids[0].best, kids[1].best) };
   };
+  // The last stage that is known roots the draw. When that is the final there is
+  // one root and the whole tree hangs off it; part way through there are several,
+  // one per match still to be decided, plus a root for every team that has broken
+  // but not yet entered. Treating the last known stage as the final is what broke
+  // this: mid-bracket it built a tree from a single match and left the rest of the
+  // field unseeded.
   const top = stages.length - 2;
-  const tree: Node = root.a && root.b
-    ? { kids: [build(root.a, top), build(root.b, top)], size: 0, best: 0 }
-    : build((root.a || root.b)!, top);
-  if (tree.kids) {
-    tree.size = tree.kids[0].size + tree.kids[1].size;
-    tree.best = Math.min(tree.kids[0].best, tree.kids[1].best);
+  const roots: Node[] = [];
+  const seen = new Set<string>();
+  const keep = (node: Node) => {
+    const walk = (x: Node) => { if (x.team !== undefined) seen.add(x.team); else x.kids?.forEach(walk); };
+    walk(node);
+    roots.push(node);
+  };
+  for (const m of last.matches) {
+    if (m.a && m.b) {
+      const kids: [Node, Node] = [build(m.a, top), build(m.b, top)];
+      keep({ kids, size: kids[0].size + kids[1].size, best: Math.min(kids[0].best, kids[1].best) });
+    } else if (m.a || m.b) {
+      keep(build((m.a || m.b)!, top));
+    }
   }
+  for (const st of broke) {
+    if (!seen.has(st.team.code)) keep({ team: st.team.code, size: 1, best: rank(st.team.code) });
+  }
+  if (!roots.length) return null;
+
+  // Each root owns an equal stretch of the bracket, so the stretches are matched
+  // to the roots by strength: the draw that is known keeps its shape, and what is
+  // not yet drawn is laid out the way it is projected.
+  let span = 1;
+  while (span * roots.length < width) span *= 2;
+  if (span * roots.length !== width) return null;
 
   // How many real teams a stretch of the bracket holds: the seeds past the break
   // are the empty slots that byes sit opposite.
@@ -286,9 +310,34 @@ function seedsFromBracket(broke: Standing[], stages: KnownElimStage[]): Map<stri
     place(x, lo, mid);
     place(y, mid, hi);
   };
-  place(tree, 0, width);
+  const spots: { lo: number; best: number; holds: number }[] = [];
+  for (let lo = 0; lo < width; lo += span) {
+    let best = Number.MAX_SAFE_INTEGER;
+    for (let i = lo; i < lo + span; i++) if (order[i] < best) best = order[i];
+    spots.push({ lo, best, holds: capacity(lo, lo + span) });
+  }
 
-  return out.size ? out : null;
+  // A root has to go somewhere that fits it. A stretch of the bracket opposite a
+  // bye holds one team, not two, so sorting roots by strength alone can drop a
+  // whole match into a bye's place and leave one of its teams with nowhere to sit.
+  // That team then has no seed, the map is rejected as incomplete, and the page
+  // falls back to projected seeds over a real draw: the bracket a person sees as
+  // scrambled. Within a size, strength decides which stretch.
+  const byHolds = new Map<number, { lo: number; best: number; holds: number }[]>();
+  for (const spot of spots) byHolds.set(spot.holds, [...(byHolds.get(spot.holds) || []), spot]);
+  const bySize = new Map<number, Node[]>();
+  for (const r of roots) bySize.set(r.size, [...(bySize.get(r.size) || []), r]);
+
+  for (const [size, group] of bySize) {
+    const open = byHolds.get(size);
+    if (!open || open.length !== group.length) return null;
+    group.sort((a, b) => a.best - b.best);
+    open.sort((a, b) => a.best - b.best);
+    group.forEach((r, i) => place(r, open[i].lo, open[i].lo + span));
+  }
+
+  // all of the field or none of it, so a caller never mixes drawn seeds with guesses
+  return out.size === broke.length ? out : null;
 }
 
 /** One side's view of a breakdown; `flip` turns it around for the other team. */
@@ -834,10 +883,15 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
     breakField: (() => {
       // Once a bracket exists the seeds come from it, not from the projection.
       const real = seedsFromBracket(one.broke, cfg.known?.elimStages ?? []);
+      // Falling back per team is what produces duplicates: a team the draw did not
+      // place would take an index already given to somebody else, so two teams end
+      // up seeded 1 and the bracket reads as nonsense. Either the draw seeds the
+      // whole field or none of it.
+      const complete = real && one.broke.every((s) => real.has(s.team.code));
       return one.broke
         .map((s, i) => ({
           code: s.team.code, wins: s.wins, losses: s.losses,
-          seed: real?.get(s.team.code) ?? i + 1,
+          seed: complete ? real!.get(s.team.code)! : i + 1,
         }))
         .sort((a, b) => a.seed - b.seed);
     })(),
