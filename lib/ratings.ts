@@ -32,6 +32,25 @@ export function isPublicForum(eventName: string): boolean {
   return /public forum|\bpf\b|\bpfd\b/.test(n);
 }
 
+/**
+ * Varsity only.
+ *
+ * A JV or novice division is a different population debating a different field.
+ * Going 6-0 in novice says nothing about how that team fares against a varsity
+ * entry, and counting both together flatters whoever happened to enter a lower
+ * division. The rankings and the prediction are a varsity table, so only varsity
+ * rounds feed them.
+ *
+ * Tabroom publishes no division level, so this reads the division's name: what is
+ * not marked junior varsity, novice or middle school is varsity. That keeps the
+ * plain "Public Forum" division, the Tournament of Champions' Gold and Silver,
+ * and round robins, which are all top-division fields.
+ */
+export function isVarsity(eventName: string): boolean {
+  const n = (eventName || "").toLowerCase();
+  return !/\bjv\b|junior varsity|novice|\bms\b|middle school|intermediate|rookie|beginner|elementary/.test(n);
+}
+
 export interface GameRow {
   tourn_id: number;
   round_id: number;
@@ -174,7 +193,7 @@ export async function ingestTournament(db: SupabaseClient, tournId: number, even
   const out = await collectGames(tournId, eventAbbr);
   // Only Public Forum rounds are rated, so a policy or LD field is read and dropped
   // rather than being stored and then filtered everywhere downstream.
-  const rows = out.rows.filter((r) => isPublicForum(r.event_name));
+  const rows = out.rows.filter((r) => isPublicForum(r.event_name) && isVarsity(r.event_name));
   if (!rows.length) return { rows: 0, entries: out.entries, name: out.name, skipped: out.rows.length > 0 };
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await db.from("rating_games").upsert(rows.slice(i, i + 500), { onConflict: "tourn_id,round_id,entry_id" });
@@ -247,6 +266,12 @@ export async function recompute(db: SupabaseClient, season = currentSeason()): P
     all.push(...((data || []) as GameRow[]));
     if (!data || data.length < PAGE) break;
   }
+  // Varsity only, whatever happens to be in the table: a JV or novice round is
+  // a different field and must never reach a varsity standing.
+  const varsityOnly = all.filter((g) => isVarsity(g.event_name));
+  all.length = 0;
+  all.push(...varsityOnly);
+
   // Keep this season only. Earlier rounds stay in the table — past meetings and
   // the prediction's prior read them — but they are not part of this standing.
   const before = all.length;
@@ -607,6 +632,7 @@ export async function pastSeasonPriors(db: SupabaseClient, season = currentSeaso
 
   const seasons: Record<string, number> = {};
   const weighted = rows.flatMap((g) => {
+    if (!isVarsity(g.event_name)) return [];
     const s = seasonOf(g.tourn_start);
     if (s === null || s >= season) return [];
     const back = season - s;
@@ -648,7 +674,7 @@ export async function headToHead(db: SupabaseClient, codes: string[]): Promise<R
     // Paged with the primary key as the order, so no meeting is counted twice or missed.
     const PAGE = 1000;
     for (let from = 0; ; from += PAGE) {
-      const { data, error } = await db.from("rating_games").select("code,opp_code,score,tourn_id,round_id,entry_id")
+      const { data, error } = await db.from("rating_games").select("code,opp_code,score,tourn_id,round_id,entry_id,event_name")
         .in("code", slice)
         .order("tourn_id", { ascending: true })
         .order("round_id", { ascending: true })
@@ -656,6 +682,9 @@ export async function headToHead(db: SupabaseClient, codes: string[]): Promise<R
         .range(from, from + PAGE - 1);
       if (error) throw new Error(error.message);
       for (const g of data || []) {
+        // A JV meeting says little about a varsity one, and the win estimate leans
+        // on this record, so only varsity rounds count here too.
+        if (!isVarsity(g.event_name)) continue;
         const row = (out[canonCode(g.code)] = out[canonCode(g.code)] || {});
         const cell = (row[canonCode(g.opp_code)] = row[canonCode(g.opp_code)] || { w: 0, l: 0 });
         if (g.score === 1) cell.w++; else if (g.score === 0) cell.l++;

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { collectGames, isPublicForum, type GameRow } from "./ratings";
+import { collectGames, isPublicForum, isVarsity, type GameRow } from "./ratings";
 
 /**
  * Past seasons, through the public API rather than by scraping.
@@ -52,7 +52,7 @@ export async function findPublicForumEvents(ref: number | string): Promise<Archi
   // the results index names every event that has published anything
   const results = await getJson<Record<string, { id: number; name: string; abbr: string; ResultSets?: unknown[] }>>(`/rest/tourns/${tournId}/results`);
   const events = Object.values(results || {})
-    .filter((e) => (e.ResultSets || []).length && isPublicForum(e.name || e.abbr || ""))
+    .filter((e) => (e.ResultSets || []).length && isPublicForum(e.name || e.abbr || "") && isVarsity(e.name || e.abbr || ""))
     .map((e) => ({ abbr: e.abbr, name: e.name }));
 
   return { tournId, name: meta.name || `Tournament ${tournId}`, start: meta.start || null, events };
@@ -85,7 +85,7 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
   for (const ev of target.events) {
     try {
       const out = await collectGames(target.tournId, ev.abbr);
-      rows = rows.concat(out.rows.filter((r) => isPublicForum(r.event_name)));
+      rows = rows.concat(out.rows.filter((r) => isPublicForum(r.event_name) && isVarsity(r.event_name)));
       entries += out.entries;
     } catch {
       // an event that publishes a bracket but no rounds simply contributes nothing
