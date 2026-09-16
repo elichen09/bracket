@@ -216,34 +216,79 @@ const gauss = (rand: () => number) => (rand() + rand() + rand() - 1.5) * 2;
  */
 function seedsFromBracket(broke: Standing[], stages: KnownElimStage[]): Map<string, number> | null {
   if (!stages.length || !broke.length) return null;
-  const first = stages[0].matches.filter((m) => m.a && m.b);
-  if (!first.length) return null;
+  const last = stages[stages.length - 1];
+  const root = last.matches.find((m) => m.a && m.b) ?? last.matches[0];
+  if (!root || (!root.a && !root.b)) return null;
 
   let width = 1;
   while (width < broke.length) width *= 2;
+  const order = seedOrder(width);          // order[slot] is the seed sitting there
 
   // this site's order, best first, used only to break what the draw leaves open
   const guess = new Map<string, number>();
-  broke.forEach((s, i) => guess.set(s.team.code, i));
+  broke.forEach((st, i) => guess.set(st.team.code, i));
   const rank = (code: string) => guess.get(code) ?? Number.MAX_SAFE_INTEGER;
 
-  const played = new Set<string>();
-  for (const m of first) { if (m.a) played.add(m.a); if (m.b) played.add(m.b); }
-
-  const out = new Map<string, number>();
-  const byes = broke.map((s) => s.team.code).filter((c) => !played.has(c)).sort((a, b) => rank(a) - rank(b));
-  byes.forEach((code, i) => out.set(code, i + 1));
-
-  const pairs = first
-    .map((m) => (rank(m.a!) <= rank(m.b!) ? [m.a!, m.b!] : [m.b!, m.a!]))
-    .sort((x, y) => rank(x[0]) - rank(y[0]));
-  pairs.forEach(([hi, lo], i) => {
-    const seed = byes.length + i + 1;
-    out.set(hi, seed);
-    out.set(lo, width + 1 - seed);
+  // the match each team played in each stage, so the draw can be walked backwards
+  const playedIn = stages.map((st) => {
+    const m = new Map<string, KnownElimMatch>();
+    for (const match of st.matches) {
+      if (match.a) m.set(match.a, match);
+      if (match.b) m.set(match.b, match);
+    }
+    return m;
   });
 
-  return out;
+  // Rebuild the draw as a tree. Working back from the final, each team came out
+  // of a match in an earlier stage, or entered on a bye and is a leaf.
+  interface Node { team?: string; kids?: [Node, Node]; size: number; best: number }
+  const build = (team: string, stage: number): Node => {
+    if (stage < 0) return { team, size: 1, best: rank(team) };
+    const m = playedIn[stage].get(team);
+    if (!m || !m.a || !m.b) return build(team, stage - 1);   // sat the stage out
+    const kids: [Node, Node] = [build(m.a, stage - 1), build(m.b, stage - 1)];
+    return { kids, size: kids[0].size + kids[1].size, best: Math.min(kids[0].best, kids[1].best) };
+  };
+  const top = stages.length - 2;
+  const tree: Node = root.a && root.b
+    ? { kids: [build(root.a, top), build(root.b, top)], size: 0, best: 0 }
+    : build((root.a || root.b)!, top);
+  if (tree.kids) {
+    tree.size = tree.kids[0].size + tree.kids[1].size;
+    tree.best = Math.min(tree.kids[0].best, tree.kids[1].best);
+  }
+
+  // How many real teams a stretch of the bracket holds: the seeds past the break
+  // are the empty slots that byes sit opposite.
+  const capacity = (lo: number, hi: number) => {
+    let n = 0;
+    for (let i = lo; i < hi; i++) if (order[i] <= broke.length) n++;
+    return n;
+  };
+
+  // Lay the tree over the bracket. Which child takes the upper half is settled by
+  // how many teams it holds, since the halves rarely hold the same number once
+  // byes are in; where they do, this site's own order breaks the tie.
+  const out = new Map<string, number>();
+  const place = (node: Node, lo: number, hi: number): void => {
+    if (node.team !== undefined) {
+      for (let i = lo; i < hi; i++) {
+        if (order[i] <= broke.length) { out.set(node.team, order[i]); return; }
+      }
+      return;
+    }
+    if (!node.kids) return;
+    const mid = (lo + hi) >> 1;
+    let [x, y] = node.kids;
+    const want = capacity(lo, mid);
+    if (x.size !== want && y.size === want) [x, y] = [y, x];
+    else if (x.size === y.size && y.best < x.best) [x, y] = [y, x];
+    place(x, lo, mid);
+    place(y, mid, hi);
+  };
+  place(tree, 0, width);
+
+  return out.size ? out : null;
 }
 
 /** One side's view of a breakdown; `flip` turns it around for the other team. */
@@ -273,7 +318,22 @@ interface Standing { team: SimTeam; wins: number; losses: number; speaks: number
  */
 function roundSpeaks(team: SimTeam, won: boolean, rand: () => number): number {
   const noise = (rand() + rand() + rand() - 1.5) * 0.9;   // roughly normal, about ±1
-  return 28.5 + team.pointsZ * 0.6 + (won ? 0.3 : 0) + noise;
+  return expectedSpeaks(team, won) + noise;
+}
+
+/**
+ * What a team is expected to earn in a round, before any luck.
+ *
+ * Used for rounds that have been debated but whose speaker points are not
+ * published. Most tournaments hold speaks back until they are over, so this is
+ * the ordinary case mid-weekend, and it is not the same as a round that has not
+ * happened: the result is known, only the points are missing. Drawing a random
+ * score for each of those piles invented variance on top of the seed-order
+ * uncertainty that is already modelled and measured, and makes the seeding worse
+ * than simply using the best estimate.
+ */
+function expectedSpeaks(team: SimTeam, won: boolean): number {
+  return 28.5 + team.pointsZ * 0.6 + (won ? 0.3 : 0);
 }
 
 /** This team's posted round, if that round has been posted for them. */
@@ -538,7 +598,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       if (!k || k.won === null) { live.push(s); continue; }
       const before = `${s.wins}-${s.losses}`;
       if (k.won) s.wins++; else s.losses++;
-      s.speaks += k.points !== null ? k.points : roundSpeaks(s.team, k.won, rand);
+      s.speaks += k.points !== null ? k.points : expectedSpeaks(s.team, k.won);
       if (k.opp) s.met.add(k.opp);
       paired.add(s.team.code);
       if (keepSample) s.rounds.push({
@@ -621,11 +681,33 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   // matches stand; undecided ones are simulated where they sit; teams that enter
   // later had a bye and join when the real bracket says they did.
   const knownStages = cfg.known?.elimStages ?? [];
+
+  // A replayed bracket has to be put back in the order it was drawn. Results come
+  // back in whatever order the entries were read, so without this a round's
+  // matches sit in an arbitrary sequence and the tree does not line up: a match
+  // appears nowhere near the two it follows from, which is what makes a correct
+  // bracket look scrambled. The recovered seeds give each team its slot, and a
+  // match belongs where its higher slot puts it.
+  const drawnSeeds = seedsFromBracket(broke, knownStages);
+  let drawnWidth = 1;
+  while (drawnWidth < broke.length) drawnWidth *= 2;
+  const slotOfSeed = new Map<number, number>();
+  seedOrder(drawnWidth).forEach((seed, slot) => slotOfSeed.set(seed, slot));
+  const slotOf = (code: string | null): number => {
+    const seed = code ? drawnSeeds?.get(code) : undefined;
+    const slot = seed === undefined ? undefined : slotOfSeed.get(seed);
+    return slot === undefined ? Number.MAX_SAFE_INTEGER : slot;
+  };
+
   let survivors: (Standing | null)[] | null = null;
   for (const stage of knownStages) {
     const matches: SimElimMatch[] = [];
     const advancing: (Standing | null)[] = [];
-    for (const m of stage.matches) {
+    const drawn = drawnSeeds
+      ? stage.matches.slice().sort((x, y) =>
+          Math.min(slotOf(x.a), slotOf(x.b)) - Math.min(slotOf(y.a), slotOf(y.b)))
+      : stage.matches;
+    for (const m of drawn) {
       const A = m.a ? byCode.get(m.a) ?? null : null;
       const B = m.b ? byCode.get(m.b) ?? null : null;
       if (A && B) {
