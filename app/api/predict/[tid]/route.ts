@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
 import { fieldWithRatings } from "@/lib/field";
 import { simulate } from "@/lib/simulate";
-import { loadProgress, knownStateFrom } from "@/lib/progress";
+import { loadProgress, knownStateFrom, rewindPoints } from "@/lib/progress";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,14 +70,30 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     // rather than guessed, so the prediction sharpens as the weekend goes on
     // instead of repeating what it thought on Friday morning. If Tabroom will not
     // answer, the prediction still runs; it just knows nothing yet.
+    //
+    // `asOfRound` and `asOfElim` rewind it. A finished tournament can be re-run
+    // from any point it passed through — before it started, after round three,
+    // after octas — by hiding everything later and predicting forward from there.
     let known;
     let progressNote: string | null = null;
+    let rewind: { label: string; round?: number; elim?: number }[] = [];
+    let asOf: string | null = null;
     try {
       const progress = await loadProgress(t.tabroom_tourn_id, t.tabroom_event_abbr);
-      known = knownStateFrom(progress);
-      progressNote = progress.prelimsDone > 0
-        ? `through round ${progress.prelimsDone}${progress.elimsStarted ? ", elims under way" : ""}`
-        : "nothing debated yet";
+      rewind = rewindPoints(progress);
+      const asOfRound = body.asOfRound === undefined || body.asOfRound === null
+        ? undefined : clamp(body.asOfRound, 0, 20, 0);
+      const asOfElim = body.asOfElim === undefined || body.asOfElim === null
+        ? undefined : clamp(body.asOfElim, 0, 12, 0);
+      known = knownStateFrom(progress, asOfRound, asOfElim);
+      asOf = rewind.find((r) => r.round === asOfRound && asOfRound !== undefined)?.label
+        ?? rewind.find((r) => r.elim === asOfElim && asOfElim !== undefined)?.label
+        ?? null;
+      progressNote = asOf
+        ? `rewound to ${asOf.toLowerCase()}`
+        : progress.prelimsDone > 0
+          ? `through round ${progress.prelimsDone}${progress.elimsStarted ? ", elims under way" : ""}`
+          : "nothing debated yet";
     } catch {
       progressNote = "could not read results, so this is a cold prediction";
     }
@@ -96,6 +112,8 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       ratedField: teams.filter((x) => x.rated).length,
       ranAt: new Date().toISOString(),
       progressNote,
+      rewind,
+      asOf,
       // schools and names so the page can label rows without another request
       labels: Object.fromEntries(entries.map((e) => [e.code, { name: e.name, school: e.school, source: e.source }])),
       odds: result.odds.map((o) => ({ ...o, name: byCode.get(o.code)?.name ?? "", source: byCode.get(o.code)?.source ?? "none" })),

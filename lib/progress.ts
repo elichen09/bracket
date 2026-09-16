@@ -1,5 +1,5 @@
 import { PRELIM_TYPES, ELIM_TYPES, getJson, pool } from "./ratings";
-import type { KnownState, KnownPrelim } from "./simulate";
+import type { KnownState, KnownPrelim, KnownElimStage } from "./simulate";
 
 /**
  * A tournament as it stands right now.
@@ -49,6 +49,7 @@ export interface ElimStage {
   order: number;            // 0 is the first elim round debated
   codes: string[];          // everyone who appeared in it
   decided: number;          // matches with a result
+  matches: { a: string; b: string | null; winner: string | null }[];
 }
 
 export interface TournamentProgress {
@@ -176,7 +177,25 @@ export async function loadProgress(tournId: number, eventAbbr: string): Promise<
   const elims: ElimStage[] = elimOrder.map((label, order) => {
     const codes = out.filter((p) => p.rounds.some((r) => r.elim && r.label === label)).map((p) => p.code);
     const decided = out.reduce((n, p) => n + p.rounds.filter((r) => r.elim && r.label === label && r.won !== null).length, 0) / 2;
-    return { label, order, codes, decided: Math.round(decided) };
+
+    // The matchups as drawn. Each side reports the round from its own view, so a
+    // match is seen twice and is kept once; a team with no opponent had a bye.
+    const matches: { a: string; b: string | null; winner: string | null }[] = [];
+    const taken = new Set<string>();
+    for (const p of out) {
+      const r = p.rounds.find((x) => x.elim && x.label === label);
+      if (!r) continue;
+      const key = r.opp ? [p.code, r.opp].sort().join("|") : p.code;
+      if (taken.has(key)) continue;
+      taken.add(key);
+      const mine = r.won;
+      const winner = mine === null ? null : mine ? p.code : (r.opp ?? null);
+      // A bye that names an opponent is a walkover, not an empty slot. Nulling the
+      // opponent here loses them entirely when this row wins the dedupe race, and a
+      // team missing from the bracket is a team the rewind has to invent a round for.
+      matches.push({ a: p.code, b: r.opp, winner });
+    }
+    return { label, order, codes, decided: Math.round(decided), matches };
   });
   // The break field is the main elim chain, not every elim-shaped round. A
   // tournament may run a side bracket after the final — the Season Opener runs an
@@ -232,7 +251,7 @@ export function standingsFrom(progress: TournamentProgress): Map<string, { wins:
  * predicts round four. Truncating also hides the break field, since a tournament
  * mid-prelims has not broken yet.
  */
-export function knownStateFrom(progress: TournamentProgress, throughRound?: number): KnownState {
+export function knownStateFrom(progress: TournamentProgress, throughRound?: number, throughElim?: number): KnownState {
   const cut = throughRound === undefined ? Number.POSITIVE_INFINITY : throughRound;
   const prelims: Record<string, KnownPrelim[]> = {};
   for (const e of progress.entries) {
@@ -241,10 +260,27 @@ export function knownStateFrom(progress: TournamentProgress, throughRound?: numb
       .map((r) => ({ round: r.round, opp: r.opp, won: r.won, points: r.points, bye: r.bye }));
     if (rs.length) prelims[e.code] = rs;
   }
+  // The break field is real only once every prelim is in; rewind to the middle of
+  // prelims and nobody has broken yet, so the bracket has to be projected.
+  const prelimsAllIn = cut >= progress.prelimsSeen && progress.prelimsSeen > 0;
+  const stagesWanted = throughElim === undefined ? progress.elims.length : Math.max(0, throughElim);
+  const elimStages: KnownElimStage[] = prelimsAllIn
+    ? progress.elims.slice(0, stagesWanted).map((st) => ({ label: st.label, matches: st.matches }))
+    : [];
+
   return {
     prelims,
     prelimsDone: Math.min(progress.prelimsDone, cut),
     pendingRound: progress.pendingRound !== null && progress.pendingRound <= cut ? progress.pendingRound : null,
-    brokeCodes: throughRound === undefined && progress.brokeCodes.length ? progress.brokeCodes : null,
+    brokeCodes: prelimsAllIn && progress.brokeCodes.length ? progress.brokeCodes : null,
+    elimStages,
   };
+}
+
+/** The points in a finished tournament worth rewinding to, oldest first. */
+export function rewindPoints(progress: TournamentProgress): { label: string; round?: number; elim?: number }[] {
+  const out: { label: string; round?: number; elim?: number }[] = [{ label: "Before it started", round: 0 }];
+  for (let r = 1; r <= progress.prelimsSeen; r++) out.push({ label: `After round ${r}`, round: r });
+  progress.elims.forEach((st, i) => out.push({ label: `After ${st.label.toLowerCase()}`, elim: i + 1 }));
+  return out;
 }

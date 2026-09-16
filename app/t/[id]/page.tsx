@@ -141,7 +141,9 @@ function Loaded({ t }: { t: Tournament }) {
         <Sub t={t} M={M} P={P} />
       </div>
 
-      <Stats t={t} M={M} P={P} s={s} view={view} viewedName={viewedName} shown={shown} dead={dead} editable={editable} />
+      {/* The prediction view is nobody's bracket, so these tiles report the
+          tournament itself rather than a viewer whose name does not exist. */}
+      <Stats t={t} M={M} P={P} s={s} view={view === "predict" ? "real" : view} viewedName={viewedName} shown={shown} dead={dead} editable={editable} />
       <Ledger M={M} s={s} />
 
       <div className="split">
@@ -168,6 +170,9 @@ function Loaded({ t }: { t: Tournament }) {
         <div className="seg" role="group">
           <button aria-pressed={view === "mine"} onClick={() => setView("mine")}>My bracket</button>
           <button aria-pressed={view === "real"} onClick={() => setView("real")}>Actual results</button>
+          {t.tabroom_event_abbr && (
+            <button aria-pressed={view === "predict"} onClick={() => setView("predict")}>Prediction</button>
+          )}
         </div>
         <input type="search" placeholder="Highlight a school or code…" value={query} onChange={(e) => setQuery(e.target.value)} />
         <select onChange={(e) => { const c = boardRef.current?.querySelector(`#round-${e.target.value}`) as HTMLElement | null; if (c) boardRef.current!.scrollTo({ left: c.offsetLeft - 20, behavior: "smooth" }); }}>
@@ -185,11 +190,18 @@ function Loaded({ t }: { t: Tournament }) {
 
       <Hint M={M} view={view} editable={editable} mine={mine} myLocked={myLocked} viewedName={viewedName} P={P} t={t} signedIn={!!user} />
 
-      <Board
-        M={M} tree={tree} real={real} dead={dead} view={view} editable={editable}
-        query={query.trim().toLowerCase()} justKey={justKey} zoom={zoom}
-        boardRef={boardRef} onClick={clickSlot} onInfo={openDossier}
-      />
+      {view === "predict" ? (
+        // A finished tournament can still be re-run. The predictor reads the real
+        // rounds and can be rewound to any point the weekend passed through, which
+        // is the only way to ask what the model would have said at the time.
+        <PreBracket tid={t.id} name={t.name} />
+      ) : (
+        <Board
+          M={M} tree={tree} real={real} dead={dead} view={view} editable={editable}
+          query={query.trim().toLowerCase()} justKey={justKey} zoom={zoom}
+          boardRef={boardRef} onClick={clickSlot} onInfo={openDossier}
+        />
+      )}
 
       {dossier && pool && <TeamDossier tid={t.id} team={dossier} pool={pool} onClose={() => setDossier(null)} />}
     </>
@@ -408,7 +420,9 @@ function Results({ M, real, onTeam }: { M: Model; real: Match[][]; onTeam: (t: T
 function Hint({ M, view, editable, mine, myLocked, viewedName, P, t, signedIn }: any) {
   let content: React.ReactNode;
   const stats = <> Hover any team and hit <b>◔</b> for its full Tabroom dossier.</>;
-  if (view === "real") {
+  if (view === "predict") {
+    content = <><b>The tournament re-run from the ratings.</b> Rounds that really happened are counted as they stand; everything after them is simulated. Use <b>as of</b> to rewind to any point the weekend passed through.</>;
+  } else if (view === "real") {
     const notes = Object.values(t.notes || {}) as string[];
     content = <><b>Actual results as reported on Tabroom</b>, ballot count beside each winner. {P.total ? `${P.done} of ${P.total} matches decided.` : ""} {notes.join(" ")} Click any team for its dossier.</>;
   } else if (editable) {

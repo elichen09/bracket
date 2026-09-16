@@ -38,11 +38,23 @@ export interface KnownPrelim {
  * What the tournament has already done. A round in here is not simulated: it is
  * applied, so every later round pairs from the standings that actually exist.
  */
+/** One elim match as it was actually drawn, and its result if there is one. */
+export interface KnownElimMatch { a: string | null; b: string | null; winner: string | null }
+export interface KnownElimStage { label: string; matches: KnownElimMatch[] }
+
 export interface KnownState {
   prelims: Record<string, KnownPrelim[]>;      // entry code -> its posted rounds
   prelimsDone: number;
   pendingRound: number | null;                 // paired but not yet debated
   brokeCodes: string[] | null;                 // the real break field, once elims start
+  /**
+   * The bracket as it was really drawn, in order. A bracket that exists is not
+   * re-seeded: a tournament's own draw is the truth, and rebuilding it from
+   * seeds would invent matchups that never happened. Stages with no winner are
+   * simulated in place; stages past the end of this list are drawn from the
+   * survivors.
+   */
+  elimStages: KnownElimStage[];
 }
 
 export interface SimConfig {
@@ -451,7 +463,62 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   const field: (Standing | null)[] = seedOrder(size).map((seed) => broke[seed - 1] ?? null);
 
   const elims: SimElimMatch[][] = [];
-  let alive: (Standing | null)[] = field;
+
+  // A bracket the tournament actually drew is replayed, not redrawn. Decided
+  // matches stand; undecided ones are simulated where they sit; teams that enter
+  // later had a bye and join when the real bracket says they did.
+  const knownStages = cfg.known?.elimStages ?? [];
+  let survivors: (Standing | null)[] | null = null;
+  for (const stage of knownStages) {
+    const matches: SimElimMatch[] = [];
+    const advancing: (Standing | null)[] = [];
+    for (const m of stage.matches) {
+      const A = m.a ? byCode.get(m.a) ?? null : null;
+      const B = m.b ? byCode.get(m.b) ?? null : null;
+      if (A && B) {
+        const bd = breakdown(A.team, B.team, cfg.headToHead);
+        const aWon = m.winner ? m.winner === A.team.code : rand() < bd.p;
+        const w = aWon ? A : B;
+        advancing.push(w);
+        matches.push({
+          round: stage.label, a: A.team.code, b: B.team.code, winner: w.team.code, bye: false,
+          chance: m.winner ? null : r3(bd.p), form: r3(bd.form), h2hW: bd.w, h2hL: bd.l,
+          aRating: Math.round(A.team.rating.rating), bRating: Math.round(B.team.rating.rating),
+        });
+      } else {
+        const w = A || B;
+        advancing.push(w);
+        matches.push({
+          round: stage.label, a: A?.team.code ?? null, b: B?.team.code ?? null, winner: w?.team.code ?? null, bye: true,
+          chance: null, form: 0, h2hW: 0, h2hL: 0,
+          aRating: Math.round(A?.team.rating.rating ?? 0), bRating: Math.round(B?.team.rating.rating ?? 0),
+        });
+      }
+    }
+    elims.push(matches);
+    survivors = advancing;
+  }
+
+  // Teams the bracket has not reached yet are still in it. A break that is not a
+  // power of two sends its top seeds straight to the second stage, so rewinding to
+  // the end of the first one leaves them waiting rather than out: dropping them
+  // would erase the very teams most likely to win.
+  let alive: (Standing | null)[];
+  if (survivors) {
+    const entered = new Set<string>();
+    for (const stage of knownStages) {
+      for (const m of stage.matches) { if (m.a) entered.add(m.a); if (m.b) entered.add(m.b); }
+    }
+    const waiting = broke.filter((s) => !entered.has(s.team.code));
+    const pool = [...survivors.filter((x): x is Standing => !!x), ...waiting];
+    const rank = new Map(broke.map((s, i) => [s.team.code, i]));
+    pool.sort((a, b) => (rank.get(a.team.code) ?? 1e9) - (rank.get(b.team.code) ?? 1e9));
+    let width = 1;
+    while (width < pool.length) width *= 2;
+    alive = seedOrder(width).map((seed) => pool[seed - 1] ?? null);
+  } else {
+    alive = field;
+  }
   while (alive.length > 1) {
     const next: (Standing | null)[] = [];
     const matches: SimElimMatch[] = [];

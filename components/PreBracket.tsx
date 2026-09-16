@@ -44,7 +44,15 @@ interface Prediction {
   } | null;
   known: { prelimsDone: number; entriesWithResults: number } | null;
   progressNote?: string | null;
+  rewind?: { label: string; round?: number; elim?: number }[];
+  asOf?: string | null;
 }
+
+/** A point in a tournament, encoded for the rewind menu. */
+type Point = { round?: number; elim?: number } | null;
+const pointKey = (p: Point) => (p == null ? "" : p.round !== undefined ? `r${p.round}` : `e${p.elim}`);
+const parsePoint = (v: string): Point =>
+  !v ? null : v[0] === "r" ? { round: Number(v.slice(1)) } : { elim: Number(v.slice(1)) };
 
 /** Where a team's run ended: the elim round they lost, or that they won it. */
 function exitOf(pred: Prediction, code: string): string {
@@ -85,6 +93,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
   const [prelims, setPrelims] = useState(6);
   const [breakWins, setBreakWins] = useState(4);
   const [runs, setRuns] = useState(600);
+  const [asOf, setAsOf] = useState<Point>(null);
 
   useEffect(() => {
     let alive = true;
@@ -99,12 +108,16 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
     return () => { alive = false; };
   }, [tid]);
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (point?: Point) => {
+    const at = point === undefined ? asOf : point;
     setRunning(true); setPredErr("");
     try {
       const res = await fetch(`/api/predict/${encodeURIComponent(tid)}`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prelims, breakWins, runs, randomRounds: 2 }),
+        body: JSON.stringify({
+          prelims, breakWins, runs, randomRounds: 2,
+          asOfRound: at?.round, asOfElim: at?.elim,
+        }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "could not run the prediction");
@@ -112,7 +125,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
       setTab("odds");
     } catch (e: any) { setPredErr(e.message); }
     finally { setRunning(false); }
-  }, [tid, prelims, breakWins, runs]);
+  }, [tid, prelims, breakWins, runs, asOf]);
 
   const q = query.trim().toLowerCase();
   const shownField = (field || []).filter((e) => !q || e.code.toLowerCase().includes(q) || (e.school || "").toLowerCase().includes(q) || e.name.toLowerCase().includes(q));
@@ -157,8 +170,29 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
         <label className="simfield mono">prelims<input type="number" min={2} max={10} value={prelims} onChange={(e) => setPrelims(Number(e.target.value))} /></label>
         <label className="simfield mono">break at<input type="number" min={1} max={10} value={breakWins} onChange={(e) => setBreakWins(Number(e.target.value))} /></label>
         <label className="simfield mono">runs<input type="number" min={100} max={4000} step={100} value={runs} onChange={(e) => setRuns(Number(e.target.value))} /></label>
-        <button className="primary" onClick={run} disabled={running || !field}>{running ? "Simulating…" : pred ? "Run again" : "Run predicted tournament"}</button>
+        {!!pred?.rewind?.length && (
+          <label className="simfield mono">as of
+            <select
+              className="rewind"
+              value={pointKey(asOf)}
+              disabled={running}
+              onChange={(e) => { const p = parsePoint(e.target.value); setAsOf(p); run(p); }}
+            >
+              <option value="">everything known</option>
+              {pred.rewind.map((r) => <option key={pointKey(r)} value={pointKey(r)}>{r.label}</option>)}
+            </select>
+          </label>
+        )}
+        <button className="primary" onClick={() => run()} disabled={running || !field}>{running ? "Simulating…" : pred ? "Run again" : "Run predicted tournament"}</button>
       </div>
+
+      {pred?.asOf && (
+        <p className="hint rewound">
+          <b>Rewound to {pred.asOf.toLowerCase()}.</b> Everything up to that point is counted as it
+          really happened; everything after it is simulated, so this is what the model would have
+          expected knowing only what was known then.
+        </p>
+      )}
 
       <p className="hint">
         <b>This is a prediction, not a result.</b> Prelims pair at random for two rounds and power-pair after
