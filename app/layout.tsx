@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./theme.css";
+import { Analytics } from "@vercel/analytics/react";
 
 export const metadata: Metadata = {
   title: "The Break",
@@ -17,7 +18,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href={FONTS} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Vercel Web Analytics: page views only, no cookies and no cross-site id. */}
+        <Analytics />
+      </body>
     </html>
   );
 }
