@@ -23,6 +23,7 @@ export interface SimRoundView {
   round: number; opp: string; won: boolean; recordBefore: string;
   chance?: number; base?: number; form?: number; h2h?: number;
   h2hW?: number; h2hL?: number; rating?: number; oppRating?: number;
+  actual?: boolean;        // debated for real, so there is nothing to predict
 }
 export interface SimPrelimView { code: string; wins: number; losses: number; seed: number; rounds: SimRoundView[] }
 export interface SimMatchView {
@@ -200,7 +201,9 @@ export default function SimRecord({
                     <span className="sim-res">{r.won ? "beat" : "lost to"}</span>
                     <span className="sim-opp">
                       <b className="sim-name">{r.opp === "bye" ? "a bye" : r.opp}</b>
-                      {r.opp !== "bye" && <Why r={r} />}
+                      {r.opp !== "bye" && (r.actual
+                        ? <small className="sim-why played">this round was debated</small>
+                        : <Why r={r} />)}
                     </span>
                   </li>
                 ))}

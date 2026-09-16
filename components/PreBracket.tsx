@@ -29,7 +29,7 @@ interface SimMatch { round: string; a: string | null; b: string | null; winner: 
 interface Prediction {
   odds: Odds[];
   sample: {
-    prelims: { code: string; wins: number; losses: number; seed: number; rounds: { round: number; opp: string; won: boolean; recordBefore: string; chance?: number; base?: number; form?: number; h2h?: number; h2hW?: number; h2hL?: number; rating?: number; oppRating?: number }[] }[];
+    prelims: { code: string; wins: number; losses: number; seed: number; rounds: { round: number; opp: string; won: boolean; recordBefore: string; actual?: boolean; chance?: number; base?: number; form?: number; h2h?: number; h2hW?: number; h2hL?: number; rating?: number; oppRating?: number }[] }[];
     breakField: { code: string; wins: number; losses: number; seed: number }[];
     elims: SimMatch[][];
     champion: string | null;
@@ -37,6 +37,13 @@ interface Prediction {
   runs: number; breakSizeAvg: number;
   config: { prelims: number; breakWins: number; randomRounds: number };
   field: number; ratedField: number; ranAt: string;
+  nextRound: {
+    round: number;
+    published: boolean;
+    matchups: { code: string; wins: number; losses: number; opponents: { opp: string; pct: number }[] }[];
+  } | null;
+  known: { prelimsDone: number; entriesWithResults: number } | null;
+  progressNote?: string | null;
 }
 
 /** Where a team's run ended: the elim round they lost, or that they won it. */
@@ -70,7 +77,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
   const [pred, setPred] = useState<Prediction | null>(null);
   const [predErr, setPredErr] = useState("");
   const [running, setRunning] = useState(false);
-  const [tab, setTab] = useState<"field" | "odds" | "bracket">("field");
+  const [tab, setTab] = useState<"field" | "odds" | "bracket" | "next">("field");
   const [openCode, setOpenCode] = useState<string | null>(null);
   // a seed in the sample bracket opens that run, not the team's real history
   const [openSim, setOpenSim] = useState<string | null>(null);
@@ -142,6 +149,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
         <div className="seg" role="group">
           <button aria-pressed={tab === "field"} onClick={() => setTab("field")}>The field</button>
           <button aria-pressed={tab === "odds"} onClick={() => setTab("odds")} disabled={!pred}>Odds</button>
+          <button aria-pressed={tab === "next"} onClick={() => setTab("next")} disabled={!pred?.nextRound}>Next round</button>
           <button aria-pressed={tab === "bracket"} onClick={() => setTab("bracket")} disabled={!pred}>Sample tournament</button>
         </div>
         <input type="search" placeholder="Find a team or school…" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -230,6 +238,51 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "next" && pred?.nextRound && (
+        <div className="sample">
+          <h3 className="sec">
+            {pred.nextRound.published
+              ? `Round ${pred.nextRound.round} is already paired`
+              : `Who you would draw in round ${pred.nextRound.round}`}{" "}
+            <span className="mono">{pred.progressNote || ""}</span>
+          </h3>
+          <p className="hint">
+            {pred.nextRound.published
+              ? "Tabroom has posted this pairing, so these are the real matchups rather than a guess."
+              : "Rounds already debated are counted as they stand, so this pairs from the real standings. A tabroom seeds each win bracket on speaker points and pairs the top against the bottom, which is what these odds follow."}
+          </p>
+          <div className="tablewrap">
+            <table className="lb rank">
+              <thead><tr>
+                <th className="mono">Entry</th><th className="mono">Record</th><th className="mono">Most likely opponents</th>
+              </tr></thead>
+              <tbody>
+                {pred.nextRound.matchups
+                  .filter((m) => !q || m.code.toLowerCase().includes(q) || m.opponents.some((o) => o.opp.toLowerCase().includes(q)))
+                  .slice(0, 120)
+                  .map((m) => (
+                    <tr key={m.code}>
+                      <td className="who"><button className="teamlink" onClick={() => setOpenSim(m.code)}>{m.code}</button></td>
+                      <td className="cr">{m.wins}&ndash;{m.losses}</td>
+                      <td>
+                        <div className="nextopps">
+                          {m.opponents.slice(0, 5).map((o) => (
+                            <span className="nextopp" key={o.opp}>
+                              <b>{o.opp === "bye" ? "a bye" : o.opp}</b>
+                              <i>{o.pct >= 99.5 ? "certain" : `${o.pct.toFixed(0)}%`}</i>
+                            </span>
+                          ))}
+                          {!m.opponents.length && <span className="nextopp"><b>nobody yet</b></span>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

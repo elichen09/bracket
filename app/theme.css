@@ -373,3 +373,15 @@ table.rank td.down { color: var(--bad); }
 .sim-why b { font-weight: 600; color: var(--ink); }
 .sim-r.l .sim-name { color: var(--bad); }
 .sim-why .upset { color: var(--gold); font-weight: 600; }
+
+/* Who a team is likely to draw next, and rounds that have already been debated. */
+.nextopps { display: flex; flex-wrap: wrap; gap: 6px; }
+.nextopp {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 3px 8px; background: var(--surface-2); border-left: 2px solid var(--line);
+  font-size: 12.5px; max-width: 100%;
+}
+.nextopp b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nextopp i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nextopp:first-child { border-left-color: var(--acc); }
+.sim-why.played { color: var(--dim); font-style: italic; }

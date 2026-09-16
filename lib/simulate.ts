@@ -25,6 +25,26 @@ export interface SimTeam {
   source: "team" | "debaters" | "none";   // where that rating came from
 }
 
+/** One prelim round that has already been posted, from this team's side of it. */
+export interface KnownPrelim {
+  round: number;
+  opp: string | null;
+  won: boolean | null;          // null when paired but not yet decided
+  points: number | null;
+  bye: boolean;
+}
+
+/**
+ * What the tournament has already done. A round in here is not simulated: it is
+ * applied, so every later round pairs from the standings that actually exist.
+ */
+export interface KnownState {
+  prelims: Record<string, KnownPrelim[]>;      // entry code -> its posted rounds
+  prelimsDone: number;
+  pendingRound: number | null;                 // paired but not yet debated
+  brokeCodes: string[] | null;                 // the real break field, once elims start
+}
+
 export interface SimConfig {
   prelims: number;              // 6 at Yale
   randomRounds: number;         // first N prelims paired at random, then power-paired
@@ -32,6 +52,9 @@ export interface SimConfig {
   runs: number;                 // Monte Carlo runs
   headToHead: Record<string, Record<string, { w: number; l: number }>>;
   seed?: number;                // deterministic runs when given
+  known?: KnownState;           // rounds already debated, applied rather than guessed
+  breakCap?: number;            // ceiling on the break field, cutting the last record bracket on speaks
+  seedJitter?: number;          // how far a pairing wanders from seed order; see SEED_JITTER
 }
 
 /**
@@ -47,6 +70,7 @@ export interface SimRound {
   h2h: number;             // what previous meetings moved it, signed
   h2hW: number; h2hL: number;   // this team's record against that opponent
   rating: number; oppRating: number;
+  actual?: boolean;        // true when this round was debated, not simulated
 }
 /** One entry's simulated weekend. `seed` is where they finished the prelims, 1 being first. */
 export interface SimEntryResult { code: string; wins: number; losses: number; seed: number; rounds: SimRound[] }
@@ -77,12 +101,22 @@ export interface SimOdds {
   recordSpread: Record<string, number>;   // "6-0" -> how many runs ended there
 }
 
+/** Who a team is likely to draw in the next round that has not been debated. */
+export interface NextRound {
+  round: number;
+  published: boolean;      // true when Tabroom has already posted the pairing
+  matchups: { code: string; wins: number; losses: number; opponents: { opp: string; pct: number }[] }[];
+}
+
 export interface SimResult {
   odds: SimOdds[];
   sample: SimSample;
   runs: number;
   breakSizeAvg: number;
   config: { prelims: number; breakWins: number; randomRounds: number };
+  nextRound: NextRound | null;
+  /** How much of the tournament was fact rather than estimate. */
+  known: { prelimsDone: number; entriesWithResults: number } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +214,45 @@ function roundSpeaks(team: SimTeam, won: boolean, rand: () => number): number {
   return 28.5 + team.pointsZ * 0.6 + (won ? 0.3 : 0) + noise;
 }
 
+/** This team's posted round, if that round has been posted for them. */
+function knownFor(known: SimConfig["known"], code: string, round: number): KnownPrelim | null {
+  if (!known) return null;
+  const list = known.prelims[code];
+  if (!list) return null;
+  for (const r of list) if (r.round === round) return r;
+  return null;
+}
+
+/**
+ * Pair the teams that still have to debate this round.
+ *
+ * A pairing Tabroom has already published is used as it stands rather than
+ * guessed at, which is the difference between predicting a round and reporting
+ * one. Whatever is left is paired the way the tournament would pair it.
+ */
+function pairFor(live: Standing[], round: number, cfg: SimConfig, rand: () => number): [Standing, Standing][] {
+  const out: [Standing, Standing][] = [];
+  if (!live.length) return out;
+  const used = new Set<string>();
+
+  if (cfg.known) {
+    const byCode = new Map(live.map((s) => [s.team.code, s]));
+    for (const s of live) {
+      if (used.has(s.team.code)) continue;
+      const k = knownFor(cfg.known, s.team.code, round);
+      const other = k?.opp ? byCode.get(k.opp) : undefined;
+      if (!other || used.has(other.team.code)) continue;
+      used.add(s.team.code);
+      used.add(other.team.code);
+      out.push([s, other]);
+    }
+  }
+
+  const rest = used.size ? live.filter((s) => !used.has(s.team.code)) : live;
+  if (!rest.length) return out;
+  return out.concat(round <= cfg.randomRounds ? pairRandom(rest, rand) : pairPower(rest, rand, cfg.seedJitter ?? SEED_JITTER));
+}
+
 function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][] {
   const shuffled = pool.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -191,8 +264,37 @@ function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][
   return out;
 }
 
-/** Power pairing: inside each win bracket, pair teams off, avoiding rematches where possible. */
-function pairPower(pool: Standing[], rand: () => number): [Standing, Standing][] {
+/**
+ * How much a real pairing wanders from the seed order, in speaker points.
+ *
+ * A tabroom seeds the bracket and pairs high against low, but it also has to
+ * honour sides, keep schools apart and avoid rematches, so the result is never
+ * exactly the seed order. Measured against the Season Opener and Grapevine, the
+ * rank sum of a real pairing averages almost exactly one bracket-width, so the
+ * rule is high-low; the jitter is what stops it being rigid.
+ *
+ * The value is measured, not guessed. Sweeping it against the rounds those two
+ * tournaments actually paired, the probability the model puts on the opponent a
+ * team really drew peaks between 0.25 and 0.5 and falls away either side. Larger
+ * values keep raising the chance the true opponent appears somewhere in the top
+ * few, which looks like an improvement and is not: it is the same confidence
+ * spread over more teams.
+ */
+const SEED_JITTER = 0.4;
+
+/**
+ * Power pairing, the way a tabroom actually does it.
+ *
+ * Inside each win bracket, teams are seeded on speaker points and then paired
+ * high against low: the top of the bracket draws the bottom, the second draws
+ * the second from bottom, and so on. That is not a detail. Pairing at random
+ * inside the bracket spreads the guess over everyone on the same record, which
+ * is worse than useless for predicting an opponent; high-low concentrates it on
+ * the handful of teams a person could actually draw.
+ *
+ * An odd team out drops to the next bracket down, which is what a pull-up is.
+ */
+function pairPower(pool: Standing[], rand: () => number, jitter = SEED_JITTER): [Standing, Standing][] {
   const brackets = new Map<number, Standing[]>();
   for (const s of pool) {
     const b = brackets.get(s.wins) || [];
@@ -202,17 +304,20 @@ function pairPower(pool: Standing[], rand: () => number): [Standing, Standing][]
   const out: [Standing, Standing][] = [];
   let carry: Standing | null = null;
   for (const wins of Array.from(brackets.keys()).sort((a, b) => b - a)) {
-    let group = brackets.get(wins)!.slice();
-    for (let i = group.length - 1; i > 0; i--) {     // shuffle inside the bracket
-      const j = Math.floor(rand() * (i + 1));
-      [group[i], group[j]] = [group[j], group[i]];
-    }
-    if (carry) { group.unshift(carry); carry = null; }
+    const group = brackets.get(wins)!.slice();
+    if (carry) { group.push(carry); carry = null; }
+
+    // seed the bracket on speaker points, jittered so the pairing is not rigid
+    const key = new Map<Standing, number>();
+    for (const s of group) key.set(s, s.speaks + (rand() + rand() - 1) * jitter);
+    group.sort((a, b) => key.get(b)! - key.get(a)! || a.team.seed - b.team.seed);
+
+    // high against low, stepping up from the bottom to dodge a rematch
     while (group.length > 1) {
       const a = group.shift()!;
-      let idx = group.findIndex((c) => !a.met.has(c.team.code));
-      if (idx < 0) idx = 0;
-      out.push([a, group.splice(idx, 1)[0]]);
+      let j = group.length - 1;
+      while (j > 0 && a.met.has(group[j].team.code)) j--;
+      out.push([a, group.splice(j, 1)[0]]);
     }
     if (group.length) carry = group[0];              // odd team drops to the next bracket
   }
@@ -247,10 +352,49 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   const standings: Standing[] = teams.map((team) => ({ team, wins: 0, losses: 0, speaks: 0, met: new Set<string>(), rounds: [] }));
   const byCode = new Map(standings.map((s) => [s.team.code, s]));
 
+  // The first round still to be debated. This follows how far the tournament has
+  // actually got, not the first gap in the data: a couple of teams always have a
+  // round missing because they dropped, and letting them define "next" would aim
+  // the whole prediction at a round the field finished hours ago.
+  const openFrom = cfg.known ? cfg.known.prelimsDone + 1 : 1;
+  let firstOpen = -1;
+  const nextPairing = new Map<string, string>();
+  const openStandings = new Map<string, { wins: number; losses: number }>();
+
   for (let round = 1; round <= cfg.prelims; round++) {
-    const pairs = round <= cfg.randomRounds ? pairRandom(standings, rand) : pairPower(standings, rand);
     const paired = new Set<string>();
+
+    // A round that has been debated is a fact, so it is applied rather than
+    // re-run. Each team carries its own posted result, so the two sides need no
+    // matching up, and every later round pairs off the standings that really exist.
+    const live: Standing[] = [];
+    for (const s of standings) {
+      const k = knownFor(cfg.known, s.team.code, round);
+      if (!k || k.won === null) { live.push(s); continue; }
+      const before = `${s.wins}-${s.losses}`;
+      if (k.won) s.wins++; else s.losses++;
+      s.speaks += k.points !== null ? k.points : roundSpeaks(s.team, k.won, rand);
+      if (k.opp) s.met.add(k.opp);
+      paired.add(s.team.code);
+      if (keepSample) s.rounds.push({
+        round, code: s.team.code, opp: k.bye ? "bye" : (k.opp || "unknown"), won: k.won, recordBefore: before,
+        chance: 1, base: 1, form: 0, h2h: 0, h2hW: 0, h2hL: 0,
+        rating: Math.round(s.team.rating.rating), oppRating: 0, actual: true,
+      });
+    }
+
+    if (firstOpen < 0 && live.length && round >= openFrom) firstOpen = round;
+    // The standings teams carry into that round, which is what the next-round
+    // view has to label them with. By the end of the run they read 4-2 instead.
+    if (round === firstOpen && !openStandings.size) {
+      for (const s of standings) openStandings.set(s.team.code, { wins: s.wins, losses: s.losses });
+    }
+    const pairs = pairFor(live, round, cfg, rand);
     for (const [x, y] of pairs) {
+      if (round === firstOpen) {
+        nextPairing.set(x.team.code, y.team.code);
+        nextPairing.set(y.team.code, x.team.code);
+      }
       paired.add(x.team.code); paired.add(y.team.code);
       const bd = breakdown(x.team, y.team, cfg.headToHead);
       const p = bd.p;
@@ -268,6 +412,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     // an odd field leaves one team unpaired: that is a bye, and a bye is a win
     for (const s of standings) {
       if (!paired.has(s.team.code)) {
+        if (round === firstOpen) nextPairing.set(s.team.code, "bye");
         s.wins++;
         s.speaks += roundSpeaks(s.team, true, rand);   // a bye is scored as an average round
         if (keepSample) s.rounds.push({
@@ -284,7 +429,19 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   // tournament seeds: two 6-0 teams are separated by the speaks they earned
   const seeded = standings.slice().sort((a, b) =>
     b.wins - a.wins || b.speaks - a.speaks || a.team.seed - b.team.seed);
-  const broke = seeded.filter((s) => s.wins >= cfg.breakWins);
+  // Who breaks. Once elims have started the real field is known and is used as
+  // it stands. Otherwise everyone on the break record advances, capped when the
+  // tournament breaks a fixed number — and because `seeded` is already ordered by
+  // wins and then speaker points, cutting at the cap splits the last record
+  // bracket on speaks, which is how a real break line falls.
+  let broke: Standing[];
+  if (cfg.known?.brokeCodes && cfg.known.brokeCodes.length) {
+    const real = new Set(cfg.known.brokeCodes);
+    broke = seeded.filter((s) => real.has(s.team.code));
+  } else {
+    broke = seeded.filter((s) => s.wins >= cfg.breakWins);
+    if (cfg.breakCap && cfg.breakCap > 0 && broke.length > cfg.breakCap) broke = broke.slice(0, cfg.breakCap);
+  }
 
   // Byes to the top seeds until the field is a power of two, laid out in the
   // standard rainbow order so the bracket behaves like a real one: the top seed
@@ -328,7 +485,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   }
 
   const champion = alive[0]?.team.code ?? null;
-  return { standings, seeded, broke, elims, champion, byCode };
+  return { standings, seeded, broke, elims, champion, byCode, firstOpen, nextPairing, openStandings };
 }
 
 // ---------------------------------------------------------------------------
@@ -341,8 +498,18 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
   for (const t of teams) tally.set(t.code, { breaks: 0, champ: 0, final: 0, semi: 0, wins: 0, records: {} });
 
   let breakSizeTotal = 0;
+  let openRound = -1;
+  const nextTally = new Map<string, Map<string, number>>();
+  const atOpen = new Map<string, { wins: number; losses: number }>();
   for (let run = 0; run < cfg.runs; run++) {
-    const { standings, broke, elims, champion } = runOnce(teams, cfg, rand, false);
+    const { standings, broke, elims, champion, firstOpen, nextPairing, openStandings } = runOnce(teams, cfg, rand, false);
+    openRound = firstOpen;
+    if (openStandings.size) for (const [code, st] of openStandings) atOpen.set(code, st);
+    for (const [code, opp] of nextPairing) {
+      const m = nextTally.get(code) || new Map<string, number>();
+      m.set(opp, (m.get(opp) || 0) + 1);
+      nextTally.set(code, m);
+    }
     breakSizeTotal += broke.length;
     for (const s of standings) {
       const t = tally.get(s.team.code)!;
@@ -380,7 +547,33 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
     };
   }).sort((a, b) => b.breakPct - a.breakPct || b.champPct - a.champPct || b.meanWins - a.meanWins);
 
-  return { odds, sample, runs: cfg.runs, breakSizeAvg: breakSizeTotal / cfg.runs, config: { prelims: cfg.prelims, breakWins: cfg.breakWins, randomRounds: cfg.randomRounds } };
+  const nextRound: NextRound | null = openRound > 0 ? {
+    round: openRound,
+    published: cfg.known?.pendingRound === openRound,
+    matchups: [...nextTally.entries()].map(([code, m]) => {
+      const st = atOpen.get(code);
+      return {
+        code,
+        wins: st?.wins ?? 0,
+        losses: st?.losses ?? 0,
+        opponents: [...m.entries()]
+          .map(([opp, n]) => ({ opp, pct: (n / cfg.runs) * 100 }))
+          .sort((a, b) => b.pct - a.pct)
+          .slice(0, 8),
+      };
+    }).sort((a, b) => b.wins - a.wins || a.code.localeCompare(b.code)),
+  } : null;
+
+  const known = cfg.known ? {
+    prelimsDone: cfg.known.prelimsDone,
+    entriesWithResults: Object.keys(cfg.known.prelims).length,
+  } : null;
+
+  return {
+    odds, sample, runs: cfg.runs, breakSizeAvg: breakSizeTotal / cfg.runs,
+    config: { prelims: cfg.prelims, breakWins: cfg.breakWins, randomRounds: cfg.randomRounds },
+    nextRound, known,
+  };
 }
 
 /**

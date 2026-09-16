@@ -78,7 +78,7 @@ export interface GameRow {
 // Tabroom reading
 // ---------------------------------------------------------------------------
 
-async function getJson<T>(path: string): Promise<T | null> {
+export async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(API + path, {
       headers: { accept: "application/json", "user-agent": "TheBreak bracket-pool (personal, low volume)" },
@@ -93,7 +93,7 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /** Run `work` over `items`, at most `limit` at a time. Tabroom is a small nonprofit site. */
-async function pool<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
+export async function pool<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let next = 0;
   const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {

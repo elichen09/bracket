@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
 import { fieldWithRatings } from "@/lib/field";
 import { simulate } from "@/lib/simulate";
+import { loadProgress, knownStateFrom } from "@/lib/progress";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,7 +66,28 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     const { teams, h2h, entries } = await fieldWithRatings(db, t.tabroom_tourn_id, t.tabroom_event_abbr);
     if (teams.length < 4) return NextResponse.json({ error: "too few entries published to simulate" }, { status: 400 });
 
-    const result = simulate(teams, { ...cfg, randomRounds: Math.min(cfg.randomRounds, cfg.prelims), headToHead: h2h });
+    // Whatever has already been debated. Rounds that have happened are applied
+    // rather than guessed, so the prediction sharpens as the weekend goes on
+    // instead of repeating what it thought on Friday morning. If Tabroom will not
+    // answer, the prediction still runs; it just knows nothing yet.
+    let known;
+    let progressNote: string | null = null;
+    try {
+      const progress = await loadProgress(t.tabroom_tourn_id, t.tabroom_event_abbr);
+      known = knownStateFrom(progress);
+      progressNote = progress.prelimsDone > 0
+        ? `through round ${progress.prelimsDone}${progress.elimsStarted ? ", elims under way" : ""}`
+        : "nothing debated yet";
+    } catch {
+      progressNote = "could not read results, so this is a cold prediction";
+    }
+
+    const result = simulate(teams, {
+      ...cfg,
+      randomRounds: Math.min(cfg.randomRounds, cfg.prelims),
+      headToHead: h2h,
+      known,
+    });
     const byCode = new Map(entries.map((e) => [e.code, e]));
     const payload = {
       ...result,
@@ -73,6 +95,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       field: teams.length,
       ratedField: teams.filter((x) => x.rated).length,
       ranAt: new Date().toISOString(),
+      progressNote,
       // schools and names so the page can label rows without another request
       labels: Object.fromEntries(entries.map((e) => [e.code, { name: e.name, school: e.school, source: e.source }])),
       odds: result.odds.map((o) => ({ ...o, name: byCode.get(o.code)?.name ?? "", source: byCode.get(o.code)?.source ?? "none" })),
