@@ -27,6 +27,7 @@ export default function Nav() {
       <Link className="brand" href="/">THE BREAK</Link>
       <div className="links mono">
         <Link href="/" className={active("home") ? "on" : ""}>Tournaments</Link>
+        <Link href="/rankings" className={path === "/rankings" ? "on" : ""}>Rankings</Link>
         <Link href="/new" className={active("new") ? "on" : ""}>Add tournament</Link>
         <Link href="/about" className={active("about") ? "on" : ""}>Scoring</Link>
         {user === undefined ? null : user ? (

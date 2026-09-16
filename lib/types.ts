@@ -12,6 +12,8 @@ export interface Tournament {
   year: string;
   tabroom_tourn_id: number | null;
   tabroom_result_id: number | null;
+  tabroom_event_abbr: string | null;   // set for tournaments tracked before a bracket exists
+  tabroom_event_id: number | null;
   round_ids: Record<string, number>;
   slots: string[];
   results: Results;

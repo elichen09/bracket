@@ -19,7 +19,27 @@ export async function POST(req: Request) {
   const url = String(body?.url || "");
   const tm = url.match(/tourn_id=(\d+)/);
   const rm = url.match(/result_id=(\d+)/);
-  if (!tm || !rm) return NextResponse.json({ error: "the bracket link needs both tourn_id and result_id" }, { status: 400 });
+  const eventAbbr = String(body?.eventAbbr || "").trim();
+  if (!tm) return NextResponse.json({ error: "the Tabroom link needs a tourn_id" }, { status: 400 });
+  if (!rm && !eventAbbr) {
+    return NextResponse.json({ error: "give a bracket link with result_id, or — for a tournament that has not started — the Tabroom event code, e.g. VPF" }, { status: 400 });
+  }
+
+  // An upcoming tournament is identified by its event rather than by a bracket.
+  // Check the event really exists before saving a row that could never load.
+  let eventId: number | null = null;
+  if (eventAbbr) {
+    try {
+      const r = await fetch(`https://api.tabroom.com/v1/rest/tourns/${tm[1]}/events/${encodeURIComponent(eventAbbr)}/field`, {
+        headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) return NextResponse.json({ error: `Tabroom has no event "${eventAbbr}" at that tournament — the code is the short one Tabroom uses, like VPF or VLD` }, { status: 400 });
+      const j = await r.json();
+      eventId = typeof j?.id === "number" ? j.id : null;
+    } catch {
+      return NextResponse.json({ error: "could not reach Tabroom to check that event — try again" }, { status: 502 });
+    }
+  }
   if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
   const rid = String(body?.roundUrl || "").match(/round_id=(\d+)/);
@@ -46,7 +66,9 @@ export async function POST(req: Request) {
   const { error } = await db.from("tournaments").insert({
     id, name, event,
     tabroom_tourn_id: Number(tm[1]),
-    tabroom_result_id: Number(rm[1]),
+    tabroom_result_id: rm ? Number(rm[1]) : null,
+    tabroom_event_abbr: eventAbbr || null,
+    tabroom_event_id: eventId,
     round_ids: rid ? { "0": Number(rid[1]) } : {},
     slots,
     results: {},

@@ -9,6 +9,7 @@ function mapTournament(row: any): Tournament {
   return {
     id: row.id, name: row.name, event: row.event, host: row.host, year: row.year,
     tabroom_tourn_id: row.tabroom_tourn_id, tabroom_result_id: row.tabroom_result_id,
+    tabroom_event_abbr: row.tabroom_event_abbr ?? null, tabroom_event_id: row.tabroom_event_id ?? null,
     round_ids: row.round_ids || {}, slots: row.slots || [], results: row.results || {},
     notes: row.notes || {}, locked_rounds: row.locked_rounds || 0, status: row.status,
     sort_order: row.sort_order || 0, last_checked_at: row.last_checked_at,

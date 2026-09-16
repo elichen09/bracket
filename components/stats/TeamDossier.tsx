@@ -170,7 +170,7 @@ export default function TeamDossier({ tid, team, pool, onClose }: Props) {
                   <PoolBars rows={pool.rows} total={pool.total} />
                 </Section>
 
-                <Section title="Career" sub="each debater's whole Tabroom record, every season" wide>
+                <Section title="Career" sub="each debater's whole record, season by season" wide>
                   {s.students.map((st) => {
                     const rec = (s.career || {})[String(st.id)];
                     const nm = `${st.first} ${st.last}`.trim();

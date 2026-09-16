@@ -309,3 +309,26 @@ table.rounds td.ch { white-space: normal; max-width: 320px; }
   .ticker .track, .scrollcue span { animation: none !important; }
   [data-reveal] { opacity: 1; transform: none; }
 }
+
+/* =====================================================================
+   Rankings and the pre-bracket view
+   ===================================================================== */
+table.rank td.num, table.rank th { white-space: nowrap; }
+table.rank tbody tr { cursor: default; }
+table.rank tbody tr:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+table.rank td.up { color: var(--s2); }
+table.rank td.down { color: var(--bad); }
+
+.prebracket { margin-top: 8px; }
+.simfield { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.simfield input { width: 74px; padding: 6px 8px; font-family: var(--mono); font-size: 12px; }
+
+.sample { margin-top: 18px; }
+.sample h3.sec { margin-bottom: 12px; }
+.elimcols { display: flex; gap: 2px; overflow-x: auto; margin-top: 16px; padding-bottom: 12px; }
+.elimcol { min-width: 190px; flex: none; }
+.elimcol .rhead { position: static; background: transparent; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.elimmatch { display: grid; gap: 2px; margin-bottom: 8px; padding: 7px 9px; background: var(--surface-2); border-left: 3px solid var(--line); font-family: var(--cond); font-size: 13px; }
+.elimmatch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.elimmatch span.w { color: var(--ink); font-weight: 600; }
+.elimcol:last-child .elimmatch { border-left-color: var(--s3); }

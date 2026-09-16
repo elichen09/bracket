@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
 import { teamStats, withFreshData } from "@/lib/tabroomApi";
 import { parseSlot } from "@/lib/bracket";
-import { careerFor } from "@/lib/career";
+import { careersDeep } from "@/lib/careerArchive";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,12 +33,21 @@ export async function GET(req: Request, { params }: { params: { tid: string } })
     const stats = fresh
       ? await withFreshData(() => teamStats(t.tabroom_tourn_id, t.tabroom_result_id, code, { live, seeds }))
       : await teamStats(t.tabroom_tourn_id, t.tabroom_result_id, code, { live, seeds });
-    // Careers: one logged-in Tabroom page per debater, cached 12h. A failure here
-    // (Tabroom login trouble, rate limit) must not take the rest of the dossier down.
-    const results = await Promise.allSettled(stats.students.map((st) => careerFor(db, st.id, fresh)));
-    results.forEach((r, i) => { if (r.status === "fulfilled") stats.career[String(stats.students[i].id)] = r.value; });
-    const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
-    if (failed.length) stats.careerNote = failed[0].reason?.message || "could not load career records";
+    // Careers come from the tournaments this site has read in through Tabroom's
+    // public API. Nothing is scraped and nothing needs a login, so this cannot be
+    // throttled out — it is only ever as deep as the archive is.
+    try {
+      const careers = await careersDeep(db, stats.students.map((st) => st.id));
+      for (const st of stats.students) {
+        const rec = careers.get(st.id);
+        if (rec && !rec.empty) stats.career[String(st.id)] = rec;
+      }
+      if (!Object.keys(stats.career).length) {
+        stats.careerNote = "no archived rounds for these debaters yet — records fill in as past tournaments are read in";
+      }
+    } catch (e: any) {
+      stats.careerNote = e?.message || "could not load career records";
+    }
     const res = NextResponse.json(stats);
     // the same document for every viewer — let the edge hold it a while
     res.headers.set("cache-control", fresh ? "no-store" : live ? "private, max-age=120" : "private, max-age=3600");

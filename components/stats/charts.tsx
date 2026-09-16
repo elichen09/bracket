@@ -470,7 +470,7 @@ export function Career({ name, rec, partnerNow, fieldCodes, currentTournId }: { 
         <span><b>{T.titles}</b> title{T.titles === 1 ? "" : "s"}</span>
         <span><b>{T.ballotsWon}–{T.ballotsLost}</b> ballots</span>
         <span><b>{T.affW}–{T.affL}</b> Aff · <b>{T.negW}–{T.negL}</b> Neg</span>
-        <span><b>{T.judges}</b> judges · <b>{T.opponents}</b> opponents</span>
+        <span><b>{T.opponents}</b> opponents faced</span>
       </div>
 
       <div className="seasons">

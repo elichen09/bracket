@@ -20,10 +20,14 @@ export default function NewTournament() {
       url: (f.elements.namedItem("url") as HTMLInputElement).value.trim(),
       roundUrl: (f.elements.namedItem("round") as HTMLInputElement).value.trim(),
       slotsText: (f.elements.namedItem("slots") as HTMLTextAreaElement).value,
+      eventAbbr: (f.elements.namedItem("eventAbbr") as HTMLInputElement).value.trim(),
     };
     if (!body.adminKey) { setMsg({ text: "The admin key is required to add a tournament.", kind: "bad" }); return; }
-    if (!/tourn_id=\d+/.test(body.url) || !/result_id=\d+/.test(body.url)) {
-      setMsg({ text: "That link needs both tourn_id and result_id — copy it from the bracket page.", kind: "bad" }); return;
+    if (!/tourn_id=\d+/.test(body.url)) {
+      setMsg({ text: "That link needs a tourn_id — any Tabroom page for the tournament has one.", kind: "bad" }); return;
+    }
+    if (!/result_id=\d+/.test(body.url) && !body.eventAbbr) {
+      setMsg({ text: "Paste the bracket link (with result_id), or give the event code below for a tournament that has not started.", kind: "bad" }); return;
     }
     if (!body.name) { setMsg({ text: "Give it a name.", kind: "bad" }); return; }
     setBusy(true);
@@ -54,6 +58,7 @@ export default function NewTournament() {
             <label><span className="mono">Tabroom bracket link</span><input name="url" placeholder="https://www.tabroom.com/index/tourn/results/bracket.mhtml?tourn_id=…&result_id=…" /></label>
             <label><span className="mono">Tournament name</span><input name="name" placeholder="e.g. Glenbrooks" maxLength={60} /></label>
             <label><span className="mono">Event · division</span><input name="event" placeholder="e.g. Public Forum · Varsity" maxLength={60} /></label>
+            <label><span className="mono">Tabroom event code (for a tournament that has not started)</span><input name="eventAbbr" placeholder="e.g. VPF — the short code Tabroom uses; lists the entries and lets people run predictions before the bracket exists" maxLength={12} /></label>
             <label><span className="mono">First elim round results link (optional fallback)</span><input name="round" placeholder="https://www.tabroom.com/index/tourn/results/round_results.mhtml?tourn_id=…&round_id=…" /></label>
             <label><span className="mono">Bracket list (optional)</span><textarea name="slots" placeholder={"One team per line, in bracket order, exactly as Tabroom lists them:\n1. Emory GY\n32. Kentucky SR\n…\nLeave a blank line for a bye."} /></label>
             <div className="row">

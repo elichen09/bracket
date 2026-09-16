@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nav from "@/components/Nav";
 import TeamDossier, { type PoolContext } from "@/components/stats/TeamDossier";
+import PreBracket from "@/components/PreBracket";
 import {
   useTournament, useEntries, useUser, useMyEntry, apiCreateEntry, apiUpdateEntry,
 } from "@/lib/useBreak";
@@ -116,6 +117,21 @@ function Loaded({ t }: { t: Tournament }) {
     if (hit) setDossier(hit);
   }, [M]);
   const pool = useMemo<PoolContext | null>(() => dossier ? poolContext(M, real, dead, P, entries, dossier) : null, [M, real, dead, P, entries, dossier]);
+
+  // Before a bracket exists there is nothing to pick, so the page shows who is
+  // entered, what the ratings know about them, and a tournament you can run.
+  if (!M.size && t.tabroom_event_abbr) {
+    return (
+      <>
+        <div className="thead">
+          <p className="crumb mono reveal"><Link href="/">← Tournaments</Link></p>
+          <h1 className="reveal">{t.name}</h1>
+          <Sub t={t} M={M} P={P} />
+        </div>
+        <PreBracket tid={t.id} name={t.name} />
+      </>
+    );
+  }
 
   return (
     <>

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { TabroomSession, syncTournament, statusFor } from "@/lib/tabroom";
 import type { Tournament } from "@/lib/types";
+import { eventForBracket } from "@/lib/tabroomApi";
+import { ingestTournament, recompute } from "@/lib/ratings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +65,38 @@ async function handle(req: Request) {
     } catch (e: any) {
       summary.push(`${t.name}: ERROR ${e?.message || e}`);
     }
+  }
+
+  // Ratings. Every tracked event is re-indexed and Glicko-2 recomputed, so the
+  // rankings follow results in as tournaments finish. Rounds are upserted, so a
+  // tournament that has not changed costs reads and writes nothing new.
+  try {
+    const { data: all } = await db.from("tournaments").select("id,name,tabroom_tourn_id,tabroom_result_id,tabroom_event_abbr");
+    let ingested = 0;
+    for (const row of all || []) {
+      if (!row.tabroom_tourn_id) continue;
+      let abbr: string | null = row.tabroom_event_abbr ?? null;
+      if (!abbr && row.tabroom_result_id) {
+        // older tournaments are identified by their bracket; learn the event once and remember it
+        const ev = await eventForBracket(row.tabroom_tourn_id, row.tabroom_result_id);
+        abbr = ev?.abbr ?? null;
+        if (abbr) await db.from("tournaments").update({ tabroom_event_abbr: abbr, tabroom_event_id: ev?.id ?? null }).eq("id", row.id);
+      }
+      if (!abbr) { summary.push(`ratings ${row.name}: no Tabroom event on file`); continue; }
+      try {
+        const r = await ingestTournament(db, row.tabroom_tourn_id, abbr);
+        ingested += r.rows;
+        summary.push(`ratings ${row.name}: ${r.rows} rounds from ${r.entries} entries`);
+      } catch (e: any) {
+        summary.push(`ratings ${row.name}: ${e?.message || e}`);
+      }
+    }
+    if (ingested) {
+      const r = await recompute(db);
+      summary.push(`ratings: ${r.teams} partnerships and ${r.debaters} debaters over ${r.periods} tournaments`);
+    }
+  } catch (e: any) {
+    summary.push(`ratings: ERROR ${e?.message || e}`);
   }
 
   return NextResponse.json({ ok: true, checked: tournaments.length, summary });

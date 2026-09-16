@@ -1,0 +1,667 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { UNRATED, update, decay, type Rating, type Game } from "./glicko";
+
+/**
+ * The ratings pipeline.
+ *
+ *   ingestTournament()  Tabroom  ->  rating_games   (one row per round, per entry)
+ *   recompute()         rating_games  ->  ratings    (Glicko-2, one period per tournament)
+ *
+ * Every round a team debates counts, prelims included — prelims are most of the
+ * rounds and most of the signal. A tournament is one rating period, so a team is
+ * updated once from its whole weekend, and deviation grows between tournaments.
+ *
+ * Partnerships are keyed by Tabroom's entry code ("Harker LL"), which is how every
+ * results document names them. Debaters are keyed by student id, so a rating
+ * follows a person across partners and seasons.
+ */
+
+const API = "https://api.tabroom.com/v1";
+
+export const PRELIM_TYPES = new Set(["prelim", "highlow"]);
+export const ELIM_TYPES = new Set(["elim", "final"]);
+
+/**
+ * The rankings are a Public Forum table, so only Public Forum rounds feed them.
+ * A tournament can still be tracked for its bracket pool without its teams ever
+ * appearing here — college policy at Coon, for instance.
+ */
+export function isPublicForum(eventName: string): boolean {
+  const n = (eventName || "").toLowerCase();
+  if (/congress|policy|lincoln|douglas|world schools|parli|speech|extemp|oratory|interp/.test(n)) return false;
+  return /public forum|\bpf\b|\bpfd\b/.test(n);
+}
+
+export interface GameRow {
+  tourn_id: number;
+  round_id: number;
+  entry_id: number;
+  opp_entry_id: number;
+  event_id: number | null;
+  event_name: string;
+  tourn_name: string;
+  tourn_start: string | null;
+  round_name: number | null;
+  round_label: string;
+  elim: boolean;
+  code: string;
+  opp_code: string;
+  school: string | null;
+  side: string | null;
+  score: number;
+  ballots_for: number;
+  ballots_against: number;
+  points: number | null;
+  student_ids: number[];
+}
+
+// ---------------------------------------------------------------------------
+// Tabroom reading
+// ---------------------------------------------------------------------------
+
+async function getJson<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(API + path, {
+      headers: { accept: "application/json", "user-agent": "TheBreak bracket-pool (personal, low volume)" },
+      signal: AbortSignal.timeout(20_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** Run `work` over `items`, at most `limit` at a time. Tabroom is a small nonprofit site. */
+async function pool<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await work(items[i]);
+    }
+  });
+  await Promise.all(runners);
+  return out;
+}
+
+interface FieldEntry { id: number; code: string; name: string; School?: { name: string }; Students?: { id: number }[] }
+interface RecordsDoc {
+  id: number; code: string; name: string;
+  Students?: Record<string, unknown>;
+  Event?: { id: number; name: string; abbr: string };
+  Rounds?: Record<string, {
+    id: number; type: string; label?: string; name?: number; sideLabel?: string; bye?: number | boolean;
+    Results?: Record<string, { winloss?: string; point?: number }>;
+    Opponent?: { id: number; code: string };
+  }>;
+}
+
+/**
+ * Read one event at one tournament into game rows. One request for the field,
+ * then one per entry — a few hundred for a big Public Forum pool, which is why
+ * this is an indexing job and not something a page does.
+ */
+export async function collectGames(tournId: number, eventAbbr: string): Promise<{ rows: GameRow[]; entries: number; name: string }> {
+  const meta = await getJson<{ name: string; start: string }>(`/rest/tourns/${tournId}`);
+  const field = await getJson<{ Entries?: FieldEntry[]; name?: string }>(`/rest/tourns/${tournId}/events/${encodeURIComponent(eventAbbr)}/field`);
+  let entries = field?.Entries || [];
+
+  // Some tournaments publish results but not a field — the national championships
+  // among them. Their published result sets name every entry, so the roster can be
+  // rebuilt from one of those instead.
+  if (!entries.length) {
+    const index = await getJson<Record<string, { abbr: string; name: string; ResultSets?: { id: number; tag: string }[] }>>(`/rest/tourns/${tournId}/results`);
+    const event = Object.values(index || {}).find((e) => e.abbr === eventAbbr);
+    const sets = (event?.ResultSets || []).slice().sort((a, b) => {
+      const rank = (t: string) => (t === "bracket" ? 0 : t === "seed" ? 1 : t === "final" ? 2 : 3);
+      return rank(a.tag) - rank(b.tag);
+    });
+    const seen = new Map<number, FieldEntry>();
+    for (const set of sets) {
+      const doc = await getJson<{ results?: { Entry?: { id: number; code: string; name: string }; School?: { name: string } }[] }[]>(`/rest/tourns/${tournId}/results/${set.id}`);
+      for (const row of (Array.isArray(doc) ? doc[0]?.results : undefined) || []) {
+        if (row.Entry?.id && !seen.has(row.Entry.id)) {
+          seen.set(row.Entry.id, { id: row.Entry.id, code: row.Entry.code, name: row.Entry.name, School: row.School });
+        }
+      }
+      if (seen.size) break;
+    }
+    entries = [...seen.values()];
+  }
+
+  if (!entries.length) throw new Error(`no entries published for ${eventAbbr} at tournament ${tournId}`);
+
+  const docs = await pool(entries, 6, (e) => getJson<RecordsDoc>(`/rest/tourns/${tournId}/entries/${e.id}/records`));
+
+  const rows: GameRow[] = [];
+  docs.forEach((doc, i) => {
+    if (!doc || !doc.Rounds) return;
+    const entry = entries[i];
+    const students = Object.keys(doc.Students || {}).map(Number).filter(Boolean);
+    for (const r of Object.values(doc.Rounds)) {
+      const isPrelim = PRELIM_TYPES.has(r.type), isElim = ELIM_TYPES.has(r.type);
+      if (!isPrelim && !isElim) continue;
+      if (!r.Opponent || r.bye) continue;                       // byes are not games
+      const ballots = Object.values(r.Results || {});
+      const won = ballots.filter((b) => b.winloss === "W").length;
+      const lost = ballots.filter((b) => b.winloss === "L").length;
+      if (!won && !lost) continue;                              // no decision posted
+      const pointBallot = ballots.find((b) => typeof b.point === "number");
+      rows.push({
+        tourn_id: tournId, round_id: r.id, entry_id: entry.id, opp_entry_id: r.Opponent.id,
+        event_id: doc.Event?.id ?? null, event_name: doc.Event?.name || field?.name || eventAbbr,
+        tourn_name: meta?.name || `Tournament ${tournId}`, tourn_start: meta?.start || null,
+        round_name: typeof r.name === "number" ? r.name : null, round_label: r.label || "",
+        elim: isElim,
+        code: entry.code, opp_code: r.Opponent.code, school: entry.School?.name || null,
+        side: r.sideLabel || null,
+        score: won > lost ? 1 : lost > won ? 0 : 0.5,
+        ballots_for: won, ballots_against: lost,
+        points: typeof pointBallot?.point === "number" ? pointBallot.point : null,
+        student_ids: students,
+      });
+    }
+  });
+  return { rows, entries: entries.length, name: meta?.name || "" };
+}
+
+/** Read one event and store its rounds. Safe to re-run: rows are upserted by round and entry. */
+export async function ingestTournament(db: SupabaseClient, tournId: number, eventAbbr: string): Promise<{ rows: number; entries: number; name: string; skipped: boolean }> {
+  const out = await collectGames(tournId, eventAbbr);
+  // Only Public Forum rounds are rated, so a policy or LD field is read and dropped
+  // rather than being stored and then filtered everywhere downstream.
+  const rows = out.rows.filter((r) => isPublicForum(r.event_name));
+  if (!rows.length) return { rows: 0, entries: out.entries, name: out.name, skipped: out.rows.length > 0 };
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await db.from("rating_games").upsert(rows.slice(i, i + 500), { onConflict: "tourn_id,round_id,entry_id" });
+    if (error) throw new Error(error.message);
+  }
+  return { rows: rows.length, entries: out.entries, name: out.name, skipped: false };
+}
+
+// ---------------------------------------------------------------------------
+// Rating computation
+// ---------------------------------------------------------------------------
+
+interface Competitor {
+  key: string;
+  display: string;
+  school: string | null;
+  r: Rating;
+  games: number; wins: number; losses: number; tournaments: number;
+  pointsSum: number; pointsN: number;
+  zSum: number; zN: number;
+  lastPlayed: string | null;
+  lastPeriod: number;                       // index of the last tournament played
+  history: { tourn: string; start: string | null; rating: number; rd: number; w: number; l: number }[];
+}
+
+const blank = (key: string, display: string, school: string | null): Competitor => ({
+  key, display, school, r: { ...UNRATED },
+  games: 0, wins: 0, losses: 0, tournaments: 0,
+  pointsSum: 0, pointsN: 0, zSum: 0, zN: 0,
+  lastPlayed: null, lastPeriod: -1, history: [],
+});
+
+/**
+ * Replay every stored round in tournament order and write the ratings table.
+ * Each tournament is one rating period for both partnerships and debaters.
+ */
+/** The season a date falls in: August starts a new one, so 2026-09 is season 2026. */
+export function seasonOf(iso: string | null): number | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const y = d.getUTCFullYear();
+  return d.getUTCMonth() >= 7 ? y : y - 1;
+}
+
+export function currentSeason(now = new Date()): number {
+  return seasonOf(now.toISOString())!;
+}
+
+/**
+ * Rebuild the ratings table.
+ *
+ * This is the season leaderboard, so it counts this season only. Earlier seasons
+ * stay in rating_games — they are what past meetings and the prediction's prior
+ * are read from — but a team's standing here is what it has done since August.
+ */
+export async function recompute(db: SupabaseClient, season = currentSeason()): Promise<{ teams: number; debaters: number; periods: number; games: number; skippedSeasons: number }> {
+  const all: GameRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    // Order by the primary key as well as the date: every round of a tournament
+    // shares one start time, and paging a sort with ties repeats some rows and
+    // drops others, which would count games twice.
+    const { data, error } = await db.from("rating_games").select("*")
+      .order("tourn_start", { ascending: true })
+      .order("tourn_id", { ascending: true })
+      .order("round_id", { ascending: true })
+      .order("entry_id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    all.push(...((data || []) as GameRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+  // Keep this season only. Earlier rounds stay in the table — past meetings and
+  // the prediction's prior read them — but they are not part of this standing.
+  const before = all.length;
+  const thisSeason = all.filter((g) => seasonOf(g.tourn_start) === season);
+  all.length = 0;
+  all.push(...thisSeason);
+  const skippedSeasons = before - all.length;
+
+  if (!all.length) return { teams: 0, debaters: 0, periods: 0, games: 0, skippedSeasons };
+
+  // one period per tournament, oldest first
+  const periods = new Map<number, GameRow[]>();
+  for (const g of all) {
+    const list = periods.get(g.tourn_id) || [];
+    list.push(g);
+    periods.set(g.tourn_id, list);
+  }
+  const order = Array.from(periods.entries()).sort((a, b) => {
+    const sa = a[1][0].tourn_start || "", sb = b[1][0].tourn_start || "";
+    return sa.localeCompare(sb) || a[0] - b[0];
+  });
+
+  const teams = new Map<string, Competitor>();
+  const debaters = new Map<string, Competitor>();
+
+  order.forEach(([, rows], period) => {
+    // speaker points are only comparable inside one tournament, so z-score them there
+    const pts = rows.map((r) => r.points).filter((p): p is number => p !== null);
+    const mean = pts.length ? pts.reduce((a, b) => a + b, 0) / pts.length : 0;
+    const sd = pts.length > 1 ? Math.sqrt(pts.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (pts.length - 1)) : 0;
+
+    // everyone's games this weekend, by competitor
+    const teamGames = new Map<string, GameRow[]>();
+    const debaterGames = new Map<string, GameRow[]>();
+    for (const row of rows) {
+      if (!row.code || !row.opp_code) continue;
+      const t = teamGames.get(row.code) || [];
+      t.push(row);
+      teamGames.set(row.code, t);
+      for (const sid of row.student_ids || []) {
+        const key = String(sid);
+        const d = debaterGames.get(key) || [];
+        d.push(row);
+        debaterGames.set(key, d);
+      }
+    }
+
+    const step = (book: Map<string, Competitor>, played: Map<string, GameRow[]>, opponentOf: (row: GameRow) => string[], label: (row: GameRow) => { display: string; school: string | null }) => {
+      // snapshot ratings at the start of the period, so results inside a weekend
+      // do not feed back on each other
+      const before = new Map<string, Rating>();
+      for (const [key, c] of book) before.set(key, c.r);
+
+      for (const [key, rows2] of played) {
+        const first = rows2[0];
+        const info = label(first);
+        const c = book.get(key) || blank(key, info.display, info.school);
+        c.display = info.display || c.display;
+        c.school = info.school ?? c.school;
+
+        const games: Game[] = [];
+        for (const row of rows2) {
+          for (const oppKey of opponentOf(row)) {
+            const opp = before.get(oppKey) || (book.has(oppKey) ? book.get(oppKey)!.r : { ...UNRATED });
+            games.push({ opponent: opp, score: row.score });
+          }
+        }
+        // idle periods widen the deviation before this weekend counts
+        const idle = c.lastPeriod < 0 ? 0 : period - c.lastPeriod - 1;
+        const base = idle > 0 ? decay(c.r, Math.min(idle, 8)) : c.r;
+        c.r = update(base, games);
+
+        for (const row of rows2) {
+          c.games++;
+          if (row.score === 1) c.wins++; else if (row.score === 0) c.losses++;
+          if (row.points !== null) {
+            c.pointsSum += row.points; c.pointsN++;
+            if (sd > 0) { c.zSum += (row.points - mean) / sd; c.zN++; }
+          }
+          if (!c.lastPlayed || (row.tourn_start || "") > c.lastPlayed) c.lastPlayed = row.tourn_start;
+        }
+        c.tournaments++;
+        c.lastPeriod = period;
+        c.history.push({
+          tourn: first.tourn_name, start: first.tourn_start,
+          rating: Math.round(c.r.rating), rd: Math.round(c.r.rd),
+          w: rows2.filter((x) => x.score === 1).length,
+          l: rows2.filter((x) => x.score === 0).length,
+        });
+        book.set(key, c);
+      }
+    };
+
+    step(teams, teamGames, (row) => [row.opp_code], (row) => ({ display: row.code, school: row.school }));
+
+    // a debater's opponents are the two people across the flow; fall back to the
+    // opposing entry's rating when we do not know who they were
+    const studentsByEntry = new Map<number, number[]>();
+    for (const row of rows) if (row.student_ids?.length) studentsByEntry.set(row.entry_id, row.student_ids);
+    step(
+      debaters, debaterGames,
+      (row) => (studentsByEntry.get(row.opp_entry_id) || []).map(String),
+      (row) => ({ display: row.code, school: row.school }),
+    );
+  });
+
+  const toRow = (kind: string) => (c: Competitor) => ({
+    kind, key: c.key, display: c.display, school: c.school,
+    rating: c.r.rating, rd: c.r.rd, vol: c.r.vol,
+    games: c.games, wins: c.wins, losses: c.losses, tournaments: c.tournaments,
+    points_avg: c.pointsN ? c.pointsSum / c.pointsN : null,
+    points_z: c.zN ? c.zSum / c.zN : null,
+    last_played: c.lastPlayed,
+    history: c.history.slice(-24),
+    updated_at: new Date().toISOString(),
+  });
+
+  const rows = [...Array.from(teams.values()).map(toRow("team")), ...Array.from(debaters.values()).map(toRow("debater"))];
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await db.from("ratings").upsert(rows.slice(i, i + 500), { onConflict: "kind,key" });
+    if (error) throw new Error(error.message);
+  }
+  return { teams: teams.size, debaters: debaters.size, periods: order.length, games: all.length, skippedSeasons };
+}
+
+// ---------------------------------------------------------------------------
+// Reading, for the rankings page and the simulator
+// ---------------------------------------------------------------------------
+
+export interface RatingRow {
+  kind: string; key: string; display: string; school: string | null;
+  rating: number; rd: number; vol: number;
+  games: number; wins: number; losses: number; tournaments: number;
+  points_avg: number | null; points_z: number | null;
+  last_played: string | null;
+  history: { tourn: string; start: string | null; rating: number; rd: number; w: number; l: number }[];
+}
+
+export async function loadRatings(db: SupabaseClient, kind: "team" | "debater"): Promise<RatingRow[]> {
+  // Paged, and ordered by the key as well as the rating: ties in a sort have no
+  // guaranteed order, so paging without a tiebreaker repeats and drops rows.
+  const out: RatingRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("ratings").select("*").eq("kind", kind)
+      .order("rating", { ascending: false })
+      .order("key", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    out.push(...((data || []) as RatingRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return out;
+}
+
+/**
+ * A code with Tabroom's stray double spaces collapsed. This is the literal
+ * identity of an entry, so "Emerald KG" and "Emerald GK" stay apart here.
+ */
+export function canonCode(code: string): string {
+  return code.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/**
+ * The same code with its initials read as a set, so a pairing written both ways
+ * collapses to one key: "Emerald KG" and "Emerald GK", "Lincoln-Sudbury CA" and
+ * "Lincoln-Sudbury AC".
+ *
+ * This is a guess, never an identity. Two different teams at one school can have
+ * initials that are anagrams — Acton-Boxborough SV and VS are four different
+ * people, as are BASIS Peoria CK and KC — so it is used only when the debaters
+ * themselves are unknown, and only when exactly one rated partnership claims it.
+ */
+export function initialsKey(code: string): string {
+  const cleaned = code.replace(/\s+/g, " ").trim();
+  const m = cleaned.match(/^(.+)\s+([A-Za-z]{1,4})$/);
+  if (!m) return cleaned.toLowerCase();
+  return `${m[1].toLowerCase()} ${m[2].toLowerCase().split("").sort().join("")}`;
+}
+
+/** Index rating rows for lookup: partnerships by canonical code, debaters by student id. */
+export function ratingIndex(rows: RatingRow[]): Map<string, RatingRow> {
+  const m = new Map<string, RatingRow>();
+  for (const r of rows) m.set(r.kind === "team" ? canonCode(r.key) : r.key, r);
+  return m;
+}
+
+export interface ResolvedRating {
+  rating: Rating;
+  pointsZ: number;
+  rated: boolean;
+  source: "team" | "debaters" | "none";
+  /** The partnership row this resolved to, when it resolved to one. */
+  row?: RatingRow;
+}
+
+/**
+ * Ways to find a partnership's rating, in order of how much they can be trusted:
+ * the two debaters, one known debater, then the spelling of the code.
+ */
+export interface TeamIndex {
+  byStudents: Map<string, RatingRow>;   // "1362322+1363031"
+  byStudent: Map<string, RatingRow>;    // a single id, most recent partnership
+  byCode: Map<string, RatingRow>;       // exact code
+  byInitials: Map<string, RatingRow>;   // sorted initials, only where unambiguous
+}
+
+const studentsKey = (ids: number[]) => ids.slice().sort((a, b) => a - b).join("+");
+
+/** Who competed under each code, from the stored rounds. */
+export async function loadRosters(db: SupabaseClient): Promise<Map<string, { ids: number[]; start: string | null }>> {
+  const out = new Map<string, { ids: number[]; start: string | null }>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("rating_games").select("code,student_ids,tourn_start,tourn_id,round_id,entry_id")
+      .order("tourn_id", { ascending: true }).order("round_id", { ascending: true }).order("entry_id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    for (const g of data || []) {
+      if (!g.student_ids?.length) continue;
+      const prev = out.get(canonCode(g.code));
+      if (!prev || (g.tourn_start || "") > (prev.start || "")) out.set(canonCode(g.code), { ids: g.student_ids, start: g.tourn_start });
+    }
+    if (!data || data.length < PAGE) break;
+  }
+  return out;
+}
+
+/** Build the lookup. Ambiguous initial-spellings are left out rather than guessed at. */
+export function buildTeamIndex(rows: RatingRow[], rosters: Map<string, { ids: number[]; start: string | null }>): TeamIndex {
+  const byStudents = new Map<string, RatingRow>();
+  const byStudent = new Map<string, RatingRow>();
+  const byCode = new Map<string, RatingRow>();
+  const initialsCount = new Map<string, Set<string>>();
+
+  for (const r of rows) {
+    const code = canonCode(r.key);
+    byCode.set(code, r);
+    const set = initialsCount.get(initialsKey(r.key)) || new Set<string>();
+    set.add(code);
+    initialsCount.set(initialsKey(r.key), set);
+
+    const roster = rosters.get(code);
+    if (roster?.ids.length) {
+      byStudents.set(studentsKey(roster.ids), r);
+      for (const id of roster.ids) {
+        const held = byStudent.get(String(id));
+        if (!held || (r.last_played || "") > (held.last_played || "")) byStudent.set(String(id), r);
+      }
+    }
+  }
+
+  const byInitials = new Map<string, RatingRow>();
+  for (const [key, codes] of initialsCount) {
+    if (codes.size === 1) {
+      const only = byCode.get([...codes][0]);
+      if (only) byInitials.set(key, only);
+    }
+  }
+  return { byStudents, byStudent, byCode, byInitials };
+}
+
+/**
+ * The rating a pairing debates at.
+ *
+ * A partnership that has competed keeps its own rating. A new pairing inherits
+ * from its debaters, averaged and with the deviation widened, because two people
+ * who have never debated together are a less certain quantity than either of them
+ * alone. With neither, the entry is unrated and debates as the field average.
+ */
+export function resolveRating(
+  code: string,
+  studentIds: number[],
+  teams: TeamIndex,
+  debaters: Map<string, RatingRow>,
+  /** What earlier seasons say, weighted down by how long ago they were. */
+  priors?: PastPriors,
+): ResolvedRating {
+  // most trustworthy first: the two debaters, one debater, the exact code, then
+  // the spelling of the code where only one team could possibly mean it
+  // This exact pairing: both its debaters, its code, or a spelling only it could mean.
+  const exact =
+    (studentIds.length > 1 ? teams.byStudents.get(studentsKey(studentIds)) : undefined) ??
+    teams.byCode.get(canonCode(code)) ??
+    teams.byInitials.get(initialsKey(code));
+  if (exact) {
+    return { rating: { rating: exact.rating, rd: exact.rd, vol: exact.vol }, pointsZ: exact.points_z ?? 0, rated: true, source: "team", row: exact };
+  }
+
+  // Otherwise gather what is known about the people. A partnership found through
+  // one debater is half of this pairing, not this pairing, so it informs the
+  // rating rather than becoming it — and the deviation widens to say so.
+  // This season's results lead. A record from earlier seasons still counts, but at
+  // a fraction of the weight, so last year adjusts the number without setting it.
+  const CURRENT = 1, PAST = 0.35;
+  const parts: { rating: number; rd: number; vol: number; z: number; w: number }[] = [];
+
+  // what this pairing did in earlier seasons, if it competed together then
+  const teamPrior = priors?.teams.get(canonCode(code)) ?? priors?.teams.get(initialsKey(code));
+  if (teamPrior) parts.push({ rating: teamPrior.rating, rd: teamPrior.rd, vol: teamPrior.vol, z: 0, w: PAST });
+
+  for (const id of studentIds) {
+    const d = debaters.get(String(id));
+    if (d) parts.push({ rating: d.rating, rd: d.rd, vol: d.vol, z: d.points_z ?? 0, w: CURRENT });
+    const prior = teams.byStudent.get(String(id));
+    if (prior) parts.push({ rating: prior.rating, rd: prior.rd, vol: prior.vol, z: prior.points_z ?? 0, w: CURRENT });
+    // and what they did in earlier seasons, whoever they debated with then
+    const past = priors?.debaters.get(String(id));
+    if (past) parts.push({ rating: past.rating, rd: past.rd, vol: past.vol, z: 0, w: PAST });
+  }
+  if (parts.length) {
+    const total = parts.reduce((a, p) => a + p.w, 0);
+    const mean = (pick: (p: typeof parts[number]) => number) => parts.reduce((a, p) => a + pick(p) * p.w, 0) / total;
+    // nothing here is this pairing itself, so the deviation widens to say so
+    const onlyPast = parts.every((p) => p.w === PAST);
+    return {
+      rating: { rating: mean((p) => p.rating), rd: Math.min(350, mean((p) => p.rd) + (onlyPast ? 90 : 60)), vol: mean((p) => p.vol) },
+      pointsZ: mean((p) => p.z),
+      rated: true,
+      source: "debaters",
+    };
+  }
+  return { rating: { ...UNRATED }, pointsZ: 0, rated: false, source: "none" };
+}
+
+/**
+ * What earlier seasons say about a competitor, for the prediction to lean on.
+ *
+ * This is deliberately not the leaderboard. The season table counts this season
+ * only; these are priors from before it, and each season back counts for less —
+ * a round from three seasons ago carries a fifth of the weight of a recent one.
+ * A team that broke at the TOC last year starts a new season looking strong,
+ * without that result outranking anything earned since.
+ */
+export const PAST_SEASON_WEIGHTS = [0.6, 0.35, 0.2];   // one season back, two, three
+
+export interface PastPriors {
+  teams: Map<string, Rating>;      // canonical code
+  debaters: Map<string, Rating>;   // student id
+  rounds: number;
+  seasons: Record<string, number>;
+}
+
+export async function pastSeasonPriors(db: SupabaseClient, season = currentSeason()): Promise<PastPriors> {
+  const rows: GameRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("rating_games").select("*")
+      .order("tourn_start", { ascending: true })
+      .order("tourn_id", { ascending: true })
+      .order("round_id", { ascending: true })
+      .order("entry_id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    rows.push(...((data || []) as GameRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+
+  const seasons: Record<string, number> = {};
+  const weighted = rows.flatMap((g) => {
+    const s = seasonOf(g.tourn_start);
+    if (s === null || s >= season) return [];
+    const back = season - s;
+    const weight = PAST_SEASON_WEIGHTS[back - 1];
+    if (!weight) return [];
+    seasons[String(s)] = (seasons[String(s)] || 0) + 1;
+    return [{ g, weight }];
+  });
+
+  // One weighted update per competitor against the field average: these are
+  // priors, not a standing, so they do not need a period-by-period replay.
+  const byTeam = new Map<string, Game[]>();
+  const byDebater = new Map<string, Game[]>();
+  for (const { g, weight } of weighted) {
+    const game: Game = { opponent: { ...UNRATED }, score: g.score, weight };
+    const code = canonCode(g.code);
+    byTeam.set(code, [...(byTeam.get(code) || []), game]);
+    for (const id of g.student_ids || []) {
+      const key = String(id);
+      byDebater.set(key, [...(byDebater.get(key) || []), game]);
+    }
+  }
+
+  const rate = (book: Map<string, Game[]>) => {
+    const out = new Map<string, Rating>();
+    for (const [key, games] of book) out.set(key, update({ ...UNRATED }, games));
+    return out;
+  };
+
+  return { teams: rate(byTeam), debaters: rate(byDebater), rounds: weighted.length, seasons };
+}
+
+/** Every past meeting between these teams: code -> opponent code -> {w, l}. */
+export async function headToHead(db: SupabaseClient, codes: string[]): Promise<Record<string, Record<string, { w: number; l: number }>>> {
+  const out: Record<string, Record<string, { w: number; l: number }>> = {};
+  if (!codes.length) return out;
+  for (let i = 0; i < codes.length; i += 200) {
+    const slice = codes.slice(i, i + 200);
+    // Paged with the primary key as the order, so no meeting is counted twice or missed.
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await db.from("rating_games").select("code,opp_code,score,tourn_id,round_id,entry_id")
+        .in("code", slice)
+        .order("tourn_id", { ascending: true })
+        .order("round_id", { ascending: true })
+        .order("entry_id", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      for (const g of data || []) {
+        const row = (out[canonCode(g.code)] = out[canonCode(g.code)] || {});
+        const cell = (row[canonCode(g.opp_code)] = row[canonCode(g.opp_code)] || { w: 0, l: 0 });
+        if (g.score === 1) cell.w++; else if (g.score === 0) cell.l++;
+      }
+      if (!data || data.length < PAGE) break;
+    }
+  }
+  return out;
+}
