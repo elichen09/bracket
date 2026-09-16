@@ -273,6 +273,7 @@ function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][
   }
   const out: [Standing, Standing][] = [];
   for (let i = 0; i + 1 < shuffled.length; i += 2) out.push([shuffled[i], shuffled[i + 1]]);
+  keepSchoolsApart(out);
   return out;
 }
 
@@ -297,6 +298,31 @@ const SEED_JITTER = 0.4;
 /** Two entries a tabroom will not put in the same room. */
 function sameSchool(a: Standing, b: Standing): boolean {
   return !!a.team.school && a.team.school === b.team.school;
+}
+
+/**
+ * Take two teams from one school out of the same room.
+ *
+ * Pairing a bracket greedily cannot avoid this on its own: by the time the last
+ * two teams are left there is no choice to make, so whoever remains is paired
+ * whatever their school. The fix is to swap partners with another pair, which
+ * every tabroom does and which is why not one of the 1,238 real pairings across
+ * Grapevine and the Season Opener put two entries from the same school together.
+ */
+function keepSchoolsApart(pairs: [Standing, Standing][]): void {
+  for (let x = 0; x < pairs.length; x++) {
+    if (!sameSchool(pairs[x][0], pairs[x][1])) continue;
+    for (let y = 0; y < pairs.length; y++) {
+      if (x === y) continue;
+      const [a1, b1] = pairs[x];
+      const [a2, b2] = pairs[y];
+      if (!sameSchool(a1, b2) && !sameSchool(a2, b1)) {
+        pairs[x] = [a1, b2];
+        pairs[y] = [a2, b1];
+        break;
+      }
+    }
+  }
 }
 
 /**
@@ -382,17 +408,18 @@ function pairPower(pool: Standing[], rand: () => number, jitter = SEED_JITTER): 
       }
     }
 
-    // High against low, stepping up from the bottom to dodge a rematch or two
-    // teams from the same school. The school rule is absolute in practice: across
-    // 1,238 real pairings at Grapevine and the Season Opener not one put two
-    // entries from the same school together, though most entries came from
-    // schools that brought several.
+    // High against low, stepping up from the bottom to dodge a rematch or a
+    // school clash. The walk cannot help the last pair in a bracket, which has no
+    // choice left, so the bracket is repaired once it is laid out.
+    const made: [Standing, Standing][] = [];
     while (group.length > 1) {
       const a = group.shift()!;
       let j = group.length - 1;
       while (j > 0 && (a.met.has(group[j].team.code) || sameSchool(a, group[j]))) j--;
-      out.push([a, group.splice(j, 1)[0]]);
+      made.push([a, group.splice(j, 1)[0]]);
     }
+    keepSchoolsApart(made);
+    for (const pair of made) out.push(pair);
     // a lone team in the lowest bracket has nobody to draw: that is a bye
   }
   return out;
