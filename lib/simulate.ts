@@ -34,10 +34,28 @@ export interface SimConfig {
   seed?: number;                // deterministic runs when given
 }
 
-export interface SimRound { round: number; code: string; opp: string; won: boolean; recordBefore: string }
+/**
+ * One round as the simulation ran it, with the reasoning kept alongside the
+ * result: `chance` is what the model gave this team before the round, and the
+ * rest is where that number came from.
+ */
+export interface SimRound {
+  round: number; code: string; opp: string; won: boolean; recordBefore: string;
+  chance: number;          // this team's chance of winning, before the round
+  base: number;            // the part of it that came from the two ratings
+  form: number;            // what speaker-point form moved it, signed
+  h2h: number;             // what previous meetings moved it, signed
+  h2hW: number; h2hL: number;   // this team's record against that opponent
+  rating: number; oppRating: number;
+}
 /** One entry's simulated weekend. `seed` is where they finished the prelims, 1 being first. */
 export interface SimEntryResult { code: string; wins: number; losses: number; seed: number; rounds: SimRound[] }
-export interface SimElimMatch { round: string; a: string | null; b: string | null; winner: string | null; bye: boolean }
+export interface SimElimMatch {
+  round: string; a: string | null; b: string | null; winner: string | null; bye: boolean;
+  chance: number | null;   // chance `a` won, null for a bye
+  form: number; h2hW: number; h2hL: number;
+  aRating: number; bRating: number;
+}
 
 export interface SimSample {
   prelims: SimEntryResult[];
@@ -88,23 +106,62 @@ const canon = (code: string) => code.replace(/\s+/g, " ").trim().toLowerCase();
  * Probability `a` beats `b`. Glicko first, then the two adjustments, kept small
  * so they colour the pick rather than overturn the ratings.
  */
-export function winChance(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"]): number {
-  let p = expectedScore(a.rating, b.rating);
+export interface WinBreakdown {
+  p: number;          // chance `a` wins, after everything
+  base: number;       // the Glicko expectation on its own
+  form: number;       // what speaker-point form moved it, signed
+  h2h: number;        // what previous meetings moved it, signed
+  w: number; l: number;   // `a`'s record against `b`
+}
+
+/**
+ * The estimate, with its parts kept.
+ *
+ * A probability on its own is not an explanation. Keeping the three terms apart
+ * lets the page say which one actually decided the round: a rating gap, a team
+ * that speaks better, or a result these two have already produced.
+ */
+export function breakdown(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"]): WinBreakdown {
+  const base = expectedScore(a.rating, b.rating);
 
   // speaker-point form: a full standard deviation of edge is worth ~6 points of probability
   const form = (a.pointsZ - b.pointsZ) * 0.06;
-  p += form;
+  const afterForm = base + form;
+  let p = afterForm;
 
   // head to head between these two specific teams
   const rec = h2h[canon(a.code)]?.[canon(b.code)];
+  let w = 0, l = 0;
   if (rec && rec.w + rec.l > 0) {
-    const n = rec.w + rec.l;
-    const observed = rec.w / n;
+    w = rec.w; l = rec.l;
+    const n = w + l;
+    const observed = w / n;
     const weight = Math.min(0.25, 0.08 * n);           // caps at a quarter of the answer
     p = p * (1 - weight) + observed * weight;
   }
 
-  return Math.max(0.03, Math.min(0.97, p));
+  return { p: Math.max(0.03, Math.min(0.97, p)), base, form, h2h: p - afterForm, w, l };
+}
+
+/** Probability `a` beats `b`, when the reasoning behind it is not needed. */
+export function winChance(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"]): number {
+  return breakdown(a, b, h2h).p;
+}
+
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** One side's view of a breakdown; `flip` turns it around for the other team. */
+function sideOf(bd: WinBreakdown, self: SimTeam, opp: SimTeam, flip: boolean) {
+  return {
+    chance: r3(flip ? 1 - bd.p : bd.p),
+    base: r3(flip ? 1 - bd.base : bd.base),
+    form: r3(flip ? -bd.form : bd.form),
+    h2h: r3(flip ? -bd.h2h : bd.h2h),
+    h2hW: flip ? bd.l : bd.w,
+    h2hL: flip ? bd.w : bd.l,
+    rating: Math.round(self.rating.rating),
+    oppRating: Math.round(opp.rating.rating),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +252,8 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     const paired = new Set<string>();
     for (const [x, y] of pairs) {
       paired.add(x.team.code); paired.add(y.team.code);
-      const p = winChance(x.team, y.team, cfg.headToHead);
+      const bd = breakdown(x.team, y.team, cfg.headToHead);
+      const p = bd.p;
       const xWins = rand() < p;
       const before = `${x.wins}-${x.losses}`, beforeY = `${y.wins}-${y.losses}`;
       if (xWins) { x.wins++; y.losses++; } else { y.wins++; x.losses++; }
@@ -203,8 +261,8 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       y.speaks += roundSpeaks(y.team, !xWins, rand);
       x.met.add(y.team.code); y.met.add(x.team.code);
       if (keepSample) {
-        x.rounds.push({ round, code: x.team.code, opp: y.team.code, won: xWins, recordBefore: before });
-        y.rounds.push({ round, code: y.team.code, opp: x.team.code, won: !xWins, recordBefore: beforeY });
+        x.rounds.push({ round, code: x.team.code, opp: y.team.code, won: xWins, recordBefore: before, ...sideOf(bd, x.team, y.team, false) });
+        y.rounds.push({ round, code: y.team.code, opp: x.team.code, won: !xWins, recordBefore: beforeY, ...sideOf(bd, y.team, x.team, true) });
       }
     }
     // an odd field leaves one team unpaired: that is a bye, and a bye is a win
@@ -212,7 +270,11 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       if (!paired.has(s.team.code)) {
         s.wins++;
         s.speaks += roundSpeaks(s.team, true, rand);   // a bye is scored as an average round
-        if (keepSample) s.rounds.push({ round, code: s.team.code, opp: "bye", won: true, recordBefore: `${s.wins - 1}-${s.losses}` });
+        if (keepSample) s.rounds.push({
+          round, code: s.team.code, opp: "bye", won: true, recordBefore: `${s.wins - 1}-${s.losses}`,
+          chance: 1, base: 1, form: 0, h2h: 0, h2hW: 0, h2hL: 0,
+          rating: Math.round(s.team.rating.rating), oppRating: 0,
+        });
       }
     }
   }
@@ -241,15 +303,24 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       const a = alive[2 * i];                               // adjacent slots meet, as the order intends
       const b = alive[2 * i + 1];
       if (a && b) {
-        const p = winChance(a.team, b.team, cfg.headToHead);
+        const bd = breakdown(a.team, b.team, cfg.headToHead);
+        const p = bd.p;
         const aWins = rand() < p;
         const w = aWins ? a : b;
         next.push(w);
-        matches.push({ round: name, a: a.team.code, b: b.team.code, winner: w.team.code, bye: false });
+        matches.push({
+          round: name, a: a.team.code, b: b.team.code, winner: w.team.code, bye: false,
+          chance: r3(bd.p), form: r3(bd.form), h2hW: bd.w, h2hL: bd.l,
+          aRating: Math.round(a.team.rating.rating), bRating: Math.round(b.team.rating.rating),
+        });
       } else {
         const w = a || b;
         next.push(w);
-        matches.push({ round: name, a: a?.team.code ?? null, b: b?.team.code ?? null, winner: w?.team.code ?? null, bye: true });
+        matches.push({
+          round: name, a: a?.team.code ?? null, b: b?.team.code ?? null, winner: w?.team.code ?? null, bye: true,
+          chance: null, form: 0, h2hW: 0, h2hL: 0,
+          aRating: Math.round(a?.team.rating.rating ?? 0), bRating: Math.round(b?.team.rating.rating ?? 0),
+        });
       }
     }
     elims.push(matches);

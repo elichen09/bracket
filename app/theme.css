@@ -364,3 +364,12 @@ table.rank td.down { color: var(--bad); }
    opponent into a 58px cell and truncated it. */
 .sim-r.elim { grid-template-columns: 118px 58px minmax(0, 1fr); }
 @media (max-width: 560px) { .sim-r.elim { grid-template-columns: 96px 52px 1fr; } }
+
+/* The opponent cell carries a second line saying why the model leaned the way it
+   did, so it stops being a single nowrap string. */
+.sim-r .sim-opp { display: grid; gap: 1px; white-space: normal; overflow: visible; font-weight: 400; font-size: inherit; }
+.sim-r .sim-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-why { font-family: var(--ui); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sim-why b { font-weight: 600; color: var(--ink); }
+.sim-r.l .sim-name { color: var(--bad); }
+.sim-why .upset { color: var(--gold); font-weight: 600; }

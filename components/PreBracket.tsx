@@ -25,11 +25,11 @@ interface Odds {
   breakPct: number; champPct: number; finalPct: number; semiPct: number; meanWins: number;
   recordSpread: Record<string, number>;
 }
-interface SimMatch { round: string; a: string | null; b: string | null; winner: string | null; bye: boolean }
+interface SimMatch { round: string; a: string | null; b: string | null; winner: string | null; bye: boolean; chance?: number | null; form?: number; h2hW?: number; h2hL?: number; aRating?: number; bRating?: number }
 interface Prediction {
   odds: Odds[];
   sample: {
-    prelims: { code: string; wins: number; losses: number; seed: number; rounds: { round: number; opp: string; won: boolean; recordBefore: string }[] }[];
+    prelims: { code: string; wins: number; losses: number; seed: number; rounds: { round: number; opp: string; won: boolean; recordBefore: string; chance?: number; base?: number; form?: number; h2h?: number; h2hW?: number; h2hL?: number; rating?: number; oppRating?: number }[] }[];
     breakField: { code: string; wins: number; losses: number; seed: number }[];
     elims: SimMatch[][];
     champion: string | null;

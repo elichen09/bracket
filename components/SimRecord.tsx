@@ -11,13 +11,24 @@ import { createPortal } from "react-dom";
  * the losses are called out on their own, because "who does the model think beats
  * them" is the question a seed line cannot answer.
  *
+ * Each round also says why it leaned the way it did. A probability alone is not
+ * an explanation, so the line names the term that actually decided it: the rating
+ * gap, speaker-point form, or a result these two have already produced.
+ *
  * This is one run out of hundreds. The odds tab is the distribution; this is a
  * single sample, and the panel says so rather than letting it read as a forecast.
  */
 
-export interface SimRoundView { round: number; opp: string; won: boolean; recordBefore: string }
+export interface SimRoundView {
+  round: number; opp: string; won: boolean; recordBefore: string;
+  chance?: number; base?: number; form?: number; h2h?: number;
+  h2hW?: number; h2hL?: number; rating?: number; oppRating?: number;
+}
 export interface SimPrelimView { code: string; wins: number; losses: number; seed: number; rounds: SimRoundView[] }
-export interface SimMatchView { round: string; a: string | null; b: string | null; winner: string | null; bye: boolean }
+export interface SimMatchView {
+  round: string; a: string | null; b: string | null; winner: string | null; bye: boolean;
+  chance?: number | null; form?: number; h2hW?: number; h2hL?: number; aRating?: number; bRating?: number;
+}
 
 interface Props {
   code: string;
@@ -31,7 +42,53 @@ interface Props {
   onCareer: (code: string) => void;
 }
 
-interface ElimStep { round: string; opp: string | null; won: boolean; bye: boolean }
+interface Reasoned {
+  chance?: number; form?: number; h2hW?: number; h2hL?: number; rating?: number; oppRating?: number; won: boolean;
+}
+
+interface ElimStep extends Reasoned { round: string; opp: string | null; bye: boolean }
+
+/**
+ * Why the model leaned this way, in one line.
+ *
+ * The rating gap is always shown, since it is the base of every estimate. A
+ * second clause appears only when another term did real work, so the usual round
+ * reads as what it is: two ratings and nothing else.
+ */
+function why(r: Reasoned): { text: string; upset: boolean } | null {
+  if (r.chance === undefined || r.chance === null) return null;
+  const pct = Math.round(r.chance * 100);
+  // Only a real surprise counts. Scoring every round the nominal favourite lost
+  // tags two rounds in five, because most pairings sit near a coin flip.
+  const upset = r.won ? r.chance <= 0.35 : r.chance >= 0.65;
+
+  const parts: string[] = [];
+  const gap = r.rating !== undefined && r.oppRating !== undefined && r.oppRating > 0 ? r.rating - r.oppRating : null;
+  if (gap !== null) {
+    parts.push(Math.abs(gap) < 25 ? `level on rating, ${r.rating} to ${r.oppRating}` : `rated ${r.rating} to ${r.oppRating}`);
+  }
+  const met = (r.h2hW ?? 0) + (r.h2hL ?? 0);
+  if (met > 0) {
+    parts.push(`${r.h2hW}–${r.h2hL} against them already`);
+  } else if (r.form !== undefined && Math.abs(r.form) >= 0.03 && (gap === null || Math.abs(gap) < 60)) {
+    // Only when form did real work. A strong-speaking team carries the same edge
+    // into every round, so naming it beside a wide rating gap explains nothing and
+    // repeats on every line.
+    parts.push(r.form > 0 ? "ahead on speaks" : "behind on speaks");
+  }
+  return { text: `${pct}% · ${parts.join(" · ")}`, upset };
+}
+
+function Why({ r }: { r: Reasoned }) {
+  const w = why(r);
+  if (!w) return null;
+  return (
+    <small className="sim-why">
+      {w.text}
+      {w.upset && <> · <span className="upset">upset</span></>}
+    </small>
+  );
+}
 
 export default function SimRecord({
   code, prelims, elims, champion, breakWins, totalPrelims, fieldSize, onClose, onCareer,
@@ -53,14 +110,26 @@ export default function SimRecord({
   const losses = (me?.rounds || []).filter((r) => !r.won);
   const broke = !!me && me.wins >= breakWins;
 
-  // their elim path, walked out of the sample bracket
+  // their elim path, walked out of the sample bracket and turned to face them
   const path: ElimStep[] = [];
   for (const round of elims) {
     const m = round.find((x) => x.a === code || x.b === code);
     if (!m) continue;
-    const opp = m.a === code ? m.b : m.a;
-    path.push({ round: m.round, opp, won: m.winner === code, bye: m.bye });
-    if (m.winner !== code) break;
+    const isA = m.a === code;
+    const won = m.winner === code;
+    path.push({
+      round: m.round,
+      opp: isA ? m.b : m.a,
+      bye: m.bye,
+      won,
+      chance: m.chance === null || m.chance === undefined ? undefined : (isA ? m.chance : 1 - m.chance),
+      form: m.form === undefined ? undefined : (isA ? m.form : -m.form),
+      h2hW: isA ? m.h2hW : m.h2hL,
+      h2hL: isA ? m.h2hL : m.h2hW,
+      rating: isA ? m.aRating : m.bRating,
+      oppRating: isA ? m.bRating : m.aRating,
+    });
+    if (!won) break;
   }
   const knockedOut = path.find((s) => !s.won) || null;
   const won = champion === code;
@@ -122,14 +191,17 @@ export default function SimRecord({
             )}
 
             <section className="d-sec wide" style={{ marginTop: 18 }}>
-              <h3>Prelims <span>round by round, with the record they carried in</span></h3>
+              <h3>Prelims <span>round by round, and what the model made of each one</span></h3>
               <ol className="sim-rounds">
                 {me.rounds.map((r) => (
                   <li className={"sim-r " + (r.won ? "w" : "l")} key={r.round}>
                     <span className="sim-rn mono">R{r.round}</span>
                     <span className="sim-rec mono">{r.recordBefore}</span>
                     <span className="sim-res">{r.won ? "beat" : "lost to"}</span>
-                    <span className="sim-opp">{r.opp === "bye" ? "a bye" : r.opp}</span>
+                    <span className="sim-opp">
+                      <b className="sim-name">{r.opp === "bye" ? "a bye" : r.opp}</b>
+                      {r.opp !== "bye" && <Why r={r} />}
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -144,13 +216,23 @@ export default function SimRecord({
                     <li className={"sim-r elim " + (s.won ? "w" : "l")} key={i}>
                       <span className="sim-rn mono">{s.round}</span>
                       <span className="sim-res">{s.bye ? "had" : s.won ? "beat" : "lost to"}</span>
-                      <span className="sim-opp">{s.bye || !s.opp ? "a bye" : s.opp}</span>
+                      <span className="sim-opp">
+                        <b className="sim-name">{s.bye || !s.opp ? "a bye" : s.opp}</b>
+                        {!s.bye && s.opp && <Why r={s} />}
+                      </span>
                     </li>
                   ))}
                 </ol>
                 {won && <p className="sim-note">Took the tournament in this run.</p>}
               </section>
             )}
+
+            <p className="sim-note">
+              The percentage is what the model gave them going into that round: the two
+              ratings first, then speaker-point form, then anything these two have already
+              done to each other. A round is marked an upset only when a clear underdog took
+              it, which at these odds happens often enough to expect.
+            </p>
 
             <div className="sim-actions">
               <button className="teamlink" onClick={() => onCareer(code)}>
