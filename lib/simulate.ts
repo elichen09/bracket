@@ -199,6 +199,53 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
 /** Roughly a standard normal, from three uniforms. */
 const gauss = (rand: () => number) => (rand() + rand() + rand() - 1.5) * 2;
 
+/**
+ * Read the seeds back out of a bracket that has actually been drawn.
+ *
+ * Seeding is a prediction until the tournament breaks. After that it is not: the
+ * draw itself says what the seeds were, because a bracket is invertible. Byes go
+ * to the top seeds, and every pair in the opening round sums to one more than the
+ * bracket width, so the real matchups pin almost every seed down.
+ *
+ * What the draw cannot say is which of two teams in a room was the higher seed,
+ * and which of several byes came first. Those are settled by this site's own
+ * estimate, which is the only part left guessing. Without this the page labels a
+ * real bracket with predicted seeds and the two disagree: at the Season Opener
+ * only 2 of 53 opening matches summed to 129, so a correct bracket read as a
+ * broken one.
+ */
+function seedsFromBracket(broke: Standing[], stages: KnownElimStage[]): Map<string, number> | null {
+  if (!stages.length || !broke.length) return null;
+  const first = stages[0].matches.filter((m) => m.a && m.b);
+  if (!first.length) return null;
+
+  let width = 1;
+  while (width < broke.length) width *= 2;
+
+  // this site's order, best first, used only to break what the draw leaves open
+  const guess = new Map<string, number>();
+  broke.forEach((s, i) => guess.set(s.team.code, i));
+  const rank = (code: string) => guess.get(code) ?? Number.MAX_SAFE_INTEGER;
+
+  const played = new Set<string>();
+  for (const m of first) { if (m.a) played.add(m.a); if (m.b) played.add(m.b); }
+
+  const out = new Map<string, number>();
+  const byes = broke.map((s) => s.team.code).filter((c) => !played.has(c)).sort((a, b) => rank(a) - rank(b));
+  byes.forEach((code, i) => out.set(code, i + 1));
+
+  const pairs = first
+    .map((m) => (rank(m.a!) <= rank(m.b!) ? [m.a!, m.b!] : [m.b!, m.a!]))
+    .sort((x, y) => rank(x[0]) - rank(y[0]));
+  pairs.forEach(([hi, lo], i) => {
+    const seed = byes.length + i + 1;
+    out.set(hi, seed);
+    out.set(lo, width + 1 - seed);
+  });
+
+  return out;
+}
+
 /** One side's view of a breakdown; `flip` turns it around for the other team. */
 function sideOf(bd: WinBreakdown, self: SimTeam, opp: SimTeam, flip: boolean) {
   return {
@@ -702,7 +749,16 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
   const one = runOnce(teams, cfg, rand, true);
   const sample: SimSample = {
     prelims: one.seeded.map((s, i) => ({ code: s.team.code, wins: s.wins, losses: s.losses, seed: i + 1, rounds: s.rounds })),
-    breakField: one.broke.map((s, i) => ({ code: s.team.code, wins: s.wins, losses: s.losses, seed: i + 1 })),
+    breakField: (() => {
+      // Once a bracket exists the seeds come from it, not from the projection.
+      const real = seedsFromBracket(one.broke, cfg.known?.elimStages ?? []);
+      return one.broke
+        .map((s, i) => ({
+          code: s.team.code, wins: s.wins, losses: s.losses,
+          seed: real?.get(s.team.code) ?? i + 1,
+        }))
+        .sort((a, b) => a.seed - b.seed);
+    })(),
     elims: one.elims,
     champion: one.champion,
   };
