@@ -56,6 +56,7 @@ export interface CareerSeason {
 export interface CareerRecord {
   studentId: number;
   fetchedAt: string;
+  empty?: boolean;                   // Tabroom publishes no results record for this debater
   tournaments: CareerTournament[];   // newest first
   seasons: CareerSeason[];           // newest first
   totals: { tournaments: number; prelimW: number; prelimL: number; elimW: number; elimL: number; breaks: number; titles: number; ballotsWon: number; ballotsLost: number; affW: number; affL: number; negW: number; negL: number; opponents: number; judges: number };
@@ -91,7 +92,16 @@ const seasonOf = (ymd: string): string => {
 export function parseStudentRecord(html: string, studentId: number): CareerRecord {
   const panels: Record<string, Panel> = grabJson(html, "panels") || {};
   const summary: Record<string, { third_speaker?: string }> = grabJson(html, "summaryTable") || {};
-  if (!Object.keys(panels).length) throw new Error("Tabroom returned no record for that debater");
+  if (!Object.keys(panels).length) {
+    // Tabroom serves an empty record shell (no panels, no season blocks) for debaters
+    // whose results it does not publish — unlinked students, or records hidden by
+    // preference. That is a fact about the debater, not a failure, so it is a valid
+    // record and gets cached like any other instead of re-fetching on every view.
+    return {
+      studentId, fetchedAt: new Date().toISOString(), empty: true, tournaments: [], seasons: [],
+      totals: { tournaments: 0, prelimW: 0, prelimL: 0, elimW: 0, elimL: 0, breaks: 0, titles: 0, ballotsWon: 0, ballotsLost: 0, affW: 0, affL: 0, negW: 0, negL: 0, opponents: 0, judges: 0 },
+    };
+  }
 
   const byTourn = new Map<number, CareerTournament>();
   for (const p of Object.values(panels)) {
@@ -179,8 +189,17 @@ function tabroom(): TabroomSession {
 }
 
 async function fetchRecord(studentId: number): Promise<CareerRecord> {
-  const html = await tabroom().page(`/index/results/team_results.mhtml?id1=${studentId}`);
-  return parseStudentRecord(html, studentId);
+  // Tabroom intermittently serves an empty record shell for a debater who does have
+  // a record (its own banner admits this page is fragile). Treat an empty answer as
+  // suspect and ask again before believing it.
+  let rec: CareerRecord | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 1200 * attempt));
+    const html = await tabroom().page(`/index/results/team_results.mhtml?id1=${studentId}`);
+    rec = parseStudentRecord(html, studentId);
+    if (!rec.empty) return rec;
+  }
+  return rec as CareerRecord;
 }
 
 /** The record for one debater — from the Supabase cache, memory, or Tabroom. `fresh` skips every cache and re-pulls. */
@@ -203,6 +222,12 @@ export async function careerFor(db: SupabaseClient | null, studentId: number, fr
   memory.set(studentId, { at: Date.now(), value });
   value.catch(() => memory.delete(studentId));
   const rec = await value;
+  if (rec.empty) {
+    // Tabroom came back empty even after retries. That is very likely a blip, so it is
+    // never cached: forget it at once and let the next view ask again.
+    memory.delete(studentId);
+    return rec;
+  }
   if (db) {
     try { await db.from("student_records").upsert({ student_id: studentId, payload: rec, fetched_at: rec.fetchedAt }, { onConflict: "student_id" }); } catch { /* cache is best-effort */ }
   }

@@ -174,9 +174,17 @@ export default function TeamDossier({ tid, team, pool, onClose }: Props) {
                   {s.students.map((st) => {
                     const rec = (s.career || {})[String(st.id)];
                     const nm = `${st.first} ${st.last}`.trim();
-                    return rec
-                      ? <Career key={st.id} name={nm} rec={rec} partnerNow={s.code} fieldCodes={fieldCodes} currentTournId={s.tournId} />
-                      : <div className="career" key={st.id}><h4>{nm}</h4><Empty>{s.careerNote || "No record came back from Tabroom."}</Empty></div>;
+                    if (rec && !rec.empty && rec.tournaments.length) {
+                      return <Career key={st.id} name={nm} rec={rec} partnerNow={s.code} fieldCodes={fieldCodes} currentTournId={s.tournId} />;
+                    }
+                    return (
+                      <div className="career" key={st.id}>
+                        <h4>{nm}</h4>
+                        <Empty>{rec
+                          ? "Tabroom did not return this debater's record just now — its results page is unreliable. Re-pull from Tabroom, below, usually fixes it."
+                          : (s.careerNote || "No record came back from Tabroom.")}</Empty>
+                      </div>
+                    );
                   })}
                 </Section>
 
