@@ -66,7 +66,7 @@ export interface SimConfig {
   seed?: number;                // deterministic runs when given
   known?: KnownState;           // rounds already debated, applied rather than guessed
   breakCap?: number;            // ceiling on the break field, cutting the last record bracket on speaks
-  seedJitter?: number;          // how far a pairing wanders from seed order; see SEED_JITTER
+  seedSigma?: number;           // how well the seed order is known, in places; see SEED_SIGMA
 }
 
 /**
@@ -196,6 +196,9 @@ export function winChance(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"]):
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
+/** Roughly a standard normal, from three uniforms. */
+const gauss = (rand: () => number) => (rand() + rand() + rand() - 1.5) * 2;
+
 /** One side's view of a breakdown; `flip` turns it around for the other team. */
 function sideOf(bd: WinBreakdown, self: SimTeam, opp: SimTeam, flip: boolean) {
   return {
@@ -262,7 +265,7 @@ function pairFor(live: Standing[], round: number, cfg: SimConfig, rand: () => nu
 
   const rest = used.size ? live.filter((s) => !used.has(s.team.code)) : live;
   if (!rest.length) return out;
-  return out.concat(round <= cfg.randomRounds ? pairRandom(rest, rand) : pairPower(rest, rand, cfg.seedJitter ?? SEED_JITTER));
+  return out.concat(round <= cfg.randomRounds ? pairRandom(rest, rand) : pairPower(rest, rand, cfg.seedSigma ?? SEED_SIGMA));
 }
 
 function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][] {
@@ -278,22 +281,34 @@ function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][
 }
 
 /**
- * How much a real pairing wanders from the seed order, in speaker points.
+ * How well the seed order is known, in places.
  *
- * A tabroom seeds the bracket and pairs high against low, but it also has to
- * honour sides, keep schools apart and avoid rematches, so the result is never
- * exactly the seed order. Measured against the Season Opener and Grapevine, the
- * rank sum of a real pairing averages almost exactly one bracket-width, so the
- * rule is high-low; the jitter is what stops it being rigid.
+ * The pairing rule itself is not in doubt: a tabroom seeds each bracket and
+ * pairs high against low. What is in doubt is the seed order this works from.
+ * Tabroom seeds on adjusted speaker points and tiebreaks this site cannot see,
+ * so the order here is an estimate, and in a bracket of twenty-four a couple of
+ * places of error changes who meets whom.
  *
- * The value is measured, not guessed. Sweeping it against the rounds those two
- * tournaments actually paired, the probability the model puts on the opponent a
- * team really drew peaks between 0.25 and 0.5 and falls away either side. Larger
- * values keep raising the chance the true opponent appears somewhere in the top
- * few, which looks like an improvement and is not: it is the same confidence
- * spread over more teams.
+ * So the uncertainty is put where it belongs. Each team's position is drawn
+ * around its estimated place with this spread, and the bracket is re-sorted
+ * before pairing: sigma is literally "the seed order is known to within about
+ * this many places". Perturbing the points instead, as this used to, barely
+ * reorders a bracket whose points are well separated, which left the model
+ * naming two possible opponents out of a bracket of six and giving the real one
+ * nothing at all.
+ *
+ * The value is chosen by calibration rather than by hit rate. Scoring it on how
+ * often it is exactly right rewards confident guesses and is indifferent to
+ * putting zero on what actually happened, which is the failure worth avoiding.
+ *
+ * Swept against the rounds Grapevine and the Season Opener actually paired: at
+ * three places the model still considers the opponent a team really drew in 56%
+ * of cases, against 10% when the order is taken as exact, and the probability it
+ * puts on that opponent when it does consider it is at its best. Going wider
+ * keeps nudging coverage up but pays for it in sharpness and halves how often
+ * the top pick is right, which is spreading confidence rather than earning it.
  */
-const SEED_JITTER = 0.4;
+const SEED_SIGMA = 3;
 
 /** Two entries a tabroom will not put in the same room. */
 function sameSchool(a: Standing, b: Standing): boolean {
@@ -346,7 +361,7 @@ function keepSchoolsApart(pairs: [Standing, Standing][]): void {
  * pull-up at Grapevine and the Season Opener, the team chosen was the worst in
  * its bracket by that measure every time.
  */
-function pairPower(pool: Standing[], rand: () => number, jitter = SEED_JITTER): [Standing, Standing][] {
+function pairPower(pool: Standing[], rand: () => number, sigma = SEED_SIGMA): [Standing, Standing][] {
   // Bracket on losses, not wins. A team that has had a bye carries one round
   // fewer, so a 4-0 belongs with the undefeated 5-0s rather than with the 4-1s.
   // Grouping on wins files it in the wrong bracket and pairs it against the
@@ -383,10 +398,12 @@ function pairPower(pool: Standing[], rand: () => number, jitter = SEED_JITTER): 
   const seeded = new Map<number, Standing[]>();
   for (const losses of order) {
     const group = brackets.get(losses)!.slice();
-    const key = new Map<Standing, number>();
-    for (const s of group) key.set(s, rate(s) + (rand() + rand() - 1) * jitter / rounds(s));
-    group.sort((a, b) => key.get(b)! - key.get(a)! || a.team.seed - b.team.seed);
-    seeded.set(losses, group);
+    // the order this site can work out, best first
+    group.sort((a, b) => rate(b) - rate(a) || a.team.seed - b.team.seed);
+    // then move each team around its place by however well that order is known
+    const placed = group.map((st, i) => ({ st, at: i + gauss(rand) * sigma }));
+    placed.sort((a, b) => a.at - b.at);
+    seeded.set(losses, placed.map((x) => x.st));
   }
 
   const out: [Standing, Standing][] = [];
