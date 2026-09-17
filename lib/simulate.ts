@@ -782,14 +782,33 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   };
 
   let survivors: (Standing | null)[] | null = null;
-  for (const stage of knownStages) {
+  const entered = new Set<string>();
+  for (let depth = 0; depth < knownStages.length; depth++) {
+    const stage = knownStages[depth];
     const matches: SimElimMatch[] = [];
     const advancing: (Standing | null)[] = [];
+
+    // A break that is not a power of two opens with a partial round, and Tabroom
+    // reports only the rooms that actually debated. The teams sitting it out are
+    // missing from the results altogether, so the column comes up short: at the
+    // Season Opener 53 matches where the bracket needs 64 places. Nothing in the
+    // next round can then sit against what feeds it. Put those teams back as the
+    // byes they are.
+    const drawnList = stage.matches.slice();
+    if (depth === 0) {
+      const inRound = new Set<string>();
+      for (const m of stage.matches) { if (m.a) inRound.add(m.a); if (m.b) inRound.add(m.b); }
+      for (const st of broke) {
+        if (!inRound.has(st.team.code)) drawnList.push({ a: st.team.code, b: null, winner: st.team.code });
+      }
+    }
+
     const drawn = drawnSeeds
-      ? stage.matches.slice().sort((x, y) =>
-          Math.min(slotOf(x.a), slotOf(x.b)) - Math.min(slotOf(y.a), slotOf(y.b)))
-      : stage.matches;
+      ? drawnList.sort((x, y) => Math.min(slotOf(x.a), slotOf(x.b)) - Math.min(slotOf(y.a), slotOf(y.b)))
+      : drawnList;
     for (const m of drawn) {
+      if (m.a) entered.add(m.a);
+      if (m.b) entered.add(m.b);
       const A = m.a ? byCode.get(m.a) ?? null : null;
       const B = m.b ? byCode.get(m.b) ?? null : null;
       if (A && B) {
@@ -822,17 +841,37 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   // would erase the very teams most likely to win.
   let alive: (Standing | null)[];
   if (survivors) {
-    const entered = new Set<string>();
-    for (const stage of knownStages) {
-      for (const m of stage.matches) { if (m.a) entered.add(m.a); if (m.b) entered.add(m.b); }
-    }
+    // Who is still to enter. This once rebuilt its own list from the raw stage
+    // data, which has no byes in it, so a team given a bye counted twice: once
+    // among the survivors and again as still waiting. The pool then overflowed
+    // the bracket and the page grew a phantom round that was the opening one
+    // inverted, 53 byes against 11 debated.
     const waiting = broke.filter((s) => !entered.has(s.team.code));
     const pool = [...survivors.filter((x): x is Standing => !!x), ...waiting];
-    const rank = new Map(broke.map((s, i) => [s.team.code, i]));
-    pool.sort((a, b) => (rank.get(a.team.code) ?? 1e9) - (rank.get(b.team.code) ?? 1e9));
-    let width = 1;
-    while (width < pool.length) width *= 2;
-    alive = seedOrder(width).map((seed) => pool[seed - 1] ?? null);
+    if (drawnSeeds && knownStages.length) {
+      // Carry the draw forward. These teams already hold places in the bracket
+      // they came out of, and a place halves each round: slot s becomes s >> k
+      // after k rounds. Re-laying them in a fresh bracket by rating instead threw
+      // that away, which is why every round after the replayed ones came out
+      // unordered and sitting against the wrong matches.
+      const done = knownStages.length;
+      const span = Math.max(1, drawnWidth >> done);
+      const carried: (Standing | null)[] = new Array(span).fill(null);
+      for (const st of pool) {
+        const slot = slotOf(st.team.code);
+        if (slot === Number.MAX_SAFE_INTEGER) continue;
+        const at = slot >> done;
+        if (at < span && !carried[at]) carried[at] = st;
+      }
+      alive = carried;
+    } else {
+      // No recovered draw to follow, so seed what is left on the standings.
+      const rank = new Map(broke.map((s, i) => [s.team.code, i]));
+      pool.sort((a, b) => (rank.get(a.team.code) ?? 1e9) - (rank.get(b.team.code) ?? 1e9));
+      let left = 1;
+      while (left < pool.length) left *= 2;
+      alive = seedOrder(left).map((seed) => pool[seed - 1] ?? null);
+    }
   } else {
     alive = field;
   }
