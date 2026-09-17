@@ -358,7 +358,34 @@ function sideOf(bd: WinBreakdown, self: SimTeam, opp: SimTeam, flip: boolean) {
 // one tournament
 // ---------------------------------------------------------------------------
 
-interface Standing { team: SimTeam; wins: number; losses: number; speaks: number; met: Set<string>; rounds: SimRound[] }
+interface Standing {
+  team: SimTeam; wins: number; losses: number; speaks: number;
+  scores: number[];            // each round on its own, so the ends can be dropped
+  met: Set<string>; rounds: SimRound[];
+}
+
+/**
+ * The points a tournament seeds on: every round except the team's best and worst.
+ *
+ * Not the running total. Tabroom drops the high and the low before seeding, and
+ * the difference decides real seeds: at Grapevine, Plano Senior SG leads Bellaire
+ * AC 356.9 to 355.9 on the raw total and trails 238.2 to 238.4 once the ends come
+ * off, and the tournament seeded Bellaire AC above them. Measured against the
+ * byes, which by definition go to the very top seeds, the raw total gets 3 of 4
+ * right at Grapevine and 10 of 11 at the Season Opener; dropping the ends gets
+ * every one.
+ */
+function adjustedPoints(scores: number[]): number {
+  if (scores.length < 3) return scores.reduce((a, b) => a + b, 0);
+  const sorted = scores.slice().sort((a, b) => a - b);
+  return sorted.slice(1, -1).reduce((a, b) => a + b, 0);
+}
+
+/** The same, per round, so a team that has debated fewer is not punished for it. */
+function seedRate(s: Standing): number {
+  const counted = s.scores.length >= 3 ? s.scores.length - 2 : s.scores.length;
+  return adjustedPoints(s.scores) / Math.max(1, counted);
+}
 
 /**
  * Speaker points for one round. Centred on what this team usually earns, a little
@@ -532,7 +559,7 @@ function pairPower(pool: Standing[], rand: () => number, sigma = SEED_SIGMA): [S
   // Seed on speaker points per round rather than the running total, for the same
   // reason: a team with a bye should not sink for having debated once less.
   const rounds = (s: Standing) => Math.max(1, s.wins + s.losses);
-  const rate = (s: Standing) => s.speaks / rounds(s);
+  const rate = (s: Standing) => seedRate(s);
 
   // The standings as they stand, best first, which is what an opponent's seed
   // means; and from that, how weak a schedule each team has faced.
@@ -623,7 +650,7 @@ function elimRoundName(matches: number): string {
 }
 
 function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSample: boolean) {
-  const standings: Standing[] = teams.map((team) => ({ team, wins: 0, losses: 0, speaks: 0, met: new Set<string>(), rounds: [] }));
+  const standings: Standing[] = teams.map((team) => ({ team, wins: 0, losses: 0, speaks: 0, scores: [], met: new Set<string>(), rounds: [] }));
   const byCode = new Map(standings.map((s) => [s.team.code, s]));
 
   // The first round still to be debated. This follows how far the tournament has
@@ -647,7 +674,9 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       if (!k || k.won === null) { live.push(s); continue; }
       const before = `${s.wins}-${s.losses}`;
       if (k.won) s.wins++; else s.losses++;
-      s.speaks += k.points !== null ? k.points : expectedSpeaks(s.team, k.won);
+      const got = k.points !== null ? k.points : expectedSpeaks(s.team, k.won);
+      s.speaks += got;
+      s.scores.push(got);
       if (k.opp) s.met.add(k.opp);
       paired.add(s.team.code);
       if (keepSample) s.rounds.push({
@@ -675,8 +704,10 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       const xWins = rand() < p;
       const before = `${x.wins}-${x.losses}`, beforeY = `${y.wins}-${y.losses}`;
       if (xWins) { x.wins++; y.losses++; } else { y.wins++; x.losses++; }
-      x.speaks += roundSpeaks(x.team, xWins, rand);
-      y.speaks += roundSpeaks(y.team, !xWins, rand);
+      const xGot = roundSpeaks(x.team, xWins, rand);
+      const yGot = roundSpeaks(y.team, !xWins, rand);
+      x.speaks += xGot; x.scores.push(xGot);
+      y.speaks += yGot; y.scores.push(yGot);
       x.met.add(y.team.code); y.met.add(x.team.code);
       if (keepSample) {
         x.rounds.push({ round, code: x.team.code, opp: y.team.code, won: xWins, recordBefore: before, ...sideOf(bd, x.team, y.team, false) });
@@ -688,7 +719,9 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       if (!paired.has(s.team.code)) {
         if (round === firstOpen) nextPairing.set(s.team.code, "bye");
         s.wins++;
-        s.speaks += roundSpeaks(s.team, true, rand);   // a bye is scored as an average round
+        const byeGot = roundSpeaks(s.team, true, rand);   // a bye is scored as an average round
+        s.speaks += byeGot;
+        s.scores.push(byeGot);
         if (keepSample) s.rounds.push({
           round, code: s.team.code, opp: "bye", won: true, recordBefore: `${s.wins - 1}-${s.losses}`,
           chance: 1, base: 1, form: 0, h2h: 0, h2hW: 0, h2hL: 0,
@@ -702,7 +735,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   // wins first, then speaker points inside each win bracket, exactly as a real
   // tournament seeds: two 6-0 teams are separated by the speaks they earned
   const seeded = standings.slice().sort((a, b) =>
-    b.wins - a.wins || b.speaks - a.speaks || a.team.seed - b.team.seed);
+    b.wins - a.wins || adjustedPoints(b.scores) - adjustedPoints(a.scores) || a.team.seed - b.team.seed);
   // Who breaks. Once elims have started the real field is known and is used as
   // it stands. Otherwise everyone on the break record advances, capped when the
   // tournament breaks a fixed number — and because `seeded` is already ordered by
