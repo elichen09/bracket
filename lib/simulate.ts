@@ -45,6 +45,7 @@ export interface KnownElimStage { label: string; matches: KnownElimMatch[] }
 export interface KnownState {
   prelims: Record<string, KnownPrelim[]>;      // entry code -> its posted rounds
   prelimsDone: number;
+  withdrawn?: Record<string, number>;          // entries no longer in the field -> last prelim they debated
   pendingRound: number | null;                 // paired but not yet debated
   brokeCodes: string[] | null;                 // the real break field, once elims start
   /**
@@ -66,7 +67,6 @@ export interface SimConfig {
   seed?: number;                // deterministic runs when given
   known?: KnownState;           // rounds already debated, applied rather than guessed
   breakCap?: number;            // ceiling on the break field, cutting the last record bracket on speaks
-  seedSigma?: number;           // how well the seed order is known, in places; see SEED_SIGMA
 }
 
 /**
@@ -294,19 +294,38 @@ function seedsFromBracket(broke: Standing[], stages: KnownElimStage[]): Map<stri
   // how many teams it holds, since the halves rarely hold the same number once
   // byes are in; where they do, this site's own order breaks the tie.
   const out = new Map<string, number>();
+
+  /** The best seed a stretch of the bracket holds. */
+  const bestSeed = (lo: number, hi: number): number => {
+    let best = Number.MAX_SAFE_INTEGER;
+    for (let i = lo; i < hi; i++) if (order[i] <= broke.length && order[i] < best) best = order[i];
+    return best;
+  };
+
   const place = (node: Node, lo: number, hi: number): void => {
     if (node.team !== undefined) {
+      let at = -1;
       for (let i = lo; i < hi; i++) {
-        if (order[i] <= broke.length) { out.set(node.team, order[i]); return; }
+        if (order[i] <= broke.length && (at < 0 || order[i] < order[at])) at = i;
       }
+      if (at >= 0) out.set(node.team, order[at]);
       return;
     }
     if (!node.kids) return;
     const mid = (lo + hi) >> 1;
     let [x, y] = node.kids;
     const want = capacity(lo, mid);
-    if (x.size !== want && y.size === want) [x, y] = [y, x];
-    else if (x.size === y.size && y.best < x.best) [x, y] = [y, x];
+    if (x.size !== want && y.size === want) {
+      [x, y] = [y, x];
+    } else if (x.size === y.size) {
+      // Rows alternate which side is drawn on top, so the earlier half of a
+      // stretch is not always the stronger one: in the second row the top slot
+      // holds seed 65 and the one under it holds 64. A side has to be placed by
+      // the seed it would take, not by where it sits, or the better team is
+      // handed the worse seed and the two swap against the real bracket.
+      const strongerFirst = bestSeed(lo, mid) < bestSeed(mid, hi);
+      if (strongerFirst !== (x.best <= y.best)) [x, y] = [y, x];
+    }
     place(x, lo, mid);
     place(y, mid, hi);
   };
@@ -362,6 +381,9 @@ interface Standing {
   team: SimTeam; wins: number; losses: number; speaks: number;
   scores: number[];            // each round on its own, so the ends can be dropped
   met: Set<string>; rounds: SimRound[];
+  guessed: number;             // debated rounds whose points were not published, so were estimated
+  pulled: number;              // times pulled up into a higher bracket, less times pulled down
+  byes: number;
 }
 
 /**
@@ -428,9 +450,9 @@ function knownFor(known: SimConfig["known"], code: string, round: number): Known
  * guessed at, which is the difference between predicting a round and reporting
  * one. Whatever is left is paired the way the tournament would pair it.
  */
-function pairFor(live: Standing[], round: number, cfg: SimConfig, rand: () => number): [Standing, Standing][] {
+function pairFor(live: Standing[], field: Standing[], round: number, cfg: SimConfig, rand: () => number): PairedRound {
   const out: [Standing, Standing][] = [];
-  if (!live.length) return out;
+  if (!live.length) return { pairs: out, order: [] };
   const used = new Set<string>();
 
   if (cfg.known) {
@@ -447,9 +469,14 @@ function pairFor(live: Standing[], round: number, cfg: SimConfig, rand: () => nu
   }
 
   const rest = used.size ? live.filter((s) => !used.has(s.team.code)) : live;
-  if (!rest.length) return out;
-  return out.concat(round <= cfg.randomRounds ? pairRandom(rest, rand) : pairPower(rest, rand, cfg.seedSigma ?? SEED_SIGMA));
+  if (!rest.length) return { pairs: out, order: [] };
+  if (round <= cfg.randomRounds) return { pairs: out.concat(pairRandom(rest, rand)), order: [] };
+  const powered = pairPower(rest, field, rand, round === cfg.randomRounds + 1);
+  return { pairs: out.concat(powered.pairs), order: powered.order };
 }
+
+/** A round's pairings, and the order the power-pairing ranked the teams in. */
+interface PairedRound { pairs: [Standing, Standing][]; order: string[] }
 
 function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][] {
   const shuffled = pool.slice();
@@ -462,36 +489,6 @@ function pairRandom(pool: Standing[], rand: () => number): [Standing, Standing][
   keepSchoolsApart(out);
   return out;
 }
-
-/**
- * How well the seed order is known, in places.
- *
- * The pairing rule itself is not in doubt: a tabroom seeds each bracket and
- * pairs high against low. What is in doubt is the seed order this works from.
- * Tabroom seeds on adjusted speaker points and tiebreaks this site cannot see,
- * so the order here is an estimate, and in a bracket of twenty-four a couple of
- * places of error changes who meets whom.
- *
- * So the uncertainty is put where it belongs. Each team's position is drawn
- * around its estimated place with this spread, and the bracket is re-sorted
- * before pairing: sigma is literally "the seed order is known to within about
- * this many places". Perturbing the points instead, as this used to, barely
- * reorders a bracket whose points are well separated, which left the model
- * naming two possible opponents out of a bracket of six and giving the real one
- * nothing at all.
- *
- * The value is chosen by calibration rather than by hit rate. Scoring it on how
- * often it is exactly right rewards confident guesses and is indifferent to
- * putting zero on what actually happened, which is the failure worth avoiding.
- *
- * Swept against the rounds Grapevine and the Season Opener actually paired: at
- * three places the model still considers the opponent a team really drew in 56%
- * of cases, against 10% when the order is taken as exact, and the probability it
- * puts on that opponent when it does consider it is at its best. Going wider
- * keeps nudging coverage up but pays for it in sharpness and halves how often
- * the top pick is right, which is spreading confidence rather than earning it.
- */
-const SEED_SIGMA = 3;
 
 /** Two entries a tabroom will not put in the same room. */
 function sameSchool(a: Standing, b: Standing): boolean {
@@ -524,105 +521,193 @@ function keepSchoolsApart(pairs: [Standing, Standing][]): void {
 }
 
 /**
- * Power pairing, the way a tabroom actually does it.
+ * How far the seed order is trusted, and in what units.
  *
- * Inside each win bracket, teams are seeded on speaker points and then paired
- * high against low: the top of the bracket draws the bottom, the second draws
- * the second from bottom, and so on. That is not a detail. Pairing at random
- * inside the bracket spreads the guess over everyone on the same record, which
- * is worse than useless for predicting an opponent; high-low concentrates it on
- * the handful of teams a person could actually draw.
+ * Points are what this site cannot always see. A round with published points
+ * seeds almost exactly as Tabroom does, so the average is only nudged; a round
+ * whose points are estimated from the team's usual form could be off by most of
+ * a point, and the order is loosened to match. SOP_SIGMA is a smaller wobble on
+ * the final ordering, in seed places, for the tiebreaks this site does not have.
  *
- * A bracket with an odd number of teams pulls one UP from the bracket below,
- * rather than pushing its own odd team down. Tabroom chooses the team with the
- * worst average opponent seed: the one that has faced the weakest schedule, and
- * so has the least claim on the record it is sitting on. That team joins at the
- * bottom of the higher bracket, so high-low sets it against the top seed there.
- *
- * Grapevine's round six is exactly this. Three teams sat at 5-0, so the top seed
- * drew a pull-up and the other two met each other. Checked against every real
- * pull-up at Grapevine and the Season Opener, the team chosen was the worst in
- * its bracket by that measure every time.
+ * Both were swept against the rounds Glenbrooks, John Edie, the TOC, Grapevine
+ * and the Season Opener actually paired. Wider values spread the list over more
+ * teams without putting the real opponent in it any more often.
  */
-function pairPower(pool: Standing[], rand: () => number, sigma = SEED_SIGMA): [Standing, Standing][] {
-  // Bracket on losses, not wins. A team that has had a bye carries one round
-  // fewer, so a 4-0 belongs with the undefeated 5-0s rather than with the 4-1s.
-  // Grouping on wins files it in the wrong bracket and pairs it against the
-  // wrong half of the field.
-  const brackets = new Map<number, Standing[]>();
+const POINTS_SIGMA = 0.05;
+const GUESSED_POINTS_SIGMA = 0.8;
+const SOP_SIGMA = 1;
+
+/**
+ * Power pairing, as Tabroom's own pairing code does it (pair_debate.mas).
+ *
+ * Every team in the field is seeded: wins first, then points with the best and
+ * worst rounds dropped, averaged over the rounds debated. Each team's SOP is its
+ * seed plus the average seed of the opponents it has met, so a team that has had
+ * an easy schedule sits lower than its record alone suggests. An opponent who
+ * has since dropped out has no seed, and counts as zero.
+ *
+ * Brackets are filled from the top. A bracket with an odd number of teams pulls
+ * one up: the team with the most wins left, and among those the weakest
+ * schedule, which is the highest average opponent seed. A team that has already
+ * been pulled up on balance is passed over. A bracket is also topped up if one
+ * school holds more than half of it, since those teams could not all be paired.
+ *
+ * Inside the bracket the best SOP takes the worst SOP it is allowed to meet, then
+ * the next best takes the worst left, and so on; a rematch or a school-mate is
+ * skipped. When that leaves someone stranded, pairings are undone from the
+ * bottom until the stranded team fits.
+ *
+ * The first power-paired round is the exception. With two rounds debated there
+ * is nothing left once the high and low are dropped, so tournaments fall through
+ * to whatever their next tiebreak is: opponent wins at some, raw points at
+ * others. That round is drawn from a mix, because which one a tournament uses is
+ * not published.
+ *
+ * Replaying Glenbrooks, John Edie, the TOC, Grapevine and the Season Opener one
+ * round at a time from round three, the opponent a team really drew is among the
+ * five the Next round tab lists 70% of the time, and first 28% of the time. The
+ * high-low on points this replaced managed 20% and 4%. The first power round is
+ * still the weak one, and at a field the size of the Opener's it is little better
+ * than a guess.
+ */
+function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean): PairedRound {
+  const wins = (s: Standing) => s.wins;
+
+  // Opponent wins, for tournaments whose first power round falls through to it.
+  const byCode = new Map(field.map((s) => [s.team.code, s]));
+  const oppWins = (s: Standing) => {
+    let n = 0;
+    for (const code of s.met) n += byCode.get(code)?.wins ?? 0;
+    return n;
+  };
+  const total = (s: Standing) => s.scores.reduce((a, b) => a + b, 0);
+  const average = (s: Standing) => total(s) / Math.max(1, s.scores.length);
+
+  // one draw of how this tournament breaks ties in the first power round
+  const style = firstPowered ? rand() : 1;
+  const points = (s: Standing) => {
+    const share = s.scores.length ? s.guessed / s.scores.length : 1;
+    const noise = gauss(rand) * (POINTS_SIGMA + (GUESSED_POINTS_SIGMA - POINTS_SIGMA) * share);
+    if (style < 0.25) return oppWins(s) * 1000 + total(s) / 1000;
+    if (style < 0.75) return average(s) + noise;
+    if (firstPowered) return rand();
+    return seedRate(s) + noise;
+  };
+
+  // seeds across the whole field, dense, 1 the best
+  const keyed = field.map((s) => ({ s, w: wins(s), p: points(s), t: total(s) }));
+  keyed.sort((a, b) => b.w - a.w || b.p - a.p || b.t - a.t);
+  const seed = new Map<string, number>();
+  let place = 0;
+  keyed.forEach((k, i) => {
+    const prev = keyed[i - 1];
+    if (!prev || prev.w !== k.w || prev.p !== k.p || prev.t !== k.t) place++;
+    seed.set(k.s.team.code, place);
+  });
+
+  const oppSeed = new Map<Standing, number>();
+  const sop = new Map<Standing, number>();
+  const tie = new Map<Standing, number>();
   for (const s of pool) {
-    const b = brackets.get(s.losses) || [];
-    b.push(s);
-    brackets.set(s.losses, b);
-  }
-
-  // Seed on speaker points per round rather than the running total, for the same
-  // reason: a team with a bye should not sink for having debated once less.
-  const rounds = (s: Standing) => Math.max(1, s.wins + s.losses);
-  const rate = (s: Standing) => seedRate(s);
-
-  // The standings as they stand, best first, which is what an opponent's seed
-  // means; and from that, how weak a schedule each team has faced.
-  const rankOf = new Map<string, number>();
-  pool.slice()
-    .sort((a, b) => a.losses - b.losses || rate(b) - rate(a) || a.team.seed - b.team.seed)
-    .forEach((st, i) => rankOf.set(st.team.code, i + 1));
-  const weakness = new Map<Standing, number>();
-  for (const st of pool) {
     let sum = 0, n = 0;
-    for (const code of st.met) {
-      const r = rankOf.get(code);
-      if (r !== undefined) { sum += r; n++; }
+    for (const code of s.met) { sum += seed.get(code) ?? 0; n++; }
+    const os = n ? sum / n : 0;
+    oppSeed.set(s, os);
+    sop.set(s, (seed.get(s.team.code) ?? place) + os + gauss(rand) * SOP_SIGMA);
+    tie.set(s, rand());
+  }
+  const seedOf = (s: Standing) => seed.get(s.team.code) ?? place;
+  const clash = (a: Standing, b: Standing) => a === b || a.met.has(b.team.code) || b.met.has(a.team.code) || sameSchool(a, b);
+  const bySop = (a: Standing, b: Standing) => sop.get(a)! - sop.get(b)! || seedOf(a) - seedOf(b) || tie.get(a)! - tie.get(b)!;
+
+  const opp = new Map<Standing, Standing>();
+  const pairs: [Standing, Standing][] = [];
+  const pair = (a: Standing, b: Standing) => { opp.set(a, b); opp.set(b, a); };
+
+  // An odd field leaves one team out: the worst SOP in the lowest bracket that has
+  // not had a bye already.
+  const rest = pool.slice();
+  if (rest.length % 2 === 1) {
+    const low = Math.min(...rest.map(wins));
+    const eligible = rest.filter((s) => wins(s) === low && s.byes === 0);
+    const from = eligible.length ? eligible : rest.filter((s) => wins(s) === low);
+    from.sort(bySop);
+    const out = from[from.length - 1];
+    rest.splice(rest.indexOf(out), 1);
+  }
+
+  const top = rest.length ? Math.max(...rest.map(wins)) : -1;
+  for (let x = top; x >= 0; x--) {
+    const bracket = rest.filter((s) => wins(s) >= x && !opp.has(s));
+    const inBracket = new Set(bracket);
+
+    for (let guard = 0; guard < 100; guard++) {
+      const schools = new Map<string, number>();
+      for (const s of bracket) if (s.team.school) schools.set(s.team.school, (schools.get(s.team.school) || 0) + 1);
+      const biggest = Math.max(0, ...schools.values());
+      const even = bracket.length % 2 === 0 && bracket.length - biggest >= biggest;
+      if (even || opp.size + bracket.length >= rest.length) break;
+      const candidates = rest
+        .filter((s) => !inBracket.has(s) && !opp.has(s))
+        .sort((a, b) => wins(b) - wins(a) || oppSeed.get(b)! - oppSeed.get(a)! || seedOf(b) - seedOf(a) || tie.get(a)! - tie.get(b)!);
+      if (!candidates.length) break;
+      const pick = candidates.find((s) => s.pulled <= 0) ?? candidates[0];
+      bracket.push(pick);
+      inBracket.add(pick);
     }
-    weakness.set(st, n ? sum / n : 0);
-  }
 
-  const order = Array.from(brackets.keys()).sort((a, b) => a - b);
-  const seeded = new Map<number, Standing[]>();
-  for (const losses of order) {
-    const group = brackets.get(losses)!.slice();
-    // the order this site can work out, best first
-    group.sort((a, b) => rate(b) - rate(a) || a.team.seed - b.team.seed);
-    // then move each team around its place by however well that order is known
-    const placed = group.map((st, i) => ({ st, at: i + gauss(rand) * sigma }));
-    placed.sort((a, b) => a.at - b.at);
-    seeded.set(losses, placed.map((x) => x.st));
-  }
-
-  const out: [Standing, Standing][] = [];
-  for (let i = 0; i < order.length; i++) {
-    const group = seeded.get(order[i])!;
-
-    // An odd bracket pulls one up from the bracket below, taken from its lower
-    // third, and that team joins at the bottom — so high-low sets it against the
-    // top seed. Pulling cascades: the bracket below is now one lighter, which can
-    // make it odd in turn, exactly as a real pairing cascades down the standings.
-    if (group.length % 2 === 1 && i + 1 < order.length) {
-      const below = seeded.get(order[i + 1])!;
-      if (below.length) {
-        let pick = 0;
-        for (let k = 1; k < below.length; k++) {
-          if ((weakness.get(below[k]) ?? 0) > (weakness.get(below[pick]) ?? 0)) pick = k;
+    const order = bracket.slice().sort(bySop);
+    const greedy = (taken: Map<Standing, Standing>) => {
+      for (const a of order) {
+        if (taken.has(a)) continue;
+        for (let j = order.length - 1; j >= 0; j--) {
+          const b = order[j];
+          if (taken.has(b) || clash(a, b)) continue;
+          taken.set(a, b); taken.set(b, a);
+          break;
         }
-        group.push(below.splice(pick, 1)[0]);
+      }
+    };
+    let trial = new Map(opp);
+    greedy(trial);
+    if (order.some((s) => !trial.has(s))) {
+      // Undo pairings from the bottom one at a time. After each, the worst team
+      // still stranded is paired first, then the rest of the bracket again.
+      const retry = new Map(trial);
+      for (let j = order.length - 1; j >= 0; j--) {
+        const stranded = order.filter((s) => !retry.has(s));
+        const child = stranded[stranded.length - 1];
+        if (!child) break;
+        const k = order[j];
+        if (k === child || !retry.has(k)) continue;
+        const was = retry.get(k)!;
+        retry.delete(k); retry.delete(was);
+        for (let i = order.length - 1; i >= 0; i--) {
+          const b = order[i];
+          if (!retry.has(b) && !clash(child, b)) { retry.set(child, b); retry.set(b, child); break; }
+        }
+        greedy(retry);
+        if (order.every((s) => retry.has(s))) { trial = retry; break; }
       }
     }
-
-    // High against low, stepping up from the bottom to dodge a rematch or a
-    // school clash. The walk cannot help the last pair in a bracket, which has no
-    // choice left, so the bracket is repaired once it is laid out.
-    const made: [Standing, Standing][] = [];
-    while (group.length > 1) {
-      const a = group.shift()!;
-      let j = group.length - 1;
-      while (j > 0 && (a.met.has(group[j].team.code) || sameSchool(a, group[j]))) j--;
-      made.push([a, group.splice(j, 1)[0]]);
-    }
-    keepSchoolsApart(made);
-    for (const pair of made) out.push(pair);
-    // a lone team in the lowest bracket has nobody to draw: that is a bye
+    for (const [a, b] of trial) if (!opp.has(a)) pair(a, b);
+    // anyone still unpaired drops into the next bracket down
   }
-  return out;
+
+  // whatever could not be placed at all is paired among itself
+  const left = rest.filter((s) => !opp.has(s));
+  for (let i = 0; i + 1 < left.length; i += 2) pair(left[i], left[i + 1]);
+
+  const seen = new Set<Standing>();
+  for (const [a, b] of opp) {
+    if (seen.has(a)) continue;
+    seen.add(a); seen.add(b);
+    pairs.push([a, b]);
+  }
+  keepSchoolsApart(pairs);
+
+  const order = pool.slice().sort((a, b) => wins(b) - wins(a) || bySop(a, b)).map((s) => s.team.code);
+  return { pairs, order };
 }
 
 /**
@@ -636,7 +721,15 @@ function seedOrder(size: number): number[] {
   while (arr.length < size) {
     const n = arr.length * 2;
     const next: number[] = [];
-    for (const s of arr) next.push(s, n + 1 - s);
+    arr.forEach((s, i) => {
+      const other = n + 1 - s;
+      // Alternate which side of the pair is drawn on top. Every other row flips,
+      // which is what puts the two best seeds at opposite ends of the column and
+      // is how the tournament's own bracket reads. Without the flip the pairs are
+      // right but the column is stacked in the wrong order.
+      if (i % 2 === 0) next.push(s, other);
+      else next.push(other, s);
+    });
     arr = next;
   }
   return arr;
@@ -650,8 +743,33 @@ function elimRoundName(matches: number): string {
 }
 
 function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSample: boolean) {
-  const standings: Standing[] = teams.map((team) => ({ team, wins: 0, losses: 0, speaks: 0, scores: [], met: new Set<string>(), rounds: [] }));
+  const fresh = (team: SimTeam): Standing => ({
+    team, wins: 0, losses: 0, speaks: 0, scores: [], met: new Set<string>(), rounds: [], guessed: 0, pulled: 0, byes: 0,
+  });
+  const standings: Standing[] = teams.map(fresh);
   const byCode = new Map(standings.map((s) => [s.team.code, s]));
+
+  // Entries that dropped out are gone from the field, but not from the rounds they
+  // debated: their opponents still met them, and Tabroom still seeded them while
+  // they were in. Each is rebuilt from its opponents' side of those rounds, so the
+  // teams that met them seed as they really did.
+  const ghostRows = new Map<string, KnownPrelim[]>();
+  if (cfg.known) {
+    for (const [code, rows] of Object.entries(cfg.known.prelims)) {
+      for (const r of rows) {
+        if (!r.opp || r.bye || r.won === null || byCode.has(r.opp)) continue;
+        const list = ghostRows.get(r.opp) || [];
+        list.push({ round: r.round, opp: code, won: !r.won, points: null, bye: false });
+        ghostRows.set(r.opp, list);
+      }
+    }
+  }
+  const ghosts: Standing[] = [...ghostRows.keys()].map((code) =>
+    fresh({ code, school: null, seed: 1e6, rating: { ...UNRATED }, pointsZ: 0, rated: false, source: "none" }));
+  const everyone = new Map(byCode);
+  for (const g of ghosts) everyone.set(g.team.code, g);
+  const rowFor = (s: Standing, round: number) =>
+    ghostRows.has(s.team.code) ? ghostRows.get(s.team.code)!.find((r) => r.round === round) ?? null : knownFor(cfg.known, s.team.code, round);
 
   // The first round still to be debated. This follows how far the tournament has
   // actually got, not the first gap in the data: a couple of teams always have a
@@ -660,24 +778,58 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   const openFrom = cfg.known ? cfg.known.prelimsDone + 1 : 1;
   let firstOpen = -1;
   const nextPairing = new Map<string, string>();
+  let nextOrder: string[] = [];
   const openStandings = new Map<string, { wins: number; losses: number }>();
 
   for (let round = 1; round <= cfg.prelims; round++) {
     const paired = new Set<string>();
+    const winsBefore = new Map<Standing, number>();
+    for (const s of everyone.values()) winsBefore.set(s, s.wins);
+    const met: [Standing, Standing][] = [];
+
+    // A dropped entry is in the rounds it has a result for and no others. Live, an
+    // entry missing from the field has already withdrawn, so it is not paired again.
+    const inRound = (g: Standing) => !!rowFor(g, round) || (cfg.known?.withdrawn?.[g.team.code] ?? 0) >= round;
+    // An entry in the field with no result in the last round debated has stopped
+    // turning up, and a tabroom does not pair a team that is not there.
+    const showed = (s: Standing) => !cfg.known || cfg.known.prelimsDone < 1 || round <= cfg.known.prelimsDone
+      ? true
+      : !!knownFor(cfg.known, s.team.code, cfg.known.prelimsDone);
+    const present = [...standings.filter(showed), ...ghosts.filter(inRound)];
 
     // A round that has been debated is a fact, so it is applied rather than
     // re-run. Each team carries its own posted result, so the two sides need no
     // matching up, and every later round pairs off the standings that really exist.
     const live: Standing[] = [];
-    for (const s of standings) {
-      const k = knownFor(cfg.known, s.team.code, round);
+    for (const s of present) {
+      let k = rowFor(s, round);
+      // A round the field has finished that this entry has nothing for is one it
+      // was not in, typically a late arrival, and Tabroom scores that as a bye.
+      // Simulating it instead gives the team a different record in every run and
+      // blurs the whole bracket it lands in.
+      if (!k && cfg.known && round <= cfg.known.prelimsDone && !ghostRows.has(s.team.code) && cfg.known.prelims[s.team.code]?.length) {
+        k = { round, opp: null, won: true, points: null, bye: true };
+      }
       if (!k || k.won === null) { live.push(s); continue; }
       const before = `${s.wins}-${s.losses}`;
       if (k.won) s.wins++; else s.losses++;
-      const got = k.points !== null ? k.points : expectedSpeaks(s.team, k.won);
-      s.speaks += got;
-      s.scores.push(got);
-      if (k.opp) s.met.add(k.opp);
+      // A forfeit is posted as a bye on one side. Tabroom leaves those rounds out of
+      // both teams' schedules, so neither counts the other as an opponent.
+      const forfeit = k.bye || (!!k.opp && !!rowFor(everyone.get(k.opp) ?? s, round)?.bye);
+      // A bye has no points to seed on, so it is left out of the average rather
+      // than filled in; Tabroom's seeds read that way.
+      if (k.bye) s.byes++;
+      else {
+        const got = k.points !== null ? k.points : expectedSpeaks(s.team, k.won);
+        if (k.points === null) s.guessed++;
+        s.speaks += got;
+        s.scores.push(got);
+      }
+      if (k.opp && !forfeit) {
+        s.met.add(k.opp);
+        const o = everyone.get(k.opp);
+        if (o && s.team.code < k.opp) met.push([s, o]);
+      }
       paired.add(s.team.code);
       if (keepSample) s.rounds.push({
         round, code: s.team.code, opp: k.bye ? "bye" : (k.opp || "unknown"), won: k.won, recordBefore: before,
@@ -692,8 +844,10 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     if (round === firstOpen && !openStandings.size) {
       for (const s of standings) openStandings.set(s.team.code, { wins: s.wins, losses: s.losses });
     }
-    const pairs = pairFor(live, round, cfg, rand);
+    const { pairs, order } = pairFor(live, present, round, cfg, rand);
+    if (round === firstOpen) nextOrder = order;
     for (const [x, y] of pairs) {
+      met.push([x, y]);
       if (round === firstOpen) {
         nextPairing.set(x.team.code, y.team.code);
         nextPairing.set(y.team.code, x.team.code);
@@ -714,14 +868,22 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
         y.rounds.push({ round, code: y.team.code, opp: x.team.code, won: !xWins, recordBefore: beforeY, ...sideOf(bd, y.team, x.team, true) });
       }
     }
+    // A power-paired round moves teams between brackets, and Tabroom will not pull
+    // the same team up twice, so each move is counted against the records the
+    // teams carried into it.
+    if (round > cfg.randomRounds) {
+      for (const [x, y] of met) {
+        const wx = winsBefore.get(x) ?? 0, wy = winsBefore.get(y) ?? 0;
+        if (wx < wy) { x.pulled++; y.pulled--; } else if (wx > wy) { x.pulled--; y.pulled++; }
+      }
+    }
     // an odd field leaves one team unpaired: that is a bye, and a bye is a win
-    for (const s of standings) {
+    for (const s of present) {
       if (!paired.has(s.team.code)) {
+        if (ghostRows.has(s.team.code)) continue;
         if (round === firstOpen) nextPairing.set(s.team.code, "bye");
         s.wins++;
-        const byeGot = roundSpeaks(s.team, true, rand);   // a bye is scored as an average round
-        s.speaks += byeGot;
-        s.scores.push(byeGot);
+        s.byes++;   // a win with no points, like a posted bye
         if (keepSample) s.rounds.push({
           round, code: s.team.code, opp: "bye", won: true, recordBefore: `${s.wins - 1}-${s.losses}`,
           chance: 1, base: 1, form: 0, h2h: 0, h2hW: 0, h2hL: 0,
@@ -734,8 +896,16 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   // seeding: wins first, then speaker form, then entry order
   // wins first, then speaker points inside each win bracket, exactly as a real
   // tournament seeds: two 6-0 teams are separated by the speaks they earned
+  // Adjusted points PER ROUND, not accumulated. A team that has had a bye debates
+  // one round fewer, so any total quietly pushes it down the board however well it
+  // has spoken. Bergen RZ finished 4-1 over five rounds at the Season Opener and
+  // VDA-Vancouver 5-1 over six; VDA leads on wins and on total points by a wide
+  // margin, yet the tournament seeded Bergen RZ 16 and VDA 17, because Bergen RZ
+  // averaged 58.60 a round against 58.35. Measured across the four pairs this got
+  // wrong, the per-round figure orders every one of them the way the tournament
+  // did, where the total manages two and win percentage none.
   const seeded = standings.slice().sort((a, b) =>
-    b.wins - a.wins || adjustedPoints(b.scores) - adjustedPoints(a.scores) || a.team.seed - b.team.seed);
+    b.wins - a.wins || seedRate(b) - seedRate(a) || a.team.seed - b.team.seed);
   // Who breaks. Once elims have started the real field is known and is used as
   // it stands. Otherwise everyone on the break record advances, capped when the
   // tournament breaks a fixed number — and because `seeded` is already ordered by
@@ -803,14 +973,23 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       }
     }
 
+    // Sort by the first slot a room occupies. This has to read the same slots the
+    // rooms are printed in, so the sides are put in slot order first and the rows
+    // sorted after: swapping the sides afterwards left every row correct inside
+    // and the column stacked wrong.
+    if (drawnSeeds) {
+      for (const m of drawnList) {
+        if (m.a && m.b && slotOf(m.a) > slotOf(m.b)) { const sw = m.a; m.a = m.b; m.b = sw; }
+      }
+    }
     const drawn = drawnSeeds
       ? drawnList.sort((x, y) => Math.min(slotOf(x.a), slotOf(x.b)) - Math.min(slotOf(y.a), slotOf(y.b)))
       : drawnList;
     for (const m of drawn) {
       if (m.a) entered.add(m.a);
       if (m.b) entered.add(m.b);
-      const A = m.a ? byCode.get(m.a) ?? null : null;
-      const B = m.b ? byCode.get(m.b) ?? null : null;
+      let A = m.a ? byCode.get(m.a) ?? null : null;
+      let B = m.b ? byCode.get(m.b) ?? null : null;
       if (A && B) {
         const bd = breakdown(A.team, B.team, cfg.headToHead);
         const aWon = m.winner ? m.winner === A.team.code : rand() < bd.p;
@@ -908,7 +1087,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   }
 
   const champion = alive[0]?.team.code ?? null;
-  return { standings, seeded, broke, elims, champion, byCode, firstOpen, nextPairing, openStandings };
+  return { standings, seeded, broke, elims, champion, byCode, firstOpen, nextPairing, nextOrder, openStandings };
 }
 
 // ---------------------------------------------------------------------------
@@ -923,10 +1102,16 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
   let breakSizeTotal = 0;
   let openRound = -1;
   const nextTally = new Map<string, Map<string, number>>();
+  const placeTally = new Map<string, { sum: number; n: number }>();
   const atOpen = new Map<string, { wins: number; losses: number }>();
   for (let run = 0; run < cfg.runs; run++) {
-    const { standings, broke, elims, champion, firstOpen, nextPairing, openStandings } = runOnce(teams, cfg, rand, false);
+    const { standings, broke, elims, champion, firstOpen, nextPairing, nextOrder, openStandings } = runOnce(teams, cfg, rand, false);
     openRound = firstOpen;
+    nextOrder.forEach((code, i) => {
+      const p = placeTally.get(code) || { sum: 0, n: 0 };
+      p.sum += i; p.n++;
+      placeTally.set(code, p);
+    });
     if (openStandings.size) for (const [code, st] of openStandings) atOpen.set(code, st);
     for (const [code, opp] of nextPairing) {
       const m = nextTally.get(code) || new Map<string, number>();
@@ -984,20 +1169,43 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
     };
   }).sort((a, b) => b.breakPct - a.breakPct || b.champPct - a.champPct || b.meanWins - a.meanWins);
 
+  // Where each team sat in the power-paired order, on average, for filling out a
+  // short list of opponents.
+  const ladder = [...placeTally.entries()]
+    .sort((a, b) => a[1].sum / a[1].n - b[1].sum / b[1].n)
+    .map(([code]) => code);
+  const rung = new Map(ladder.map((code, i) => [code, i]));
+  const schoolOf = new Map(teams.map((t) => [t.code, t.school]));
+  const metBefore = (code: string) => new Set((cfg.known?.prelims[code] ?? []).filter((r) => r.round < openRound && r.opp).map((r) => r.opp!));
+
   const nextRound: NextRound | null = openRound > 0 ? {
     round: openRound,
     published: cfg.known?.pendingRound === openRound,
-    matchups: [...nextTally.entries()].map(([code, m]) => {
+    matchups: [...nextTally.entries()].filter(([code]) => schoolOf.has(code)).map(([code, m]) => {
       const st = atOpen.get(code);
-      return {
-        code,
-        wins: st?.wins ?? 0,
-        losses: st?.losses ?? 0,
-        opponents: [...m.entries()]
-          .map(([opp, n]) => ({ opp, pct: (n / cfg.runs) * 100 }))
-          .sort((a, b) => b.pct - a.pct)
-          .slice(0, 8),
-      };
+      const opponents = [...m.entries()]
+        .map(([opp, n]) => ({ opp, pct: (n / cfg.runs) * 100 }))
+        .sort((a, b) => b.pct - a.pct)
+        .slice(0, 8);
+      // A pairing is sensitive to small differences in seeding, so when the runs
+      // agree on only a few opponents, the teams either side of the likeliest one
+      // are the next most likely. Those are listed after, as long shots.
+      const anchor = opponents.length ? rung.get(opponents[0].opp) : undefined;
+      if (anchor !== undefined && opponents.length < 5) {
+        const met = metBefore(code);
+        const listed = new Set(opponents.map((o) => o.opp));
+        for (let step = 1; opponents.length < 5 && step < ladder.length; step++) {
+          for (const at of [anchor + step, anchor - step]) {
+            const other = ladder[at];
+            if (!other || other === code || listed.has(other) || met.has(other)) continue;
+            if (schoolOf.get(other) && schoolOf.get(other) === schoolOf.get(code)) continue;
+            opponents.push({ opp: other, pct: 0 });
+            listed.add(other);
+            if (opponents.length >= 5) break;
+          }
+        }
+      }
+      return { code, wins: st?.wins ?? 0, losses: st?.losses ?? 0, opponents };
     }).sort((a, b) => b.wins - a.wins || a.code.localeCompare(b.code)),
   } : null;
 

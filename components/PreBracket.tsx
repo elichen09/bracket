@@ -306,7 +306,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
                           {m.opponents.slice(0, 5).map((o) => (
                             <span className="nextopp" key={o.opp}>
                               <b>{o.opp === "bye" ? "a bye" : o.opp}</b>
-                              <i>{o.pct >= 99.5 ? "99%+" : `${o.pct.toFixed(0)}%`}</i>
+                              <i>{o.pct >= 99.5 ? "99%+" : o.pct < 0.5 ? "<1%" : `${o.pct.toFixed(0)}%`}</i>
                             </span>
                           ))}
                           {!m.opponents.length && <span className="nextopp"><b>nobody yet</b></span>}

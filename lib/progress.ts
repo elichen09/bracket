@@ -268,8 +268,22 @@ export function knownStateFrom(progress: TournamentProgress, throughRound?: numb
     ? progress.elims.slice(0, stagesWanted).map((st) => ({ label: st.label, matches: st.matches }))
     : [];
 
+  // Entries that withdrew are missing from the field, so the last round each one
+  // debated is read off their opponents. Replaying a finished tournament, that says
+  // whether a team that later withdrew was still in the round being predicted;
+  // live, the answer is always no.
+  const listed = new Set(progress.entries.map((e) => e.code));
+  const withdrawn: Record<string, number> = {};
+  for (const e of progress.entries) {
+    for (const r of e.rounds) {
+      if (r.elim || !r.opp || listed.has(r.opp)) continue;
+      withdrawn[r.opp] = Math.max(withdrawn[r.opp] ?? 0, r.round);
+    }
+  }
+
   return {
     prelims,
+    withdrawn,
     prelimsDone: Math.min(progress.prelimsDone, cut),
     pendingRound: progress.pendingRound !== null && progress.pendingRound <= cut ? progress.pendingRound : null,
     brokeCodes: prelimsAllIn && progress.brokeCodes.length ? progress.brokeCodes : null,
