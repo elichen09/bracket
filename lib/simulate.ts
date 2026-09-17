@@ -413,26 +413,45 @@ function seedRate(s: Standing): number {
  * Speaker points for one round. Centred on what this team usually earns, a little
  * higher for winning, and with enough spread that two teams on the same record do
  * not always seed the same way — which is the point of seeding on speaks at all.
+ * The spread is a single round's: two judges' points for the same team differ by
+ * about a point and a half.
  */
-function roundSpeaks(team: SimTeam, won: boolean, rand: () => number): number {
-  const noise = (rand() + rand() + rand() - 1.5) * 0.9;   // roughly normal, about ±1
-  return expectedSpeaks(team, won) + noise;
+function roundSpeaks(team: SimTeam, won: boolean, scale: PointsScale, rand: () => number): number {
+  return expectedSpeaks(team, won, scale) + gauss(rand) * ROUND_POINTS_SD;
 }
+
+/** A team's points for a round, on the tournament's own scale. */
+interface PointsScale { mean: number }
 
 /**
  * What a team is expected to earn in a round, before any luck.
  *
  * Used for rounds that have been debated but whose speaker points are not
  * published. Most tournaments hold speaks back until they are over, so this is
- * the ordinary case mid-weekend, and it is not the same as a round that has not
- * happened: the result is known, only the points are missing. Drawing a random
- * score for each of those piles invented variance on top of the seed-order
- * uncertainty that is already modelled and measured, and makes the seeding worse
- * than simply using the best estimate.
+ * the ordinary case mid-weekend: the result is known, only the points are
+ * missing, and the seeds that decide the next pairing are built from them.
+ *
+ * Measured on five tournaments with every point known, a single round's team
+ * points are mostly the judge: the team's level and the result explain about a
+ * fifth of the variation. Of what can be seen before points are posted, the
+ * result is the largest part, a win being worth about a point. The team's rating
+ * and its points history add a little. Everything is on the scale Tabroom
+ * publishes, the two speakers together, and centred on this tournament's own
+ * average when any of its rounds have posted points; mixing a one-speaker
+ * estimate with posted team totals would scramble the seeds outright.
  */
-function expectedSpeaks(team: SimTeam, won: boolean): number {
-  return 28.5 + team.pointsZ * 0.6 + (won ? 0.3 : 0);
+function expectedSpeaks(team: SimTeam, won: boolean, scale: PointsScale): number {
+  return scale.mean
+    + (won ? WIN_POINTS / 2 : -WIN_POINTS / 2)
+    + team.pointsZ * POINTS_Z_WEIGHT
+    + ((team.rating.rating - 1500) / 100) * RATING_POINTS;
 }
+
+const WIN_POINTS = 1.0;
+const POINTS_Z_WEIGHT = 0.3;
+const RATING_POINTS = 0.2;
+const ROUND_POINTS_SD = 1.5;
+const TEAM_POINTS_MEAN = 57.5;
 
 /** This team's posted round, if that round has been posted for them. */
 function knownFor(known: SimConfig["known"], code: string, round: number): KnownPrelim | null {
@@ -768,6 +787,12 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     fresh({ code, school: null, seed: 1e6, rating: { ...UNRATED }, pointsZ: 0, rated: false, source: "none" }));
   const everyone = new Map(byCode);
   for (const g of ghosts) everyone.set(g.team.code, g);
+  // The scale this tournament's points are on, from whatever it has posted.
+  const posted: number[] = [];
+  if (cfg.known) for (const rows of Object.values(cfg.known.prelims)) for (const r of rows) {
+    if (!r.bye && r.points !== null && r.points > 40) posted.push(r.points);
+  }
+  const scale: PointsScale = { mean: posted.length >= 10 ? posted.reduce((a, b) => a + b, 0) / posted.length : TEAM_POINTS_MEAN };
   const rowFor = (s: Standing, round: number) =>
     ghostRows.has(s.team.code) ? ghostRows.get(s.team.code)!.find((r) => r.round === round) ?? null : knownFor(cfg.known, s.team.code, round);
 
@@ -820,7 +845,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       // than filled in; Tabroom's seeds read that way.
       if (k.bye) s.byes++;
       else {
-        const got = k.points !== null ? k.points : expectedSpeaks(s.team, k.won);
+        const got = k.points !== null ? k.points : expectedSpeaks(s.team, k.won, scale);
         if (k.points === null) s.guessed++;
         s.speaks += got;
         s.scores.push(got);
@@ -858,8 +883,8 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       const xWins = rand() < p;
       const before = `${x.wins}-${x.losses}`, beforeY = `${y.wins}-${y.losses}`;
       if (xWins) { x.wins++; y.losses++; } else { y.wins++; x.losses++; }
-      const xGot = roundSpeaks(x.team, xWins, rand);
-      const yGot = roundSpeaks(y.team, !xWins, rand);
+      const xGot = roundSpeaks(x.team, xWins, scale, rand);
+      const yGot = roundSpeaks(y.team, !xWins, scale, rand);
       x.speaks += xGot; x.scores.push(xGot);
       y.speaks += yGot; y.scores.push(yGot);
       x.met.add(y.team.code); y.met.add(x.team.code);
