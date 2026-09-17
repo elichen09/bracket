@@ -32,6 +32,7 @@ export interface KnownPrelim {
   won: boolean | null;          // null when paired but not yet decided
   points: number | null;
   bye: boolean;
+  judges?: number[];            // paradigm ids of whoever judged it
 }
 
 /**
@@ -67,6 +68,7 @@ export interface SimConfig {
   seed?: number;                // deterministic runs when given
   known?: KnownState;           // rounds already debated, applied rather than guessed
   breakCap?: number;            // ceiling on the break field, cutting the last record bracket on speaks
+  judgeHabits?: Record<string, number>;   // paradigm id -> points that judge gives above or below the norm
 }
 
 /**
@@ -435,13 +437,15 @@ interface PointsScale { mean: number }
  * points are mostly the judge: the team's level and the result explain about a
  * fifth of the variation. Of what can be seen before points are posted, the
  * result is the largest part, a win being worth about a point. The team's rating
- * and its points history add a little. Everything is on the scale Tabroom
+ * and its points history add a little. The judge's habit, read from how they
+ * scored at other tournaments (lib/judges.ts), adds more than both. Everything is
+ * on the scale Tabroom
  * publishes, the two speakers together, and centred on this tournament's own
  * average when any of its rounds have posted points; mixing a one-speaker
  * estimate with posted team totals would scramble the seeds outright.
  */
-function expectedSpeaks(team: SimTeam, won: boolean, scale: PointsScale): number {
-  return scale.mean
+function expectedSpeaks(team: SimTeam, won: boolean, scale: PointsScale, judgeLean = 0): number {
+  return scale.mean + judgeLean
     + (won ? WIN_POINTS / 2 : -WIN_POINTS / 2)
     + team.pointsZ * POINTS_Z_WEIGHT
     + ((team.rating.rating - 1500) / 100) * RATING_POINTS;
@@ -452,6 +456,7 @@ const POINTS_Z_WEIGHT = 0.3;
 const RATING_POINTS = 0.2;
 const ROUND_POINTS_SD = 1.5;
 const TEAM_POINTS_MEAN = 57.5;
+const JUDGE_WEIGHT = 1.0;
 
 /** This team's posted round, if that round has been posted for them. */
 function knownFor(known: SimConfig["known"], code: string, round: number): KnownPrelim | null {
@@ -793,6 +798,14 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     if (!r.bye && r.points !== null && r.points > 40) posted.push(r.points);
   }
   const scale: PointsScale = { mean: posted.length >= 10 ? posted.reduce((a, b) => a + b, 0) / posted.length : TEAM_POINTS_MEAN };
+  // How the judges of a round usually score, which is most of what can be known
+  // about points that have not been posted.
+  const judgeLean = (judges: number[] | undefined): number => {
+    if (!judges?.length || !cfg.judgeHabits) return 0;
+    let sum = 0;
+    for (const j of judges) sum += cfg.judgeHabits[String(j)] ?? 0;
+    return (sum / judges.length) * JUDGE_WEIGHT;
+  };
   const rowFor = (s: Standing, round: number) =>
     ghostRows.has(s.team.code) ? ghostRows.get(s.team.code)!.find((r) => r.round === round) ?? null : knownFor(cfg.known, s.team.code, round);
 
@@ -845,7 +858,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       // than filled in; Tabroom's seeds read that way.
       if (k.bye) s.byes++;
       else {
-        const got = k.points !== null ? k.points : expectedSpeaks(s.team, k.won, scale);
+        const got = k.points !== null ? k.points : expectedSpeaks(s.team, k.won, scale, judgeLean(k.judges));
         if (k.points === null) s.guessed++;
         s.speaks += got;
         s.scores.push(got);

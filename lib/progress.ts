@@ -35,6 +35,7 @@ export interface KnownRound {
   bye: boolean;
   points: number | null;    // team speaker points for the round
   side: string | null;
+  judges?: number[];        // Tabroom paradigm ids of whoever judged it
 }
 
 export interface EntryProgress {
@@ -71,6 +72,7 @@ export interface TournamentProgress {
 interface RoundDoc {
   id: number; type: string; label?: string; name?: number; sideLabel?: string; bye?: number | boolean;
   Results?: Record<string, { winloss?: string; point?: number }>;
+  Judges?: Record<string, { paradigm?: number }>;
   Opponent?: { id: number; code: string };
 }
 interface RecordsDoc {
@@ -132,6 +134,7 @@ export async function loadProgress(tournId: number, eventAbbr: string): Promise<
         bye,
         points: typeof pointBallot?.point === "number" ? pointBallot.point : null,
         side: r.sideLabel || null,
+        judges: Object.values(r.Judges || {}).map((j) => j.paradigm ?? 0).filter((x) => x > 0),
       });
     }
     rounds.sort((a, b) => Number(a.elim) - Number(b.elim) || a.round - b.round);
@@ -257,7 +260,7 @@ export function knownStateFrom(progress: TournamentProgress, throughRound?: numb
   for (const e of progress.entries) {
     const rs: KnownPrelim[] = e.rounds
       .filter((r) => !r.elim && r.round <= cut)
-      .map((r) => ({ round: r.round, opp: r.opp, won: r.won, points: r.points, bye: r.bye }));
+      .map((r) => ({ round: r.round, opp: r.opp, won: r.won, points: r.points, bye: r.bye, judges: r.judges }));
     if (rs.length) prelims[e.code] = rs;
   }
   // The break field is real only once every prelim is in; rewind to the middle of

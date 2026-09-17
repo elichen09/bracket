@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { collectGames, isPublicForum, isVarsity, type GameRow } from "./ratings";
+import { judgeTallies, saveJudgeHabits, type JudgeBallot } from "./judges";
 
 /**
  * Past seasons, through the public API rather than by scraping.
@@ -82,10 +83,12 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
 
   let rows: GameRow[] = [];
   let entries = 0;
+  const judgeBallots = new Map<string, JudgeBallot[]>();
   for (const ev of target.events) {
     try {
       const out = await collectGames(target.tournId, ev.abbr);
       rows = rows.concat(out.rows.filter((r) => isPublicForum(r.event_name) && isVarsity(r.event_name)));
+      judgeBallots.set(ev.abbr, out.judgeBallots);
       entries += out.entries;
     } catch {
       // an event that publishes a bracket but no rounds simply contributes nothing
@@ -96,6 +99,13 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
     const { error } = await db.from("rating_games").upsert(rows.slice(i, i + 500), { onConflict: "tourn_id,round_id,entry_id" });
     if (error) return { tournId: target.tournId, name: target.name, start: target.start, events: target.events.map((e) => e.abbr), rows: 0, entries, error: error.message };
   }
+  // How each judge scored, for estimating points a tournament has not posted yet.
+  // A failure here is not worth losing the rounds over.
+  try {
+    for (const [abbr, ballots] of judgeBallots) {
+      await saveJudgeHabits(db, target.tournId, abbr, target.start, judgeTallies(ballots));
+    }
+  } catch { /* the habits are refreshed next time this tournament is read */ }
 
   return {
     tournId: target.tournId,

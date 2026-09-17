@@ -4,6 +4,7 @@ import { currentUser } from "@/lib/auth";
 import { fieldWithRatings } from "@/lib/field";
 import { simulate } from "@/lib/simulate";
 import { loadProgress, knownStateFrom, rewindPoints } from "@/lib/progress";
+import { loadJudgeHabits } from "@/lib/judges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,6 +76,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     // from any point it passed through — before it started, after round three,
     // after octas — by hiding everything later and predicting forward from there.
     let known;
+    let judgeHabits: Record<string, number> | undefined;
     let progressNote: string | null = null;
     let rewind: { label: string; round?: number; elim?: number }[] = [];
     let asOf: string | null = null;
@@ -86,6 +88,13 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       const asOfElim = body.asOfElim === undefined || body.asOfElim === null
         ? undefined : clamp(body.asOfElim, 0, 12, 0);
       known = knownStateFrom(progress, asOfRound, asOfElim);
+      // How this tournament's judges score elsewhere, for points not yet posted.
+      // Its own ballots are left out, so a finished tournament replayed from the
+      // archive is not estimated from the points it is standing in for.
+      try {
+        const paradigms = progress.entries.flatMap((e) => e.rounds.flatMap((r) => r.judges ?? []));
+        judgeHabits = await loadJudgeHabits(db, paradigms, t.tabroom_tourn_id);
+      } catch { /* points are estimated without them */ }
       asOf = rewind.find((r) => r.round === asOfRound && asOfRound !== undefined)?.label
         ?? rewind.find((r) => r.elim === asOfElim && asOfElim !== undefined)?.label
         ?? null;
@@ -103,6 +112,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       randomRounds: Math.min(cfg.randomRounds, cfg.prelims),
       headToHead: h2h,
       known,
+      judgeHabits,
     });
     const byCode = new Map(entries.map((e) => [e.code, e]));
     const payload = {

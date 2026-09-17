@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { UNRATED, update, decay, type Rating, type Game } from "./glicko";
+import { ballotsFromRecords, judgeTallies, saveJudgeHabits, type JudgeBallot } from "./judges";
 
 /**
  * The ratings pipeline.
@@ -115,6 +116,7 @@ interface RecordsDoc {
   Rounds?: Record<string, {
     id: number; type: string; label?: string; name?: number; sideLabel?: string; bye?: number | boolean;
     Results?: Record<string, { winloss?: string; point?: number }>;
+    Judges?: Record<string, { paradigm?: number }>;
     Opponent?: { id: number; code: string };
   }>;
 }
@@ -124,7 +126,7 @@ interface RecordsDoc {
  * then one per entry — a few hundred for a big Public Forum pool, which is why
  * this is an indexing job and not something a page does.
  */
-export async function collectGames(tournId: number, eventAbbr: string): Promise<{ rows: GameRow[]; entries: number; name: string }> {
+export async function collectGames(tournId: number, eventAbbr: string): Promise<{ rows: GameRow[]; entries: number; name: string; start: string | null; judgeBallots: JudgeBallot[] }> {
   const meta = await getJson<{ name: string; start: string }>(`/rest/tourns/${tournId}`);
   const field = await getJson<{ Entries?: FieldEntry[]; name?: string }>(`/rest/tourns/${tournId}/events/${encodeURIComponent(eventAbbr)}/field`);
   let entries = field?.Entries || [];
@@ -157,9 +159,13 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
   const docs = await pool(entries, 6, (e) => getJson<RecordsDoc>(`/rest/tourns/${tournId}/entries/${e.id}/records`));
 
   const rows: GameRow[] = [];
+  // Every ballot of a rated event, with its judge, for judge scoring habits.
+  const judgeBallots: JudgeBallot[] = [];
   docs.forEach((doc, i) => {
     if (!doc || !doc.Rounds) return;
     const entry = entries[i];
+    const eventName = doc.Event?.name || field?.name || eventAbbr;
+    if (isPublicForum(eventName) && isVarsity(eventName)) judgeBallots.push(...ballotsFromRecords(doc));
     const students = Object.keys(doc.Students || {}).map(Number).filter(Boolean);
     for (const r of Object.values(doc.Rounds)) {
       const isPrelim = PRELIM_TYPES.has(r.type), isElim = ELIM_TYPES.has(r.type);
@@ -185,7 +191,7 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
       });
     }
   });
-  return { rows, entries: entries.length, name: meta?.name || "" };
+  return { rows, entries: entries.length, name: meta?.name || "", start: meta?.start || null, judgeBallots };
 }
 
 /** Read one event and store its rounds. Safe to re-run: rows are upserted by round and entry. */
@@ -199,6 +205,7 @@ export async function ingestTournament(db: SupabaseClient, tournId: number, even
     const { error } = await db.from("rating_games").upsert(rows.slice(i, i + 500), { onConflict: "tourn_id,round_id,entry_id" });
     if (error) throw new Error(error.message);
   }
+  await saveJudgeHabits(db, tournId, eventAbbr, out.start, judgeTallies(out.judgeBallots));
   return { rows: rows.length, entries: out.entries, name: out.name, skipped: false };
 }
 
