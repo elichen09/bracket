@@ -80,6 +80,21 @@ export interface SimConfig {
   sideConstraints?: boolean;
   /** How sharply a rating gap decides a round on this circuit; see lib/circuit.ts. */
   winCurve?: WinCurve;
+  /**
+   * The first power-paired round falls through to a tiebreak this site cannot see,
+   * because dropping the high and low from two rounds of points leaves nothing.
+   * That is a Public Forum problem: college policy has two preset rounds first, so
+   * by the time it power-matches there are two rounds of points to seed on.
+   */
+  firstPowerMixture?: boolean;
+  /**
+   * Whether a team can be pulled up more than once over the weekend. Tabroom skips
+   * anyone already pulled up unless the tournament says otherwise, and Public Forum
+   * pairings read that way. College policy does not: pulling the same team up again
+   * is what its pairings actually do, worth a point and a half of accuracy, which
+   * is what a field of a hundred-odd with side constraints leaves room for.
+   */
+  repeatPullUps?: boolean;
 }
 
 /**
@@ -522,7 +537,8 @@ function pairFor(live: Standing[], field: Standing[], round: number, cfg: SimCon
   const rest = used.size ? live.filter((s) => !used.has(s.team.code)) : live;
   if (!rest.length) return { pairs: out, order: [] };
   if (round <= cfg.randomRounds) return { pairs: out.concat(pairRandom(rest, rand)), order: [] };
-  const powered = pairPower(rest, field, rand, round === cfg.randomRounds + 1, lockedRound(round, cfg));
+  const firstPowered = (cfg.firstPowerMixture ?? true) && round === cfg.randomRounds + 1;
+  const powered = pairPower(rest, field, rand, firstPowered, lockedRound(round, cfg), !!cfg.repeatPullUps);
   return { pairs: out.concat(powered.pairs), order: powered.order };
 }
 
@@ -644,7 +660,7 @@ const SOP_SIGMA = 1;
  * still the weak one, and at a field the size of the Opener's it is little better
  * than a guess.
  */
-function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean, sideLocked = false): PairedRound {
+function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean, sideLocked = false, repeatPullUps = false): PairedRound {
   const wins = (s: Standing) => s.wins;
 
   // Opponent wins, for tournaments whose first power round falls through to it.
@@ -739,7 +755,7 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
         .filter((s) => !inBracket.has(s) && !opp.has(s) && (need === 0 || sideDue(s) === need || sideDue(s) === 0))
         .sort((a, b) => wins(b) - wins(a) || oppSeed.get(b)! - oppSeed.get(a)! || seedOf(b) - seedOf(a) || tie.get(a)! - tie.get(b)!);
       if (!candidates.length) break;
-      const pick = candidates.find((s) => s.pulled <= 0) ?? candidates[0];
+      const pick = (repeatPullUps ? undefined : candidates.find((s) => s.pulled <= 0)) ?? candidates[0];   // see repeatPullUps
       bracket.push(pick);
       inBracket.add(pick);
     }
