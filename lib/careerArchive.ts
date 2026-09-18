@@ -25,6 +25,61 @@ const seasonStart = (ymd: string): number => {
 
 const seasonLabel = (start: number) => `${start}–${String(start + 1).slice(2)}`;
 
+/**
+ * Roll a set of tournaments up into the seasons and totals the career panel draws.
+ * Shared, so a merged record counts the same way an archived one does.
+ */
+export function summarise(studentId: number, list: CareerTournament[]): CareerRecord {
+  const tournaments = list.slice().sort((a, b) => b.start.localeCompare(a.start));
+
+  const bySeason = new Map<number, CareerTournament[]>();
+  for (const t of tournaments) {
+    const s = seasonStart(t.start);
+    bySeason.set(s, [...(bySeason.get(s) || []), t]);
+  }
+  const seasons = [...bySeason.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([start, group]) => {
+      const pts = group.flatMap((t) => t.rounds.filter((r) => !r.elim && r.points !== null).map((r) => r.points as number));
+      return {
+        label: seasonLabel(start),
+        tournaments: group.length,
+        prelimW: group.reduce((n, t) => n + t.prelimW, 0),
+        prelimL: group.reduce((n, t) => n + t.prelimL, 0),
+        elimW: group.reduce((n, t) => n + t.elimW, 0),
+        elimL: group.reduce((n, t) => n + t.elimL, 0),
+        breaks: group.filter((t) => t.broke).length,
+        titles: group.filter((t) => t.won).length,
+        avgPoints: pts.length ? Math.round((pts.reduce((a, b) => a + b, 0) / pts.length) * 100) / 100 : null,
+      };
+    });
+
+  const all = tournaments.flatMap((t) => t.rounds);
+  return {
+    studentId,
+    fetchedAt: new Date().toISOString(),
+    tournaments,
+    seasons,
+    totals: {
+      tournaments: tournaments.length,
+      prelimW: tournaments.reduce((n, t) => n + t.prelimW, 0),
+      prelimL: tournaments.reduce((n, t) => n + t.prelimL, 0),
+      elimW: tournaments.reduce((n, t) => n + t.elimW, 0),
+      elimL: tournaments.reduce((n, t) => n + t.elimL, 0),
+      breaks: tournaments.filter((t) => t.broke).length,
+      titles: tournaments.filter((t) => t.won).length,
+      ballotsWon: all.reduce((n, r) => n + r.ballotsWon, 0),
+      ballotsLost: all.reduce((n, r) => n + r.ballotsLost, 0),
+      affW: all.filter((r) => r.side === "Aff" && r.result === "W").length,
+      affL: all.filter((r) => r.side === "Aff" && r.result === "L").length,
+      negW: all.filter((r) => r.side === "Neg" && r.result === "W").length,
+      negL: all.filter((r) => r.side === "Neg" && r.result === "L").length,
+      opponents: new Set(all.map((r) => r.opponent).filter(Boolean)).size,
+      judges: 0,
+    },
+  };
+}
+
 /** Rounds for these debaters, newest tournament first, as career records. */
 export async function careersFromArchive(db: SupabaseClient, studentIds: number[]): Promise<Map<number, CareerRecord>> {
   const out = new Map<number, CareerRecord>();
@@ -101,56 +156,7 @@ export async function careersFromArchive(db: SupabaseClient, studentIds: number[
       });
     }
 
-    tournaments.sort((a, b) => b.start.localeCompare(a.start));
-
-    // seasons
-    const bySeason = new Map<number, CareerTournament[]>();
-    for (const t of tournaments) {
-      const s = seasonStart(t.start);
-      bySeason.set(s, [...(bySeason.get(s) || []), t]);
-    }
-    const seasons = [...bySeason.entries()]
-      .sort((a, b) => b[0] - a[0])
-      .map(([start, list]) => {
-        const pts = list.flatMap((t) => t.rounds.filter((r) => !r.elim && r.points !== null).map((r) => r.points as number));
-        return {
-          label: seasonLabel(start),
-          tournaments: list.length,
-          prelimW: list.reduce((n, t) => n + t.prelimW, 0),
-          prelimL: list.reduce((n, t) => n + t.prelimL, 0),
-          elimW: list.reduce((n, t) => n + t.elimW, 0),
-          elimL: list.reduce((n, t) => n + t.elimL, 0),
-          breaks: list.filter((t) => t.broke).length,
-          titles: list.filter((t) => t.won).length,
-          avgPoints: pts.length ? Math.round((pts.reduce((a, b) => a + b, 0) / pts.length) * 100) / 100 : null,
-        };
-      });
-
-    const all = tournaments.flatMap((t) => t.rounds);
-    out.set(id, {
-      studentId: id,
-      fetchedAt: new Date().toISOString(),
-      tournaments,
-      seasons,
-      totals: {
-        tournaments: tournaments.length,
-        prelimW: tournaments.reduce((n, t) => n + t.prelimW, 0),
-        prelimL: tournaments.reduce((n, t) => n + t.prelimL, 0),
-        elimW: tournaments.reduce((n, t) => n + t.elimW, 0),
-        elimL: tournaments.reduce((n, t) => n + t.elimL, 0),
-        breaks: tournaments.filter((t) => t.broke).length,
-        titles: tournaments.filter((t) => t.won).length,
-        ballotsWon: all.reduce((n, r) => n + r.ballotsWon, 0),
-        ballotsLost: all.reduce((n, r) => n + r.ballotsLost, 0),
-        affW: all.filter((r) => r.side === "Aff" && r.result === "W").length,
-        affL: all.filter((r) => r.side === "Aff" && r.result === "L").length,
-        negW: all.filter((r) => r.side === "Neg" && r.result === "W").length,
-        negL: all.filter((r) => r.side === "Neg" && r.result === "L").length,
-        opponents: new Set(all.map((r) => r.opponent).filter(Boolean)).size,
-        judges: 0,
-      },
-    });
-  }
+    out.set(id, summarise(id, tournaments));  }
 
   return out;
 }
@@ -179,9 +185,36 @@ export async function careersDeep(db: SupabaseClient, studentIds: number[]): Pro
       // throttled, logged out, or offline — the archive covers it
     }
     const fallback = archive.get(id) ?? emptyRecord(id);
-    out.set(id, deep ? { ...deep, source: "tabroom" } : { ...fallback, source: "archive" });
+    out.set(id, deep ? { ...merge(id, deep, fallback), source: "tabroom" } : { ...fallback, source: "archive" });
   }
   return out;
+}
+
+/**
+ * Both sources, tournament by tournament.
+ *
+ * Tabroom's own page reaches back years, further than anything archived here, so
+ * it leads. But it is not always complete: for Emory GY's win at Coon 2026 it
+ * listed the doubles and none of the four elims after it, which reads as going
+ * out in the doubles rather than winning the tournament. The archive is read from
+ * the results API a round at a time and had all five, so where it holds more of a
+ * tournament, its rounds are the ones counted — keeping the names and partner the
+ * scraped page knows and this site does not.
+ */
+function merge(studentId: number, deep: CareerRecord, archive: CareerRecord): CareerRecord {
+  const byId = new Map(deep.tournaments.map((t) => [t.tournId, t]));
+  for (const mine of archive.tournaments) {
+    const theirs = byId.get(mine.tournId);
+    if (theirs && theirs.rounds.length >= mine.rounds.length) continue;
+    byId.set(mine.tournId, theirs ? {
+      ...mine,
+      name: theirs.name || mine.name,
+      event: theirs.event || mine.event,
+      level: theirs.level || mine.level,
+      partner: theirs.partner ?? mine.partner,
+    } : mine);
+  }
+  return summarise(studentId, [...byId.values()]);
 }
 
 function emptyRecord(studentId: number): CareerRecord {
