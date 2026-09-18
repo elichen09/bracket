@@ -78,6 +78,8 @@ export interface SimConfig {
    * Public Forum flips a coin instead, so this is off there.
    */
   sideConstraints?: boolean;
+  /** How sharply a rating gap decides a round on this circuit; see lib/circuit.ts. */
+  winCurve?: WinCurve;
 }
 
 /**
@@ -178,8 +180,22 @@ export interface WinBreakdown {
  * lets the page say which one actually decided the round: a rating gap, a team
  * that speaks better, or a result these two have already produced.
  */
-export function breakdown(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"]): WinBreakdown {
-  const base = expectedScore(a.rating, b.rating);
+export interface WinCurve { sharpen: number; cap: number }
+const EVEN_CURVE: WinCurve = { sharpen: 1, cap: 0.97 };
+
+/**
+ * Stretch the rating expectation on the log-odds scale. A sharpen above one makes
+ * the better team win more often than Glicko alone says, which is what college
+ * policy rounds actually do; at one this changes nothing.
+ */
+function sharpen(p: number, k: number): number {
+  if (k === 1) return p;
+  const q = Math.max(1e-6, Math.min(1 - 1e-6, p));
+  return 1 / (1 + Math.exp(-k * Math.log(q / (1 - q))));
+}
+
+export function breakdown(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"], curve: WinCurve = EVEN_CURVE): WinBreakdown {
+  const base = sharpen(expectedScore(a.rating, b.rating), curve.sharpen);
 
   // speaker-point form: a full standard deviation of edge is worth ~6 points of probability
   const form = (a.pointsZ - b.pointsZ) * 0.06;
@@ -197,12 +213,12 @@ export function breakdown(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"]):
     p = p * (1 - weight) + observed * weight;
   }
 
-  return { p: Math.max(0.03, Math.min(0.97, p)), base, form, h2h: p - afterForm, w, l };
+  return { p: Math.max(1 - curve.cap, Math.min(curve.cap, p)), base, form, h2h: p - afterForm, w, l };
 }
 
 /** Probability `a` beats `b`, when the reasoning behind it is not needed. */
-export function winChance(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"]): number {
-  return breakdown(a, b, h2h).p;
+export function winChance(a: SimTeam, b: SimTeam, h2h: SimConfig["headToHead"], curve?: WinCurve): number {
+  return breakdown(a, b, h2h, curve).p;
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -957,7 +973,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
         x.lastSide = xSide; if (xSide === 1) x.affs++; else x.negs++;
         y.lastSide = ySide; if (ySide === 1) y.affs++; else y.negs++;
       }
-      const bd = breakdown(x.team, y.team, cfg.headToHead);
+      const bd = breakdown(x.team, y.team, cfg.headToHead, cfg.winCurve);
       const p = bd.p;
       const xWins = rand() < p;
       const before = `${x.wins}-${x.losses}`, beforeY = `${y.wins}-${y.losses}`;
@@ -1095,7 +1111,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       let A = m.a ? byCode.get(m.a) ?? null : null;
       let B = m.b ? byCode.get(m.b) ?? null : null;
       if (A && B) {
-        const bd = breakdown(A.team, B.team, cfg.headToHead);
+        const bd = breakdown(A.team, B.team, cfg.headToHead, cfg.winCurve);
         const aWon = m.winner ? m.winner === A.team.code : rand() < bd.p;
         const w = aWon ? A : B;
         advancing.push(w);
@@ -1166,7 +1182,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
       const a = alive[2 * i];                               // adjacent slots meet, as the order intends
       const b = alive[2 * i + 1];
       if (a && b) {
-        const bd = breakdown(a.team, b.team, cfg.headToHead);
+        const bd = breakdown(a.team, b.team, cfg.headToHead, cfg.winCurve);
         const p = bd.p;
         const aWins = rand() < p;
         const w = aWins ? a : b;

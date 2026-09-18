@@ -69,6 +69,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     seed: body.seed === undefined ? undefined : clamp(body.seed, 1, 2 ** 31 - 1, 1),
     breakCap: shape.breakCap,
     sideConstraints: shape.sideConstraints,
+    winCurve: CIRCUITS[circuit].winCurve,
   };
 
   try {

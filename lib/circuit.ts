@@ -35,16 +35,35 @@ export interface CircuitMeta {
    * records fall — so the break is a cut at that many, not a record.
    */
   defaults: { prelims: number; breakWins: number; randomRounds: number; breakCap?: number; sideConstraints: boolean };
+  /**
+   * How sharply a rating gap decides a round, fitted to the circuit's own rounds.
+   *
+   * Glicko's own curve is not the same on both circuits. Replaying every archived
+   * round from the ratings held before that weekend, and counting only rounds
+   * between two teams with at least eight rounds behind them, college policy
+   * favourites win more often than the curve says at every gap: 82% where it says
+   * 77%, 95% where it says 91%. Sharpening the log-odds by a quarter matches what
+   * the rounds did, band for band, and is the best fit by likelihood over 6,463
+   * rounds. Public Forum runs the other way — its favourites win less often than
+   * the curve says — so it is left alone here.
+   *
+   * `cap` is the most the model will ever give anyone. Big gaps do not become
+   * certainties: at 300 points and up the college favourite still lost 86 of 894
+   * prelims, about one in ten.
+   */
+  winCurve: { sharpen: number; cap: number };
 }
 
 export const CIRCUITS: Record<Circuit, CircuitMeta> = {
   pf: {
     id: "pf", label: "Public Forum", short: "PF", teamKind: "team", debaterKind: "debater", entrant: "team",
     defaults: { prelims: 6, breakWins: 4, randomRounds: 2, sideConstraints: false },
+    winCurve: { sharpen: 1, cap: 0.97 },
   },
   cx: {
     id: "cx", label: "College policy", short: "College CX", teamKind: "cx-team", debaterKind: "cx-debater", entrant: "team",
     defaults: { prelims: 8, breakWins: 4, randomRounds: 1, breakCap: 32, sideConstraints: true },
+    winCurve: { sharpen: 1.25, cap: 0.97 },
   },
 };
 
