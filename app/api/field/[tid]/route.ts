@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
 import { fieldWithRatings } from "@/lib/field";
+import { circuitOfTournament, CIRCUITS } from "@/lib/circuit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,10 +24,13 @@ export async function GET(_req: Request, { params }: { params: { tid: string } }
   }
 
   try {
-    const { entries } = await fieldWithRatings(db, t.tabroom_tourn_id, t.tabroom_event_abbr);
+    // Ratings are per circuit, so a college policy field has to be read from the
+    // college table; looked up in the Public Forum one, every entry comes back unrated.
+    const circuit = circuitOfTournament(t.name, t.event);
+    const { entries } = await fieldWithRatings(db, t.tabroom_tourn_id, t.tabroom_event_abbr, circuit);
     const rated = entries.filter((e) => e.rating !== null).length;
     const res = NextResponse.json({
-      tournament: { id: t.id, name: t.name, event: t.event },
+      tournament: { id: t.id, name: t.name, event: t.event, circuit, circuitLabel: CIRCUITS[circuit].label },
       count: entries.length,
       rated,
       entries: entries.slice().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.code.localeCompare(b.code)),

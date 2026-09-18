@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { circuitOfTournament, CIRCUITS } from "@/lib/circuit";
 import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
 import { loadField } from "@/lib/field";
@@ -37,12 +38,15 @@ export async function GET(req: Request, { params }: { params: { tid: string } })
   }
 
   try {
+    // Ratings, priors and past meetings are per circuit: a college policy entry is
+    // unrated in the Public Forum table and has never met anyone in it.
+    const circuit = circuitOfTournament(t.name, t.event);
     const [raw, teamRows, debRows, rosters, priors] = await Promise.all([
       loadField(t.tabroom_tourn_id, t.tabroom_event_abbr),
-      loadRatings(db, "team"),
-      loadRatings(db, "debater"),
+      loadRatings(db, CIRCUITS[circuit].teamKind),
+      loadRatings(db, CIRCUITS[circuit].debaterKind),
       loadRosters(db),
-      pastSeasonPriors(db),
+      pastSeasonPriors(db, undefined, circuit),
     ]);
     const entry = raw.find((e) => canonCode(e.code) === canonCode(code));
     if (!entry) return NextResponse.json({ error: `"${code}" is not in this field` }, { status: 404 });
@@ -73,7 +77,7 @@ export async function GET(req: Request, { params }: { params: { tid: string } })
       };
     });
 
-    const h2h = await headToHead(db, [entry.code]);
+    const h2h = await headToHead(db, [entry.code], circuit);
     const own = resolved.row;
 
     return NextResponse.json({
