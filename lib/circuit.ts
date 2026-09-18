@@ -34,7 +34,7 @@ export interface CircuitMeta {
    * flipping for them, and breaks a fixed thirty-two to doubles however the
    * records fall — so the break is a cut at that many, not a record.
    */
-  defaults: { prelims: number; breakWins: number; randomRounds: number; breakCap?: number; sideConstraints: boolean; firstPowerMixture: boolean; repeatPullUps: boolean };
+  defaults: { prelims: number; breakWins: number; randomRounds: number; breakCap?: number; sideConstraints: boolean; firstPowerMixture: boolean; repeatPullUps: boolean; sopSigma: number };
   /**
    * How sharply a rating gap decides a round, fitted to the circuit's own rounds.
    *
@@ -57,12 +57,12 @@ export interface CircuitMeta {
 export const CIRCUITS: Record<Circuit, CircuitMeta> = {
   pf: {
     id: "pf", label: "Public Forum", short: "PF", teamKind: "team", debaterKind: "debater", entrant: "team",
-    defaults: { prelims: 6, breakWins: 4, randomRounds: 2, sideConstraints: false, firstPowerMixture: true, repeatPullUps: false },
+    defaults: { prelims: 6, breakWins: 4, randomRounds: 2, sideConstraints: false, firstPowerMixture: true, repeatPullUps: false, sopSigma: 1 },
     winCurve: { sharpen: 1, cap: 0.97 },
   },
   cx: {
     id: "cx", label: "College policy", short: "College CX", teamKind: "cx-team", debaterKind: "cx-debater", entrant: "team",
-    defaults: { prelims: 8, breakWins: 4, randomRounds: 1, breakCap: 32, sideConstraints: true, firstPowerMixture: true, repeatPullUps: true },
+    defaults: { prelims: 8, breakWins: 4, randomRounds: 1, breakCap: 32, sideConstraints: true, firstPowerMixture: true, repeatPullUps: true, sopSigma: 2 },
     winCurve: { sharpen: 1.25, cap: 0.97 },
   },
 };

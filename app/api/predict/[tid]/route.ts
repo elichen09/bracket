@@ -72,6 +72,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     winCurve: CIRCUITS[circuit].winCurve,
     firstPowerMixture: shape.firstPowerMixture,
     repeatPullUps: shape.repeatPullUps,
+    sopSigma: shape.sopSigma,
   };
 
   try {

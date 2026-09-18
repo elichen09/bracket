@@ -81,12 +81,14 @@ export interface SimConfig {
   /** How sharply a rating gap decides a round on this circuit; see lib/circuit.ts. */
   winCurve?: WinCurve;
   /**
-   * The first power-paired round falls through to a tiebreak this site cannot see,
-   * because dropping the high and low from two rounds of points leaves nothing.
-   * That is a Public Forum problem: college policy has two preset rounds first, so
-   * by the time it power-matches there are two rounds of points to seed on.
+   * Whether the first power-paired round falls through to a tiebreak this site
+   * cannot see, because dropping the high and low from what has been debated so
+   * far leaves nothing to seed on. Both circuits do; what they fall through to
+   * differs by tournament, so that round is drawn from a mix.
    */
   firstPowerMixture?: boolean;
+  /** How well this circuit's seed order is known, in places; see SOP_SIGMA. */
+  sopSigma?: number;
   /**
    * Whether a team can be pulled up more than once over the weekend. Tabroom skips
    * anyone already pulled up unless the tournament says otherwise, and Public Forum
@@ -538,7 +540,7 @@ function pairFor(live: Standing[], field: Standing[], round: number, cfg: SimCon
   if (!rest.length) return { pairs: out, order: [] };
   if (round <= cfg.randomRounds) return { pairs: out.concat(pairRandom(rest, rand)), order: [] };
   const firstPowered = (cfg.firstPowerMixture ?? true) && round === cfg.randomRounds + 1;
-  const powered = pairPower(rest, field, rand, firstPowered, lockedRound(round, cfg), !!cfg.repeatPullUps);
+  const powered = pairPower(rest, field, rand, firstPowered, lockedRound(round, cfg), !!cfg.repeatPullUps, cfg.sopSigma ?? SOP_SIGMA);
   return { pairs: out.concat(powered.pairs), order: powered.order };
 }
 
@@ -625,6 +627,15 @@ function keepSchoolsApart(pairs: [Standing, Standing][]): void {
  */
 const POINTS_SIGMA = 0.05;
 const GUESSED_POINTS_SIGMA = 0.8;
+/**
+ * The default place-order wobble. Each circuit sets its own (lib/circuit.ts):
+ * college policy is given two places rather than one, because its brackets are
+ * small and full of school-mates who cannot meet, so a bracket often reaches down
+ * for two or three opponents at once, and which of two evenly seeded teams picks
+ * first decides which of them each draws. A place or two of doubt there is real,
+ * and saying so keeps the alternative on the list instead of showing one opponent
+ * at 99%.
+ */
 const SOP_SIGMA = 1;
 
 /**
@@ -660,7 +671,7 @@ const SOP_SIGMA = 1;
  * still the weak one, and at a field the size of the Opener's it is little better
  * than a guess.
  */
-function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean, sideLocked = false, repeatPullUps = false): PairedRound {
+function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean, sideLocked = false, repeatPullUps = false, sopSigma = SOP_SIGMA): PairedRound {
   const wins = (s: Standing) => s.wins;
 
   // Opponent wins, for tournaments whose first power round falls through to it.
@@ -703,9 +714,13 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
     for (const code of s.met) { sum += seed.get(code) ?? 0; n++; }
     const os = n ? sum / n : 0;
     oppSeed.set(s, os);
-    sop.set(s, (seed.get(s.team.code) ?? place) + os + gauss(rand) * SOP_SIGMA);
+    sop.set(s, (seed.get(s.team.code) ?? place) + os + gauss(rand) * sopSigma);
     tie.set(s, rand());
   }
+  // Who gets pulled up is a judgement between teams with similar schedules, so the
+  // order carries the same wobble as the seed order itself.
+  const pullUpOrder = new Map<Standing, number>();
+  for (const s of pool) pullUpOrder.set(s, (oppSeed.get(s) ?? 0) + gauss(rand) * sopSigma);
   const seedOf = (s: Standing) => seed.get(s.team.code) ?? place;
   const clash = (a: Standing, b: Standing) => {
     if (a === b || a.met.has(b.team.code) || b.met.has(a.team.code) || sameSchool(a, b)) return true;
@@ -753,7 +768,7 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
       if (even || opp.size + bracket.length >= rest.length) break;
       const candidates = rest
         .filter((s) => !inBracket.has(s) && !opp.has(s) && (need === 0 || sideDue(s) === need || sideDue(s) === 0))
-        .sort((a, b) => wins(b) - wins(a) || oppSeed.get(b)! - oppSeed.get(a)! || seedOf(b) - seedOf(a) || tie.get(a)! - tie.get(b)!);
+        .sort((a, b) => wins(b) - wins(a) || pullUpOrder.get(b)! - pullUpOrder.get(a)! || seedOf(b) - seedOf(a) || tie.get(a)! - tie.get(b)!);
       if (!candidates.length) break;
       const pick = (repeatPullUps ? undefined : candidates.find((s) => s.pulled <= 0)) ?? candidates[0];   // see repeatPullUps
       bracket.push(pick);
