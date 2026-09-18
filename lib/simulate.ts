@@ -33,6 +33,7 @@ export interface KnownPrelim {
   points: number | null;
   bye: boolean;
   judges?: number[];            // paradigm ids of whoever judged it
+  side?: string | null;         // the side this team was on, where the event assigns them
 }
 
 /**
@@ -69,6 +70,14 @@ export interface SimConfig {
   known?: KnownState;           // rounds already debated, applied rather than guessed
   breakCap?: number;            // ceiling on the break field, cutting the last record bracket on speaks
   judgeHabits?: Record<string, number>;   // paradigm id -> points that judge gives above or below the norm
+  /**
+   * Sides are assigned rather than flipped for, as in college policy, where a team
+   * debates each side four times over eight prelims. Every even round is then
+   * side-locked: a team due aff can only be paired against a team due neg, which
+   * cuts across the brackets and is most of what makes those rounds look untidy.
+   * Public Forum flips a coin instead, so this is off there.
+   */
+  sideConstraints?: boolean;
 }
 
 /**
@@ -386,6 +395,8 @@ interface Standing {
   guessed: number;             // debated rounds whose points were not published, so were estimated
   pulled: number;              // times pulled up into a higher bracket, less times pulled down
   byes: number;
+  lastSide: Side;              // the side debated most recently, 0 when unknown
+  affs: number; negs: number;  // how many of each so far
 }
 
 /**
@@ -495,8 +506,31 @@ function pairFor(live: Standing[], field: Standing[], round: number, cfg: SimCon
   const rest = used.size ? live.filter((s) => !used.has(s.team.code)) : live;
   if (!rest.length) return { pairs: out, order: [] };
   if (round <= cfg.randomRounds) return { pairs: out.concat(pairRandom(rest, rand)), order: [] };
-  const powered = pairPower(rest, field, rand, round === cfg.randomRounds + 1);
+  const powered = pairPower(rest, field, rand, round === cfg.randomRounds + 1, lockedRound(round, cfg));
   return { pairs: out.concat(powered.pairs), order: powered.order };
+}
+
+/** Aff or neg, where an event assigns them; 0 when it is not known. */
+type Side = 0 | 1 | 2;
+
+/** Which side a posted round put this team on. Tabroom labels it per event. */
+function sideOfLabel(label: string | null | undefined): Side {
+  const s = (label || "").toLowerCase();
+  if (/^(aff|pro|gov|prop)/.test(s)) return 1;
+  if (/^(neg|con|opp)/.test(s)) return 2;
+  return 0;
+}
+
+/** The side a team is due next: the one it did not just debate. */
+function sideDue(s: Standing): Side {
+  if (s.lastSide === 1) return 2;
+  if (s.lastSide === 2) return 1;
+  return 0;               // nothing posted, so either side will do
+}
+
+/** Sides are assigned in even rounds, so that a team alternates across the weekend. */
+function lockedRound(round: number, cfg: SimConfig): boolean {
+  return !!cfg.sideConstraints && round % 2 === 0;
 }
 
 /** A round's pairings, and the order the power-pairing ranked the teams in. */
@@ -594,7 +628,7 @@ const SOP_SIGMA = 1;
  * still the weak one, and at a field the size of the Opener's it is little better
  * than a guess.
  */
-function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean): PairedRound {
+function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean, sideLocked = false): PairedRound {
   const wins = (s: Standing) => s.wins;
 
   // Opponent wins, for tournaments whose first power round falls through to it.
@@ -641,7 +675,16 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
     tie.set(s, rand());
   }
   const seedOf = (s: Standing) => seed.get(s.team.code) ?? place;
-  const clash = (a: Standing, b: Standing) => a === b || a.met.has(b.team.code) || b.met.has(a.team.code) || sameSchool(a, b);
+  const clash = (a: Standing, b: Standing) => {
+    if (a === b || a.met.has(b.team.code) || b.met.has(a.team.code) || sameSchool(a, b)) return true;
+    // A side-locked round pairs a team due aff against one due neg. A team with no
+    // side posted yet is due neither and can take whichever is left.
+    if (sideLocked) {
+      const da = sideDue(a), db = sideDue(b);
+      if (da !== 0 && da === db) return true;
+    }
+    return false;
+  };
   const bySop = (a: Standing, b: Standing) => sop.get(a)! - sop.get(b)! || seedOf(a) - seedOf(b) || tie.get(a)! - tie.get(b)!;
 
   const opp = new Map<Standing, Standing>();
@@ -669,10 +712,15 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
       const schools = new Map<string, number>();
       for (const s of bracket) if (s.team.school) schools.set(s.team.school, (schools.get(s.team.school) || 0) + 1);
       const biggest = Math.max(0, ...schools.values());
-      const even = bracket.length % 2 === 0 && bracket.length - biggest >= biggest;
+      // A side-locked bracket has to hold as many teams due aff as due neg, or the
+      // last pair has nobody legal left; the shortfall decides who is pulled up.
+      const affs = bracket.filter((s) => sideDue(s) === 1).length;
+      const negs = bracket.filter((s) => sideDue(s) === 2).length;
+      const need: Side = !sideLocked || affs === negs ? 0 : affs < negs ? 1 : 2;
+      const even = bracket.length % 2 === 0 && bracket.length - biggest >= biggest && need === 0;
       if (even || opp.size + bracket.length >= rest.length) break;
       const candidates = rest
-        .filter((s) => !inBracket.has(s) && !opp.has(s))
+        .filter((s) => !inBracket.has(s) && !opp.has(s) && (need === 0 || sideDue(s) === need || sideDue(s) === 0))
         .sort((a, b) => wins(b) - wins(a) || oppSeed.get(b)! - oppSeed.get(a)! || seedOf(b) - seedOf(a) || tie.get(a)! - tie.get(b)!);
       if (!candidates.length) break;
       const pick = candidates.find((s) => s.pulled <= 0) ?? candidates[0];
@@ -684,6 +732,9 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
     const greedy = (taken: Map<Standing, Standing>) => {
       for (const a of order) {
         if (taken.has(a)) continue;
+        // In a locked round every debate is found from its aff side, so a team due
+        // neg waits to be picked rather than picking.
+        if (sideLocked && sideDue(a) === 2 && order.some((b) => !taken.has(b) && sideDue(b) !== 2)) continue;
         for (let j = order.length - 1; j >= 0; j--) {
           const b = order[j];
           if (taken.has(b) || clash(a, b)) continue;
@@ -769,6 +820,7 @@ function elimRoundName(matches: number): string {
 function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSample: boolean) {
   const fresh = (team: SimTeam): Standing => ({
     team, wins: 0, losses: 0, speaks: 0, scores: [], met: new Set<string>(), rounds: [], guessed: 0, pulled: 0, byes: 0,
+    lastSide: 0, affs: 0, negs: 0,
   });
   const standings: Standing[] = teams.map(fresh);
   const byCode = new Map(standings.map((s) => [s.team.code, s]));
@@ -863,6 +915,11 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
         s.speaks += got;
         s.scores.push(got);
       }
+      const side = sideOfLabel(k.side);
+      if (side) {
+        s.lastSide = side;
+        if (side === 1) s.affs++; else s.negs++;
+      }
       if (k.opp && !forfeit) {
         s.met.add(k.opp);
         const o = everyone.get(k.opp);
@@ -891,6 +948,15 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
         nextPairing.set(y.team.code, x.team.code);
       }
       paired.add(x.team.code); paired.add(y.team.code);
+      if (cfg.sideConstraints) {
+        // Give each team the side it is due; when neither is owed one, the team
+        // that has been aff less often takes it, which is how sides even out.
+        let xSide = sideDue(x);
+        if (!xSide) xSide = sideDue(y) === 1 ? 2 : sideDue(y) === 2 ? 1 : (x.affs - x.negs <= y.affs - y.negs ? 1 : 2);
+        const ySide: Side = xSide === 1 ? 2 : 1;
+        x.lastSide = xSide; if (xSide === 1) x.affs++; else x.negs++;
+        y.lastSide = ySide; if (ySide === 1) y.affs++; else y.negs++;
+      }
       const bd = breakdown(x.team, y.team, cfg.headToHead);
       const p = bd.p;
       const xWins = rand() < p;

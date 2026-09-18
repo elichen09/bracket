@@ -260,7 +260,7 @@ export function knownStateFrom(progress: TournamentProgress, throughRound?: numb
   for (const e of progress.entries) {
     const rs: KnownPrelim[] = e.rounds
       .filter((r) => !r.elim && r.round <= cut)
-      .map((r) => ({ round: r.round, opp: r.opp, won: r.won, points: r.points, bye: r.bye, judges: r.judges }));
+      .map((r) => ({ round: r.round, opp: r.opp, won: r.won, points: r.points, bye: r.bye, judges: r.judges, side: r.side }));
     if (rs.length) prelims[e.code] = rs;
   }
   // The break field is real only once every prelim is in; rewind to the middle of

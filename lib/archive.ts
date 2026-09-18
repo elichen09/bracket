@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { collectGames, isPublicForum, isVarsity, type GameRow } from "./ratings";
+import { collectGames, type GameRow } from "./ratings";
 import { judgeTallies, saveJudgeHabits, type JudgeBallot } from "./judges";
+import { COLLEGE_TOURNAMENTS, archivable, circuitOf, circuitOfTournament, counts, type Circuit } from "./circuit";
 
 /**
  * Past seasons, through the public API rather than by scraping.
@@ -23,6 +24,7 @@ export interface ArchiveTarget {
   name: string;
   start: string | null;
   events: { abbr: string; name: string }[];
+  circuit: Circuit;
 }
 
 async function getJson<T>(path: string): Promise<T | null> {
@@ -38,7 +40,11 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
-/** Resolve a tournament to its Public Forum events, by id or by Tabroom webname. */
+/**
+ * Resolve a tournament to the events worth archiving, by id or by Tabroom webname.
+ * Which events those are depends on the circuit: top-division Public Forum at a
+ * high school tournament, the open division at a college policy one.
+ */
 export async function findPublicForumEvents(ref: number | string): Promise<ArchiveTarget | null> {
   let tournId: number | null = typeof ref === "number" ? ref : null;
   if (tournId === null) {
@@ -50,13 +56,17 @@ export async function findPublicForumEvents(ref: number | string): Promise<Archi
   const meta = await getJson<{ id: number; name: string; start: string }>(`/rest/tourns/${tournId}`);
   if (!meta?.id) return null;
 
-  // the results index names every event that has published anything
-  const results = await getJson<Record<string, { id: number; name: string; abbr: string; ResultSets?: unknown[] }>>(`/rest/tourns/${tournId}/results`);
+  const name = meta.name || `Tournament ${tournId}`;
+  const circuit = circuitOfTournament(name);
+
+  // the results index names every event that has published anything, with the
+  // division level Tabroom holds for it
+  const results = await getJson<Record<string, { id: number; name: string; abbr: string; level?: string; type?: string; ResultSets?: unknown[] }>>(`/rest/tourns/${tournId}/results`);
   const events = Object.values(results || {})
-    .filter((e) => (e.ResultSets || []).length && isPublicForum(e.name || e.abbr || "") && isVarsity(e.name || e.abbr || ""))
+    .filter((e) => (e.ResultSets || []).length && archivable(circuit, e))
     .map((e) => ({ abbr: e.abbr, name: e.name }));
 
-  return { tournId, name: meta.name || `Tournament ${tournId}`, start: meta.start || null, events };
+  return { tournId, name, start: meta.start || null, events, circuit };
 }
 
 export interface ArchiveResult {
@@ -78,7 +88,8 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
   const target = await findPublicForumEvents(ref);
   if (!target) return { tournId: 0, name: String(ref), start: null, events: [], rows: 0, entries: 0, error: "no such tournament on Tabroom" };
   if (!target.events.length) {
-    return { tournId: target.tournId, name: target.name, start: target.start, events: [], rows: 0, entries: 0, error: "no published Public Forum results" };
+    const what = target.circuit === "cx" ? "open division" : "Public Forum";
+    return { tournId: target.tournId, name: target.name, start: target.start, events: [], rows: 0, entries: 0, error: `no published ${what} results` };
   }
 
   let rows: GameRow[] = [];
@@ -87,7 +98,12 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
   for (const ev of target.events) {
     try {
       const out = await collectGames(target.tournId, ev.abbr);
-      rows = rows.concat(out.rows.filter((r) => isPublicForum(r.event_name) && isVarsity(r.event_name)));
+      // a chosen event can still carry rounds that do not count, so the same test
+      // the ingest uses applies here
+      rows = rows.concat(out.rows.filter((r) => {
+        const c = circuitOf(r.tourn_name, r.event_name);
+        return c !== null && counts(c, r.event_name);
+      }));
       judgeBallots.set(ev.abbr, out.judgeBallots);
       entries += out.entries;
     } catch {
@@ -146,7 +162,7 @@ export async function archiveMany(db: SupabaseClient, refs: (number | string)[],
  * The current season is never governed by this list. Those rounds are the
  * leaderboard itself and are kept whatever their tournament.
  */
-export interface ArchiveEntry { name: string; re: RegExp; not?: RegExp }
+export interface ArchiveEntry { name: string; re: RegExp; not?: RegExp; circuit?: Circuit }
 
 export const ARCHIVED_TOURNAMENTS: ArchiveEntry[] = [
   { name: "National Speech and Debate Season Opener", re: /national speech and debate season opener/i },
@@ -167,6 +183,9 @@ export const ARCHIVED_TOURNAMENTS: ArchiveEntry[] = [
   // matches this yet. It stays listed so that the year it does, it is kept.
   { name: "Harvard National", re: /harvard national/i },
   { name: "Tournament of Champions", re: /annual tournament of champions/i, not: /middle school/i },
+  // College policy. These are named in lib/circuit.ts, which is also what marks a
+  // round as college rather than high school policy.
+  ...COLLEGE_TOURNAMENTS.map((t) => ({ ...t, circuit: "cx" as Circuit })),
 ];
 
 /** Is this tournament one the archive is meant to hold? */

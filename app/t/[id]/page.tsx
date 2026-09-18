@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nav from "@/components/Nav";
 import TeamDossier, { type PoolContext } from "@/components/stats/TeamDossier";
 import PreBracket from "@/components/PreBracket";
+import { circuitOfTournament } from "@/lib/circuit";
 import {
   useTournament, useEntries, useUser, useMyEntry, apiCreateEntry, apiUpdateEntry,
 } from "@/lib/useBreak";
@@ -128,7 +129,7 @@ function Loaded({ t }: { t: Tournament }) {
           <h1 className="reveal">{t.name}</h1>
           <Sub t={t} M={M} P={P} />
         </div>
-        <PreBracket tid={t.id} name={t.name} />
+        <PreBracket tid={t.id} name={t.name} circuit={circuitOfTournament(t.name, t.event)} />
       </>
     );
   }
@@ -194,7 +195,7 @@ function Loaded({ t }: { t: Tournament }) {
         // A finished tournament can still be re-run. The predictor reads the real
         // rounds and can be rewound to any point the weekend passed through, which
         // is the only way to ask what the model would have said at the time.
-        <PreBracket tid={t.id} name={t.name} />
+        <PreBracket tid={t.id} name={t.name} circuit={circuitOfTournament(t.name, t.event)} />
       ) : (
         <Board
           M={M} tree={tree} real={real} dead={dead} view={view} editable={editable}

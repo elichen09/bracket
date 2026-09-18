@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { UNRATED, update, decay, type Rating, type Game } from "./glicko";
 import { ballotsFromRecords, judgeTallies, saveJudgeHabits, type JudgeBallot } from "./judges";
+import { CIRCUITS, circuitOf, counts, type Circuit } from "./circuit";
 
 /**
  * The ratings pipeline.
@@ -170,7 +171,9 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
     for (const r of Object.values(doc.Rounds)) {
       const isPrelim = PRELIM_TYPES.has(r.type), isElim = ELIM_TYPES.has(r.type);
       if (!isPrelim && !isElim) continue;
-      if (!r.Opponent || r.bye) continue;                       // byes are not games
+      // Byes are not games, and neither is a round whose opponent Tabroom has not
+      // filled in — a forfeit against a withdrawn entry reads that way.
+      if (!r.Opponent?.id || r.bye) continue;
       const ballots = Object.values(r.Results || {});
       const won = ballots.filter((b) => b.winloss === "W").length;
       const lost = ballots.filter((b) => b.winloss === "L").length;
@@ -197,9 +200,13 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
 /** Read one event and store its rounds. Safe to re-run: rows are upserted by round and entry. */
 export async function ingestTournament(db: SupabaseClient, tournId: number, eventAbbr: string): Promise<{ rows: number; entries: number; name: string; skipped: boolean }> {
   const out = await collectGames(tournId, eventAbbr);
-  // Only Public Forum rounds are rated, so a policy or LD field is read and dropped
-  // rather than being stored and then filtered everywhere downstream.
-  const rows = out.rows.filter((r) => isPublicForum(r.event_name) && isVarsity(r.event_name));
+  // A round is stored when it counts towards one of the circuits: top-division
+  // Public Forum, or top-division policy at one of the college tournaments. A
+  // high school policy or LD field belongs to neither and is read and dropped.
+  const rows = out.rows.filter((r) => {
+    const c = circuitOf(r.tourn_name, r.event_name);
+    return c !== null && counts(c, r.event_name);
+  });
   if (!rows.length) return { rows: 0, entries: out.entries, name: out.name, skipped: out.rows.length > 0 };
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await db.from("rating_games").upsert(rows.slice(i, i + 500), { onConflict: "tourn_id,round_id,entry_id" });
@@ -256,7 +263,7 @@ export function currentSeason(now = new Date()): number {
  * stay in rating_games — they are what past meetings and the prediction's prior
  * are read from — but a team's standing here is what it has done since August.
  */
-export async function recompute(db: SupabaseClient, season = currentSeason()): Promise<{ teams: number; debaters: number; periods: number; games: number; skippedSeasons: number }> {
+export async function recompute(db: SupabaseClient, season = currentSeason(), circuit: Circuit = "pf"): Promise<{ teams: number; debaters: number; periods: number; games: number; skippedSeasons: number }> {
   const all: GameRow[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
@@ -273,11 +280,15 @@ export async function recompute(db: SupabaseClient, season = currentSeason()): P
     all.push(...((data || []) as GameRow[]));
     if (!data || data.length < PAGE) break;
   }
-  // Varsity only, whatever happens to be in the table: a JV or novice round is
-  // a different field and must never reach a varsity standing.
-  const varsityOnly = all.filter((g) => isVarsity(g.event_name));
+  // Each circuit is rated on its own rounds only. Varsity or open division only,
+  // whatever happens to be in the table: a JV or novice round is a different field
+  // and must never reach a top-division standing.
+  const counted = all.filter((g) => {
+    const c = circuitOf(g.tourn_name, g.event_name);
+    return c !== null && c === circuit && counts(c, g.event_name);
+  });
   all.length = 0;
-  all.push(...varsityOnly);
+  all.push(...counted);
 
   // Keep this season only. Earlier rounds stay in the table — past meetings and
   // the prediction's prior read them — but they are not part of this standing.
@@ -396,7 +407,10 @@ export async function recompute(db: SupabaseClient, season = currentSeason()): P
     updated_at: new Date().toISOString(),
   });
 
-  const rows = [...Array.from(teams.values()).map(toRow("team")), ...Array.from(debaters.values()).map(toRow("debater"))];
+  const rows = [
+    ...Array.from(teams.values()).map(toRow(CIRCUITS[circuit].teamKind)),
+    ...Array.from(debaters.values()).map(toRow(CIRCUITS[circuit].debaterKind)),
+  ];
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await db.from("ratings").upsert(rows.slice(i, i + 500), { onConflict: "kind,key" });
     if (error) throw new Error(error.message);
@@ -417,7 +431,7 @@ export interface RatingRow {
   history: { tourn: string; start: string | null; rating: number; rd: number; w: number; l: number }[];
 }
 
-export async function loadRatings(db: SupabaseClient, kind: "team" | "debater"): Promise<RatingRow[]> {
+export async function loadRatings(db: SupabaseClient, kind: string): Promise<RatingRow[]> {
   // Paged, and ordered by the key as well as the rating: ties in a sort have no
   // guaranteed order, so paging without a tiebreaker repeats and drops rows.
   const out: RatingRow[] = [];
@@ -622,7 +636,7 @@ export interface PastPriors {
   seasons: Record<string, number>;
 }
 
-export async function pastSeasonPriors(db: SupabaseClient, season = currentSeason()): Promise<PastPriors> {
+export async function pastSeasonPriors(db: SupabaseClient, season = currentSeason(), circuit: Circuit = "pf"): Promise<PastPriors> {
   const rows: GameRow[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
@@ -639,7 +653,7 @@ export async function pastSeasonPriors(db: SupabaseClient, season = currentSeaso
 
   const seasons: Record<string, number> = {};
   const weighted = rows.flatMap((g) => {
-    if (!isVarsity(g.event_name)) return [];
+    if (circuitOf(g.tourn_name, g.event_name) !== circuit || !counts(circuit, g.event_name)) return [];
     const s = seasonOf(g.tourn_start);
     if (s === null || s >= season) return [];
     const back = season - s;
@@ -673,7 +687,7 @@ export async function pastSeasonPriors(db: SupabaseClient, season = currentSeaso
 }
 
 /** Every past meeting between these teams: code -> opponent code -> {w, l}. */
-export async function headToHead(db: SupabaseClient, codes: string[]): Promise<Record<string, Record<string, { w: number; l: number }>>> {
+export async function headToHead(db: SupabaseClient, codes: string[], circuit: Circuit = "pf"): Promise<Record<string, Record<string, { w: number; l: number }>>> {
   const out: Record<string, Record<string, { w: number; l: number }>> = {};
   if (!codes.length) return out;
   for (let i = 0; i < codes.length; i += 200) {
@@ -681,7 +695,7 @@ export async function headToHead(db: SupabaseClient, codes: string[]): Promise<R
     // Paged with the primary key as the order, so no meeting is counted twice or missed.
     const PAGE = 1000;
     for (let from = 0; ; from += PAGE) {
-      const { data, error } = await db.from("rating_games").select("code,opp_code,score,tourn_id,round_id,entry_id,event_name")
+      const { data, error } = await db.from("rating_games").select("code,opp_code,score,tourn_id,round_id,entry_id,event_name,tourn_name")
         .in("code", slice)
         .order("tourn_id", { ascending: true })
         .order("round_id", { ascending: true })
@@ -689,9 +703,9 @@ export async function headToHead(db: SupabaseClient, codes: string[]): Promise<R
         .range(from, from + PAGE - 1);
       if (error) throw new Error(error.message);
       for (const g of data || []) {
-        // A JV meeting says little about a varsity one, and the win estimate leans
-        // on this record, so only varsity rounds count here too.
-        if (!isVarsity(g.event_name)) continue;
+        // A JV meeting says little about a varsity one, and a Public Forum meeting
+        // nothing at all about a policy one, so both filters apply here too.
+        if (circuitOf(g.tourn_name, g.event_name) !== circuit || !counts(circuit, g.event_name)) continue;
         const row = (out[canonCode(g.code)] = out[canonCode(g.code)] || {});
         const cell = (row[canonCode(g.opp_code)] = row[canonCode(g.opp_code)] || { w: 0, l: 0 });
         if (g.score === 1) cell.w++; else if (g.score === 0) cell.l++;

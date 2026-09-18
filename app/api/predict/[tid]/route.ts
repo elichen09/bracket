@@ -5,6 +5,7 @@ import { fieldWithRatings } from "@/lib/field";
 import { simulate } from "@/lib/simulate";
 import { loadProgress, knownStateFrom, rewindPoints } from "@/lib/progress";
 import { loadJudgeHabits } from "@/lib/judges";
+import { circuitOfTournament, CIRCUITS } from "@/lib/circuit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,16 +56,23 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     const n = Number(v);
     return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : fallback;
   };
+  // Which circuit this tournament is decides how a weekend is shaped and which
+  // ratings it is predicted from: a college policy field has never met a Public
+  // Forum one, and it debates eight rounds with sides assigned rather than flipped.
+  const circuit = circuitOfTournament(t.name, t.event);
+  const shape = CIRCUITS[circuit].defaults;
   const cfg = {
-    prelims: clamp(body.prelims, 2, 10, DEFAULTS.prelims),
-    randomRounds: clamp(body.randomRounds, 0, 6, DEFAULTS.randomRounds),
-    breakWins: clamp(body.breakWins, 1, 10, DEFAULTS.breakWins),
+    prelims: clamp(body.prelims, 2, 12, shape.prelims),
+    randomRounds: clamp(body.randomRounds, 0, 6, shape.randomRounds),
+    breakWins: clamp(body.breakWins, 1, 10, shape.breakWins),
     runs: clamp(body.runs, 100, 4000, DEFAULTS.runs),
     seed: body.seed === undefined ? undefined : clamp(body.seed, 1, 2 ** 31 - 1, 1),
+    breakCap: shape.breakCap,
+    sideConstraints: shape.sideConstraints,
   };
 
   try {
-    const { teams, h2h, entries } = await fieldWithRatings(db, t.tabroom_tourn_id, t.tabroom_event_abbr);
+    const { teams, h2h, entries } = await fieldWithRatings(db, t.tabroom_tourn_id, t.tabroom_event_abbr, circuit);
     if (teams.length < 4) return NextResponse.json({ error: "too few entries published to simulate" }, { status: 400 });
 
     // Whatever has already been debated. Rounds that have happened are applied
@@ -117,7 +125,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     const byCode = new Map(entries.map((e) => [e.code, e]));
     const payload = {
       ...result,
-      tournament: { id: t.id, name: t.name, event: t.event },
+      tournament: { id: t.id, name: t.name, event: t.event, circuit, circuitLabel: CIRCUITS[circuit].label },
       field: teams.length,
       ratedField: teams.filter((x) => x.rated).length,
       ranAt: new Date().toISOString(),

@@ -68,11 +68,14 @@ export async function POST(req: Request) {
     }
 
     const results = await archiveMany(db, refs);
-    const rated = await recompute(db);
+    // Each circuit is its own standing, so each is rebuilt on its own rounds.
+    const rated = await recompute(db, undefined, "pf");
+    const ratedCx = await recompute(db, undefined, "cx");
     return NextResponse.json({
       archived: results,
       rounds: results.reduce((n, r) => n + r.rows, 0),
       leaderboard: { partnerships: rated.teams, roundsThisSeason: rated.games, olderRoundsIgnored: rated.skippedSeasons },
+      collegeLeaderboard: { partnerships: ratedCx.teams, roundsThisSeason: ratedCx.games, olderRoundsIgnored: ratedCx.skippedSeasons },
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "could not archive" }, { status: 502 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CIRCUITS, type Circuit } from "@/lib/circuit";
 import EntryDossier from "./EntryDossier";
 import SimRecord from "./SimRecord";
 
@@ -79,7 +80,7 @@ function SimSlot({ code, winner, seeds, onOpen }: { code: string | null; winner:
   );
 }
 
-export default function PreBracket({ tid, name }: { tid: string; name: string }) {
+export default function PreBracket({ tid, name, circuit = "pf" }: { tid: string; name: string; circuit?: Circuit }) {
   const [field, setField] = useState<FieldTeam[] | null>(null);
   const [fieldErr, setFieldErr] = useState("");
   const [pred, setPred] = useState<Prediction | null>(null);
@@ -90,8 +91,11 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
   // a seed in the sample bracket opens that run, not the team's real history
   const [openSim, setOpenSim] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [prelims, setPrelims] = useState(6);
-  const [breakWins, setBreakWins] = useState(4);
+  // A weekend is shaped differently on each circuit: college policy debates eight
+  // prelims and breaks a fixed thirty-two, Public Forum six and everyone on four wins.
+  const shape = CIRCUITS[circuit].defaults;
+  const [prelims, setPrelims] = useState(shape.prelims);
+  const [breakWins, setBreakWins] = useState(shape.breakWins);
   const [runs, setRuns] = useState(600);
   const [asOf, setAsOf] = useState<Point>(null);
 
@@ -115,7 +119,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
       const res = await fetch(`/api/predict/${encodeURIComponent(tid)}`, {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          prelims, breakWins, runs, randomRounds: 2,
+          prelims, breakWins, runs, randomRounds: shape.randomRounds,
           asOfRound: at?.round, asOfElim: at?.elim,
         }),
       });
@@ -125,7 +129,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
       setTab("odds");
     } catch (e: any) { setPredErr(e.message); }
     finally { setRunning(false); }
-  }, [tid, prelims, breakWins, runs, asOf]);
+  }, [tid, prelims, breakWins, runs, asOf, shape.randomRounds]);
 
   const q = query.trim().toLowerCase();
   const shownField = (field || []).filter((e) => !q || e.code.toLowerCase().includes(q) || (e.school || "").toLowerCase().includes(q) || e.name.toLowerCase().includes(q));
@@ -149,7 +153,7 @@ export default function PreBracket({ tid, name }: { tid: string; name: string })
         <div className="stat">
           <div className="k mono">Format</div>
           <div className="v small">{prelims} prelims</div>
-          <div className="sub">all {breakWins}–{prelims - breakWins}s break</div>
+          <div className="sub">{shape.breakCap ? `top ${shape.breakCap} break` : `all ${breakWins}–${prelims - breakWins}s break`}</div>
         </div>
         <div className="stat">
           <div className="k mono">Prediction</div>

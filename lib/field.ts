@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { CIRCUITS, type Circuit } from "./circuit";
 import { loadRatings, ratingIndex, resolveRating, headToHead, loadRosters, buildTeamIndex, pastSeasonPriors, type RatingRow } from "./ratings";
 import { teamFrom, type SimTeam } from "./simulate";
 
@@ -52,17 +53,17 @@ export async function loadField(tournId: number, abbr: string): Promise<RawEntry
 }
 
 /** The field with ratings attached, plus the simulator's view of the same entries. */
-export async function fieldWithRatings(db: SupabaseClient, tournId: number, abbr: string): Promise<{
+export async function fieldWithRatings(db: SupabaseClient, tournId: number, abbr: string, circuit: Circuit = "pf"): Promise<{
   entries: FieldTeam[];
   teams: SimTeam[];
   h2h: Record<string, Record<string, { w: number; l: number }>>;
 }> {
   const [raw, teamRows, debRows, rosters, priors] = await Promise.all([
     loadField(tournId, abbr),
-    loadRatings(db, "team"),
-    loadRatings(db, "debater"),
+    loadRatings(db, CIRCUITS[circuit].teamKind),
+    loadRatings(db, CIRCUITS[circuit].debaterKind),
     loadRosters(db),
-    pastSeasonPriors(db),
+    pastSeasonPriors(db, undefined, circuit),
   ]);
   const teamIdx = buildTeamIndex(teamRows, rosters);
   const debIdx = ratingIndex(debRows);
@@ -104,6 +105,6 @@ export async function fieldWithRatings(db: SupabaseClient, tournId: number, abbr
     return teamFrom(e.code, e.School?.name || null, i + 1, resolveRating(e.code, ids, teamIdx, debIdx, priors));
   });
 
-  const h2h = await headToHead(db, raw.map((e) => e.code));
+  const h2h = await headToHead(db, raw.map((e) => e.code), circuit);
   return { entries, teams, h2h };
 }
