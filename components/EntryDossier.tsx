@@ -70,8 +70,16 @@ export default function EntryDossier({ tid, code, onClose }: { tid: string; code
 
   if (typeof document === "undefined") return null;
 
-  const fieldCodes = new Set((data?.fieldCodes || []).map((c) => c.replace(/\s+/g, " ").trim().toLowerCase()));
-  const meetings = Object.entries(data?.h2h || {}).filter(([opp]) => opp !== code.toLowerCase());
+  // Past meetings are keyed by a flattened code so that a pairing written two ways
+  // still matches, which is not how anyone writes it: show the field's own spelling.
+  const canon = (c: string) => c.replace(/\s+/g, " ").trim().toLowerCase();
+  const asEntered = new Map((data?.fieldCodes || []).map((c) => [canon(c), c]));
+  const fieldCodes = new Set(asEntered.keys());
+  // Only teams entered here, which is what the heading promises: a record against
+  // someone who is not at this tournament says nothing about this weekend.
+  const meetings = Object.entries(data?.h2h || {})
+    .filter(([opp]) => opp !== canon(code) && asEntered.has(opp))
+    .sort((a, b) => (b[1].w + b[1].l) - (a[1].w + a[1].l) || a[0].localeCompare(b[0]));
 
   return createPortal(
     <div className="dossier-veil" onClick={onClose}>
@@ -109,7 +117,7 @@ export default function EntryDossier({ tid, code, onClose }: { tid: string; code
                 <ul>
                   {meetings.slice(0, 12).map(([opp, rec]) => (
                     <li key={opp}>
-                      <b className={rec.w > rec.l ? "w" : rec.l > rec.w ? "l" : ""}>{rec.w}–{rec.l}</b> against {opp}
+                      <b className={rec.w > rec.l ? "w" : rec.l > rec.w ? "l" : ""}>{rec.w}–{rec.l}</b> against {asEntered.get(opp) ?? opp}
                     </li>
                   ))}
                 </ul>
