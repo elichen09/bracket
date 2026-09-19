@@ -52,6 +52,13 @@ export interface CircuitMeta {
    * prelims, about one in ten.
    */
   winCurve: { sharpen: number; cap: number };
+  /**
+   * What a point of judge-adjusted speaker form this weekend is worth, in
+   * log-odds, fitted on archived rounds the fit never saw. College policy weighs
+   * it heavier because its points are bunched more tightly, so a point of
+   * difference says more.
+   */
+  speaksFormWeight: number;
 }
 
 export const CIRCUITS: Record<Circuit, CircuitMeta> = {
@@ -59,11 +66,13 @@ export const CIRCUITS: Record<Circuit, CircuitMeta> = {
     id: "pf", label: "Public Forum", short: "PF", teamKind: "team", debaterKind: "debater", entrant: "team",
     defaults: { prelims: 6, breakWins: 4, randomRounds: 2, sideConstraints: false, firstPowerMixture: true, repeatPullUps: false, sopSigma: 1 },
     winCurve: { sharpen: 1, cap: 0.97 },
+    speaksFormWeight: 0.5,
   },
   cx: {
     id: "cx", label: "College policy", short: "College CX", teamKind: "cx-team", debaterKind: "cx-debater", entrant: "team",
     defaults: { prelims: 8, breakWins: 4, randomRounds: 1, breakCap: 32, sideConstraints: true, firstPowerMixture: true, repeatPullUps: true, sopSigma: 2 },
     winCurve: { sharpen: 1.25, cap: 0.97 },
+    speaksFormWeight: 1.2,
   },
 };
 

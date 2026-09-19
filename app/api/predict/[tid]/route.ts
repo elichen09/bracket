@@ -70,6 +70,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
     breakCap: shape.breakCap,
     sideConstraints: shape.sideConstraints,
     winCurve: CIRCUITS[circuit].winCurve,
+    speaksFormWeight: CIRCUITS[circuit].speaksFormWeight,
     firstPowerMixture: shape.firstPowerMixture,
     repeatPullUps: shape.repeatPullUps,
     sopSigma: shape.sopSigma,
