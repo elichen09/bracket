@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
 import { fieldWithRatings } from "@/lib/field";
-import { simulate } from "@/lib/simulate";
+import { simulate, fitPairing } from "@/lib/simulate";
 import { loadProgress, knownStateFrom, rewindPoints } from "@/lib/progress";
 import { loadJudgeHabits } from "@/lib/judges";
 import { circuitOfTournament, CIRCUITS } from "@/lib/circuit";
@@ -120,13 +120,17 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       progressNote = "could not read results, so this is a cold prediction";
     }
 
-    const result = simulate(teams, {
+    const base = {
       ...cfg,
       randomRounds: Math.min(cfg.randomRounds, cfg.prelims),
       headToHead: h2h,
       known,
       judgeHabits,
-    });
+    };
+    // What this tournament's own posted rounds say about how it pairs, and — when
+    // it is holding its points back — the seed order those pairings imply.
+    const pairingFit = fitPairing(teams, base) ?? undefined;
+    const result = simulate(teams, { ...base, pairingFit });
     const byCode = new Map(entries.map((e) => [e.code, e]));
     const payload = {
       ...result,
@@ -135,6 +139,10 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       ratedField: teams.filter((x) => x.rated).length,
       ranAt: new Date().toISOString(),
       progressNote,
+      pairingFit: pairingFit && {
+        rounds: pairingFit.rounds, matched: Math.round(100 * pairingFit.best),
+        fittedOrder: !!pairingFit.seedLevels,
+      },
       rewind,
       asOf,
       // schools and names so the page can label rows without another request

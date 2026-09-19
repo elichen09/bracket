@@ -102,6 +102,8 @@ export interface SimConfig {
    * is what a field of a hundred-odd with side constraints leaves room for.
    */
   repeatPullUps?: boolean;
+  /** What this tournament's own posted rounds say about how it pairs; see fitPairing. */
+  pairingFit?: PairingFit;
 }
 
 /**
@@ -550,7 +552,7 @@ function knownFor(known: SimConfig["known"], code: string, round: number): Known
  * guessed at, which is the difference between predicting a round and reporting
  * one. Whatever is left is paired the way the tournament would pair it.
  */
-function pairFor(live: Standing[], field: Standing[], round: number, cfg: SimConfig, rand: () => number): PairedRound {
+function pairFor(live: Standing[], field: Standing[], round: number, cfg: SimConfig, rand: () => number, fitted?: PairingOptions, seedLevels?: Map<string, number>): PairedRound {
   const out: [Standing, Standing][] = [];
   if (!live.length) return { pairs: out, order: [] };
   const used = new Set<string>();
@@ -572,7 +574,18 @@ function pairFor(live: Standing[], field: Standing[], round: number, cfg: SimCon
   if (!rest.length) return { pairs: out, order: [] };
   if (round <= cfg.randomRounds) return { pairs: out.concat(pairRandom(rest, rand)), order: [] };
   const firstPowered = (cfg.firstPowerMixture ?? true) && round === cfg.randomRounds + 1;
-  const powered = pairPower(rest, field, rand, firstPowered, lockedRound(round, cfg), !!cfg.repeatPullUps, cfg.sopSigma ?? SOP_SIGMA);
+  // A tournament's own settings, where they have been read back off its posted
+  // rounds; otherwise whatever the circuit usually does.
+  const powered = pairPower(rest, field, rand, {
+    firstPowered,
+    sideLocked: (fitted ? fitted.sideConstraints : !!cfg.sideConstraints) && round % 2 === 0,
+    repeatPullUps: fitted ? fitted.repeatPullUps : !!cfg.repeatPullUps,
+    sopSigma: cfg.sopSigma ?? SOP_SIGMA,
+    basis: fitted?.basis,
+    sopMode: fitted?.sopMode,
+    pullUpByOppWins: fitted?.pullUpByOppWins,
+    seedLevels,
+  });
   return { pairs: out.concat(powered.pairs), order: powered.order };
 }
 
@@ -669,6 +682,10 @@ const GUESSED_POINTS_SIGMA = 0.8;
  * at 99%.
  */
 const SOP_SIGMA = 1;
+/** How roughly an order fitted to posted pairings is known, in its own units. */
+const FITTED_ORDER_SIGMA = 0.6;
+/** What that order is worth beside the estimate from ratings and judges. */
+const FITTED_ORDER_WEIGHT = 0.4;
 
 /**
  * Power pairing, as Tabroom's own pairing code does it (pair_debate.mas).
@@ -703,7 +720,20 @@ const SOP_SIGMA = 1;
  * still the weak one, and at a field the size of the Opener's it is little better
  * than a guess.
  */
-function pairPower(pool: Standing[], field: Standing[], rand: () => number, firstPowered: boolean, sideLocked = false, repeatPullUps = false, sopSigma = SOP_SIGMA): PairedRound {
+interface PowerOptions {
+  firstPowered: boolean;
+  sideLocked: boolean;
+  repeatPullUps: boolean;
+  sopSigma: number;
+  pointsSigma?: number;                    // 0 while fitting, so a setting is judged on itself
+  basis?: PairingOptions["basis"];
+  sopMode?: PairingOptions["sopMode"];
+  pullUpByOppWins?: boolean;
+  seedLevels?: Map<string, number>;        // a fitted order, when the points are not posted
+}
+
+function pairPower(pool: Standing[], field: Standing[], rand: () => number, o: PowerOptions): PairedRound {
+  const { firstPowered, sideLocked, repeatPullUps, sopSigma } = o;
   const wins = (s: Standing) => s.wins;
 
   // Opponent wins, for tournaments whose first power round falls through to it.
@@ -718,12 +748,20 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
 
   // one draw of how this tournament breaks ties in the first power round
   const style = firstPowered ? rand() : 1;
+  const spread = o.pointsSigma ?? 1;
   const points = (s: Standing) => {
     const share = s.scores.length ? s.guessed / s.scores.length : 1;
-    const noise = gauss(rand) * (POINTS_SIGMA + (GUESSED_POINTS_SIGMA - POINTS_SIGMA) * share);
+    const noise = gauss(rand) * spread * (POINTS_SIGMA + (GUESSED_POINTS_SIGMA - POINTS_SIGMA) * share);
+    // An order fitted to the posted pairings stands in for points nobody has seen.
+    // It is a rough order, so it carries its own doubt rather than being taken flat.
+    if (o.seedLevels) {
+      return seedRate(s) + (o.seedLevels.get(s.team.code) ?? 0) * FITTED_ORDER_WEIGHT + gauss(rand) * spread * FITTED_ORDER_SIGMA;
+    }
     if (style < 0.25) return oppWins(s) * 1000 + total(s) / 1000;
     if (style < 0.75) return average(s) + noise;
     if (firstPowered) return rand();
+    if (o.basis === "total") return total(s) + noise;
+    if (o.basis === "average") return average(s) + noise;
     return seedRate(s) + noise;
   };
 
@@ -746,13 +784,17 @@ function pairPower(pool: Standing[], field: Standing[], rand: () => number, firs
     for (const code of s.met) { sum += seed.get(code) ?? 0; n++; }
     const os = n ? sum / n : 0;
     oppSeed.set(s, os);
-    sop.set(s, (seed.get(s.team.code) ?? place) + os + gauss(rand) * sopSigma);
+    sop.set(s, (seed.get(s.team.code) ?? place) + (o.sopMode === "seed" ? 0 : os) + gauss(rand) * sopSigma);
     tie.set(s, rand());
   }
   // Who gets pulled up is a judgement between teams with similar schedules, so the
   // order carries the same wobble as the seed order itself.
   const pullUpOrder = new Map<Standing, number>();
-  for (const s of pool) pullUpOrder.set(s, (oppSeed.get(s) ?? 0) + gauss(rand) * sopSigma);
+  for (const s of pool) {
+    // the weakest schedule goes up: by opponents' seeds, or by their wins
+    const weakness = o.pullUpByOppWins ? -oppWins(s) : (oppSeed.get(s) ?? 0);
+    pullUpOrder.set(s, weakness + gauss(rand) * sopSigma);
+  }
   const seedOf = (s: Standing) => seed.get(s.team.code) ?? place;
   const clash = (a: Standing, b: Standing) => {
     if (a === b || a.met.has(b.team.code) || b.met.has(a.team.code) || sameSchool(a, b)) return true;
@@ -896,7 +938,27 @@ function elimRoundName(matches: number): string {
   return Number.isInteger(i) && ROUND_NAMES[i] ? ROUND_NAMES[i] : `Round of ${matches * 2}`;
 }
 
-function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSample: boolean) {
+/**
+ * Everything a tournament has already done, replayed onto standings.
+ *
+ * Both the simulation and the settings fit (fitPairing) need the same thing: the
+ * standings as they stood before a given round, built from the posted results the
+ * same way every time. Keeping it in one place means the fit judges the same state
+ * the prediction will pair from.
+ */
+interface Replay {
+  standings: Standing[];
+  everyone: Map<string, Standing>;
+  scale: PointsScale;
+  rowFor(s: Standing, round: number): KnownPrelim | null;
+  /** Apply every posted result for this round, and say who is left to pair. */
+  applyKnown(round: number, keepSample?: boolean): {
+    present: Standing[]; live: Standing[]; paired: Set<string>;
+    met: [Standing, Standing][]; winsBefore: Map<Standing, number>;
+  };
+}
+
+function knownReplay(teams: SimTeam[], cfg: SimConfig): Replay {
   const fresh = (team: SimTeam): Standing => ({
     team, wins: 0, losses: 0, speaks: 0, scores: [], met: new Set<string>(), rounds: [], guessed: 0, pulled: 0, byes: 0,
     lastSide: 0, affs: 0, negs: 0, formSum: 0, formN: 0,
@@ -923,12 +985,14 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     fresh({ code, school: null, seed: 1e6, rating: { ...UNRATED }, pointsZ: 0, rated: false, source: "none" }));
   const everyone = new Map(byCode);
   for (const g of ghosts) everyone.set(g.team.code, g);
+
   // The scale this tournament's points are on, from whatever it has posted.
   const posted: number[] = [];
   if (cfg.known) for (const rows of Object.values(cfg.known.prelims)) for (const r of rows) {
     if (!r.bye && r.points !== null && r.points > 40) posted.push(r.points);
   }
   const scale: PointsScale = { mean: posted.length >= 10 ? posted.reduce((a, b) => a + b, 0) / posted.length : TEAM_POINTS_MEAN };
+
   // How the judges of a round usually score, which is most of what can be known
   // about points that have not been posted.
   const judgeLean = (judges: number[] | undefined): number => {
@@ -940,17 +1004,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
   const rowFor = (s: Standing, round: number) =>
     ghostRows.has(s.team.code) ? ghostRows.get(s.team.code)!.find((r) => r.round === round) ?? null : knownFor(cfg.known, s.team.code, round);
 
-  // The first round still to be debated. This follows how far the tournament has
-  // actually got, not the first gap in the data: a couple of teams always have a
-  // round missing because they dropped, and letting them define "next" would aim
-  // the whole prediction at a round the field finished hours ago.
-  const openFrom = cfg.known ? cfg.known.prelimsDone + 1 : 1;
-  let firstOpen = -1;
-  const nextPairing = new Map<string, string>();
-  let nextOrder: string[] = [];
-  const openStandings = new Map<string, { wins: number; losses: number }>();
-
-  for (let round = 1; round <= cfg.prelims; round++) {
+  const applyKnown = (round: number, keepSample = false) => {
     const paired = new Set<string>();
     const winsBefore = new Map<Standing, number>();
     for (const s of everyone.values()) winsBefore.set(s, s.wins);
@@ -1013,6 +1067,311 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
         rating: Math.round(s.team.rating.rating), oppRating: 0, actual: true,
       });
     }
+    return { present, live, paired, met, winsBefore };
+  };
+
+  return { standings, everyone, scale, rowFor, applyKnown };
+}
+
+// ---------------------------------------------------------------------------
+// learning a tournament's own settings from the rounds it has posted
+// ---------------------------------------------------------------------------
+
+/**
+ * The settings a tournament pairs by, which Tabroom keeps per event and does not
+ * publish. Defaults differ by circuit, but tournaments differ inside a circuit
+ * too, so rather than assume, this is read back from the rounds already posted.
+ */
+export interface PairingOptions {
+  /** What a bracket is ordered on after wins. */
+  basis: "dropHighLow" | "total" | "average";
+  /** Seed plus opponents' seeds, or the seed alone. */
+  sopMode: "sop" | "seed";
+  /** Pull up the weakest schedule by opponents' seeds, or by opponents' wins. */
+  pullUpByOppWins: boolean;
+  repeatPullUps: boolean;
+  sideConstraints: boolean;
+}
+
+export interface PairingFit {
+  /** Posted rounds it learned from, and how many pairings those held. */
+  rounds: number;
+  pairs: number;
+  /** The share of those pairings the best setting reproduces exactly. */
+  best: number;
+  /** The settings worth predicting from, and how much of the prediction each gets. */
+  choices: { opts: PairingOptions; matched: number; weight: number }[];
+  /**
+   * A stand-in seed order, fitted when the tournament has not posted its points.
+   * Every posted pairing is evidence about the order the tabroom is working from,
+   * since a bracket is paired top against bottom; this is the order that best
+   * reproduces them.
+   */
+  seedLevels?: Record<string, number>;
+}
+
+const BASES: PairingOptions["basis"][] = ["dropHighLow", "total", "average"];
+
+/** Every setting worth trying, starting from what the circuit usually does. */
+function candidates(base: PairingOptions): PairingOptions[] {
+  const out: PairingOptions[] = [];
+  for (const basis of BASES) {
+    for (const sopMode of ["sop", "seed"] as const) {
+      for (const pullUpByOppWins of [false, true]) {
+        for (const repeatPullUps of [false, true]) {
+          out.push({ basis, sopMode, pullUpByOppWins, repeatPullUps, sideConstraints: base.sideConstraints });
+        }
+      }
+    }
+  }
+  // whether sides are locked is usually known from the circuit, but a tournament
+  // that turns them off pairs nothing like one that does not, so try both
+  return [...out, ...out.map((o) => ({ ...o, sideConstraints: !base.sideConstraints }))];
+}
+
+/** The pairings a round actually had, as a map each way round. */
+function postedPairs(cfg: SimConfig, round: number): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [code, rows] of Object.entries(cfg.known?.prelims ?? {})) {
+    for (const r of rows) {
+      if (r.round === round && r.opp && !r.bye && r.won !== null) out.set(code, r.opp);
+    }
+  }
+  return out;
+}
+
+/**
+ * Read a tournament's pairing settings back out of the rounds it has posted.
+ *
+ * Each candidate setting re-pairs every posted power round from the standings as
+ * they stood before it, and is scored on how many of the real pairings it gets
+ * exactly right. The settings that explain the tournament best are the ones the
+ * prediction uses, in proportion to how well they did, so a tournament that is
+ * ambiguous between two of them is predicted as both.
+ */
+export function fitPairing(teams: SimTeam[], cfg: SimConfig): PairingFit | null {
+  const done = cfg.known?.prelimsDone ?? 0;
+  const first = cfg.randomRounds + 1;
+  if (done < first) return null;
+
+  const base: PairingOptions = {
+    basis: "dropHighLow", sopMode: "sop", pullUpByOppWins: false,
+    repeatPullUps: !!cfg.repeatPullUps, sideConstraints: !!cfg.sideConstraints,
+  };
+  const rounds: { round: number; live: Standing[]; field: Standing[]; truth: Map<string, string> }[] = [];
+
+  // Replaying has to stop short of each round in turn, so each round gets its own
+  // pass over what came before it.
+  for (let round = first; round <= done; round++) {
+    // The first power-paired round is the one whose tiebreak nobody can see, so it
+    // is drawn from a mixture rather than paired from a setting. Judging settings
+    // on it would be reading the mixture's own noise.
+    if ((cfg.firstPowerMixture ?? true) && round === first) continue;
+    const truth = postedPairs(cfg, round);
+    if (truth.size < 8) continue;
+    const r = knownReplay(teams, cfg);
+    for (let earlier = 1; earlier < round; earlier++) r.applyKnown(earlier);
+    const field = r.standings.concat([...r.everyone.values()].filter((s) => !r.standings.includes(s)));
+    const live = field.filter((s) => truth.has(s.team.code));
+    if (live.length < 8) continue;
+    rounds.push({ round, live, field, truth });
+  }
+  if (!rounds.length) return null;
+
+  const score = (opts: PairingOptions, seedLevels?: Map<string, number>) => {
+    let hit = 0, total = 0;
+    for (const { round, live, field, truth } of rounds) {
+      const rand = rng(99);
+      const { pairs } = pairPower(live, field, rand, {
+        firstPowered: (cfg.firstPowerMixture ?? true) && round === cfg.randomRounds + 1,
+        sideLocked: opts.sideConstraints && round % 2 === 0,
+        repeatPullUps: opts.repeatPullUps,
+        sopSigma: 0, pointsSigma: 0,
+        basis: opts.basis, sopMode: opts.sopMode, pullUpByOppWins: opts.pullUpByOppWins,
+        seedLevels,
+      });
+      for (const [a, b] of pairs) {
+        total++;
+        if (truth.get(a.team.code) === b.team.code) hit++;
+      }
+    }
+    return total ? hit / total : 0;
+  };
+
+  const fitPairs = rounds.reduce((n, r) => n + r.truth.size / 2, 0);
+  const scored = candidates(base)
+    .map((opts) => ({ opts, matched: score(opts) }))
+    .sort((a, b) => b.matched - a.matched);
+  const best = scored[0].matched;
+  const usual = score(base);
+
+  // Replaying a round reproduces only a fraction of it exactly however the
+  // settings are set, so a small edge over what the circuit usually does is noise
+  // rather than evidence. One round is never enough: at Grapevine a single round
+  // matched 13% of its pairings and that was enough to pick a setting the
+  // tournament plainly did not use, which cost two thirds of the round's accuracy.
+  const CLEAR = 0.12;
+  const enough = rounds.length >= 3 && fitPairs >= 120;
+  const kept = !enough || best - usual < CLEAR
+    ? [{ opts: base, matched: usual }]
+    : scored.filter((c) => c.matched >= best - 0.02).slice(0, 4);
+  const raw = kept.map((c) => Math.exp((c.matched - kept[0].matched) * 60));
+  const sum = raw.reduce((a, b) => a + b, 0);
+  const choices = kept.map((c, i) => ({ opts: c.opts, matched: c.matched, weight: raw[i] / sum }));
+
+  const fit: PairingFit = {
+    rounds: rounds.length,
+    pairs: fitPairs,
+    best,
+    choices,
+  };
+
+  // When the tournament has not posted its points, the order it is pairing from is
+  // unknown, and the pairings themselves are the only evidence for it.
+  const debated = Object.values(cfg.known?.prelims ?? {}).flat().filter((r) => !r.bye && r.won !== null);
+  const withPoints = debated.filter((r) => r.points !== null).length;
+  if (debated.length && withPoints / debated.length < 0.5) {
+    const levels = inferSeedLevels(rounds, choices[0].opts);
+    if (levels) {
+      fit.seedLevels = Object.fromEntries(levels);
+      fit.best = Math.max(fit.best, score(choices[0].opts, levels));
+    }
+  }
+  return fit;
+}
+
+/**
+ * A seed order fitted to the posted pairings, for a tournament holding its points
+ * back. A bracket is paired top against bottom, so each posted pairing says the
+ * two teams sit about as far from the top and the bottom of their bracket; this
+ * hunts for the order that makes all of them true at once. It cannot recover the
+ * order exactly — many orders explain the same pairings — but it beats knowing
+ * nothing, which is where a tournament without points otherwise leaves the model.
+ */
+function inferSeedLevels(
+  rounds: { round: number; live: Standing[]; field: Standing[]; truth: Map<string, string> }[],
+  opts: PairingOptions,
+): Map<string, number> | null {
+  const level = new Map<string, number>();
+  for (const { field } of rounds) for (const s of field) if (!level.has(s.team.code)) level.set(s.team.code, 0);
+  if (level.size < 8) return null;
+
+  // How far the posted pairings sit from top-against-bottom, under a given order.
+  const loss = (): number => {
+    let total = 0;
+    for (const { live, field, truth } of rounds) {
+      const seed = seedRanks(field, level, opts.basis);
+      const oppSeed = new Map<Standing, number>();
+      for (const s of live) {
+        let sum = 0, n = 0;
+        for (const code of s.met) { sum += seed.get(code) ?? 0; n++; }
+        oppSeed.set(s, n ? sum / n : 0);
+      }
+      const sop = (s: Standing) => (seed.get(s.team.code) ?? 0) + (opts.sopMode === "sop" ? oppSeed.get(s) ?? 0 : 0);
+      const brackets = new Map<number, Standing[]>();
+      for (const s of live) brackets.set(s.wins, [...(brackets.get(s.wins) || []), s]);
+      for (const group of brackets.values()) {
+        if (group.length < 6) continue;
+        const order = group.slice().sort((a, b) => sop(a) - sop(b));
+        const rank = new Map(order.map((s, i) => [s.team.code, i + 1]));
+        const n = order.length;
+        for (const s of group) {
+          const other = truth.get(s.team.code);
+          const mine = rank.get(s.team.code), theirs = other ? rank.get(other) : undefined;
+          if (mine === undefined || theirs === undefined || mine > theirs) continue;
+          total += Math.abs(mine + theirs - n - 1) / n;
+        }
+      }
+    }
+    return total;
+  };
+
+  let bestLoss = loss();
+  // The search is one pass per team per candidate level, over every posted round,
+  // so a big field has to be searched less thoroughly to stay inside a web
+  // request: a 330-team pool would otherwise take twenty seconds on its own.
+  const wide = [-3, -2, -1.25, -0.75, -0.35, 0, 0.35, 0.75, 1.25, 2, 3];
+  const narrow = [-2.5, -1.25, -0.5, 0, 0.5, 1.25, 2.5];
+  const grid = level.size > 150 ? narrow : wide;
+  const sweeps = level.size > 250 ? 1 : level.size > 150 ? 2 : 3;
+  const codes = [...level.keys()];
+  for (let sweep = 0; sweep < sweeps; sweep++) {
+    let moved = false;
+    for (const code of codes) {
+      const was = level.get(code)!;
+      let bestVal = was;
+      for (const v of grid) {
+        if (v === was) continue;
+        level.set(code, v);
+        const l = loss();
+        if (l < bestLoss - 1e-9) { bestLoss = l; bestVal = v; }
+      }
+      level.set(code, bestVal);
+      if (bestVal !== was) moved = true;
+    }
+    if (!moved) break;
+  }
+  return level;
+}
+
+/** Dense seed order over a field: wins first, then whatever the tournament seeds on. */
+function seedRanks(field: Standing[], level: Map<string, number> | undefined, basis: PairingOptions["basis"]): Map<string, number> {
+  const points = (s: Standing) => {
+    if (level) return level.get(s.team.code) ?? 0;
+    if (basis === "total") return s.scores.reduce((a, b) => a + b, 0);
+    if (basis === "average") return s.scores.reduce((a, b) => a + b, 0) / Math.max(1, s.scores.length);
+    return seedRate(s);
+  };
+  const keyed = field.map((s) => ({ s, w: s.wins, p: points(s) }));
+  keyed.sort((a, b) => b.w - a.w || b.p - a.p);
+  const seed = new Map<string, number>();
+  let place = 0;
+  keyed.forEach((k, i) => {
+    const prev = keyed[i - 1];
+    if (!prev || prev.w !== k.w || prev.p !== k.p) place++;
+    seed.set(k.s.team.code, place);
+  });
+  return seed;
+}
+
+
+/** One of the fitted settings, drawn in proportion to how well each explained the posted rounds. */
+function pickFitted(fit: PairingFit | undefined, rand: () => number): PairingOptions | undefined {
+  if (!fit?.choices.length) return undefined;
+  let u = rand();
+  for (const c of fit.choices) {
+    u -= c.weight;
+    if (u <= 0) return c.opts;
+  }
+  return fit.choices[0].opts;
+}
+
+function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSample: boolean, pickRand: () => number = rand) {
+  const replay = knownReplay(teams, cfg);
+  const { standings, everyone, scale } = replay;
+  const byCode = new Map(standings.map((s) => [s.team.code, s]));
+  const isGhost = (code: string) => !byCode.has(code);
+
+  // The first round still to be debated. This follows how far the tournament has
+  // actually got, not the first gap in the data: a couple of teams always have a
+  // round missing because they dropped, and letting them define "next" would aim
+  // the whole prediction at a round the field finished hours ago.
+  // Which of the fitted settings this run pairs by, and the seed order that goes
+  // with them. Drawing per run means an ambiguous tournament comes out as the mix
+  // of settings it looks like rather than one confident guess.
+  const fitted = pickFitted(cfg.pairingFit, pickRand);
+  const seedLevels = cfg.pairingFit?.seedLevels
+    ? new Map<string, number>(Object.entries(cfg.pairingFit.seedLevels))
+    : undefined;
+
+  const openFrom = cfg.known ? cfg.known.prelimsDone + 1 : 1;
+  let firstOpen = -1;
+  const nextPairing = new Map<string, string>();
+  let nextOrder: string[] = [];
+  const openStandings = new Map<string, { wins: number; losses: number }>();
+
+  for (let round = 1; round <= cfg.prelims; round++) {
+    const { present, live, paired, met, winsBefore } = replay.applyKnown(round, keepSample);
 
     if (firstOpen < 0 && live.length && round >= openFrom) firstOpen = round;
     // The standings teams carry into that round, which is what the next-round
@@ -1020,7 +1379,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     if (round === firstOpen && !openStandings.size) {
       for (const s of standings) openStandings.set(s.team.code, { wins: s.wins, losses: s.losses });
     }
-    const { pairs, order } = pairFor(live, present, round, cfg, rand);
+    const { pairs, order } = pairFor(live, present, round, cfg, rand, fitted, seedLevels);
     if (round === firstOpen) nextOrder = order;
     for (const [x, y] of pairs) {
       met.push([x, y]);
@@ -1066,7 +1425,7 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
     // an odd field leaves one team unpaired: that is a bye, and a bye is a win
     for (const s of present) {
       if (!paired.has(s.team.code)) {
-        if (ghostRows.has(s.team.code)) continue;
+        if (isGhost(s.team.code)) continue;
         if (round === firstOpen) nextPairing.set(s.team.code, "bye");
         s.wins++;
         s.byes++;   // a win with no points, like a posted bye
@@ -1282,6 +1641,9 @@ function runOnce(teams: SimTeam[], cfg: SimConfig, rand: () => number, keepSampl
 
 export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
   const rand = rng(cfg.seed ?? Math.floor(Math.random() * 2 ** 31));
+  // Which fitted settings a run pairs by is drawn from its own stream, so adding
+  // the fit does not shift every other draw in the simulation.
+  const pickRand = rng((cfg.seed ?? 1) * 7919 + 13);
   const tally = new Map<string, { breaks: number; champ: number; final: number; semi: number; wins: number; records: Record<string, number> }>();
   for (const t of teams) tally.set(t.code, { breaks: 0, champ: 0, final: 0, semi: 0, wins: 0, records: {} });
 
@@ -1291,7 +1653,7 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
   const placeTally = new Map<string, { sum: number; n: number }>();
   const atOpen = new Map<string, { wins: number; losses: number }>();
   for (let run = 0; run < cfg.runs; run++) {
-    const { standings, broke, elims, champion, firstOpen, nextPairing, nextOrder, openStandings } = runOnce(teams, cfg, rand, false);
+    const { standings, broke, elims, champion, firstOpen, nextPairing, nextOrder, openStandings } = runOnce(teams, cfg, rand, false, pickRand);
     openRound = firstOpen;
     nextOrder.forEach((code, i) => {
       const p = placeTally.get(code) || { sum: 0, n: 0 };
@@ -1320,7 +1682,7 @@ export function simulate(teams: SimTeam[], cfg: SimConfig): SimResult {
   }
 
   // one full tournament to show underneath the odds
-  const one = runOnce(teams, cfg, rand, true);
+  const one = runOnce(teams, cfg, rand, true, pickRand);
   const sample: SimSample = {
     prelims: one.seeded.map((s, i) => ({ code: s.team.code, wins: s.wins, losses: s.losses, seed: i + 1, rounds: s.rounds })),
     breakField: (() => {
