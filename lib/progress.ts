@@ -211,6 +211,13 @@ export async function loadProgress(tournId: number, eventAbbr: string): Promise<
     if (prev && stage.codes.length >= prev.codes.length) break;
     mainChain.push(stage);
   }
+  // An elim that is paired but not yet judged is in none of the above: Tabroom's
+  // entry records only carry a round once a ballot exists for it. The pairing is
+  // posted, though, so it is read and added — which is what lets the bracket be
+  // drawn the moment doubles go up rather than after the first result.
+  const posted = await postedElims(tournId, eventAbbr, new Set(mainChain.map((s) => s.label)), mainChain.length, out.map((p) => p.code));
+  for (const stage of posted) mainChain.push(stage);
+
   const brokeSet = new Set<string>();
   for (const stage of mainChain) for (const c of stage.codes) brokeSet.add(c);
   const brokeCodes = [...brokeSet];
@@ -226,6 +233,84 @@ export async function loadProgress(tournId: number, eventAbbr: string): Promise<
     brokeCodes,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Elim rounds that are paired but not yet judged, read off Tabroom's public
+ * postings page.
+ *
+ * An entry's records carry a round only once a ballot exists for it, so a bracket
+ * posted an hour ago is invisible there: the field has its doubles pairing on a
+ * screen in the hallway while this site still shows the prediction's own guess.
+ * The postings page needs no login, and is the same page the room assignments are
+ * printed from.
+ *
+ * What comes back is the pairing, not the draw: the page lists rooms in section
+ * order, so the first room is not the top of the bracket. That is enough — in a
+ * bracket of thirty-two every pairing is a seed against its mirror, so the pairs
+ * plus this site's own standing recover which is which.
+ */
+async function postedElims(
+  tournId: number, eventAbbr: string, have: Set<string>, order: number, fieldCodes: string[],
+): Promise<ElimStage[]> {
+  // The page prints a code as HTML, which collapses the double spaces Tabroom
+  // leaves in some of them: "Strake Jesuit  MZ" comes back "Strake Jesuit MZ", and
+  // a code that does not match the field is a team missing from the bracket.
+  const flat = (code: string) => code.replace(/\s+/g, " ").trim().toLowerCase();
+  const asEntered = new Map(fieldCodes.map((c) => [flat(c), c]));
+  const resolve = (code: string) => asEntered.get(flat(code)) ?? code;
+  const rounds = await getJson<{ id: number; type: string; label?: string; name?: number; published?: number; Event?: { abbr?: string } }[]>(
+    `/rest/tourns/${tournId}/rounds`,
+  );
+  if (!Array.isArray(rounds)) return [];
+
+  const wanted = rounds
+    .filter((r) => r.Event?.abbr === eventAbbr && ELIM_TYPES.has(r.type) && r.published && !have.has(r.label || String(r.id)))
+    .sort((a, b) => a.id - b.id);
+
+  const out: ElimStage[] = [];
+  for (const round of wanted) {
+    const raw = await postedPairing(tournId, round.id);
+    if (!raw.length) continue;
+    const pairs = raw.map((p) => ({ a: resolve(p.a), b: p.b === null ? null : resolve(p.b) }));
+    const codes = pairs.flatMap((p) => (p.b ? [p.a, p.b] : [p.a]));
+    out.push({
+      label: round.label || `Elim ${round.name ?? round.id}`,
+      order: order + out.length,
+      codes,
+      decided: 0,
+      matches: pairs.map((p) => ({ a: p.a, b: p.b, winner: null })),
+    });
+  }
+  return out;
+}
+
+/** One posted round's rooms, as pairs of entry codes. */
+async function postedPairing(tournId: number, roundId: number): Promise<{ a: string; b: string | null }[]> {
+  let html = "";
+  try {
+    const res = await fetch(
+      `https://www.tabroom.com/index/tourn/postings/round.mhtml?tourn_id=${tournId}&round_id=${roundId}`,
+      { headers: { "user-agent": "TheBreak bracket-pool (personal, low volume)" }, signal: AbortSignal.timeout(20_000), cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    html = await res.text();
+  } catch {
+    return [];                                   // the pairing simply is not readable yet
+  }
+
+  const table = new RegExp(`<table id="${roundId}">([\\s\\S]*?)</table>`).exec(html);
+  const body = table ? table[1] : html;
+  const out: { a: string; b: string | null }[] = [];
+  for (const row of body.match(/<tr[\s\S]*?<\/tr>/g) || []) {
+    const codes = [...row.matchAll(/entry_record\.mhtml\?tourn_id=\d+&entry_id=\d+"\s*>([\s\S]*?)<\/a>/g)]
+      .map((m) => m[1].replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    if (!codes.length) continue;
+    const bye = /<td[^>]*>\s*bye\s*<\/td>/i.test(row);
+    out.push({ a: codes[0], b: bye || codes.length < 2 ? null : codes[1] });
+  }
+  return out;
 }
 
 /** Records and speaker totals as they stand, for seeding and for display. */
