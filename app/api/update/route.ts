@@ -4,7 +4,7 @@ import { TabroomSession, syncTournament, statusFor } from "@/lib/tabroom";
 import type { Tournament } from "@/lib/types";
 import { eventForBracket } from "@/lib/tabroomApi";
 import { ingestTournament, recompute } from "@/lib/ratings";
-import { CIRCUITS } from "@/lib/circuit";
+import { CIRCUITS, CIRCUIT_IDS } from "@/lib/circuit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,7 +94,7 @@ async function handle(req: Request) {
     }
     if (ingested) {
       // Each circuit is its own standing, so each is rebuilt on its own rounds.
-      for (const circuit of ["pf", "cx"] as const) {
+      for (const circuit of CIRCUIT_IDS) {
         const r = await recompute(db, undefined, circuit);
         summary.push(`ratings ${CIRCUITS[circuit].short}: ${r.teams} partnerships and ${r.debaters} debaters over ${r.periods} tournaments`);
       }

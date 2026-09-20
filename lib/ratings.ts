@@ -35,6 +35,27 @@ export function isPublicForum(eventName: string): boolean {
 }
 
 /**
+ * Lincoln-Douglas, which names itself. "LD" counts on its own, as in "Varsity
+ * LD", but not inside a longer word.
+ */
+export function isLincolnDouglas(eventName: string): boolean {
+  const n = (eventName || "").toLowerCase();
+  if (/public forum|policy|congress|world schools|parli|speech|extemp|oratory|interp/.test(n)) return false;
+  return /lincoln|douglas|(^|[^a-z])lds?([^a-z]|$)/.test(n);
+}
+
+/**
+ * Policy, either circuit. College divisions are usually called "Open" rather than
+ * policy at all, so this catches the name where there is one and lib/circuit.ts
+ * decides the rest from the tournament it was debated at.
+ */
+export function isPolicy(eventName: string): boolean {
+  const n = (eventName || "").toLowerCase();
+  if (/public forum|lincoln|douglas|congress|world schools|parli|speech|extemp|oratory|interp/.test(n)) return false;
+  return /policy|(^|[^a-z])cx([^a-z]|$)|cross ?examination/.test(n);
+}
+
+/**
  * Varsity only.
  *
  * A JV or novice division is a different population debating a different field.
@@ -165,8 +186,10 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
   docs.forEach((doc, i) => {
     if (!doc || !doc.Rounds) return;
     const entry = entries[i];
+    // Judge habits are kept for every rated circuit, not just Public Forum.
     const eventName = doc.Event?.name || field?.name || eventAbbr;
-    if (isPublicForum(eventName) && isVarsity(eventName)) judgeBallots.push(...ballotsFromRecords(doc));
+    const circuit = circuitOf(meta?.name || "", eventName);
+    if (circuit && counts(circuit, eventName)) judgeBallots.push(...ballotsFromRecords(doc));
     const students = Object.keys(doc.Students || {}).map(Number).filter(Boolean);
     for (const r of Object.values(doc.Rounds)) {
       const isPrelim = PRELIM_TYPES.has(r.type), isElim = ELIM_TYPES.has(r.type);
@@ -212,7 +235,8 @@ export async function ingestTournament(db: SupabaseClient, tournId: number, even
     const { error } = await db.from("rating_games").upsert(rows.slice(i, i + 500), { onConflict: "tourn_id,round_id,entry_id" });
     if (error) throw new Error(error.message);
   }
-  await saveJudgeHabits(db, tournId, eventAbbr, out.start, judgeTallies(out.judgeBallots));
+  const circuit = circuitOf(out.name, rows[0]?.event_name ?? eventAbbr);
+  if (circuit) await saveJudgeHabits(db, tournId, eventAbbr, out.start, judgeTallies(out.judgeBallots), circuit);
   return { rows: rows.length, entries: out.entries, name: out.name, skipped: false };
 }
 

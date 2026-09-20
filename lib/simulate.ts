@@ -102,6 +102,8 @@ export interface SimConfig {
    * is what a field of a hundred-odd with side constraints leaves room for.
    */
   repeatPullUps?: boolean;
+  /** A round's points when none are posted: two speakers, or one in Lincoln-Douglas. */
+  pointsMean?: number;
   /** What this tournament's own posted rounds say about how it pairs; see fitPairing. */
   pairingFit?: PairingFit;
 }
@@ -991,7 +993,9 @@ function knownReplay(teams: SimTeam[], cfg: SimConfig): Replay {
   if (cfg.known) for (const rows of Object.values(cfg.known.prelims)) for (const r of rows) {
     if (!r.bye && r.points !== null && r.points > 40) posted.push(r.points);
   }
-  const scale: PointsScale = { mean: posted.length >= 10 ? posted.reduce((a, b) => a + b, 0) / posted.length : TEAM_POINTS_MEAN };
+  const scale: PointsScale = {
+    mean: posted.length >= 10 ? posted.reduce((a, b) => a + b, 0) / posted.length : (cfg.pointsMean ?? TEAM_POINTS_MEAN),
+  };
 
   // How the judges of a round usually score, which is most of what can be known
   // about points that have not been posted.

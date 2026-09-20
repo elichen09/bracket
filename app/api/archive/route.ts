@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { archiveMany, findPublicForumEvents, isArchived } from "@/lib/archive";
 import { recompute } from "@/lib/ratings";
+import { CIRCUIT_IDS } from "@/lib/circuit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,12 +71,16 @@ export async function POST(req: Request) {
     const results = await archiveMany(db, refs);
     // Each circuit is its own standing, so each is rebuilt on its own rounds.
     const rated = await recompute(db, undefined, "pf");
-    const ratedCx = await recompute(db, undefined, "cx");
+    const others = [] as { circuit: string; teams: number; games: number }[];
+    for (const circuit of CIRCUIT_IDS.filter((c) => c !== "pf")) {
+      const out = await recompute(db, undefined, circuit);
+      others.push({ circuit, teams: out.teams, games: out.games });
+    }
     return NextResponse.json({
       archived: results,
       rounds: results.reduce((n, r) => n + r.rows, 0),
       leaderboard: { partnerships: rated.teams, roundsThisSeason: rated.games, olderRoundsIgnored: rated.skippedSeasons },
-      collegeLeaderboard: { partnerships: ratedCx.teams, roundsThisSeason: ratedCx.games, olderRoundsIgnored: ratedCx.skippedSeasons },
+      otherCircuits: others,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "could not archive" }, { status: 502 });

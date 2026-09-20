@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { collectGames, type GameRow } from "./ratings";
 import { judgeTallies, saveJudgeHabits, type JudgeBallot } from "./judges";
-import { COLLEGE_TOURNAMENTS, archivable, circuitOf, circuitOfTournament, counts, type Circuit } from "./circuit";
+import { COLLEGE_TOURNAMENTS, archivable, circuitOf, isCollegeTournament, counts, type Circuit } from "./circuit";
 
 /**
  * Past seasons, through the public API rather than by scraping.
@@ -23,8 +23,8 @@ export interface ArchiveTarget {
   tournId: number;
   name: string;
   start: string | null;
-  events: { abbr: string; name: string }[];
-  circuit: Circuit;
+  events: { abbr: string; name: string; circuit: Circuit }[];
+  circuits: Circuit[];
 }
 
 async function getJson<T>(path: string): Promise<T | null> {
@@ -42,8 +42,11 @@ async function getJson<T>(path: string): Promise<T | null> {
 
 /**
  * Resolve a tournament to the events worth archiving, by id or by Tabroom webname.
- * Which events those are depends on the circuit: top-division Public Forum at a
- * high school tournament, the open division at a college policy one.
+ *
+ * A tournament can feed more than one circuit: Greenhill runs Lincoln-Douglas and
+ * policy side by side, the Season Opener runs all three high school circuits, and
+ * each division is read into its own. A round robin is left out, being a separate
+ * sixteen-entry invitational rather than the tournament's own field.
  */
 export async function findPublicForumEvents(ref: number | string): Promise<ArchiveTarget | null> {
   let tournId: number | null = typeof ref === "number" ? ref : null;
@@ -57,16 +60,18 @@ export async function findPublicForumEvents(ref: number | string): Promise<Archi
   if (!meta?.id) return null;
 
   const name = meta.name || `Tournament ${tournId}`;
-  const circuit = circuitOfTournament(name);
 
   // the results index names every event that has published anything, with the
   // division level Tabroom holds for it
   const results = await getJson<Record<string, { id: number; name: string; abbr: string; level?: string; type?: string; ResultSets?: unknown[] }>>(`/rest/tourns/${tournId}/results`);
-  const events = Object.values(results || {})
-    .filter((e) => (e.ResultSets || []).length && archivable(circuit, e))
-    .map((e) => ({ abbr: e.abbr, name: e.name }));
+  const events: { abbr: string; name: string; circuit: Circuit }[] = [];
+  for (const e of Object.values(results || {})) {
+    if (!(e.ResultSets || []).length) continue;
+    const circuit = circuitOf(name, e.name || e.abbr || "");
+    if (circuit && archivable(circuit, e)) events.push({ abbr: e.abbr, name: e.name, circuit });
+  }
 
-  return { tournId, name, start: meta.start || null, events, circuit };
+  return { tournId, name, start: meta.start || null, events, circuits: [...new Set(events.map((e) => e.circuit))] };
 }
 
 export interface ArchiveResult {
@@ -88,7 +93,7 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
   const target = await findPublicForumEvents(ref);
   if (!target) return { tournId: 0, name: String(ref), start: null, events: [], rows: 0, entries: 0, error: "no such tournament on Tabroom" };
   if (!target.events.length) {
-    const what = target.circuit === "cx" ? "open division" : "Public Forum";
+    const what = isCollegeTournament(target.name) ? "open division" : "top-division debate";
     return { tournId: target.tournId, name: target.name, start: target.start, events: [], rows: 0, entries: 0, error: `no published ${what} results` };
   }
 
@@ -119,7 +124,8 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
   // A failure here is not worth losing the rounds over.
   try {
     for (const [abbr, ballots] of judgeBallots) {
-      await saveJudgeHabits(db, target.tournId, abbr, target.start, judgeTallies(ballots));
+      const ev = target.events.find((e) => e.abbr === abbr);
+      if (ev) await saveJudgeHabits(db, target.tournId, abbr, target.start, judgeTallies(ballots), ev.circuit);
     }
   } catch { /* the habits are refreshed next time this tournament is read */ }
 
@@ -183,6 +189,9 @@ export const ARCHIVED_TOURNAMENTS: ArchiveEntry[] = [
   // matches this yet. It stays listed so that the year it does, it is kept.
   { name: "Harvard National", re: /harvard national/i },
   { name: "Tournament of Champions", re: /annual tournament of champions/i, not: /middle school/i },
+  // Lincoln-Douglas and high school policy, whose seasons start here
+  { name: "Greenhill Fall Classic", re: /greenhill/i },
+  { name: "Loyola Invitational", re: /loyola invitational/i },
   // College policy. These are named in lib/circuit.ts, which is also what marks a
   // round as college rather than high school policy.
   ...COLLEGE_TOURNAMENTS.map((t) => ({ ...t, circuit: "cx" as Circuit })),

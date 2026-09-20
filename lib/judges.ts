@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Circuit } from "./circuit";
 
 /**
  * How judges score.
@@ -29,6 +30,14 @@ export interface JudgeBallot {
 }
 
 export interface JudgeTally { n: number; sum: number }
+
+/**
+ * Habits are kept per circuit. A judge's points mean different things in
+ * different events: Lincoln-Douglas scores one speaker around 28.5, Public Forum
+ * and policy two together around 57.5, so a deviation from one says nothing about
+ * the other even for the same person.
+ */
+export const habitKey = (circuit: Circuit, paradigm: number) => `${circuit}:${paradigm}`;
 
 /** Ballots are worth a habit only with points on the usual scale; forfeits score far below it. */
 const PLAUSIBLE_POINTS = 40;
@@ -82,9 +91,10 @@ interface HistoryItem { tourn: string; start: string | null; n: number; sum: num
 /** Fold one event's tallies into the stored habits. Reading the event again replaces its share. */
 export async function saveJudgeHabits(
   db: SupabaseClient, tournId: number, eventAbbr: string, start: string | null, tallies: Map<number, JudgeTally>,
+  circuit: Circuit = "pf",
 ): Promise<number> {
   const source = `${tournId}:${eventAbbr}`;
-  const keys = [...tallies.keys()].map(String);
+  const keys = [...tallies.keys()].map((p) => habitKey(circuit, p));
   const existing = new Map<string, HistoryItem[]>();
   for (let i = 0; i < keys.length; i += 200) {
     const { data, error } = await db.from("ratings").select("key,history").eq("kind", "judge").in("key", keys.slice(i, i + 200));
@@ -93,7 +103,7 @@ export async function saveJudgeHabits(
   }
 
   const rows = keys.map((key) => {
-    const t = tallies.get(Number(key))!;
+    const t = tallies.get(Number(key.split(":")[1]))!;
     const history = (existing.get(key) || []).filter((h) => h.tourn !== source);
     history.push({ tourn: source, start, n: t.n, sum: Math.round(t.sum * 100) / 100 });
     const n = history.reduce((a, h) => a + h.n, 0);
@@ -125,9 +135,9 @@ const HABIT_PRIOR_BALLOTS = 4;
  * tournament's share when asked.
  */
 export async function loadJudgeHabits(
-  db: SupabaseClient, paradigms: number[], excludeTourn?: number,
+  db: SupabaseClient, paradigms: number[], excludeTourn?: number, circuit: Circuit = "pf",
 ): Promise<Record<string, number>> {
-  const keys = [...new Set(paradigms.filter((p) => p > 0))].map(String);
+  const keys = [...new Set(paradigms.filter((p) => p > 0))].map((p) => habitKey(circuit, p));
   const out: Record<string, number> = {};
   for (let i = 0; i < keys.length; i += 200) {
     const { data, error } = await db.from("ratings").select("key,history").eq("kind", "judge").in("key", keys.slice(i, i + 200));
@@ -136,7 +146,8 @@ export async function loadJudgeHabits(
       const history = ((row.history as HistoryItem[]) || []).filter((h) => excludeTourn === undefined || h.tourn.split(":")[0] !== String(excludeTourn));
       const n = history.reduce((a, h) => a + h.n, 0);
       if (!n) continue;
-      out[row.key] = history.reduce((a, h) => a + h.sum, 0) / (n + HABIT_PRIOR_BALLOTS);
+      // keyed back to the bare judge id, which is what a round carries
+      out[String(row.key).split(":")[1] ?? row.key] = history.reduce((a, h) => a + h.sum, 0) / (n + HABIT_PRIOR_BALLOTS);
     }
   }
   return out;

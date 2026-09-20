@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Nav from "@/components/Nav";
+import { CIRCUITS, CIRCUIT_IDS, type Circuit } from "@/lib/circuit";
 
 /**
  * The Glicko-2 table. Partnerships lead, because that is how results are
@@ -45,7 +46,7 @@ export default function RankingsPage() {
   const [kind, setKind] = useState<"team" | "debater">("team");
   // Public Forum and college policy are separate tables: the two never debate each
   // other, so a rating from one says nothing about the other.
-  const [circuit, setCircuit] = useState<"pf" | "cx">("pf");
+  const [circuit, setCircuit] = useState<Circuit>("pf");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [err, setErr] = useState("");
@@ -70,7 +71,7 @@ export default function RankingsPage() {
       <main>
         <section className="view enter">
           <div className="thead">
-            <p className="crumb mono reveal">Glicko-2 · {circuit === "cx" ? "College policy" : "Public Forum"}</p>
+            <p className="crumb mono reveal">Glicko-2 · {CIRCUITS[circuit].label}</p>
             <h1 className="reveal">Rankings</h1>
             <p className="prose reveal">
               Every round counts, prelims included, because prelims are where most of the debating happens.
@@ -81,8 +82,9 @@ export default function RankingsPage() {
 
           <div className="controls">
             <div className="seg" role="group">
-              <button aria-pressed={circuit === "pf"} onClick={() => setCircuit("pf")}>Public Forum</button>
-              <button aria-pressed={circuit === "cx"} onClick={() => setCircuit("cx")}>College policy</button>
+              {CIRCUIT_IDS.map((id) => (
+                <button key={id} aria-pressed={circuit === id} onClick={() => setCircuit(id)}>{CIRCUITS[id].short}</button>
+              ))}
             </div>
             <div className="seg" role="group">
               <button aria-pressed={kind === "team"} onClick={() => setKind("team")}>Partnerships</button>
@@ -98,7 +100,7 @@ export default function RankingsPage() {
           {err && <div className="d-err" style={{ marginTop: 20 }}>{err}</div>}
           {!rows && !err && <div className="lbempty">Loading the table…</div>}
 
-          {rows && !rows.length && <div className="lbempty">Nothing rated yet in {circuit === "cx" ? "college policy" : "Public Forum"}. Results are indexed as tournaments finish.</div>}
+          {rows && !rows.length && <div className="lbempty">Nothing rated yet in {CIRCUITS[circuit].label}. Results are indexed as tournaments finish.</div>}
 
           {rows && rows.length > 0 && (
             <div className="tablewrap">
@@ -106,7 +108,7 @@ export default function RankingsPage() {
                 <thead>
                   <tr>
                     <th className="rk mono">#</th>
-                    <th className="mono">{kind === "team" ? "Partnership" : "Debater"}</th>
+                    <th className="mono">{kind === "team" ? (CIRCUITS[circuit].entrant === "debater" ? "Entry" : "Partnership") : "Debater"}</th>
                     <th className="mono">Rating</th>
                     <th className="mono">Floor</th>
                     <th className="mono">±</th>

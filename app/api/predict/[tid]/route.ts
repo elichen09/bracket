@@ -106,7 +106,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       // archive is not estimated from the points it is standing in for.
       try {
         const paradigms = progress.entries.flatMap((e) => e.rounds.flatMap((r) => r.judges ?? []));
-        judgeHabits = await loadJudgeHabits(db, paradigms, t.tabroom_tourn_id);
+        judgeHabits = await loadJudgeHabits(db, paradigms, t.tabroom_tourn_id, circuit);
       } catch { /* points are estimated without them */ }
       asOf = rewind.find((r) => r.round === asOfRound && asOfRound !== undefined)?.label
         ?? rewind.find((r) => r.elim === asOfElim && asOfElim !== undefined)?.label
@@ -126,6 +126,7 @@ export async function POST(req: Request, { params }: { params: { tid: string } }
       headToHead: h2h,
       known,
       judgeHabits,
+      pointsMean: CIRCUITS[circuit].pointsMean,
     };
     // What this tournament's own posted rounds say about how it pairs, and — when
     // it is holding its points back — the seed order those pairings imply.

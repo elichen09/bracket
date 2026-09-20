@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
 import { loadRatings } from "@/lib/ratings";
 import { conservative } from "@/lib/glicko";
-import { CIRCUITS, type Circuit } from "@/lib/circuit";
+import { CIRCUITS, CIRCUIT_IDS, type Circuit } from "@/lib/circuit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,8 @@ export async function GET(req: Request) {
 
   const params = new URL(req.url).searchParams;
   const kind = params.get("kind") === "debater" ? "debater" : "team";
-  const circuit: Circuit = params.get("circuit") === "cx" ? "cx" : "pf";
+  const asked = params.get("circuit") as Circuit | null;
+  const circuit: Circuit = asked && CIRCUIT_IDS.includes(asked) ? asked : "pf";
   const stored = kind === "debater" ? CIRCUITS[circuit].debaterKind : CIRCUITS[circuit].teamKind;
   try {
     const db = supabaseAdmin();
