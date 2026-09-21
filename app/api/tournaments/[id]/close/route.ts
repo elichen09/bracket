@@ -16,9 +16,12 @@ export const dynamic = "force-dynamic";
  * seen it, nobody else should be typing. Waiting for the first ballot is too
  * late, and there is no time on the clock to automate it against.
  *
- * `open: true` undoes it. A close stamps every bracket it touches with the same
- * `locked_at`, so passing that timestamp back reopens exactly the brackets this
- * close shut and leaves alone anyone who had locked their own beforehand.
+ * `open: true` is the same control in reverse, and stands on its own: a pool shut
+ * too early, or one whose bracket Tabroom then redrew, has to be openable hours
+ * later from a fresh page. A close stamps every bracket it touches with the same
+ * `locked_at`, so passing that timestamp back as `at` reopens exactly the
+ * brackets that close shut and leaves alone anyone who had locked their own
+ * beforehand. Without it, opening unlocks the whole pool.
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   let body: any;
