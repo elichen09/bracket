@@ -53,6 +53,7 @@ function Loaded({ t }: { t: Tournament }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWrite = useRef(0);
+  const starting = useRef(false);
 
   const mine = my?.id ? { id: my.id } : null;
   const name = my?.name || "";
@@ -65,6 +66,10 @@ function Loaded({ t }: { t: Tournament }) {
 
   const myLocked = !!myEntry?.locked;
   const editable = view === "mine" && !!mine && !myLocked;
+  // Before there is a bracket to edit, the board is still where people reach
+  // first: they click the team they think wins, not a button labelled "start".
+  // So an open pool picks up that click and starts the bracket with it.
+  const canStart = view === "mine" && !mine && my !== undefined && !!user && !!M.size && !entriesClosed(M);
 
   const real = useMemo(() => build(M, "real"), [M]);
   const dead = useMemo(() => eliminated(real), [real]);
@@ -87,7 +92,10 @@ function Loaded({ t }: { t: Tournament }) {
   }
 
   function clickSlot(r: number, m: number, side: 0 | 1) {
-    if (!editable) return;
+    if (!editable && !canStart) return;
+    // A second click while the first is still creating the bracket would be made
+    // against an entry that does not exist yet, and lost.
+    if (starting.current) return;
     const mt = build(M, "picks", myPicks)[r][m];
     const team = side === 0 ? mt.a : mt.b;
     if (!team || !mt.a || !mt.b || mt.bye || r < M.locked) return;
@@ -97,18 +105,22 @@ function Loaded({ t }: { t: Tournament }) {
     const pruned = prune(M, next);
     setMyPicks(pruned);
     setJustKey(`${r}:${m}:${side}`);
-    persist(pruned);
+    if (!mine) start(name, pruned); else persist(pruned);
   }
 
-  async function start(nm: string) {
-    const clean = nm.trim().slice(0, 24);
-    if (!clean) return;
+  async function start(nm: string, picks: Picks = myPicks) {
+    if (starting.current) return;
+    starting.current = true;
     try {
-      const created = await apiCreateEntry(t.id, clean, myPicks);
+      // The name can be left blank: the account's own name goes on the
+      // leaderboard until it is changed, which is one less thing between
+      // someone and their first pick.
+      const created = await apiCreateEntry(t.id, nm.trim().slice(0, 24), picks);
       setMineId(created.id);
       setView("mine");
       reload(); reloadMine();
     } catch (e: any) { alert(e.message); }
+    finally { starting.current = false; }
   }
 
   const openDossier = useCallback((team: Team) => setDossier(team), []);
@@ -200,7 +212,7 @@ function Loaded({ t }: { t: Tournament }) {
         <PreBracket tid={t.id} name={t.name} circuit={circuitOfTournament(t.name, t.event)} />
       ) : (
         <Board
-          M={M} tree={tree} real={real} dead={dead} view={view} editable={editable}
+          M={M} tree={tree} real={real} dead={dead} view={view} editable={editable || canStart}
           query={query.trim().toLowerCase()} justKey={justKey} zoom={zoom}
           boardRef={boardRef} onClick={clickSlot} onInfo={openDossier}
         />
@@ -323,7 +335,7 @@ function Me({ M, mine, ready, lookupError, name, myLocked, myEntry, myPicks, onS
       <div className="me">
         <input value={draft} maxLength={24} placeholder="Name on the leaderboard" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onStart(draft); }} />
         <button className="primary" onClick={() => onStart(draft)}>Start my bracket</button>
-        <span className="grow" /><span className="mono" style={{ color: "var(--muted)" }}>one per person</span>
+        <span className="grow" /><span className="mono" style={{ color: "var(--muted)" }}>or just click a winner below</span>
       </div>
     );
   }
@@ -435,7 +447,9 @@ function Hint({ M, view, editable, mine, myLocked, viewedName, P, t, signedIn }:
   } else if (view === "mine" && entriesClosed(M)) {
     content = <><b>Brackets are closed</b> — first-round results are in. Switch to Actual results, or click a name in the pool to see their picks. Click any team for its dossier.</>;
   } else if (view === "mine") {
-    content = <><b>{signedIn ? "Start your bracket above." : "Sign in to start a bracket."}</b> One bracket per person per tournament; everyone scores on the same leaderboard. Click any team for its dossier.</>;
+    content = signedIn
+      ? <><b>Click the team you think wins</b> and your bracket starts there — or name it above first. One bracket per person per tournament; everyone scores on the same leaderboard.{stats}</>
+      : <><b>Sign in to start a bracket.</b> One bracket per person per tournament; everyone scores on the same leaderboard. Click any team for its dossier.</>;
   } else {
     content = <><b>Viewing {viewedName}&rsquo;s bracket</b> — read-only. Switch back to My bracket to change yours. Click any team for its dossier.</>;
   }
