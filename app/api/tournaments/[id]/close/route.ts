@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { model, entriesClosed } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const db = supabaseAdmin();
-  const { data: t } = await db.from("tournaments").select("id,name").eq("id", params.id).maybeSingle();
+  const { data: t } = await db.from("tournaments").select("id,name,slots,results,locked_rounds").eq("id", params.id).maybeSingle();
   if (!t) return NextResponse.json({ error: "no such tournament" }, { status: 404 });
 
   if (body?.open === true) {
@@ -43,7 +44,26 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (at) q = q.eq("locked_at", at);
     const { data, error } = await q.select("id");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, open: true, count: (data || []).length });
+
+    // Unlocking brackets is only half of open. Nobody can *start* one once the
+    // first scored round has a result, which is the rule that stops someone
+    // entering a pool after they have seen how it is going. Opening a pool that
+    // is already under way means starting the scoring later instead: the rounds
+    // already debated become truth that counts for nobody, and picking begins at
+    // the first round still undecided. An undo of a close leaves this alone —
+    // closing never moved it.
+    let startsAt: string | null = null;
+    const M = model(t as any);
+    if (!at && M.size && entriesClosed(M)) {
+      let r = M.locked;
+      while (r < M.rounds - 1 && Object.keys((t.results || {})[String(r)] || {}).length) r++;
+      if (r > M.locked && !Object.keys((t.results || {})[String(r)] || {}).length) {
+        const { error: e2 } = await db.from("tournaments").update({ locked_rounds: r }).eq("id", params.id);
+        if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
+        startsAt = M.names[r] || `round ${r + 1}`;
+      }
+    }
+    return NextResponse.json({ ok: true, open: true, count: (data || []).length, startsAt });
   }
 
   const at = new Date().toISOString();

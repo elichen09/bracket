@@ -56,7 +56,10 @@ export default function AdminClose({ tid, onDone }: { tid: string; onDone?: () =
       } else {
         const j = await post({ open: true, at: closedAt });
         setClosedAt(null);
-        setMsg({ text: `Open — ${n(j.count)} unlocked.`, kind: "good" });
+        setMsg({
+          text: `Open — ${n(j.count)} unlocked.` + (j.startsAt ? ` New brackets can be started; picking and scoring begin at ${j.startsAt}.` : ""),
+          kind: "good",
+        });
       }
       onDone?.();
     } catch (err: any) {
