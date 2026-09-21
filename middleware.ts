@@ -5,8 +5,12 @@ import { createServerClient } from "@supabase/ssr";
  * Keeps the auth session fresh on every request and gates the app: everything
  * except the landing page, the scoring explainer, the login page and the
  * scheduled updater needs an account.
+ *
+ * Closing a pool is on that list too: it is keyed by ADMIN_KEY rather than by a
+ * session, the same way the updater is, so whoever runs the pool can shut it from
+ * a phone without signing in first.
  */
-const PUBLIC = [/^\/$/, /^\/login$/, /^\/about$/, /^\/api\/update$/, /^\/api\/auth\//];
+const PUBLIC = [/^\/$/, /^\/login$/, /^\/about$/, /^\/api\/update$/, /^\/api\/auth\//, /^\/api\/tournaments\/[^/]+\/close$/];
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: { headers: req.headers } });

@@ -112,6 +112,27 @@ export async function eventForBracket(tournId: number, resultId: number): Promis
   return null;
 }
 
+/**
+ * The bracket a division has published, if it has one yet.
+ *
+ * A pool is usually registered from a bracket link, which is only possible once
+ * the bracket exists. A pool added while the tournament is still in prelims has
+ * no such link, and without it the updater has nothing to sync: the site sits on
+ * "bracket pending" while the bracket is up on Tabroom. Tabroom tags its own
+ * result sets, so the bracket can simply be asked for by event.
+ */
+export async function bracketResultId(tournId: number, abbr: string): Promise<number | null> {
+  try {
+    const j = await getJson<Record<string, EventMeta>>(`/rest/tourns/${tournId}/results`, 5 * MIN);
+    for (const ev of Object.values(j || {})) {
+      if (ev.abbr !== abbr) continue;
+      const bracket = (ev.ResultSets || []).find((r) => r.tag === "bracket");
+      if (bracket) return bracket.id;
+    }
+    return null;
+  } catch { return null; }
+}
+
 export interface FieldEntry { id: number; code: string; name: string; School?: { id: number; name: string }; Students?: { id: number; firstName: string; lastName: string }[] }
 
 /** Public tournament header: name and dates. Null if unknown. */

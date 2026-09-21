@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nav from "@/components/Nav";
 import TeamDossier, { type PoolContext } from "@/components/stats/TeamDossier";
 import PreBracket from "@/components/PreBracket";
+import AdminClose from "@/components/AdminClose";
 import { circuitOfTournament } from "@/lib/circuit";
 import {
   useTournament, useEntries, useUser, useMyEntry, apiCreateEntry, apiUpdateEntry,
@@ -163,6 +164,7 @@ function Loaded({ t }: { t: Tournament }) {
             myName={name} myPicks={myPicks} myLocked={myLocked} view={view}
             onView={(id: string) => setView(id)}
           />
+          <AdminClose tid={t.id} onDone={() => { reload(); reloadMine(); }} />
         </div>
         <Results M={M} real={real} onTeam={openDossier} />
       </div>

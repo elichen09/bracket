@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { TabroomSession, syncTournament, statusFor } from "@/lib/tabroom";
 import type { Tournament } from "@/lib/types";
-import { eventForBracket } from "@/lib/tabroomApi";
+import { eventForBracket, bracketResultId } from "@/lib/tabroomApi";
 import { ingestTournament, recompute } from "@/lib/ratings";
 import { CIRCUITS, CIRCUIT_IDS } from "@/lib/circuit";
 
@@ -44,11 +44,22 @@ async function handle(req: Request) {
   const summary: string[] = [];
 
   for (const t of tournaments) {
-    if (!t.tabroom_tourn_id || !t.tabroom_result_id) { summary.push(`${t.name}: no tabroom ids`); continue; }
+    if (!t.tabroom_tourn_id) { summary.push(`${t.name}: no tabroom ids`); continue; }
+    // A pool added mid-tournament has no bracket link, because there was no
+    // bracket to link to. Ask Tabroom for one each time until it has posted it.
+    let resultId = t.tabroom_result_id;
+    if (!resultId && t.tabroom_event_abbr) {
+      resultId = await bracketResultId(t.tabroom_tourn_id, t.tabroom_event_abbr);
+      if (resultId) {
+        await db.from("tournaments").update({ tabroom_result_id: resultId }).eq("id", t.id);
+        summary.push(`${t.name}: bracket posted, result_id ${resultId}`);
+      }
+    }
+    if (!resultId) { summary.push(`${t.name}: no bracket published yet`); continue; }
     try {
       const out = await syncTournament(session, {
         tournId: t.tabroom_tourn_id,
-        resultId: t.tabroom_result_id,
+        resultId,
         slots: t.slots || [],
         results: t.results || {},
         roundIds: t.round_ids || {},
