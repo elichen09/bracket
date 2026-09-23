@@ -74,8 +74,8 @@
 
 /* The micro label: the site's .mono, applied to what the engine writes. */
 .evi .brand, .evi .chip, .evi .btn, .evi .tabs button, .evi .meta, .evi .searchmeta,
-.evi .seth, .evi .foothint, .evi .sent .cite, .evi .pn, .evi .argn, .evi .casebar .lbl,
-.evi .link, .evi .trig, .evi .indexhead, .evi .grp, .evi .gcount {
+.evi .seth, .evi .foothint, .evi .sent .cite, .evi .pn, .evi .casebar .lbl,
+.evi .link, .evi .indexhead {
   font-family: var(--mono);
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -282,69 +282,91 @@
   font-size: var(--evi-micro); color: var(--dim);
 }
 .evi .indexhead i { font-style: normal; }
-.evi .indexhead .c1 { width: 30%; flex-shrink: 0; }
-.evi .indexhead .c2 { flex: 1; }
-.evi .indexhead .c3 { width: 26%; text-align: right; flex-shrink: 0; }
+.evi .indexhead i { flex: 1; }
+.evi .indexhead .c3 { text-align: right; flex-shrink: 0; }
 
 .evi #results { flex: 1; overflow-y: auto; padding-bottom: 52px; }
 
-/* ------------------------------------------------------------ results */
-.evi .row {
-  display: flex; align-items: baseline; gap: 16px;
-  padding: 15px var(--evi-gut); cursor: pointer;
-  border-bottom: 1px solid var(--line-soft);
-  position: relative;
-  transition: background .16s var(--ease), padding-left .26s var(--ease), color .16s var(--ease);
+/* ------------------------------------------------------- the outline
+   The library is drawn as the outline of the document it came out of:
+   pocket, hat, block, tag, each indented under the last, in the order they
+   are in the file. That is the shape the evidence was written in and the one
+   every debater already navigates it by — the editor's outline pane, which
+   this is deliberately a copy of.
+
+   So there are no columns. A block's trigger is made out of its own title, so
+   printing it beside the title said the same thing twice; the count of tags
+   only shows while they are folded away, because otherwise you can see them.
+   Hierarchy is carried by indent, weight and colour, and nothing else.
+   -------------------------------------------------------------------- */
+.evi .node, .evi .row, .evi .arg {
+  display: flex; align-items: baseline; gap: 9px; cursor: pointer; line-height: 1.45;
+  position: relative; padding: 4px var(--evi-gut) 4px calc(var(--evi-gut) + var(--step, 0px));
+  transition: background .16s var(--ease), padding-left .2s var(--ease), color .16s var(--ease);
 }
+.evi .lv1 { --step: 0px; }
+.evi .lv2 { --step: 17px; }
+.evi .lv3 { --step: 34px; }
+.evi .lv4 { --step: 51px; }
+
 /* the site's own index rows slide a little when you point at them */
-.evi .row:hover:not(.sel) { background: var(--surface); padding-left: calc(var(--evi-gut) + 8px); }
-.evi .row.sel { background: var(--ink); color: var(--ground); padding-left: calc(var(--evi-gut) + 8px); }
-.evi .row.sel::before {
+.evi .node:hover:not(.sel), .evi .row:hover:not(.sel), .evi .arg:hover:not(.sel) {
+  background: var(--surface);
+  padding-left: calc(var(--evi-gut) + var(--step, 0px) + 6px);
+}
+.evi .node.sel, .evi .row.sel, .evi .arg.sel {
+  background: var(--ink); color: var(--ground);
+  padding-left: calc(var(--evi-gut) + var(--step, 0px) + 6px);
+}
+.evi .node.sel::before, .evi .row.sel::before, .evi .arg.sel::before {
   content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--acc);
 }
-.evi .trig {
-  width: 30%; flex-shrink: 0; font-size: 10.5px; color: var(--muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+/* A pocket opens a section of the library, so it gets the air around it. */
+.evi .node.lv1 {
+  margin-top: 14px; padding-top: 11px; border-top: 1px solid var(--line);
 }
+.evi #results > .node.lv1:first-child { margin-top: 0; border-top: 0; }
+
+/* The fold mark is drawn rather than typed: ▸ and ▾ fall back to a full stop
+   in some of the font stacks this runs in, and a mark you cannot see is worse
+   than none. A line with nothing under it gets no mark at all. */
+.evi .chev { width: 11px; flex-shrink: 0; align-self: center; position: relative; height: 12px; }
+.evi .open > .chev::before, .evi .shut > .chev::before {
+  content: ""; position: absolute; left: 2px; top: 50%;
+  width: 0; height: 0; border: 4px solid transparent; border-left-color: var(--dim);
+  transform: translateY(-50%);
+  transition: transform .18s var(--spring), border-left-color .16s var(--ease);
+}
+.evi .open > .chev::before { transform: translateY(-50%) rotate(90deg); }
+.evi .node:hover > .chev::before, .evi .row:hover > .chev::before { border-left-color: var(--ink); }
+.evi .sel > .chev::before { border-left-color: var(--ground); }
+
+/* The four levels are told apart by indent and weight, and nothing else —
+   these are the writer's own words, so none of them is restyled into a label.
+   Uppercasing a pocket would rewrite "AT: NIF Not Key" as something the file
+   does not say. */
+.evi .nlabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi .node.lv1 .nlabel { font-size: 13.5px; font-weight: 700; letter-spacing: -.015em; color: var(--ink); }
+.evi .node.lv2 .nlabel { font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); }
+.evi .ncount, .evi .meta {
+  flex-shrink: 0; font-family: var(--mono); font-size: var(--evi-micro);
+  color: var(--dim); font-variant-numeric: tabular-nums;
+}
+.evi .sel .ncount, .evi .sel .meta { color: var(--ground); opacity: .7; }
+
 .evi .ttl {
-  flex: 1; font-size: 15.5px; font-weight: 500; letter-spacing: -.01em;
+  flex: 1; min-width: 0; font-size: 13.5px; font-weight: 450; letter-spacing: -.005em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.evi .meta {
-  width: 26%; text-align: right; flex-shrink: 0;
-  font-size: var(--evi-micro); color: var(--dim);
+.evi .argt {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.evi .row.sel .meta, .evi .row.sel .trig, .evi .row.sel .ttl { color: var(--ground); }
+.evi .arg:hover:not(.sel) .argt { color: var(--ink); }
+.evi .sel .ttl, .evi .sel .argt { color: var(--ground); }
 .evi mark { background: var(--acc); color: #fff; padding: 0 3px; font-weight: 600; }
 
-.evi .args { border-bottom: 1px solid var(--line-soft); background: var(--surface); }
-.evi .arg {
-  display: flex; align-items: center; gap: 14px;
-  padding: 11px var(--evi-gut); font-size: 13.5px; color: var(--muted); cursor: pointer;
-  transition: background .16s var(--ease), color .16s var(--ease), padding-left .26s var(--ease);
-}
-.evi .arg:hover:not(.sel) { color: var(--ink); padding-left: calc(var(--evi-gut) + 8px); }
-.evi .arg.sel { background: var(--ink); color: var(--ground); padding-left: calc(var(--evi-gut) + 8px); }
-.evi .arg.sel .argn { color: var(--ground); }
-.evi .argn { width: calc(30% - 16px); flex-shrink: 0; font-size: var(--evi-micro); color: var(--dim); }
-.evi .argt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* --------------------------------------------------------- categories */
-.evi .grp {
-  display: flex; align-items: center; gap: 12px;
-  padding: 13px var(--evi-gut); cursor: pointer; position: sticky; top: 0; z-index: 2;
-  background: var(--surface-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-  font-size: var(--evi-micro); color: var(--ink);
-  transition: background .16s var(--ease);
-}
-.evi .grp:first-child { border-top: 0; }
-.evi .grp:hover:not(.sel) { background: var(--surface); }
-.evi .grp.sel { background: var(--ink); color: var(--ground); }
-.evi .chev { width: 10px; flex-shrink: 0; font-size: 9px; color: var(--muted); }
-.evi .glabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.evi .gcount { flex-shrink: 0; color: var(--dim); }
-.evi .grp.sel .gcount { color: var(--ground); opacity: .7; }
 .evi .indexhead .link { margin-left: 12px; }
 
 .evi .blank { padding: 84px 34px; text-align: center; }
@@ -564,10 +586,10 @@
 }
 .evi .row:hover .del, .evi .row.sel .del,
 .evi .arg:hover .del, .evi .arg.sel .del,
-.evi .grp:hover .del, .evi .grp.sel .del { opacity: 1; }
-.evi .row.sel .del, .evi .grp.sel .del { color: var(--ground); }
+.evi .node:hover .del, .evi .node.sel .del { opacity: 1; }
+.evi .row.sel .del, .evi .arg.sel .del, .evi .node.sel .del { color: var(--ground); }
 .evi .del:hover { color: var(--bad); opacity: 1; transform: scale(1.15); }
-.evi .grp.sel .del:hover { color: var(--acc); }
+.evi .sel .del:hover { color: var(--acc); }
 .evi .del:focus-visible { opacity: 1; outline: 2px solid var(--acc); }
 
 /* =====================================================================
@@ -606,7 +628,7 @@
    feel answered rather than merely registered. The element is made and
    removed by the motion layer; these are its clothes. */
 .evi .btn, .evi .docbar .fbtn, .evi .tabs button, .evi .tick, .evi .mv,
-.evi .row, .evi .arg, .evi .grp { position: relative; overflow: hidden; }
+.evi .row, .evi .arg, .evi .node { position: relative; overflow: hidden; }
 .evi .rip {
   position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px;
   border-radius: 50%; background: currentColor; pointer-events: none;
@@ -636,7 +658,7 @@
    Only when the result set itself changed. Moving the selection with the
    arrow keys redraws the same list, and a list that re-animates under every
    keypress is worse than one that never moves at all. */
-.evi #results.fresh > .grp, .evi #results.fresh > .row, .evi #results.fresh > .args {
+.evi #results.fresh > .node, .evi #results.fresh > .row, .evi #results.fresh > .arg {
   animation: eviIn .34s var(--spring) both;
   animation-delay: calc(var(--i, 0) * 15ms);
 }
@@ -726,7 +748,8 @@
    same tool without the movement. */
 @media (prefers-reduced-motion: reduce) {
   .evi *, .evi *::before, .evi *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
-  .evi .row:hover:not(.sel), .evi .row.sel, .evi .arg:hover:not(.sel), .evi .arg.sel { padding-left: var(--evi-gut); }
+  .evi .node:hover:not(.sel), .evi .node.sel, .evi .row:hover:not(.sel), .evi .row.sel,
+  .evi .arg:hover:not(.sel), .evi .arg.sel { padding-left: calc(var(--evi-gut) + var(--step, 0px)); }
   .evi .sent:hover, .evi .btn:active:not(:disabled), .evi .tabs button:active,
   .evi .tick:active, .evi .mv:active:not(:disabled), .evi .del:active, .evi .x:active { transform: none; }
   .evi .searchwrap::after, .evi .toast::after { display: none; }
@@ -741,8 +764,6 @@
   .evi { --evi-gut: 20px; }
   .evi .right { width: min(var(--evi-side), 46vw); }
   .evi .foothint { right: calc(min(var(--evi-side), 46vw) + 9px); }
-  .evi .indexhead .c3, .evi .meta { display: none; }
-  .evi .trig { width: 38%; }
-  .evi .argn { width: calc(38% - 16px); }
+  .evi .ncount, .evi .meta { display: none; }
   .evi .slash, .evi #q { font-size: 30px; }
 }

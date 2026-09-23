@@ -161,9 +161,8 @@ export default function Evidence() {
             <span className="searchmeta mono" id="searchmeta" />
           </div>
           <div className="indexhead mono">
-            <i className="c1">Trigger</i>
-            <i className="c2">Block</i>
-            <i className="c3">Cards <button className="link" data-act="groups">Fold all</button></i>
+            <i>Outline</i>
+            <i className="c3"><button className="link" data-act="groups">Fold all</button></i>
           </div>
           <div id="results" />
         </section>
