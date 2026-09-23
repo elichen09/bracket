@@ -198,6 +198,14 @@
 .evi .page[contenteditable] { cursor: text; }
 .evi .page[contenteditable]:focus { outline: none; border-color: var(--ink); }
 .evi .page[contenteditable]:hover { border-color: var(--muted); }
+/* The blank page's prompt: drawn behind the first line, gone on the first
+   keystroke. It is not content — the page is genuinely empty. */
+.evi .page.blank { position: relative; }
+.evi .page.blank::before {
+  content: "Type here, or send a card from the list";
+  position: absolute; left: 32px; top: 34px; right: 32px;
+  color: var(--dim); pointer-events: none; font-size: 11pt;
+}
 .evi .docempty {
   padding: 48px 26px; text-align: center; color: var(--dim);
   font-size: 13px; line-height: 1.7;
