@@ -136,25 +136,15 @@
 .evi.resizing { cursor: col-resize; user-select: none; }
 .evi.resizing .grab i { inset: 0 3px; background: var(--acc); }
 
-/* ---------- the document, as Google Docs would show it ----------
-   Not a styled preview of the content: the page itself. US Letter at 96dpi is
-   816 x 1056, the margins are Docs' own inch, and the type is Docs' own —
-   Arial 11pt, 1.15 lines, headings at 20/16/14/12pt. The page is drawn at its
-   real size and zoomed to fit the panel, so what is on screen is the line
-   breaks, the widows and the length of the document as the other team will
-   see them. Zoom rather than a transform, because zoom reflows and a
-   transform would leave the panel scrolling over empty space.
-
-   A page break draws as the gap between two sheets, running the full width of
-   the paper. It is honest about what it is: Docs discards page breaks on
-   paste, so this is what the document looks like once they are put back. */
-/* The formatting row: one line, and only over a document you can write in.
-   It is quiet on purpose — the panel's job is to show the document, and a
-   second wall of controls would eat the thing it is showing. */
+/* ---------- the formatting row ----------
+   One line, and only over a document you can write in. It is quiet on
+   purpose: the panel's job is to show the document, and a second wall of
+   controls would eat the thing it is showing. (Kept above the paper section
+   on purpose — it has been deleted twice by rewrites of the block below.) */
 .evi .docbar { display: none; }
 .evi .docpane.editable .docbar {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-  padding: 8px 20px; border-bottom: 1px solid var(--line-soft);
+  padding: 8px 18px; border-bottom: 1px solid var(--line-soft);
   background: var(--surface); flex-shrink: 0;
 }
 .evi .docbar .fsel {
@@ -167,50 +157,92 @@
 .evi .docbar .fsel:hover { color: var(--ink); border-color: var(--ink); }
 .evi .docbar .fbtn {
   min-width: 24px; height: 24px; padding: 0 5px; font-size: 12.5px; line-height: 1;
-  border: 1px solid transparent; color: var(--muted);
+  border: 1px solid transparent; color: var(--muted); flex-shrink: 0;
   transition: color .16s var(--ease), background .16s var(--ease), border-color .16s var(--ease);
 }
 .evi .docbar .fbtn:hover { color: var(--ink); background: var(--surface-2); border-color: var(--line); }
 .evi .docbar .fbtn:active { background: var(--ink); color: var(--ground); border-color: var(--ink); }
 .evi .docbar .fbtn.hl i { display: block; width: 13px; height: 13px; background: #ffff00; border: 1px solid var(--line); }
-.evi .docbar .fdiv { width: 1px; height: 15px; background: var(--line-soft); margin: 0 3px; }
+.evi .docbar .fdiv { width: 1px; height: 15px; background: var(--line-soft); margin: 0 3px; flex-shrink: 0; }
 .evi .docbar .fbtn.wide {
   font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .08em; text-transform: uppercase;
   padding: 0 7px; border-color: var(--line); color: var(--muted);
 }
 .evi .docbar .fbtn.wide:hover { color: var(--ink); border-color: var(--ink); background: none; }
 
-.evi .docpane { width: var(--evi-doc); flex-shrink: 0; background: var(--surface-2); display: none; }
+/* ---------- the document, on paper ----------
+   A document is not a long strip: it is sheets, one after another, with the
+   desk showing between them. So the panel builds sheets — US Letter at 96dpi,
+   816 by 1056, with an inch of margin — and a page break starts a new one. A
+   sheet is a full page tall however little is on it, which is why a cover
+   page looks like a cover page. All of it sits in one editable element rather
+   than one per sheet, so the cursor walks from the foot of one page to the
+   head of the next.
+
+   The type is not this site's and not a word processor's defaults: it is the
+   one every block file in the activity is written in. The sizes and weights
+   below are CardMirror's, the debate editor at github.com/ant981228/cardmirror
+   (src/editor/style.css), which are Verbatim's: body 11pt at 1.3, and the
+   four heading levels a cut file actually uses —
+
+     pocket  26pt  bold, centred, in a box      the cover
+     hat     22pt  bold, centred, double rule
+     block   16pt  bold, centred, ruled         "AT: Maiese---2AC"
+     tag     13pt  bold                         the argument
+     cite    13pt  at 1.2
+
+   which is why a block heading is centred and underlined here rather than
+   left-aligned and grey, and why the cover is a box.
+
+   The stack is zoomed to whatever width the panel has been dragged to, so a
+   line breaks here where it breaks there. Zoom rather than a transform: zoom
+   reflows, and a transform would leave the panel scrolling over air. */
+.evi .docpane { width: var(--evi-doc); flex-shrink: 0; background: #f3f3f3; display: none; flex-direction: column; }
 .evi.withdoc .docpane { display: flex; }
-.evi #docbody { flex: 1; overflow: auto; padding: 16px 0 60px; }
-.evi .page {
-  width: 816px; min-height: 1056px; margin: 0 auto;
-  zoom: var(--evi-docscale, .5);
-  background: #fff; border: 1px solid #c6c1b5;
-  padding: 96px;
-  font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.15;
-  color: #000; letter-spacing: 0; text-transform: none;
+.evi #docbody { flex: 1; overflow: auto; padding: 0; background: #f3f3f3; }
+.evi .paper { zoom: var(--evi-docscale, .5); padding: 22px 0 60px; }
+.evi .paper:focus { outline: none; }
+.evi .sheet {
+  width: 816px; min-height: 1056px; margin: 0 auto 22px; padding: 96px;
+  background: #fff;
+  box-shadow: 0 1px 3px 1px rgba(60, 64, 67, .15), 0 1px 2px rgba(60, 64, 67, .3);
+  font-family: Calibri, Carlito, "Times New Roman", serif;
+  font-size: 11pt; line-height: 1.3;
+  color: #222; letter-spacing: 0; text-transform: none;
   overflow-wrap: anywhere;
 }
-.evi .page h1, .evi .page h2, .evi .page h3, .evi .page h4 {
-  font-family: inherit; font-weight: 400; color: #000;
-  margin: 20pt 0 6pt; line-height: 1.15;
+.evi .sheet:last-child { margin-bottom: 0; }
+
+.evi .sheet h1, .evi .sheet h2, .evi .sheet h3, .evi .sheet h4 {
+  font-family: inherit; font-weight: 700; color: inherit;
+  line-height: 1.2; margin: 10pt 0 4pt;
 }
-.evi .page h1 { font-size: 20pt; }
-.evi .page h2 { font-size: 16pt; }
-.evi .page h3 { font-size: 14pt; }
-.evi .page h4 { font-size: 12pt; }
-.evi .page > :first-child { margin-top: 0; }
-.evi .page p { margin: 0 0 0; }
-.evi .page ul, .evi .page ol { margin: 0; padding-left: 36px; }
-.evi .page a { color: #1155cc; text-decoration: underline; }
-/* Height and the white-to-grey-to-white gradient are measured and set by
-   paginate(), because how much white is left on a sheet depends on where the
-   text happened to reach. This is the fallback before it runs. */
-.evi .page hr.brk {
-  border: 0; height: 232px; margin: 0 -96px; background: var(--surface-2);
+.evi .sheet h1 {                       /* pocket */
+  font-size: 26pt; text-align: center;
+  border: 3px solid #333; padding: 6pt 10pt;
 }
-.evi .page { position: relative; }
+.evi .sheet h2 {                       /* hat */
+  font-size: 22pt; text-align: center; text-decoration: underline double;
+}
+.evi .sheet h3 {                       /* block */
+  font-size: 16pt; text-align: center; text-decoration: underline;
+}
+.evi .sheet h4 { font-size: 13pt; }    /* tag */
+.evi .sheet > :first-child { margin-top: 0; }
+.evi .sheet p { margin: 0; }
+.evi .sheet ul, .evi .sheet ol { margin: 0; padding-left: 36px; }
+.evi .sheet a { color: #1155cc; text-decoration: underline; }
+.evi .sheet hr { display: none; }
+
+/* The blank sheet's prompt: where the first line goes, gone on the first
+   keystroke. It is not content — the page is truly empty. */
+.evi .sheet.blank { position: relative; }
+.evi .sheet.blank::before {
+  content: "Type here, or send a card from the list";
+  position: absolute; left: 96px; top: 96px; right: 96px;
+  color: #9aa0a6; pointer-events: none; font-size: 11pt; line-height: 1.3;
+}
+
 .evi .docempty {
   padding: 48px 26px; text-align: center; color: var(--dim);
   font-size: 13px; line-height: 1.7;
@@ -219,20 +251,9 @@
 /* Once it has been typed in it is a draft, and says so. */
 .evi .docnote {
   font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim); padding: 0 20px 10px; display: flex; gap: 12px; align-items: baseline;
+  color: var(--muted); padding: 9px 18px; display: flex; gap: 12px; align-items: baseline;
   justify-content: space-between; flex-wrap: wrap;
-}
-.evi .page[contenteditable] { cursor: text; }
-.evi .page[contenteditable]:focus { outline: none; border-color: #9a958a; }
-.evi .page[contenteditable]:hover { border-color: #9a958a; }
-
-/* The blank page's prompt: drawn where the first line of a page sits, and
-   gone on the first keystroke. It is not content — the page is truly empty. */
-.evi .page.blank { position: relative; }
-.evi .page.blank::before {
-  content: "Type here, or send a card from the list";
-  position: absolute; left: 96px; top: 96px; right: 96px;
-  color: #9a958a; pointer-events: none; font-size: 11pt; line-height: 1.15;
+  background: var(--surface); border-bottom: 1px solid var(--line-soft);
 }
 
 /* ------------------------------------------------------------- search */

@@ -33,7 +33,7 @@ export default function DocFormat({ host }: { host: React.RefObject<HTMLDivEleme
   const saved = useRef<Range | null>(null);
 
   const page = useCallback(
-    () => host.current?.querySelector<HTMLElement>("#docbody .page[contenteditable]") || null,
+    () => host.current?.querySelector<HTMLElement>("#docbody .paper[contenteditable]") || null,
     [host],
   );
 
