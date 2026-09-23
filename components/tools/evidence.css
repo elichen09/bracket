@@ -185,14 +185,14 @@
    (src/editor/style.css), which are Verbatim's: body 11pt at 1.3, and the
    four heading levels a cut file actually uses —
 
-     pocket  26pt  bold, centred, in a box      the cover
+     pocket  26pt  bold, centred                the cover
      hat     22pt  bold, centred, double rule
      block   16pt  bold, centred, ruled         "AT: Maiese---2AC"
      tag     13pt  bold                         the argument
      cite    13pt  at 1.2
 
    which is why a block heading is centred and underlined here rather than
-   left-aligned and grey, and why the cover is a box.
+   left-aligned and grey.
 
    The stack is zoomed to whatever width the panel has been dragged to, so a
    line breaks here where it breaks there. Zoom rather than a transform: zoom
@@ -217,10 +217,7 @@
   font-family: inherit; font-weight: 700; color: inherit;
   line-height: 1.2; margin: 10pt 0 4pt;
 }
-.evi .sheet h1 {                       /* pocket */
-  font-size: 26pt; text-align: center;
-  border: 3px solid #333; padding: 6pt 10pt;
-}
+.evi .sheet h1 { font-size: 26pt; text-align: center; }     /* pocket */
 .evi .sheet h2 {                       /* hat */
   font-size: 22pt; text-align: center; text-decoration: underline double;
 }
