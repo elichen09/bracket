@@ -12,7 +12,10 @@ const FONTS = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The tools pin the theme on <html> before React hydrates, which is the
+    // point of doing it in a script; React would otherwise call the attribute
+    // it finds there a mismatch.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
