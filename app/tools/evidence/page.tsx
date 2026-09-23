@@ -1,16 +1,17 @@
-import Link from "next/link";
 import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import Evidence from "@/components/tools/Evidence";
 import { isAdmin } from "@/lib/admin";
-import { toolBySlug } from "@/lib/tools";
 import "../tools.css";
 
 export const metadata = { title: "Evidence · The Break" };
 export const dynamic = "force-dynamic";
 
+/**
+ * The tool gets the window. No title band, no blurb: what it is and where it
+ * came from live in its own toolbar, and every pixel of the rest is the work.
+ */
 export default function EvidenceTool() {
-  const tool = toolBySlug("evidence")!;
   if (!isAdmin()) {
     return (
       <>
@@ -23,15 +24,7 @@ export default function EvidenceTool() {
     <>
       <Nav />
       <main>
-        <div className="toolpage">
-          <div className="toolhead">
-            <Link className="crumb mono" href="/tools">← Tools</Link>
-            <h1>{tool.name}</h1>
-            <p className="about">{tool.about}</p>
-            <span className="where mono">In this browser only</span>
-          </div>
-          <Evidence />
-        </div>
+        <div className="toolpage"><Evidence /></div>
       </main>
     </>
   );

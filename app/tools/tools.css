@@ -21,29 +21,20 @@
 /* ---------- the frame a tool runs inside ----------
    A tool is not a document: it fills what is left of the window and does its
    own scrolling, so the page itself never scrolls and the site's nav stays put
-   above it. */
-.toolpage {
-  height: calc(100dvh - 59px);
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  position: relative;
-}
-.toolhead {
-  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
-  padding: 14px var(--gutter) 13px;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-}
-.toolhead h1 {
-  margin: 0; font-family: var(--display); font-weight: 800;
-  font-size: 22px; letter-spacing: -.03em; line-height: 1;
-}
-.toolhead .crumb { color: var(--muted); }
-.toolhead .crumb:hover { color: var(--ink); }
-.toolhead .about { color: var(--muted); font-size: 12.5px; max-width: 74ch; flex: 1; min-width: 240px; }
-.toolhead .where { color: var(--dim); white-space: nowrap; }
+   above it. Nothing else sits between the two — a title band and a paragraph
+   of explanation is dead space in something you work in for an hour, so what
+   the tool is lives in the tool's own toolbar.
 
-@media (max-width: 900px) {
-  .toolpage { height: calc(100dvh - 55px); }
-  .toolhead .about { display: none; }
-}
+   "What is left of the window" was a subtraction — 100dvh minus the nav's
+   height, written down as a number. The nav is not that number at every font
+   size and width, and being a few pixels out pushed the keyboard hint strip
+   off the bottom of the screen. So the page is a flex column instead and the
+   tool simply takes the rest; nothing has to know how tall anything is. */
+/* The browser's own 8px body margin is invisible on a page that scrolls —
+   the background propagates to the canvas and covers it — but here it made
+   the page eight pixels taller than the window and pushed the hint strip
+   under the fold. Only the tool pages are unmargined; the rest of the site
+   is left exactly as it is. */
+body:has(.toolpage) { margin: 0; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+body:has(.toolpage) main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.toolpage { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
