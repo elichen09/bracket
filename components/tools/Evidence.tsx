@@ -127,7 +127,13 @@ export default function Evidence() {
 
   return (
     <div className={"evi" + (dragging ? " resizing" : "") + (doc ? " withdoc" : "")} ref={ref}
-      style={{ ["--evi-side" as any]: `${Math.round(side)}px`, ["--evi-doc" as any]: `${Math.round(docW)}px` }}>
+      style={{
+        ["--evi-side" as any]: `${Math.round(side)}px`,
+        ["--evi-doc" as any]: `${Math.round(docW)}px`,
+        // The page is drawn at its real 816px and zoomed to fit whatever the
+        // panel has been dragged to, so the line breaks are the real ones.
+        ["--evi-docscale" as any]: Math.max(0.3, Math.min(1.1, (docW - 34) / 816)).toFixed(3),
+      }}>
       <header className="bar">
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
         <div className="brand mono">Evidence</div>
