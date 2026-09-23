@@ -33,7 +33,16 @@ export default function DocFormat({ host }: { host: React.RefObject<HTMLDivEleme
   const saved = useRef<Range | null>(null);
 
   const page = useCallback(
-    () => host.current?.querySelector<HTMLElement>("#docbody .paper[contenteditable]") || null,
+    // The sheets are the editable regions; formatting applies to whichever one
+    // holds the selection, or the first if the document has not been touched.
+    () => {
+      const sel = window.getSelection();
+      const node = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+      const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
+      return (el?.closest("#docbody .sheet[contenteditable]") as HTMLElement | null)
+        || host.current?.querySelector<HTMLElement>("#docbody .sheet[contenteditable]")
+        || null;
+    },
     [host],
   );
 

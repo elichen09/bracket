@@ -201,7 +201,8 @@
 .evi.withdoc .docpane { display: flex; }
 .evi #docbody { flex: 1; overflow: auto; padding: 0; background: #f3f3f3; }
 .evi .paper { zoom: var(--evi-docscale, .5); padding: 22px 0 60px; }
-.evi .paper:focus { outline: none; }
+.evi .sheet:focus { outline: none; }
+.evi .sheet[contenteditable] { cursor: text; }
 .evi .sheet {
   width: 816px; min-height: 1056px; margin: 0 auto 22px; padding: 96px;
   background: #fff;
