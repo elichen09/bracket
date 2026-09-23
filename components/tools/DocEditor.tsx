@@ -63,6 +63,9 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
   const readRef = useRef(false);               // for callbacks that outlive a render
   const [draft, setDraft] = useState(false);
   const [zoom, setZoom] = useState(0);
+  const [drop, setDrop] = useState("");          // the SpeechDrop row, when open
+  const [room, setRoom] = useState("");
+  const [sending, setSending] = useState(false);
   const [, force] = useState(0);
 
   /** Hand the document back to the engine, which owns saving and the clipboard. */
@@ -218,6 +221,47 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
     v.focus();
   };
 
+  /** The room code is the same one all weekend, so it is remembered. */
+  useEffect(() => {
+    try { setRoom(localStorage.getItem("evidence.room") || ""); } catch { /* private */ }
+  }, []);
+
+  /** The document as a file, built once and then either saved or sent. */
+  const file = useCallback(async () => {
+    const v = view.current;
+    const EV = (window as any).EV;
+    if (!v || !EV?.elementsFromHtml) return null;
+    const { buildDocx } = await import("@/lib/evidence/docx");
+    const elements = EV.elementsFromHtml(htmlFromDoc(v.state));
+    const name = (EV.docTitle && EV.docTitle(EV.state.settings)) || "send doc";
+    return buildDocx(elements, name);
+  }, []);
+
+  /**
+   * Straight into the round's SpeechDrop room. It goes by way of the site's
+   * own server, because a browser will not post to speechdrop.net from here.
+   */
+  const toSpeechDrop = useCallback(async () => {
+    const code = room.trim();
+    if (!code) { setDrop("A room code, please."); return; }
+    setSending(true);
+    setDrop("Sending…");
+    try {
+      const made = await file();
+      if (!made) throw new Error("nothing to send");
+      try { localStorage.setItem("evidence.room", code); } catch { /* private */ }
+      const body = new FormData();
+      body.append("room", code);
+      body.append("file", made.blob, made.filename);
+      const res = await fetch("/api/tools/speechdrop", { method: "POST", body });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "that didn't work");
+      setDrop(`In room ${j.room} — ${j.files} file${j.files === 1 ? "" : "s"} there now.`);
+    } catch (err: any) {
+      setDrop(err?.message || String(err));
+    } finally { setSending(false); }
+  }, [file, room]);
+
   /** The file, for the breaks and the box that a paste cannot carry. */
   const saveDocx = useCallback(async () => {
     const v = view.current;
@@ -300,11 +344,26 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
           title="Title it, drop the analytics, renumber, take out the white space">Format</button>
         <button type="button" className="fbtn wide" onClick={saveDocx}
           title="Download as .docx — keeps the page breaks and the cover's box, which a paste cannot">.docx</button>
+        <button type="button" className={"fbtn wide" + (drop ? " on" : "")}
+          onClick={() => setDrop(drop ? "" : "open")}
+          title="Put this document straight into a SpeechDrop room">SpeechDrop</button>
         <select className="fsel narrow zoom" value={zoom} title="Zoom"
           onChange={(e) => setZoom(Number(e.target.value))}>
           {ZOOMS.map((z) => <option key={z.label} value={z.value}>{z.label}</option>)}
         </select>
       </div>
+
+      {drop && (
+        <div className="droprow">
+          <input value={room} placeholder="room code" maxLength={16} spellCheck={false}
+            onChange={(e) => setRoom(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") toSpeechDrop(); }} />
+          <button type="button" className="fbtn wide" disabled={sending} onClick={toSpeechDrop}>
+            {sending ? "Sending…" : "Send"}
+          </button>
+          {drop !== "open" && <span className="msg">{drop}</span>}
+        </div>
+      )}
 
       {draft && (
         <div className="docnote">

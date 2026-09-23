@@ -54,7 +54,7 @@ export const schema = new Schema({
       toDOM(node): DOMOutputSpec {
         const tag = `h${node.attrs.level}`;
         if (node.attrs.level !== 1) return [tag, 0];
-        return [tag, { style: "text-align:center;border:3px solid #333333;padding:6pt 10pt" }, 0];
+        return [tag, { style: "text-align:center;border:4px solid #333333;padding:8pt 12pt" }, 0];
       },
     },
 

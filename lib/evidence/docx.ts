@@ -16,6 +16,8 @@ import type { Run, Elem } from "./elements";
 
 const PT = 2;                       // docx sizes are half-points
 const TWIP = 1440;                  // per inch
+const SPACE_AFTER = 120;            // 6pt under a paragraph
+const SPACE_BEFORE_HEAD = 240;      // 12pt over a heading
 
 /** "#ffff00" -> "FFFF00", which is how OOXML wants a colour. */
 const hex = (c?: string | null) => (c ? String(c).replace(/^#/, "").toUpperCase() : undefined);
@@ -29,7 +31,8 @@ const LEVEL = [
   { size: 13, centre: false, box: false, underline: false },  // tag
 ] as const;
 
-export async function downloadDocx(elements: Elem[], name: string) {
+/** The file itself, for saving or for sending somewhere. */
+export async function buildDocx(elements: Elem[], name: string): Promise<{ blob: Blob; filename: string }> {
   const stage = (s: string) => { (window as any).__docxStage = s; };
   stage("importing");
   const {
@@ -72,11 +75,14 @@ export async function downloadDocx(elements: Elem[], name: string) {
       children: line.length ? line : [new TextRun({ text: "" })],
       heading: l ? heading[l] : undefined,
       alignment: style && style.centre ? AlignmentType.CENTER : undefined,
+      // Room between things, given the way a word processor gives it: spacing
+      // on the paragraph rather than blank lines to delete later.
+      spacing: { before: l ? SPACE_BEFORE_HEAD : 0, after: l ? 60 : SPACE_AFTER },
       border: style && style.box ? {
-        top: { style: BorderStyle.SINGLE, size: 18, color: "333333", space: 6 },
-        bottom: { style: BorderStyle.SINGLE, size: 18, color: "333333", space: 6 },
-        left: { style: BorderStyle.SINGLE, size: 18, color: "333333", space: 6 },
-        right: { style: BorderStyle.SINGLE, size: 18, color: "333333", space: 6 },
+        top: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
+        bottom: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
+        left: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
+        right: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
       } : undefined,
     }));
   });
@@ -91,16 +97,21 @@ export async function downloadDocx(elements: Elem[], name: string) {
   stage("packing " + children.length + " paragraphs");
   const blob = await Packer.toBlob(doc);
   stage("packed");
+  return { blob, filename: (name || "send doc").replace(/[\\/:*?"<>|]/g, "-") + ".docx" };
+}
+
+/** Save it to disk. */
+export async function downloadDocx(elements: Elem[], name: string) {
+  const { blob, filename } = await buildDocx(elements, name);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = (name || "send doc").replace(/[\\/:*?"<>|]/g, "-") + ".docx";
+  a.download = filename;
   // The anchor has to be in the document: a detached one is ignored by some
   // browsers, and by a browser being driven by a test.
   a.style.display = "none";
   document.body.appendChild(a);
   a.click();
-  stage("clicked");
   setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 2000);
   return blob.size;
 }
