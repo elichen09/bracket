@@ -157,6 +157,15 @@
 .evi .page p { margin: 0 0 6px; }
 .evi .page ul, .evi .page ol { margin: 0 0 6px; padding-left: 22px; }
 .evi .page a { color: #1155cc; text-decoration: underline; }
+/* Once it has been typed in it is a draft, and says so. */
+.evi .docnote {
+  font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim); padding: 0 2px 12px; display: flex; gap: 12px; align-items: baseline;
+  justify-content: space-between; flex-wrap: wrap;
+}
+.evi .page[contenteditable] { cursor: text; }
+.evi .page[contenteditable]:focus { outline: none; border-color: var(--ink); }
+.evi .page[contenteditable]:hover { border-color: var(--muted); }
 .evi .docempty {
   padding: 48px 26px; text-align: center; color: var(--dim);
   font-size: 13px; line-height: 1.7;

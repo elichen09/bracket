@@ -184,7 +184,7 @@ export default function Evidence() {
         <span><kbd>↵</kbd> copy + send</span>
         <span><kbd>esc</kbd> clear</span>
         <span><kbd>del</kbd> remove from library</span>
-        <span className="drift">drag a sent block to reorder it</span>
+        <span className="drift">drag a sent block to reorder it · type in the document to edit it</span>
       </div>
 
       <div className="veil" id="veil"><div className="card" id="card" /></div>
