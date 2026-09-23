@@ -207,10 +207,13 @@
   font-family: inherit; font-weight: 700; color: inherit;
   line-height: 1.2; margin: 10pt 0 4pt;
 }
-.evi .sheet h1 { font-size: 26pt; text-align: center; }                          /* pocket */
+.evi .sheet h1 {                                                                 /* pocket */
+  font-size: 26pt; text-align: center;
+  border: 3px solid #333; padding: 6pt 10pt;
+}
 .evi .sheet h2 { font-size: 22pt; text-align: center; text-decoration: underline double; }  /* hat */
 .evi .sheet h3 { font-size: 16pt; text-align: center; text-decoration: underline; }         /* block */
-.evi .sheet h4 { font-size: 13pt; }                                              /* tag */
+.evi .sheet h4 { font-size: 13pt; text-decoration: none; }                       /* tag */
 .evi .sheet > :first-child { margin-top: 0; }
 .evi .sheet p { margin: 0; }
 .evi .sheet a { color: #1155cc; text-decoration: underline; }

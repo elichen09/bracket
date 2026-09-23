@@ -176,10 +176,35 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
     return node.type === schema.nodes.heading ? node.attrs.level : 0;
   })();
 
+  /**
+   * Changing the style changes the type of the paragraph and the marks on it.
+   *
+   * A block heading arrives from a cut file underlined — an underline *mark*
+   * on the text, because that is what Google Docs exports — and the mark has
+   * no reason to know it was only there because the line was a heading. So a
+   * style sets what its level is: bold at its own size, with the underline
+   * and strike taken off. A tag is a Heading 4, bold, 13pt, and nothing else.
+   */
+  const SIZE: Record<number, string> = { 1: "26pt", 2: "22pt", 3: "16pt", 4: "13pt" };
+
   const setLevel = (l: number) => {
-    run(l === 0
-      ? setBlockType(schema.nodes.paragraph)
-      : setBlockType(schema.nodes.heading, { level: l }));
+    const v = view.current;
+    if (!v) return;
+    const { $from, $to } = v.state.selection;
+    const from = $from.start(), to = $to.end();
+
+    let tr = v.state.tr;
+    if (l === 0) tr.setBlockType(from, to, schema.nodes.paragraph);
+    else {
+      tr.setBlockType(from, to, schema.nodes.heading, { level: l });
+      tr.removeMark(from, to, schema.marks.underline);
+      tr.removeMark(from, to, schema.marks.strike);
+      tr.addMark(from, to, schema.marks.strong.create());
+      tr.removeMark(from, to, schema.marks.fontSize);
+      tr.addMark(from, to, schema.marks.fontSize.create({ size: SIZE[l] }));
+    }
+    v.dispatch(tr);
+    v.focus();
   };
 
   const clearMarks = () => {
@@ -192,6 +217,26 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
     v.dispatch(tr);
     v.focus();
   };
+
+  /** The file, for the breaks and the box that a paste cannot carry. */
+  const saveDocx = useCallback(async () => {
+    const v = view.current;
+    const EV = (window as any).EV;
+    if (!v || !EV?.elementsFromHtml) return;
+    try {
+      (window as any).__docxStarted = true;
+      const { downloadDocx } = await import("@/lib/evidence/docx");
+      const elements = EV.elementsFromHtml(htmlFromDoc(v.state));
+      const name = (EV.docTitle && EV.docTitle(EV.state.settings)) || "send doc";
+      (window as any).__docxSize = await downloadDocx(elements, name);
+    } catch (err: any) {
+      // Writing a file is the one thing here that can fail on its own, so say
+      // so rather than leaving a button that appears to do nothing.
+      (window as any).__docxError = String(err && err.message ? err.message : err);
+      console.error("docx export failed:", err);
+      alert("Could not write the .docx: " + ((err && err.message) || err));
+    }
+  }, []);
 
   const insertBreak = () => {
     const v = view.current;
@@ -253,6 +298,8 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
         <Btn label="⏎" title="Page break — shown here; Docs drops these on paste" act={insertBreak} />
         <button type="button" className="fbtn wide" data-act="format"
           title="Title it, drop the analytics, renumber, take out the white space">Format</button>
+        <button type="button" className="fbtn wide" onClick={saveDocx}
+          title="Download as .docx — keeps the page breaks and the cover's box, which a paste cannot">.docx</button>
         <select className="fsel narrow zoom" value={zoom} title="Zoom"
           onChange={(e) => setZoom(Number(e.target.value))}>
           {ZOOMS.map((z) => <option key={z.label} value={z.value}>{z.label}</option>)}
@@ -260,7 +307,8 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
       </div>
 
       {draft && (
-        <div className="docnote">Your draft — new cards join the end
+        <div className="docnote">
+          {read ? "Read from your draft" : "Your draft — new cards join the end"}
           <button className="link" data-act="docReset">Rebuild</button>
         </div>
       )}

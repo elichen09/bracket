@@ -43,7 +43,19 @@ export const schema = new Schema({
       group: "block",
       defining: true,
       parseDOM: [1, 2, 3, 4].map((level) => ({ tag: `h${level}`, attrs: { level } })),
-      toDOM(node): DOMOutputSpec { return [`h${node.attrs.level}`, 0]; },
+      /**
+       * The cover carries its rule inline, because a paste has no stylesheet
+       * to consult and a box is the one part of a cover page that is not a
+       * heading style. Nothing else is decorated here: an inline underline
+       * would be read back as an underline *mark* the next time the document
+       * is parsed, and would then follow the text into whatever style it was
+       * changed to — which is how tags ended up underlined.
+       */
+      toDOM(node): DOMOutputSpec {
+        const tag = `h${node.attrs.level}`;
+        if (node.attrs.level !== 1) return [tag, 0];
+        return [tag, { style: "text-align:center;border:3px solid #333333;padding:6pt 10pt" }, 0];
+      },
     },
 
     /** Drawn as a rule on the page; taken out again on the way to the clipboard. */
