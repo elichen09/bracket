@@ -570,11 +570,166 @@
 .evi .grp.sel .del:hover { color: var(--acc); }
 .evi .del:focus-visible { opacity: 1; outline: 2px solid var(--acc); }
 
+/* =====================================================================
+   Movement
+
+   This is a tool used with a timer running, where the same four actions
+   happen a hundred times in an afternoon. Everything below is feedback
+   rather than decoration: the button goes down under the finger, the card
+   you sent visibly travels to the list it landed in, the count it landed in
+   bumps, and the toast shows how long it has left. Nothing here moves on its
+   own, nothing waits for an animation before doing the work, and none of it
+   lasts longer than a third of a second — the point is to answer faster than
+   you can wonder whether the click registered.
+
+   Two curves do all of it: --spring arrives fast and settles, --pop goes a
+   little past and comes back. Both are the same shape as the site's.
+   ===================================================================== */
+.evi {
+  --spring: cubic-bezier(.22, 1, .36, 1);
+  --pop: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* ---------- the press ----------
+   Everything that can be clicked goes down by a few percent while it is
+   held. It is the cheapest thing in here and the one most missed. */
+.evi .btn:active:not(:disabled), .evi .docbar .fbtn:active, .evi .docbar .fsel:active,
+.evi .tabs button:active, .evi .tick:active, .evi .mv:active:not(:disabled),
+.evi .link:active, .evi .del:active, .evi .x:active, .evi .back:active {
+  transform: scale(.955);
+}
+.evi .btn:active:not(:disabled) { transform: translateY(0) scale(.955); }
+.evi .del:active, .evi .x:active { transform: scale(1.05); }
+
+/* ---------- the ripple ----------
+   Drawn from where the pointer actually landed, which is what makes a click
+   feel answered rather than merely registered. The element is made and
+   removed by the motion layer; these are its clothes. */
+.evi .btn, .evi .docbar .fbtn, .evi .tabs button, .evi .tick, .evi .mv,
+.evi .row, .evi .arg, .evi .grp { position: relative; overflow: hidden; }
+.evi .rip {
+  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+  border-radius: 50%; background: currentColor; pointer-events: none;
+}
+
+/* ---------- the flight ----------
+   A card that has been sent travels from the row you pressed to the tab it
+   is now counted in, so the list at the side is never somewhere things
+   silently appear. */
+.evi .fly {
+  position: fixed; z-index: 95; pointer-events: none;
+  font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .1em;
+  text-transform: uppercase; text-align: left;
+  background: var(--ink); color: var(--ground); padding: 7px 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  box-shadow: 0 8px 26px rgba(14, 14, 13, .24);
+}
+.evi .tabs .count { display: inline-block; }
+.evi .tabs .count.bump { animation: eviBump .44s var(--pop); }
+@keyframes eviBump {
+  0% { transform: none; }
+  30% { transform: scale(1.4); }
+  100% { transform: none; }
+}
+
+/* ---------- results arriving ----------
+   Only when the result set itself changed. Moving the selection with the
+   arrow keys redraws the same list, and a list that re-animates under every
+   keypress is worse than one that never moves at all. */
+.evi #results.fresh > .grp, .evi #results.fresh > .row, .evi #results.fresh > .args {
+  animation: eviIn .34s var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 15ms);
+}
+@keyframes eviIn {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+.evi .blank { animation: eviIn .3s var(--spring) both; }
+
+/* ---------- the send list ----------
+   The block that has just landed says so once, then settles into the list. */
+.evi .sent:hover { transform: translateY(-1px); box-shadow: 0 3px 14px rgba(14, 14, 13, .07); }
+.evi .sent { transition: background .16s var(--ease), box-shadow .18s var(--ease), opacity .16s var(--ease), transform .18s var(--spring); }
+.evi .sent.landed { animation: eviLanded .8s var(--ease) both; }
+@keyframes eviLanded {
+  0% {
+    background: color-mix(in srgb, var(--acc) 26%, var(--surface));
+    box-shadow: inset 3px 0 0 var(--acc); transform: translateX(12px);
+  }
+  22% {
+    background: color-mix(in srgb, var(--acc) 26%, var(--surface));
+    box-shadow: inset 3px 0 0 var(--acc); transform: none;
+  }
+  100% { background: var(--surface); box-shadow: inset 3px 0 0 transparent; transform: none; }
+}
+
+/* ---------- panels and sheets ---------- */
+.evi.withdoc .docpane { animation: eviPanel .34s var(--spring) both; }
+@keyframes eviPanel {
+  from { opacity: 0; transform: translateX(22px); }
+  to { opacity: 1; transform: none; }
+}
+.evi .droprow { animation: eviDrop .24s var(--spring) both; }
+@keyframes eviDrop {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+.evi .sheet { transition: box-shadow .3s var(--ease); }
+.evi #docbody:focus-within .sheet {
+  box-shadow: 0 2px 6px 1px rgba(60, 64, 67, .18), 0 2px 10px rgba(60, 64, 67, .28);
+}
+.evi #sidebody, .evi #docbody { scroll-behavior: smooth; }
+
+/* ---------- the search line ----------
+   The rule under the search box becomes the accent while you are typing in
+   it — the one place in the tool where the cursor lives. */
+.evi .searchwrap { position: relative; }
+.evi .searchwrap::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: var(--acc); transform: scaleX(0); transform-origin: left;
+  transition: transform .34s var(--spring);
+}
+.evi .searchwrap:focus-within::after { transform: scaleX(1); }
+
+/* ---------- the toast, with its own clock ----------
+   The bar across the top runs down for exactly as long as the message has
+   left, so a message that is about to go does not look like one that is
+   staying. The engine sets --life. */
+.evi .toast { transition: transform .34s var(--pop); }
+.evi .toast::after {
+  content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 100%;
+  background: var(--acc); transform-origin: left; transform: scaleX(0);
+}
+.evi .toast.on::after { animation: eviLife var(--life, 2400ms) linear forwards; }
+.evi .toast.on.alt::after { animation-name: eviLifeAlt; }
+.evi .toast.bad::after { background: #fff; opacity: .5; }
+@keyframes eviLife {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+/* The same clock under another name, so consecutive messages restart it. */
+@keyframes eviLifeAlt {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* ---------- modals arrive rather than appear ---------- */
+.evi .card { animation: eviCard .3s var(--pop) both; }
+
+/* ---------- where the keyboard is ---------- */
+.evi button:focus-visible, .evi input:focus-visible, .evi select:focus-visible {
+  outline: 2px solid var(--acc); outline-offset: 2px;
+}
+.evi #q:focus-visible, .evi .sheet:focus-visible { outline: none; }
+
 /* Everything above moves. Anyone who has asked their system not to gets the
    same tool without the movement. */
 @media (prefers-reduced-motion: reduce) {
   .evi *, .evi *::before, .evi *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   .evi .row:hover:not(.sel), .evi .row.sel, .evi .arg:hover:not(.sel), .evi .arg.sel { padding-left: var(--evi-gut); }
+  .evi .sent:hover, .evi .btn:active:not(:disabled), .evi .tabs button:active,
+  .evi .tick:active, .evi .mv:active:not(:disabled), .evi .del:active, .evi .x:active { transform: none; }
+  .evi .searchwrap::after, .evi .toast::after { display: none; }
 }
 
 @media (max-width: 1240px) {

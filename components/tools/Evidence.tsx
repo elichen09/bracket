@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import DocEditor from "./DocEditor";
+import { polish } from "@/lib/evidence/polish";
 import "./evidence.css";
 
 /**
@@ -42,6 +43,9 @@ export default function Evidence() {
     if (!el) return;
     let off: (() => void) | undefined;
     let dead = false;
+    // The ripples and the flight of a sent card. It listens on the root and
+    // owns nothing, so it can go on before the engine has finished loading.
+    const unpolish = polish(el);
     // The engine reaches for IndexedDB and the clipboard the moment it starts,
     // so it is imported in the browser rather than rendered on the server.
     import("@/lib/evidence/engine").then((m: any) => {
@@ -49,7 +53,7 @@ export default function Evidence() {
       engine.current = m;
       off = m.boot(el);
     });
-    return () => { dead = true; if (off) off(); };
+    return () => { dead = true; unpolish(); if (off) off(); };
   }, []);
 
   // How it was left last time. Read after mount so the server and the first
