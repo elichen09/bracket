@@ -189,6 +189,20 @@
 .evi .page p { margin: 0 0 6px; }
 .evi .page ul, .evi .page ol { margin: 0 0 6px; padding-left: 22px; }
 .evi .page a { color: #1155cc; text-decoration: underline; }
+/* The cover's box is a one-cell table, as it is in a real block file. */
+.evi .page table { border-collapse: collapse; width: 100%; margin: 0 0 10px; }
+.evi .page td { border: 2.25pt solid #000; padding: 10pt 12pt; text-align: center; }
+.evi .page td p { margin: 0; }
+/* A page break is a real break in the document, so it is drawn as one. */
+.evi .page hr {
+  border: 0; border-top: 1px dashed #b9b4a8; margin: 20px 0; height: 0;
+  position: relative; overflow: visible;
+}
+.evi .page hr::after {
+  content: "page"; position: absolute; right: 0; top: -8px; background: #fff;
+  padding: 0 5px; font-family: var(--mono); font-size: 8px; letter-spacing: .14em;
+  text-transform: uppercase; color: #b9b4a8;
+}
 /* Once it has been typed in it is a draft, and says so. */
 .evi .docnote {
   font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .1em; text-transform: uppercase;
