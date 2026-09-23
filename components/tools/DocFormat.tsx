@@ -116,6 +116,12 @@ export default function DocFormat({ host }: { host: React.RefObject<HTMLDivEleme
       {/* Docs' own mark for this, and it keeps the row to one line. */}
       <button type="button" className="fbtn" title="Clear the formatting on the selection"
         onMouseDown={(e) => e.preventDefault()} onClick={() => run("removeFormat")}>T<sub>x</sub></button>
+
+      <span className="fdiv" />
+      {/* The whole document rather than the selection, so it is the engine's
+          job: it asks the questions and rewrites the draft. */}
+      <button type="button" className="fbtn wide" data-act="format"
+        title="Title it, drop the analytics, renumber, take out the white space">Format</button>
     </div>
   );
 }

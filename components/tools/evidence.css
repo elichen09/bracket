@@ -155,7 +155,7 @@
 .evi .docbar .fsel {
   font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .06em;
   background: var(--ground); border: 1px solid var(--line); color: var(--muted);
-  padding: 3px 5px; max-width: 98px;
+  padding: 3px 4px; max-width: 88px;
   transition: color .16s var(--ease), border-color .16s var(--ease);
 }
 .evi .docbar .fsel.narrow { max-width: 58px; }
@@ -169,6 +169,11 @@
 .evi .docbar .fbtn:active { background: var(--ink); color: var(--ground); border-color: var(--ink); }
 .evi .docbar .fbtn.hl i { display: block; width: 13px; height: 13px; background: #ffff00; border: 1px solid var(--line); }
 .evi .docbar .fdiv { width: 1px; height: 15px; background: var(--line-soft); margin: 0 3px; }
+.evi .docbar .fbtn.wide {
+  font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .08em; text-transform: uppercase;
+  padding: 0 7px; border-color: var(--line); color: var(--muted);
+}
+.evi .docbar .fbtn.wide:hover { color: var(--ink); border-color: var(--ink); background: none; }
 
 .evi #docbody { flex: 1; overflow-y: auto; padding: 22px 20px 60px; }
 .evi .page {
