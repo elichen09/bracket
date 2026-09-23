@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import DocFormat from "./DocFormat";
+import DocEditor from "./DocEditor";
 import "./evidence.css";
 
 /**
@@ -181,8 +181,7 @@ export default function Evidence() {
             tabIndex={0} onPointerDown={grab("doc")} onKeyDown={nudge("doc")}><i /></div>
         )}
         <aside className="pane docpane" aria-hidden={!doc}>
-          <DocFormat host={ref} />
-          <div id="docbody" />
+          <DocEditor host={ref} width={docW} />
         </aside>
       </div>
 
