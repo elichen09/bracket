@@ -1,0 +1,49 @@
+/* The tools suite: the lock, the index, and the frame a tool runs inside. */
+
+/* ---------- the lock ---------- */
+.gate { padding-top: 12vh; max-width: 46ch; }
+.gate .mono { color: var(--muted); }
+.gate h1 {
+  margin: 8px 0 0; font-family: var(--display); font-weight: 800;
+  font-size: clamp(56px, 12vw, 128px); letter-spacing: -.045em; line-height: .9;
+  text-transform: uppercase;
+}
+.gate .prose { color: var(--muted); margin: 16px 0 24px; font-size: 14px; line-height: 1.6; }
+.gate form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.gate input { min-width: 220px; }
+.gate .msg { font-size: 13px; color: var(--muted); }
+.gate .msg.bad { color: var(--bad); }
+
+/* ---------- the index ---------- */
+.index .row.toolrow { grid-template-columns: 56px 1fr auto 40px; }
+.index .row.toolrow .s { font-size: 10px; letter-spacing: .1em; color: var(--dim); }
+
+/* ---------- the frame a tool runs inside ----------
+   A tool is not a document: it fills what is left of the window and does its
+   own scrolling, so the page itself never scrolls and the site's nav stays put
+   above it. */
+.toolpage {
+  height: calc(100dvh - 59px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.toolhead {
+  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  padding: 14px var(--gutter) 13px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.toolhead h1 {
+  margin: 0; font-family: var(--display); font-weight: 800;
+  font-size: 22px; letter-spacing: -.03em; line-height: 1;
+}
+.toolhead .crumb { color: var(--muted); }
+.toolhead .crumb:hover { color: var(--ink); }
+.toolhead .about { color: var(--muted); font-size: 12.5px; max-width: 74ch; flex: 1; min-width: 240px; }
+.toolhead .where { color: var(--dim); white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .toolpage { height: calc(100dvh - 55px); }
+  .toolhead .about { display: none; }
+}

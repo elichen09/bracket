@@ -1,0 +1,370 @@
+/* =====================================================================
+   Evidence — dressed in The Break's clothes.
+
+   The tool arrived with its own look: monochrome, hairline rules, one pink
+   accent. The bones were already close to this site's, so what changed is
+   the palette and the type — every colour is a site token, every micro label
+   is the site's uppercase mono, and the one accent is the site's orange.
+   Nothing is hard-coded, so the tool follows the site into light mode
+   without knowing that light mode exists.
+
+   Everything is scoped under .evi. The engine writes raw HTML with these
+   class names, and several of them — .row, .card, .tag, .hint, .btn — are
+   names the site uses too, for different things.
+   ===================================================================== */
+
+.evi {
+  --evi-micro: 10px;
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.evi *, .evi *::before, .evi *::after { box-sizing: border-box; border-radius: 0; }
+
+/* ---------------------------------------------------------------------
+   Names the site already uses, for something else.
+
+   Twenty-two of the tool's class names also appear in the site's stylesheet.
+   Most are harmless, because the site scopes them (.nav .brand, .slot.blank,
+   .index .row .n) and none of those ancestors exist in here. Five are not
+   scoped at all, so they reach in and win on the properties the tool doesn't
+   happen to set — which is how the toolbar's counts ended up printed on top
+   of each other, squeezed into the 10px square the site uses for a chart
+   legend swatch. Each is reset here, by name, with what it collided with.
+   --------------------------------------------------------------------- */
+.evi .bar { margin-top: 0; overflow: visible; }                   /* a progress bar */
+.evi .chip { display: inline; width: auto; height: auto; border: 0; }  /* a legend swatch */
+.evi .btn.key { display: inline-block; align-items: normal; gap: 0; margin-right: 0; white-space: nowrap; }  /* a legend row */
+.evi .stat { padding: 0; margin-right: 0; border-right: 0; }      /* a tournament stat tile */
+.evi .toast { opacity: 1; pointer-events: auto; }                 /* the site's own toast */
+
+/* The site gives every button and input a border and padding. Inside the tool
+   most buttons are bare text, so the baseline is reset and put back by hand. */
+.evi button { border: 0; padding: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.evi button:hover { border-color: transparent; }
+.evi input, .evi textarea, .evi select { border-radius: 0; }
+.evi ::selection { background: var(--acc); color: var(--ground); }
+
+/* The micro label: the site's .mono, applied to what the engine writes. */
+.evi .brand, .evi .chip, .evi .btn, .evi .tabs button, .evi .meta, .evi .searchmeta,
+.evi .seth, .evi .foothint, .evi .sent .cite, .evi .pn, .evi .argn, .evi .casebar .lbl,
+.evi .link, .evi .trig, .evi .indexhead, .evi .grp, .evi .gcount {
+  font-family: var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------ toolbar */
+.evi .bar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 18px; height: 46px; flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.evi .brand { font-size: 11px; color: var(--ink); }
+.evi .stat { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.evi .chip { font-size: var(--evi-micro); color: var(--muted); white-space: nowrap; }
+.evi .chip.good { color: var(--ink); }
+.evi .chip.warn { color: var(--gold); }
+.evi .spacer { flex: 1; }
+
+.evi .btn {
+  font-size: var(--evi-micro); padding: 6px 11px;
+  border: 1px solid var(--line); color: var(--muted); background: none;
+  transition: color .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
+}
+.evi .btn:hover { color: var(--ink); border-color: var(--ink); }
+.evi .btn.key { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.evi .btn.key:hover { opacity: .88; }
+.evi .btn:disabled { opacity: .4; cursor: default; }
+.evi .btn:disabled:hover { color: var(--muted); border-color: var(--line); }
+
+/* --------------------------------------------------------------- body */
+.evi .panes { flex: 1; display: flex; min-height: 0; }
+.evi .pane { display: flex; flex-direction: column; min-height: 0; }
+.evi .left { flex: 1; min-width: 0; background: var(--ground); }
+.evi .right { width: 400px; flex-shrink: 0; border-left: 1px solid var(--line); background: var(--surface); }
+
+/* ------------------------------------------------------------- search */
+.evi .searchwrap {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 20px 22px 16px; border-bottom: 1px solid var(--line);
+}
+.evi .slash { font-family: var(--display); font-weight: 800; font-size: 30px; line-height: 1; color: var(--dim); }
+.evi #q {
+  flex: 1; min-width: 0; background: none; border: 0; padding: 0; outline: none;
+  font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1;
+  letter-spacing: -.03em; color: var(--ink);
+}
+.evi #q::placeholder { color: var(--dim); font-weight: 500; letter-spacing: -.01em; }
+.evi .searchmeta { font-size: var(--evi-micro); color: var(--muted); white-space: nowrap; }
+
+.evi .indexhead {
+  display: flex; gap: 14px; padding: 8px 22px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--evi-micro); color: var(--dim);
+}
+.evi .indexhead i { font-style: normal; }
+.evi .indexhead .c1 { width: 30%; flex-shrink: 0; }
+.evi .indexhead .c2 { flex: 1; }
+.evi .indexhead .c3 { width: 26%; text-align: right; flex-shrink: 0; }
+
+.evi #results { flex: 1; overflow-y: auto; padding-bottom: 42px; }
+
+/* ------------------------------------------------------------ results */
+.evi .row {
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 10px 22px; cursor: pointer;
+  border-bottom: 1px solid var(--line-soft);
+}
+.evi .row:hover:not(.sel) { background: var(--surface); }
+.evi .row.sel { background: var(--ink); color: var(--ground); }
+.evi .trig {
+  width: 30%; flex-shrink: 0; font-size: 10.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evi .ttl {
+  flex: 1; font-size: 14.5px; font-weight: 500; letter-spacing: -.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evi .meta {
+  width: 26%; text-align: right; flex-shrink: 0;
+  font-size: var(--evi-micro); color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evi .row.sel .meta, .evi .row.sel .trig, .evi .row.sel .ttl { color: var(--ground); }
+.evi mark { background: var(--acc); color: var(--ground); padding: 0 2px; font-weight: 600; }
+
+.evi .args { border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+.evi .arg {
+  display: flex; align-items: center; gap: 12px;
+  padding: 7px 22px; font-size: 13px; color: var(--muted); cursor: pointer;
+}
+.evi .arg:hover:not(.sel) { color: var(--ink); }
+.evi .arg.sel { background: var(--ink); color: var(--ground); }
+.evi .arg.sel .argn { color: var(--ground); }
+.evi .argn { width: calc(30% - 14px); flex-shrink: 0; font-size: var(--evi-micro); color: var(--dim); }
+.evi .argt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --------------------------------------------------------- categories */
+.evi .grp {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 22px; cursor: pointer; position: sticky; top: 0; z-index: 2;
+  background: var(--surface-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  font-size: var(--evi-micro); color: var(--ink);
+}
+.evi .grp:first-child { border-top: 0; }
+.evi .grp:hover:not(.sel) { background: var(--surface); }
+.evi .grp.sel { background: var(--ink); color: var(--ground); }
+.evi .chev { width: 9px; flex-shrink: 0; font-size: 9px; }
+.evi .glabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi .gcount { flex-shrink: 0; color: var(--dim); }
+.evi .grp.sel .gcount { color: var(--ground); opacity: .7; }
+.evi .indexhead .link { margin-left: 10px; }
+
+.evi .blank { padding: 70px 30px; text-align: center; }
+.evi .blank strong {
+  display: block; font-family: var(--display); font-weight: 700;
+  font-size: 22px; letter-spacing: -.02em; margin-bottom: 10px;
+}
+.evi .blank p { margin: 0 auto; max-width: 400px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.evi .blank b { color: var(--ink); font-weight: 500; }
+
+/* --------------------------------------------------------- right pane */
+.evi .tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.evi .tabs button {
+  flex: 1; padding: 12px 6px; font-size: var(--evi-micro);
+  color: var(--muted); border-right: 1px solid var(--line-soft);
+}
+.evi .tabs button:last-child { border-right: 0; }
+.evi .tabs button:hover { color: var(--ink); }
+.evi .tabs button.on { background: var(--ink); color: var(--ground); }
+.evi .tabs .count { opacity: .65; }
+
+.evi .sideacts {
+  display: flex; gap: 6px; padding: 10px 12px; align-items: center; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line-soft); flex-shrink: 0;
+}
+.evi .sideacts .chip { color: var(--muted); }
+.evi .sideacts .chip.good { color: var(--ink); }
+.evi #sidebody { flex: 1; overflow-y: auto; padding-bottom: 42px; }
+
+.evi .sent { display: flex; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line-soft); }
+.evi .sent .n { font-size: var(--evi-micro); font-family: var(--mono); color: var(--dim); padding-top: 3px; }
+.evi .sent .body { flex: 1; min-width: 0; }
+.evi .sent .tag {
+  font-size: 14px; font-weight: 500; letter-spacing: -.01em; font-family: var(--ui);
+  text-transform: none; border: 0; padding: 0; margin: 0; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evi .sent .cite { font-size: var(--evi-micro); color: var(--dim); margin-top: 4px; }
+.evi .sent .x, .evi .part .x { font-size: 15px; line-height: 1; padding: 0 3px; color: var(--dim); }
+.evi .sent .x:hover, .evi .part .x:hover { color: var(--bad); }
+
+.evi .link { font-size: var(--evi-micro); color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.evi .link:hover { color: var(--ink); }
+
+.evi .parts { border-bottom: 1px solid var(--line-soft); background: var(--surface-2); }
+.evi .part { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 34px; font-size: 13px; }
+.evi .part + .part { border-top: 1px solid var(--line-soft); }
+.evi .part.off .ptitle { opacity: .45; text-decoration: line-through; }
+.evi .pn { font-size: var(--evi-micro); color: var(--dim); flex-shrink: 0; }
+.evi .ptitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi .ptitle.dim { color: var(--muted); }
+.evi .tick {
+  width: 17px; height: 17px; flex-shrink: 0; font-size: 10px; line-height: 1;
+  border: 1px solid var(--line); color: var(--ink); background: var(--ground);
+}
+.evi .tick:hover { border-color: var(--ink); background: var(--ink); color: var(--ground); }
+.evi .part.addrow { padding-top: 8px; padding-bottom: 8px; }
+
+.evi .mvs { display: flex; flex-direction: column; flex-shrink: 0; }
+.evi .mv {
+  width: 18px; height: 12px; line-height: 1; font-size: 7px;
+  color: var(--dim); border: 1px solid var(--line-soft);
+}
+.evi .mv + .mv { border-top: 0; }
+.evi .mv:hover:not(:disabled) { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.evi .mv:disabled { opacity: .3; cursor: default; }
+
+/* --------------------------------------------------------- the composer */
+.evi .composer { padding: 12px 14px 14px 34px; background: var(--surface); border-top: 1px solid var(--line-soft); }
+.evi .composer textarea {
+  width: 100%; resize: vertical; min-height: 66px;
+  background: var(--ground); border: 1px solid var(--line); color: var(--ink);
+  font: inherit; font-size: 13.5px; line-height: 1.5; padding: 10px;
+}
+.evi .composer textarea:focus { outline: 2px solid var(--acc); outline-offset: -1px; border-color: var(--acc); }
+.evi .composer textarea::placeholder { color: var(--dim); }
+.evi .crow { display: flex; align-items: center; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
+.evi .crow .hint { font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .1em; text-transform: uppercase; margin: 0; }
+
+/* ------------------------------------------------------------ preview */
+.evi .preview { padding: 16px 18px 28px; font-size: 14px; line-height: 1.6; }
+.evi .preview .pv-head {
+  font-family: var(--mono); font-size: var(--evi-micro); letter-spacing: .12em; text-transform: uppercase;
+  margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); color: var(--ink);
+}
+.evi .preview .pv-head:first-child { margin-top: 0; }
+.evi .preview .pv-tag { font-weight: 600; margin-top: 16px; letter-spacing: -.01em; color: var(--ink); }
+.evi .preview .pv-tag:first-child { margin-top: 0; }
+.evi .preview .pv-cite { font-weight: 600; font-size: 12.5px; color: var(--ink); }
+.evi .preview .pv-fullcite { font-size: 11px; color: var(--dim); line-height: 1.45; }
+.evi .preview .pv-txt { color: var(--muted); margin-top: 3px; }
+
+/* ------------------------------------------------------------- modals */
+.evi .veil {
+  position: fixed; inset: 0; z-index: 50; padding: 26px;
+  background: color-mix(in srgb, var(--ground) 78%, transparent);
+  backdrop-filter: blur(6px);
+  display: none; align-items: center; justify-content: center;
+}
+.evi .veil.on { display: flex; }
+.evi .card {
+  background: var(--surface); border: 1px solid var(--line);
+  width: 100%; max-width: 660px; max-height: 86vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.evi .card.wide { max-width: 940px; height: 88vh; }
+.evi .card h2 {
+  margin: 0; padding: 14px 22px; font-family: var(--mono); font-size: var(--evi-micro);
+  letter-spacing: .14em; text-transform: uppercase; font-weight: 500;
+  background: var(--ink); color: var(--ground);
+}
+.evi .card .in { padding: 22px; overflow-y: auto; }
+.evi .card .out {
+  padding: 12px 22px; border-top: 1px solid var(--line);
+  display: flex; gap: 8px; align-items: center;
+}
+.evi .hint { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0; max-width: none; }
+.evi .hint b { color: var(--ink); font-weight: 500; }
+
+.evi #dropzone, .evi #casezone {
+  margin-top: 16px; min-height: 170px; max-height: 300px; overflow: auto;
+  border: 1px dashed var(--line); padding: 18px; background: var(--ground);
+  color: var(--dim); font-size: 14px; outline: none;
+}
+.evi #dropzone:focus, .evi #casezone:focus { border-color: var(--acc); border-style: solid; color: var(--ink); }
+.evi #dropzone.full { color: var(--ink); border-style: solid; }
+
+.evi .opt {
+  display: flex; align-items: center; gap: 10px; margin-top: 16px;
+  font-size: 13px; color: var(--muted); cursor: pointer;
+}
+.evi .opt input { width: 15px; height: 15px; accent-color: var(--acc); }
+
+/* ----------------------------------------------------------- settings */
+.evi .set { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.evi .set label { flex: 1; font-size: 13.5px; }
+.evi .set .sub { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.evi .set input[type=number], .evi .set input[type=text], .evi .set select {
+  background: var(--ground); border: 1px solid var(--line); color: var(--ink);
+  padding: 6px 8px; font: inherit; font-size: 13px;
+}
+.evi .set input[type=number], .evi .set input[type=text] { width: 84px; }
+.evi .set select { max-width: 250px; }
+.evi .set input:focus, .evi .set select:focus { outline: 2px solid var(--acc); outline-offset: -1px; }
+.evi .set input[type=range] { width: 150px; accent-color: var(--acc); }
+.evi .set input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--acc); }
+.evi .seth {
+  font-size: var(--evi-micro); color: var(--ink); margin: 26px 0 4px;
+  padding-bottom: 7px; border-bottom: 1px solid var(--line);
+}
+.evi .seth:first-child { margin-top: 0; }
+.evi #usage b { color: var(--ink); font-weight: 500; }
+
+/* --------------------------------------------------- the case converter */
+.evi .casebar {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 18px 22px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+}
+.evi .casebar .big { font-family: var(--display); font-size: 46px; font-weight: 800; letter-spacing: -.04em; line-height: .9; }
+.evi .casebar .lbl { font-size: var(--evi-micro); color: var(--dim); margin-right: 10px; }
+.evi .casebar .chip { color: var(--muted); }
+.evi .casebar .chip.good { color: var(--ink); }
+
+/* --------------------------------------------------------------- misc */
+.evi .toast {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+  background: var(--ink); color: var(--ground);
+  padding: 12px 22px; font-size: 12px;
+  transform: translateY(100%); transition: transform .18s var(--ease);
+}
+.evi .toast.on { transform: translateY(0); }
+.evi .toast.bad { background: var(--bad); color: #fff; }
+
+.evi kbd {
+  font-family: var(--mono); font-size: var(--evi-micro);
+  border: 1px solid var(--line); padding: 1px 4px; color: var(--muted);
+}
+.evi .foothint {
+  position: absolute; bottom: 0; left: 0; right: 400px; z-index: 5;
+  padding: 9px 22px; font-size: var(--evi-micro); color: var(--dim);
+  background: var(--ground); border-top: 1px solid var(--line-soft);
+  display: flex; gap: 18px; flex-wrap: wrap;
+}
+.evi #clipstage { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; overflow: hidden; }
+
+/* --------------------------------------------------------- delete mark */
+.evi .del {
+  flex-shrink: 0; width: 20px; height: 20px; line-height: 1; font-size: 15px;
+  color: var(--dim); opacity: 0; transition: opacity .12s;
+}
+.evi .row:hover .del, .evi .row.sel .del,
+.evi .arg:hover .del, .evi .arg.sel .del,
+.evi .grp:hover .del, .evi .grp.sel .del { opacity: 1; }
+.evi .row.sel .del, .evi .grp.sel .del { color: var(--ground); }
+.evi .del:hover { color: var(--bad); opacity: 1; }
+.evi .grp.sel .del:hover { color: var(--gold); }
+.evi .del:focus-visible { opacity: 1; outline: 2px solid var(--acc); }
+
+@media (max-width: 1000px) {
+  .evi .right { width: 320px; }
+  .evi .foothint { right: 320px; }
+  .evi .indexhead .c3, .evi .meta { display: none; }
+  .evi .trig { width: 38%; }
+  .evi .argn { width: calc(38% - 14px); }
+}

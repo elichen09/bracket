@@ -7,6 +7,7 @@ import { useUser, userName, signOut } from "@/lib/useBreak";
 
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
+  const [tools, setTools] = useState(false);
   const path = usePathname();
   const router = useRouter();
   const user = useUser();
@@ -16,6 +17,13 @@ export default function Nav() {
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
   }, []);
+  // The tools are admin-only, and the link is shown to whoever has unlocked
+  // them here. This cookie says only that; the key itself is httpOnly and
+  // never reaches this file, so being wrong here shows a link to a locked page
+  // rather than letting anyone through it.
+  useEffect(() => {
+    setTools(document.cookie.split("; ").some((c) => c === "break_admin_on=1"));
+  }, [path]);
   const active = (which: string) => {
     if (which === "home") return path === "/" || path.startsWith("/t/");
     if (which === "new") return path === "/new";
@@ -30,6 +38,7 @@ export default function Nav() {
         <Link href="/rankings" className={path === "/rankings" ? "on" : ""}>Rankings</Link>
         <Link href="/new" className={active("new") ? "on" : ""}>Add tournament</Link>
         <Link href="/about" className={active("about") ? "on" : ""}>Scoring</Link>
+        {tools && <Link href="/tools" className={path.startsWith("/tools") ? "on" : ""}>Tools</Link>}
         {user === undefined ? null : user ? (
           <span className="who-nav">
             <span className="uname">{userName(user)}</span>
