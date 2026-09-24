@@ -1,179 +1,276 @@
 /* =====================================================================
-   The finish every tool shares — the Flow it look.
+   The finish every tool shares, in five colour schemes.
 
    Evidence (.evi), Flow (.flw), Doc flow (.dfl) and Past flows (.pfl) sit
-   on one desk and under one banner:
+   on one desk under one banner, and every colour they share comes from the
+   --t-* and --bn-* variables below. A scheme is one block of those values;
+   the Colours button in each banner sets <html data-tool-theme>, and nothing
+   else changes.
 
-   · a forest-green banner with a fine grain, cream type, a pill clock with
-     a round play button, and pill buttons;
-   · cream paper, warm beige tints and firm but soft rules below it;
-   · terracotta for whatever is happening now — the live column, the cell
-     being written, a turn, a running clock;
-   · in Flow, the two sides as forest (Pro) and clay (Con). Clay is kept
-     much lighter than forest, so the pair still separates by lightness for
-     colour-blind readers, and every side is named in words as well.
+   The shape does not change with the colour: square corners, hairline
+   rules, mono labels — the postmodern paper the tools were drawn as. Only
+   dots, avatars and stop numbers are round.
 
-   Loaded after each tool's own sheet; every rule is scoped under .toolpage
-   so it wins without !important.
+   Checked, not guessed: in every scheme Pro and Con stay at least 9.6 apart
+   (OKLab x100) under simulated protanopia and deuteranopia, and white label
+   text clears 4.5:1 on each side colour and accent. They are named in words
+   too.
+
+   Loaded after each tool's own sheet; scoped under .toolpage so it wins.
    ===================================================================== */
 
 .toolpage {
   --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .15  0 0 0 0 .08  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   --grain-light: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 .92  0 0 0 .08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  --forest: #1F2C24;
-  --forest-2: #2A3B30;
-  --cream: #F3EDE1;
-  --terra: #C4553A;
-  --terra-hi: #D96A4D;
+
+  /* ---- Forest: the Flow it look (the default) ---- */
+  --t-ground: #ECE5D8; --t-panel: #F0EADF; --t-surface: #FBF8F2; --t-surface-2: #F4EEE3; --t-paper: #FFFCF6;
+  --t-line: #C8BDAB; --t-line-soft: #E0D6C5; --t-ink: #1D1B17; --t-muted: #5A554B; --t-dim: #857E71;
+  --bn: #1F2C24; --bn-top: #243329; --bn-bot: #1C271F; --bn-glow: #2B3D31; --bn-edge: #16201A;
+  --bn-ink: #F3EDE1; --bn-rgb: 243, 237, 225; --bn-well: rgba(0, 0, 0, .18); --bn-grain: var(--grain-light);
+  --bn-main: #F3EDE1; --bn-main-ink: #1F2C24;
+  --t-acc: #C4553A; --t-acc-hi: #D96A4D; --t-acc-rgb: 196, 85, 58;
+  --t-deep: #1F2C24; --t-deep-2: #2A3B30; --t-deep-ink: #F3EDE1;
+  --t-pro: #22493A; --t-pro-ink: #1A3A2D; --t-pro-head: #EAEDE3; --t-pro-bg: #F7F5EE; --t-pro-rgb: 34, 73, 58;
+  --t-con: #AE6044; --t-con-ink: #8E4A33; --t-con-head: #F5E9DF; --t-con-bg: #FAF3EC; --t-con-rgb: 174, 96, 68;
+  --t-vision: #3F5566; --t-live: #EFE5D6;
+}
+
+/* ---- Paper: the light banner, ink and red, blue and garnet ---- */
+html[data-tool-theme="paper"] .toolpage {
+  --t-ground: #E9E5DD; --t-panel: #F1EEE7; --t-surface: #FFFFFF; --t-surface-2: #F6F3EC; --t-paper: #FFFFFF;
+  --t-line: #BDB7AB; --t-line-soft: #DAD5C9; --t-ink: #16161A; --t-muted: #55534E; --t-dim: #7C7A73;
+  --bn: #FFFFFF; --bn-top: #FFFFFF; --bn-bot: #F7F4EE; --bn-glow: #FFFFFF; --bn-edge: #16161A;
+  --bn-ink: #16161A; --bn-rgb: 22, 22, 26; --bn-well: rgba(0, 0, 0, .035); --bn-grain: var(--grain);
+  --bn-main: #16161A; --bn-main-ink: #FFFFFF;
+  --t-acc: #CF2A22; --t-acc-hi: #E0352C; --t-acc-rgb: 207, 42, 34;
+  --t-deep: #16161A; --t-deep-2: #3A1D22; --t-deep-ink: #FFFFFF;
+  --t-pro: #2E5FAE; --t-pro-ink: #22498A; --t-pro-head: #EDF1F9; --t-pro-bg: #F5F7FB; --t-pro-rgb: 46, 95, 174;
+  --t-con: #A93650; --t-con-ink: #86283E; --t-con-head: #F8ECEC; --t-con-bg: #FBF5F4; --t-con-rgb: 169, 54, 80;
+  --t-vision: #0F766E; --t-live: #F1ECE2;
+}
+
+/* ---- Navy: night blue, cool paper, coral ---- */
+html[data-tool-theme="navy"] .toolpage {
+  --t-ground: #E7E6E1; --t-panel: #EFEEEA; --t-surface: #FBFAF7; --t-surface-2: #F3F2EE; --t-paper: #FFFEFB;
+  --t-line: #BEBBB2; --t-line-soft: #DCD9D0; --t-ink: #161A24; --t-muted: #4F5563; --t-dim: #7C8190;
+  --bn: #1B2437; --bn-top: #222D44; --bn-bot: #172032; --bn-glow: #2B3957; --bn-edge: #111827;
+  --bn-ink: #EEF0F4; --bn-rgb: 238, 240, 244; --bn-well: rgba(0, 0, 0, .2); --bn-grain: var(--grain-light);
+  --bn-main: #EEF0F4; --bn-main-ink: #1B2437;
+  --t-acc: #B9502F; --t-acc-hi: #D2603F; --t-acc-rgb: 185, 80, 47;
+  --t-deep: #1B2437; --t-deep-2: #27334D; --t-deep-ink: #EEF0F4;
+  --t-pro: #284C80; --t-pro-ink: #1F3C66; --t-pro-head: #E8EDF5; --t-pro-bg: #F6F8FB; --t-pro-rgb: 40, 76, 128;
+  --t-con: #A8603A; --t-con-ink: #85492B; --t-con-head: #F6EBE2; --t-con-bg: #FBF5F0; --t-con-rgb: 168, 96, 58;
+  --t-vision: #5B4A8B; --t-live: #E9E4DA;
+}
+
+/* ---- Oxblood: deep wine, warm paper, teal ---- */
+html[data-tool-theme="oxblood"] .toolpage {
+  --t-ground: #EDE6DF; --t-panel: #F2ECE6; --t-surface: #FCF9F6; --t-surface-2: #F5EFEA; --t-paper: #FFFCFA;
+  --t-line: #C9BCB2; --t-line-soft: #E2D7CE; --t-ink: #1E1616; --t-muted: #5E5050; --t-dim: #8A7B78;
+  --bn: #3A1719; --bn-top: #45201F; --bn-bot: #311315; --bn-glow: #562B29; --bn-edge: #240C0E;
+  --bn-ink: #F6EDE6; --bn-rgb: 246, 237, 230; --bn-well: rgba(0, 0, 0, .22); --bn-grain: var(--grain-light);
+  --bn-main: #F6EDE6; --bn-main-ink: #3A1719;
+  --t-acc: #2F7F79; --t-acc-hi: #3C9A93; --t-acc-rgb: 47, 127, 121;
+  --t-deep: #3A1719; --t-deep-2: #4A2224; --t-deep-ink: #F6EDE6;
+  --t-pro: #2F7A74; --t-pro-ink: #235E59; --t-pro-head: #E7EFEE; --t-pro-bg: #F6F8F7; --t-pro-rgb: 47, 122, 116;
+  --t-con: #8E3337; --t-con-ink: #72272B; --t-con-head: #F5E6E4; --t-con-bg: #FBF4F3; --t-con-rgb: 142, 51, 55;
+  --t-vision: #5A5F73; --t-live: #EFE3DC;
+}
+
+/* ---- Graphite: charcoal, white paper, violet ---- */
+html[data-tool-theme="graphite"] .toolpage {
+  --t-ground: #E4E4E1; --t-panel: #ECECE9; --t-surface: #FFFFFF; --t-surface-2: #F4F4F1; --t-paper: #FFFFFF;
+  --t-line: #B7B7B2; --t-line-soft: #D8D8D3; --t-ink: #141517; --t-muted: #52545A; --t-dim: #7E8086;
+  --bn: #2A2C31; --bn-top: #313339; --bn-bot: #232429; --bn-glow: #3B3E46; --bn-edge: #16171A;
+  --bn-ink: #F2F2F0; --bn-rgb: 242, 242, 240; --bn-well: rgba(0, 0, 0, .25); --bn-grain: var(--grain-light);
+  --bn-main: #F2F2F0; --bn-main-ink: #2A2C31;
+  --t-acc: #6D48E0; --t-acc-hi: #8466F0; --t-acc-rgb: 109, 72, 224;
+  --t-deep: #2A2C31; --t-deep-2: #383B42; --t-deep-ink: #F2F2F0;
+  --t-pro: #1F5E8C; --t-pro-ink: #184B70; --t-pro-head: #E6EEF5; --t-pro-bg: #F6F9FB; --t-pro-rgb: 31, 94, 140;
+  --t-con: #B64F1E; --t-con-ink: #93400F; --t-con-head: #FBECE3; --t-con-bg: #FDF7F2; --t-con-rgb: 182, 79, 30;
+  --t-vision: #0E7490; --t-live: #ECEEF3;
 }
 
 /* ------------------------------------------------------------ the desk */
 .toolpage .evi, .toolpage .flw, .toolpage .dfl, .toolpage .pfl {
-  --ground: #ECE5D8;
-  --surface: #FBF8F2;
-  --surface-2: #F4EEE3;
-  --line: #C8BDAB;
-  --line-soft: #E0D6C5;
-  --ink: #1D1B17;
-  --muted: #5A554B;
-  --dim: #857E71;
+  --ground: var(--t-ground); --surface: var(--t-surface); --surface-2: var(--t-surface-2);
+  --line: var(--t-line); --line-soft: var(--t-line-soft);
+  --ink: var(--t-ink); --muted: var(--t-muted); --dim: var(--t-dim);
   background-color: var(--ground);
   background-image: var(--grain);
 }
 .toolpage .dfl .dside, .toolpage .dfl .dright, .toolpage .pfl .pf-list, .toolpage .evi .left {
-  background-color: #F0EADF;
+  background-color: var(--t-panel);
   background-image: var(--grain);
 }
 .toolpage .dfl .dside { border-right-color: var(--line); }
 .toolpage .dfl .dright { border-left-color: var(--line); }
 
-/* pages and cards: cream paper that lifts off the desk */
+/* pages and cards lift off the desk */
 .toolpage .dfl .dpaper, .toolpage .pfl .pf-vhead, .toolpage .pfl .pf-read {
-  background: #FFFCF6;
+  background: var(--t-paper);
   box-shadow: 0 0 0 1px rgba(60, 45, 25, .09), 0 2px 3px rgba(60, 45, 25, .07), 0 22px 44px -26px rgba(60, 45, 25, .42);
 }
-.toolpage .dfl .rp, .toolpage .dfl .vs, .toolpage .pfl .pf-row { background: #FFFCF6; border-color: #DDD2C0; box-shadow: 0 1px 2px rgba(60, 45, 25, .06); }
+.toolpage .dfl .rp, .toolpage .dfl .vs, .toolpage .pfl .pf-row { background: var(--t-paper); border-color: var(--line-soft); box-shadow: 0 1px 2px rgba(60, 45, 25, .06); }
 
-/* the one main button, anywhere below the banner: forest, like the banner */
-.toolpage .dfl .dbtn.ink, .toolpage .dfl .dnew, .toolpage .pfl .pf-btn.ink,
-.toolpage .dfl .dsharepop .dbtn.ink {
-  background: linear-gradient(180deg, var(--forest-2), var(--forest)); color: var(--cream); border-color: var(--forest);
-  box-shadow: 0 8px 18px -12px rgba(31, 44, 36, .9);
+/* the one main button below the banner, and what is selected, in the scheme's deep colour */
+.toolpage .dfl .dbtn.ink, .toolpage .dfl .dnew, .toolpage .pfl .pf-btn.ink, .toolpage .dfl .dsharepop .dbtn.ink {
+  background: linear-gradient(180deg, var(--t-deep-2), var(--t-deep)); color: var(--t-deep-ink); border-color: var(--t-deep);
+  box-shadow: 0 8px 18px -12px rgba(0, 0, 0, .7);
 }
-.toolpage .dfl .dbtn.ink:hover, .toolpage .dfl .dnew:hover, .toolpage .pfl .pf-btn.ink:hover { color: #fff; }
-.toolpage .pfl .pf-row.on, .toolpage .dfl .vs.now { background: var(--forest); border-color: var(--forest); }
-.toolpage .dfl .dlist li.on { background: var(--forest); }
+.toolpage .dfl .dbtn.ink:hover, .toolpage .dfl .dnew:hover, .toolpage .pfl .pf-btn.ink:hover { color: var(--t-deep-ink); filter: brightness(1.15); }
+.toolpage .pfl .pf-row.on, .toolpage .dfl .vs.now { background: var(--t-deep); border-color: var(--t-deep); }
+.toolpage .dfl .dlist li.on { background: var(--t-deep); }
+.toolpage .evi .node.sel, .toolpage .evi .row.sel, .toolpage .evi .arg.sel { background: var(--t-deep); color: var(--t-deep-ink); }
+.toolpage .evi .node.sel::before, .toolpage .evi .row.sel::before, .toolpage .evi .arg.sel::before { background: var(--t-acc); }
+.toolpage .flw .btn.on, .toolpage .flw .btn.go { background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep); }
+.toolpage .flw .tst, .toolpage .evi .toast, .toolpage .dfl .dtoast, .toolpage .pfl .pf-toast {
+  background-color: var(--t-deep); background-image: var(--grain-light); color: var(--t-deep-ink);
+  box-shadow: 0 16px 34px -16px rgba(0, 0, 0, .7);
+}
+.toolpage .dfl .dtoast::after, .toolpage .pfl .pf-toast::after { background: linear-gradient(90deg, var(--t-acc), var(--t-deep-ink)); }
 
 /* ------------------------------------------------------------ the banner */
 .toolpage .evi > .bar, .toolpage .flw > .topbar, .toolpage .dfl > .dtop, .toolpage .pfl > .pf-top {
-  --ink: #F3EDE1;
-  --ground: #1F2C24;
-  --surface: #26352C;
-  --surface-2: #2E4035;
-  --line: rgba(243, 237, 225, .24);
-  --line-soft: rgba(243, 237, 225, .12);
-  --muted: rgba(243, 237, 225, .78);
-  --dim: rgba(243, 237, 225, .55);
-  --acc: #F3EDE1;
+  --ink: var(--bn-ink);
+  --ground: var(--bn);
+  --surface: var(--bn-top);
+  --surface-2: var(--bn-glow);
+  --line: rgba(var(--bn-rgb), .26);
+  --line-soft: rgba(var(--bn-rgb), .12);
+  --muted: rgba(var(--bn-rgb), .78);
+  --dim: rgba(var(--bn-rgb), .55);
+  --acc: var(--bn-ink);
   color: var(--ink);
-  background-color: var(--forest);
-  background-image: var(--grain-light), radial-gradient(120% 180% at 0% 0%, #2B3D31 0%, transparent 60%), linear-gradient(180deg, #243329, #1C271F);
-  border-bottom: 1px solid #16201A;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 10px 22px -18px rgba(20, 30, 24, .9);
+  background-color: var(--bn);
+  background-image: var(--bn-grain), radial-gradient(120% 180% at 0% 0%, var(--bn-glow) 0%, transparent 60%), linear-gradient(180deg, var(--bn-top), var(--bn-bot));
+  border-bottom: 1px solid var(--bn-edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 10px 22px -18px rgba(0, 0, 0, .7);
   position: relative; z-index: 5;
 }
-/* no rule under it: the banner's edge is the rule */
 .toolpage .evi > .bar::after, .toolpage .flw > .topbar::after, .toolpage .dfl > .dtop::after, .toolpage .pfl > .pf-top::after { content: none; }
 
-/* pill buttons, outlined in cream */
+/* square buttons, hairline in the banner's own ink */
 .toolpage .evi > .bar .btn, .toolpage .flw > .topbar .btn, .toolpage .dfl > .dtop .dbtn, .toolpage .pfl > .pf-top .pf-btn {
-  border-radius: 999px; background-color: transparent; border-color: rgba(243, 237, 225, .3); color: var(--ink);
+  background-color: transparent; border-color: rgba(var(--bn-rgb), .32); color: var(--ink);
 }
 .toolpage .evi > .bar .btn:hover, .toolpage .flw > .topbar .btn:hover, .toolpage .dfl > .dtop .dbtn:hover, .toolpage .pfl > .pf-top .pf-btn:hover {
-  background-color: rgba(243, 237, 225, .1); border-color: rgba(243, 237, 225, .7); color: #fff;
+  background-color: rgba(var(--bn-rgb), .1); border-color: rgba(var(--bn-rgb), .75); color: var(--ink);
 }
-/* the main one, filled cream */
+/* the main one, filled */
 .toolpage .dfl > .dtop .dbtn.ink, .toolpage .flw > .topbar .btn.cmd, .toolpage .evi > .bar .btn.key, .toolpage .evi > .bar .docbtn.on {
-  background: var(--cream); color: var(--forest); border-color: var(--cream);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 8px 18px -12px rgba(0, 0, 0, .8);
+  background: var(--bn-main); color: var(--bn-main-ink); border-color: var(--bn-main);
+  box-shadow: 0 8px 18px -12px rgba(0, 0, 0, .6);
 }
 .toolpage .dfl > .dtop .dbtn.ink:hover, .toolpage .flw > .topbar .btn.cmd:hover, .toolpage .evi > .bar .btn.key:hover, .toolpage .evi > .bar .docbtn.on:hover {
-  background: #fff; color: var(--forest); opacity: 1;
+  background: var(--bn-main); color: var(--bn-main-ink); opacity: .9;
 }
-.toolpage .dfl > .dtop .dbtn.ink kbd, .toolpage .flw > .topbar .btn.cmd kbd { color: var(--forest); border-color: rgba(31, 44, 36, .25); background: none; }
-.toolpage .dfl > .dtop kbd, .toolpage .pfl > .pf-top kbd { background: rgba(243, 237, 225, .08); color: var(--muted); border-color: var(--line); }
+.toolpage .dfl > .dtop .dbtn.ink kbd, .toolpage .flw > .topbar .btn.cmd kbd { color: var(--bn-main-ink); border-color: currentColor; background: none; opacity: .6; }
+.toolpage .dfl > .dtop kbd, .toolpage .pfl > .pf-top kbd { background: rgba(var(--bn-rgb), .08); color: var(--muted); border-color: var(--line); }
 
-/* the clock: a pill, with a round play button; red-clay when it runs */
+/* the clock: a well in the banner, a square play button, the accent when it runs */
 .toolpage .dfl > .dtop .dclock, .toolpage .flw > .topbar .tbar {
-  border-radius: 999px; padding: 4px 6px; background: rgba(0, 0, 0, .18); border-color: rgba(243, 237, 225, .26);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+  background: var(--bn-well); border-color: rgba(var(--bn-rgb), .28); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25);
 }
-.toolpage .dfl > .dtop .dclock button, .toolpage .flw > .topbar .tbar button { border-radius: 999px; }
-.toolpage .dfl > .dtop .dclock button:hover, .toolpage .flw > .topbar .tbar button:hover { background: rgba(243, 237, 225, .1); }
-.toolpage .dfl > .dtop .dclock .play, .toolpage .flw > .topbar .tbar .play {
-  width: 30px; min-width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border-radius: 50%;
-  background: var(--cream); color: var(--forest); box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
-}
-.toolpage .dfl > .dtop .dclock .play:hover, .toolpage .flw > .topbar .tbar .play:hover { background: #fff; color: var(--forest); }
-.toolpage .dfl > .dtop .dclock .play.on, .toolpage .flw > .topbar .tbar .play.on { background: var(--terra); color: #fff; }
-.toolpage .dfl > .dtop .dclock .pp { border-left-color: rgba(243, 237, 225, .2); }
-.toolpage .dfl > .dtop .dclock .pp.on, .toolpage .flw > .topbar .prep button[aria-pressed="true"] { background: var(--terra); color: #fff; border-color: var(--terra); }
-.toolpage .flw > .topbar .prep button { border-radius: 999px; }
-.toolpage .dfl > .dtop .dclock .tm.on, .toolpage .flw > .topbar .tbar .tm.low, .toolpage .dfl > .dtop .dclock .tm.low { color: #F08A6C; }
-.toolpage .flw > .topbar .tbar.live { border-color: var(--terra); }
-.toolpage .flw > .topbar .tbar.live .dot { background: var(--terra-hi); }
+.toolpage .dfl > .dtop .dclock button:hover, .toolpage .flw > .topbar .tbar button:hover { background: rgba(var(--bn-rgb), .1); }
+.toolpage .dfl > .dtop .dclock .play, .toolpage .flw > .topbar .tbar .play { background: var(--bn-main); color: var(--bn-main-ink); }
+.toolpage .dfl > .dtop .dclock .play:hover, .toolpage .flw > .topbar .tbar .play:hover { background: var(--bn-main); color: var(--bn-main-ink); opacity: .88; }
+.toolpage .dfl > .dtop .dclock .play.on, .toolpage .flw > .topbar .tbar .play.on { background: var(--t-acc); color: #fff; }
+.toolpage .dfl > .dtop .dclock .pp { border-left-color: rgba(var(--bn-rgb), .2); }
+.toolpage .dfl > .dtop .dclock .pp.on, .toolpage .flw > .topbar .prep button[aria-pressed="true"] { background: var(--t-acc); color: #fff; border-color: var(--t-acc); }
+.toolpage .dfl > .dtop .dclock .tm.on, .toolpage .flw > .topbar .tbar .tm.low, .toolpage .dfl > .dtop .dclock .tm.low { color: var(--t-acc-hi); }
+.toolpage .flw > .topbar .tbar.live { border-color: var(--t-acc); }
+.toolpage .flw > .topbar .tbar.live .dot { background: var(--t-acc-hi); }
 
 /* Doc flow's share button, Past flows' search and filter */
-.toolpage .dfl > .dtop .droom.live { background: rgba(243, 237, 225, .08); }
-.toolpage .dfl > .dtop .dfaces b { box-shadow: 0 0 0 2px var(--forest); }
-.toolpage .pfl > .pf-top .pf-seg { border-radius: 999px; overflow: hidden; border-color: rgba(243, 237, 225, .3); }
-.toolpage .pfl > .pf-top .pf-seg button.on { background: var(--cream); color: var(--forest); }
-.toolpage .pfl > .pf-top .pf-seg button.on em { color: rgba(31, 44, 36, .55); }
-.toolpage .pfl > .pf-top .pf-search { border-radius: 999px; background: rgba(0, 0, 0, .18); border-color: rgba(243, 237, 225, .26); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35); }
-.toolpage .pfl > .pf-top .pf-search:focus-within { background: rgba(0, 0, 0, .26); border-color: rgba(243, 237, 225, .65); }
-.toolpage .pfl > .pf-top .pf-search input { color: #fff; }
-.toolpage .pfl > .pf-top .pf-search input::placeholder { color: rgba(243, 237, 225, .55); }
+.toolpage .dfl > .dtop .droom.live { background: rgba(var(--bn-rgb), .08); }
+.toolpage .dfl > .dtop .dfaces b { box-shadow: 0 0 0 2px var(--bn); }
+.toolpage .pfl > .pf-top .pf-seg { border-color: rgba(var(--bn-rgb), .32); }
+.toolpage .pfl > .pf-top .pf-seg button.on { background: var(--bn-main); color: var(--bn-main-ink); }
+.toolpage .pfl > .pf-top .pf-seg button.on em { color: inherit; opacity: .55; }
+.toolpage .pfl > .pf-top .pf-search { background: var(--bn-well); border-color: rgba(var(--bn-rgb), .28); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25); }
+.toolpage .pfl > .pf-top .pf-search:focus-within { border-color: rgba(var(--bn-rgb), .7); }
+.toolpage .pfl > .pf-top .pf-search input { color: var(--ink); }
+.toolpage .pfl > .pf-top .pf-search input::placeholder { color: rgba(var(--bn-rgb), .55); }
 
-/* what opens out of the banner is cream paper again: the share popover */
+/* what opens out of the banner is paper again */
 .toolpage .dfl > .dtop .dsharepop {
-  --ink: #1D1B17; --ground: #ECE5D8; --surface: #FFFCF6; --surface-2: #F4EEE3;
-  --line: #C8BDAB; --line-soft: #E0D6C5; --muted: #5A554B; --dim: #857E71;
-  color: var(--ink); background: #FFFCF6; border-color: var(--forest);
+  --ink: var(--t-ink); --ground: var(--t-ground); --surface: var(--t-paper); --surface-2: var(--t-surface-2);
+  --line: var(--t-line); --line-soft: var(--t-line-soft); --muted: var(--t-muted); --dim: var(--t-dim);
+  color: var(--ink); background: var(--t-paper); border-color: var(--t-deep);
 }
-.toolpage .dfl > .dtop .dsharepop .dbtn { background: none; border-radius: 0; color: var(--muted); border-color: var(--line); }
+.toolpage .dfl > .dtop .dsharepop .dbtn { background: none; color: var(--muted); border-color: var(--line); }
 .toolpage .dfl > .dtop .dsharepop .dbtn:hover { color: var(--ink); background: var(--surface-2); border-color: var(--ink); }
-.toolpage .dfl > .dtop .dsharepop .dbtn.ink, .toolpage .dfl > .dtop .dsharepop .dbtn.ink:hover { background: linear-gradient(180deg, var(--forest-2), var(--forest)); color: var(--cream); border-color: var(--forest); }
+.toolpage .dfl > .dtop .dsharepop .dbtn.ink, .toolpage .dfl > .dtop .dsharepop .dbtn.ink:hover { background: linear-gradient(180deg, var(--t-deep-2), var(--t-deep)); color: var(--t-deep-ink); border-color: var(--t-deep); }
 
-/* ------------------------------------------------------------ Flow's sides, and now */
+/* ------------------------------------------------------------ Flow's sides, and what is live */
 .toolpage .flw {
-  --pro: #2D5A43;  --pro-ink: #234735;  --pro-head: #EAEDE3;  --pro-bg: #F7F5EE;
-  --con: #B8664A;  --con-ink: #8E4A33;  --con-head: #F5E9DF;  --con-bg: #FAF3EC;
-  --vision: #3F5566; --vision-2: #2F4252;
-  --acc: #C4553A; --acc-rgb: 196, 85, 58; --acc-hi: #D96A4D;
-  --rule: #E3D9C9;
+  --pro: var(--t-pro); --pro-ink: var(--t-pro-ink); --pro-head: var(--t-pro-head); --pro-bg: var(--t-pro-bg);
+  --con: var(--t-con); --con-ink: var(--t-con-ink); --con-head: var(--t-con-head); --con-bg: var(--t-con-bg);
+  --vision: var(--t-vision); --vision-2: var(--t-vision);
+  --acc: var(--t-acc); --acc-rgb: var(--t-acc-rgb); --acc-hi: var(--t-acc-hi);
+  --rule: var(--t-line-soft);
 }
-.toolpage .flw .cursor.pro { box-shadow: 0 0 0 4px rgba(45, 90, 67, .14); }
-.toolpage .flw .cursor.con { box-shadow: 0 0 0 4px rgba(184, 102, 74, .16); }
-/* the live column: a warm beige, a terracotta rule under its head, and a dot — as Flow it drew it */
-.toolpage .flw .c.livecol { background-color: #EFE5D6; }
-.toolpage .flw .h.live { box-shadow: inset 0 -3px 0 var(--acc); }
-.toolpage .flw .h.live .lv { background: none; color: var(--acc); }
-.toolpage .flw .rh { background: linear-gradient(90deg, rgba(63, 85, 102, .06), transparent 45%), var(--ground); box-shadow: inset 3px 0 0 var(--vision); }
-/* Past flows names the sides the same way */
-.toolpage .pfl { --pro: #2D5A43; --con: #B8664A; }
-.toolpage .flw .c.pro.livecol, .toolpage .flw .c.con.livecol { background-image: none; background-color: #EFE5D6; }
-.toolpage .flw .h.pro.live, .toolpage .flw .h.con.live { box-shadow: inset 0 -3px 0 var(--acc); }
-.toolpage .flw .h.pro.live .lv, .toolpage .flw .h.con.live .lv { background: none; color: var(--acc); }
+.toolpage .flw .cursor.pro { box-shadow: 0 0 0 4px rgba(var(--t-pro-rgb), .14); }
+.toolpage .flw .cursor.con { box-shadow: 0 0 0 4px rgba(var(--t-con-rgb), .16); }
+.toolpage .flw .c.livecol, .toolpage .flw .c.pro.livecol, .toolpage .flw .c.con.livecol { background-image: none; background-color: var(--t-live); }
+.toolpage .flw .h.live, .toolpage .flw .h.pro.live, .toolpage .flw .h.con.live { box-shadow: inset 0 -3px 0 var(--acc); }
+.toolpage .flw .h.live .lv, .toolpage .flw .h.pro.live .lv, .toolpage .flw .h.con.live .lv { background: none; color: var(--acc); }
 .toolpage .flw .h.live .lv i { background: var(--acc); }
-/* a turn is the thing that decides a round: filled terracotta, as Flow it has it */
-.toolpage .flw .c .tg.turn { color: #fff; background: var(--acc); border-color: transparent; box-shadow: 0 2px 6px -2px rgba(196, 85, 58, .6); }
-.toolpage .flw .c .tg.dropped { color: var(--acc); background: rgba(196, 85, 58, .08); border-color: rgba(196, 85, 58, .5); }
+.toolpage .flw .rh { background: linear-gradient(90deg, rgba(var(--t-pro-rgb), .05), transparent 45%), var(--ground); box-shadow: inset 3px 0 0 var(--vision); }
+.toolpage .flw .c .tg.turn { color: #fff; background: var(--acc); border-color: transparent; box-shadow: 0 2px 6px -2px rgba(var(--t-acc-rgb), .6); }
+.toolpage .flw .c .tg.dropped { color: var(--acc); background: rgba(var(--t-acc-rgb), .08); border-color: rgba(var(--t-acc-rgb), .5); }
 .toolpage .flw .c .arr { color: var(--acc); }
+.toolpage .pfl { --pro: var(--t-pro); --con: var(--t-con); }
 
-/* nothing black left below the banner: toggles that are on, and the toasts, are forest */
-.toolpage .flw .btn.on, .toolpage .flw .btn.go { background: var(--forest); color: var(--cream); border-color: var(--forest); }
-.toolpage .flw .tst, .toolpage .evi .toast, .toolpage .dfl .dtoast, .toolpage .pfl .pf-toast {
-  background-color: var(--forest); background-image: var(--grain-light); color: var(--cream);
-  box-shadow: 0 16px 34px -16px rgba(20, 30, 24, .8);
+/* ------------------------------------------------------------ square
+   Corners are square in every scheme. Only what is meant to be a dot stays
+   round: avatars, stop numbers, pulses, the spinner. */
+.toolpage .dfl *, .toolpage .pfl *, .toolpage .evi > .bar *, .toolpage .flw > .topbar *,
+.toolpage .flw .tagpick *, .toolpage .flw .pal *, .toolpage .flw .palbins * { border-radius: 0 !important; }
+.toolpage .dfl .vs-n, .toolpage .dfl .dfaces b, .toolpage .dfl .mate b, .toolpage .dfl .pulse,
+.toolpage .dfl .dlive i, .toolpage .dfl .spin, .toolpage .flw > .topbar .dot, .toolpage .evi > .bar .dot { border-radius: 50% !important; }
+
+/* ------------------------------------------------------------ the Colours picker */
+.toolpage .themes { position: relative; display: inline-flex; }
+.toolpage .themes .th-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 7px 11px; border: 1px solid rgba(var(--bn-rgb), .32); color: var(--bn-ink); background: none; cursor: pointer;
+  transition: background .15s, border-color .15s;
 }
-.toolpage .dfl .dtoast::after, .toolpage .pfl .pf-toast::after { background: linear-gradient(90deg, var(--terra), var(--cream)); }
+.toolpage .themes .th-btn:hover, .toolpage .themes .th-btn[aria-expanded="true"] { background: rgba(var(--bn-rgb), .1); border-color: rgba(var(--bn-rgb), .75); }
+.toolpage .themes .th-dots { display: inline-flex; }
+.toolpage .themes .th-dots i { width: 8px; height: 8px; border: 1px solid rgba(var(--bn-rgb), .5); }
+.toolpage .themes .th-dots i + i { margin-left: -2px; }
+.toolpage .themes .th-pop {
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 70; width: 300px; padding: 12px;
+  background: var(--t-paper); color: var(--t-ink); border: 1px solid var(--t-ink);
+  box-shadow: 0 30px 70px -28px rgba(0, 0, 0, .5); display: grid; gap: 6px;
+  animation: thPop .2s cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes thPop { from { opacity: 0; transform: translateY(-4px); } }
+.toolpage .themes .th-h { font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-dim); padding: 2px 2px 6px; }
+.toolpage .themes .th-opt {
+  display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; text-align: left;
+  padding: 7px; border: 1px solid var(--t-line-soft); background: none; cursor: pointer; color: var(--t-ink); font: inherit;
+  transition: border-color .15s, background .15s;
+}
+.toolpage .themes .th-opt:hover { border-color: var(--t-ink); }
+.toolpage .themes .th-opt.on { border-color: var(--t-ink); box-shadow: inset 3px 0 0 var(--t-acc); background: var(--t-surface-2); }
+.toolpage .themes .th-sw { height: 36px; display: grid; grid-template-rows: 12px 1fr; border: 1px solid rgba(0, 0, 0, .15); }
+.toolpage .themes .th-sw b { display: block; }
+.toolpage .themes .th-sw span { display: grid; grid-template-columns: 1fr 1fr 10px; }
+.toolpage .themes .th-sw span i { display: block; }
+.toolpage .themes .th-name { font-family: var(--ui); font-size: 13.5px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.toolpage .themes .th-name small { display: block; font-weight: 400; font-size: 11px; color: var(--t-dim); }
+
+/* ------------------------------------------------------------ the last of the black, in the scheme's deep colour */
+.toolpage .flw .pal.ev .palin .glyph, .toolpage .flw .pal.pick .palin .glyph { background: var(--t-deep); color: var(--t-deep-ink); }
+.toolpage .flw .pal.ev li.hl, .toolpage .flw .pal.pick li.hl { background: var(--t-deep); }
+.toolpage .flw .pal li.hl { background: var(--t-deep); }
+.toolpage .flw .palin input:focus-visible { outline: none; }
+.toolpage .evi .tabs button.on, .toolpage .evi .panes .btn.key, .toolpage .evi .docbar .fbtn.on,
+.toolpage .evi .card h2 { background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep); }
+.toolpage .dfl .dpal li.on, .toolpage .dfl .dslash button.on { background: var(--t-deep); color: var(--t-deep-ink); }

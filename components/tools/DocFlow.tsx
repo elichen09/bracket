@@ -23,12 +23,13 @@ import { loadPieces, savePieces, newPieceId, titleFrom, fromDoc, merge, type Pie
 import { stopsOf, toggleStop, setStop, reorder, clearStops, visionPlugin, visionKey, type Stop } from "@/lib/docflow/vision";
 import { openRoom, MATE_COLORS, type Room, type RoomStatus, type Mate } from "@/lib/docflow/room";
 import { newCode, tidyCode } from "@/lib/flow/share";
-import { library, find, sendToEvidence, blockTags, type Entry, type Hit, type Tag } from "@/lib/flow/cards";
+import { library, find, sendToEvidence, blockTags, readBins, setBinUse, type Entry, type Hit, type Tag, type Bins } from "@/lib/flow/cards";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { speeches, clock, PREP_DEFAULT } from "@/lib/flow/format";
 import { polish } from "@/lib/evidence/polish";
 import "./docflow.css";
 import "./finish.css";
+import ThemePicker from "./ThemePicker";
 
 /**
  * Doc flow — flowing the way a Google Doc gets flowed, with the tool doing
@@ -149,6 +150,8 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
   const panelRef = useRef(panel);
   panelRef.current = panel;
   const [hits, setHits] = useState<Hit[]>([]);
+  const [binsInfo, setBinsInfo] = useState<{ bins: Bins; counts: Record<string, number> } | null>(null);
+  const [binTick, setBinTick] = useState(0);
   // a block chosen from the search, open to its cards
   const [pick, setPick] = useState<null | { hit: Hit; tags: Tag[]; sel: number[]; q: string; i: number; back: string }>(null);
   const index = useRef<Entry[] | null>(null);
@@ -817,7 +820,8 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
   );
 
   /* ------------------------------------------------------------ the command panel, and evidence */
-  const openPanel = useCallback((q = "") => { setPanel({ q, i: 0 }); }, []);
+  // read the library afresh each time: bins may have changed in Evidence since
+  const openPanel = useCallback((q = "") => { index.current = null; setPanel({ q, i: 0 }); }, []);
   const closePanel = useCallback(() => { setPanel(null); setPick(null); view.current?.focus(); }, []);
 
   /** Every action in the key table, by id. */
@@ -900,7 +904,21 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
       setHits(q ? find(index.current || [], q, 20) : []);
     })();
     return () => { dead = true; };
-  }, [panel, evMode, answering, owner]);
+  }, [panel, evMode, answering, owner, binTick]);
+
+  // the Evidence bins, switchable from the search mid-round
+  useEffect(() => {
+    if (!evMode) return;
+    let dead = false;
+    readBins(owner).then((b) => { if (!dead) setBinsInfo(b); });
+    return () => { dead = true; };
+  }, [evMode, owner, binTick]);
+  const flipBin = useCallback(async (id: string, on: boolean) => {
+    await setBinUse(owner, id, !on);
+    bus.current?.post({ kind: "bins-changed" });
+    index.current = null;
+    setBinTick((t) => t + 1);
+  }, [owner]);
 
   /** Answer with some of a block's cards (or all of them), and send those cards along. */
   const answerFrom = useCallback(async (h: Hit, lines: string[], picks: number[] | undefined, send: boolean) => {
@@ -1119,6 +1137,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
         <button type="button" className="dbtn" onClick={copyForDocs} title="Numbered, red and highlighted, as a Doc">Copy for Docs</button>
         <button type="button" className="dbtn" onClick={saveDocx}>.docx</button>
         <a className="dbtn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
+        <ThemePicker />
       </header>
 
       <div className="dbody">
@@ -1397,6 +1416,18 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
             {pick ? (
               <div className="dpsrc"><b className="ink">{pick.hit.title}</b> · {pick.sel.length ? `${pick.sel.length} picked` : "Enter takes the card you are on"}{answering ? <> · answering <b>{answering}</b></> : null}</div>
             ) : evMode && answering && <div className="dpsrc">Answering <b>{answering}</b></div>}
+            {evMode && !pick && binsInfo && binsInfo.bins.list.length > 0 && (
+              <div className="dpbins mono" onMouseDown={(e) => e.preventDefault()}>
+                <span className="pb-l">Bins this round</span>
+                {[...binsInfo.bins.list.map((b) => ({ id: b.id, name: b.name, on: b.on })),
+                  ...(binsInfo.counts[""] ? [{ id: "", name: "Unsorted", on: binsInfo.bins.loose }] : [])].map((b) => (
+                  <button type="button" key={b.id || "loose"} className={"pbin" + (b.on ? " on" : "")} onClick={() => flipBin(b.id, b.on)}
+                    title={b.on ? "Searched this round — click to leave it out" : "Left out — click to search it"}>
+                    <i />{b.name}<em>{binsInfo.counts[b.id] || 0}</em>
+                  </button>
+                ))}
+              </div>
+            )}
             <ul>
               {pick ? pickRows.map((r, i) => {
                 const ticked = r.all ? pick.sel.length === pick.tags.length : !!r.tag && pick.sel.includes(r.tag.i);

@@ -557,3 +557,14 @@
 .dfl .dpsrc b.ink { color: var(--ink); }
 .dfl .dpfoot .dgo { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); border: 1px solid var(--line); padding: 3px 8px 3px 4px; text-transform: uppercase; letter-spacing: .1em; font-family: var(--mono); font-size: 9.5px; transition: background .15s, color .15s; }
 .dfl .dpfoot .dgo:hover { background: var(--ink); color: #fff; }
+
+/* the Evidence bins this round searches */
+.dfl .dpbins { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 18px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2); font-size: 9.5px; }
+.dfl .dpbins .pb-l { color: var(--dim); margin-right: 4px; }
+.dfl .dpbins .pbin { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); color: var(--dim); letter-spacing: .08em; text-transform: uppercase; font-family: var(--mono); font-size: 9.5px; transition: background .15s, color .15s, border-color .15s; }
+.dfl .dpbins .pbin i { width: 8px; height: 8px; border: 1.5px solid currentColor; }
+.dfl .dpbins .pbin em { font-style: normal; opacity: .6; }
+.dfl .dpbins .pbin.on { color: var(--ink); border-color: var(--ink); }
+.dfl .dpbins .pbin.on i { background: currentColor; }
+.dfl .dpbins .pbin:not(.on) { text-decoration: line-through; }
+.dfl .dpbins .pbin:hover { border-color: var(--ink); color: var(--ink); }

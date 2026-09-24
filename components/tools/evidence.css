@@ -777,3 +777,57 @@
   .evi .ncount, .evi .meta { display: none; }
   .evi .slash, .evi #q { font-size: 30px; }
 }
+
+/* ---------------------------------------------------------------- bins
+   The piles the library is sorted into, as a row of switches over the
+   outline: a filled square is in this round, an empty one is left out.
+   Drag a block, a hat or a pocket onto one to move it there. */
+.evi .binbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 10px var(--evi-gut); border-bottom: 1px solid var(--line-soft);
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+}
+.evi .binbar[hidden] { display: none; }
+.evi .binbar .bl { color: var(--dim); margin-right: 6px; }
+.evi .bin { display: inline-flex; align-items: stretch; border: 1px solid var(--line); background: var(--surface); transition: border-color .15s var(--ease), background .15s var(--ease), transform .18s var(--ease); }
+.evi .bin-t { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--dim); }
+.evi .bin-t i { width: 9px; height: 9px; border: 1.5px solid currentColor; flex-shrink: 0; transition: background .15s var(--ease); }
+.evi .bin-t em { font-style: normal; opacity: .6; }
+.evi .bin.on { border-color: var(--ink); }
+.evi .bin.on .bin-t { color: var(--ink); }
+.evi .bin.on .bin-t i { background: currentColor; }
+.evi .bin.off .bin-n { text-decoration: line-through; }
+.evi .bin:hover { border-color: var(--ink); }
+.evi .bin-x { width: 22px; font-size: 13px; color: var(--dim); border-left: 1px solid var(--line-soft); opacity: 0; transition: opacity .14s var(--ease), color .14s var(--ease); }
+.evi .bin:hover .bin-x { opacity: 1; }
+.evi .bin-x:hover { color: var(--bad); }
+.evi .bin-in { font: inherit; letter-spacing: .06em; text-transform: none; width: 120px; border: 0; outline: 0; background: none; color: var(--ink); padding: 0; }
+.evi .bin-add { font: inherit; letter-spacing: inherit; text-transform: inherit; padding: 5px 9px; border: 1px dashed var(--line); color: var(--muted); transition: border-color .15s var(--ease), color .15s var(--ease); }
+.evi .bin-add:hover { border-style: solid; border-color: var(--ink); color: var(--ink); }
+.evi .bin-out { color: var(--dim); margin-left: auto; letter-spacing: .08em; }
+/* while something is being dragged, the bins are where it can go */
+.evi.binning .bin { border-style: dashed; }
+.evi.binning .bin.over { border-style: solid; border-color: var(--acc); background: var(--surface-2); transform: translateY(-2px); }
+.evi #results .lifting { opacity: .45; }
+
+/* a row's bin: named quietly, and a button to move it */
+.evi .binof { flex-shrink: 0; font-family: var(--mono); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); border: 1px solid var(--line-soft); padding: 0 5px; line-height: 1.6; }
+.evi .sel .binof { color: inherit; border-color: currentColor; opacity: .7; }
+.evi .tobin {
+  flex-shrink: 0; font-family: var(--mono); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 1px 6px; border: 1px solid var(--line); color: var(--muted); opacity: 0;
+  transition: opacity .14s var(--ease), background .14s var(--ease), color .14s var(--ease);
+}
+.evi .node:hover .tobin, .evi .row:hover .tobin, .evi .sel .tobin { opacity: 1; }
+.evi .sel .tobin { color: inherit; border-color: currentColor; }
+.evi .tobin:hover { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.evi .binmenu {
+  position: absolute; z-index: 60; min-width: 200px; background: var(--surface); border: 1px solid var(--ink);
+  box-shadow: 0 24px 50px -22px rgba(0, 0, 0, .45); display: grid; padding: 4px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+}
+.evi .binmenu .bm-h { color: var(--dim); padding: 6px 8px 4px; font-size: 9px; }
+.evi .binmenu button { text-align: left; padding: 7px 8px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--ink); }
+.evi .binmenu button:hover { background: var(--ink); color: var(--ground); }
+.evi .binmenu button small { color: var(--dim); margin-left: 6px; }
+.evi .binmenu .bm-new { border-top: 1px solid var(--line-soft); margin-top: 3px; color: var(--muted); }

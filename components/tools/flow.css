@@ -1026,3 +1026,14 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .tagpick .tp b { font-size: 12.5px; font-weight: 600; line-height: 1.35; }
 .flw .tagpick .tp small { font-size: 11px; color: var(--dim); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flw .tagpick .tp:has(input:checked) { background: rgba(14, 14, 13, .06); }
+
+/* the Evidence bins this round searches, switchable from the search */
+.flw .palbins { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 18px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2); font-size: 9.5px; }
+.flw .palbins .pb-l { color: var(--dim); margin-right: 4px; letter-spacing: .12em; }
+.flw .palbins .pbin { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); color: var(--dim); letter-spacing: .08em; text-transform: uppercase; transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease); }
+.flw .palbins .pbin i { width: 8px; height: 8px; border: 1.5px solid currentColor; }
+.flw .palbins .pbin em { font-style: normal; opacity: .6; }
+.flw .palbins .pbin.on { color: var(--ink); border-color: var(--ink); }
+.flw .palbins .pbin.on i { background: currentColor; }
+.flw .palbins .pbin:not(.on) { text-decoration: line-through; text-decoration-color: rgba(0, 0, 0, .3); }
+.flw .palbins .pbin:hover { border-color: var(--ink); color: var(--ink); }

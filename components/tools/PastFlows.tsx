@@ -12,6 +12,7 @@ import { scoped } from "@/lib/owner";
 import { polish } from "@/lib/evidence/polish";
 import "./pastflows.css";
 import "./finish.css";
+import ThemePicker from "./ThemePicker";
 
 /**
  * Past flows — every round, in either tool, in one place.
@@ -318,6 +319,7 @@ export default function PastFlows({ owner }: { owner?: string }) {
         <div className="pf-gap" />
         <Link className="pf-btn" href="/tools/docflow">+ Doc flow</Link>
         <Link className="pf-btn" href="/tools/flow">+ Grid flow</Link>
+        <ThemePicker />
       </header>
 
       <div className="pf-body">

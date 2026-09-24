@@ -42,8 +42,81 @@ export interface Hit {
   cards?: number;
 }
 
-/** The whole index of this account's library, or nothing at all. */
-export async function library(owner?: string | null): Promise<Entry[]> {
+/**
+ * Evidence bins — the piles a library is sorted into, each in the round or
+ * out of it. Blocks are filed by address (pocket | hat | title), the same key
+ * Evidence uses, and a block in no bin is Unsorted (`loose`).
+ */
+export interface Bin { id: string; name: string; on: boolean }
+export interface Bins { list: Bin[]; of: Record<string, string>; loose: boolean }
+const tidy = (x?: string) => String(x || "").replace(/[\s​ ﻿]+/g, " ").trim();
+const binKey = (e: Entry) => [tidy(e.c1), tidy(e.c2), tidy(e.t)].join("|");
+function normalizeBins(b: any): Bins {
+  const x = b && typeof b === "object" ? b : {};
+  return {
+    list: Array.isArray(x.list) ? x.list.filter((y: any) => y && y.id).map((y: any) => ({ id: y.id, name: String(y.name || "Bin"), on: y.on !== false })) : [],
+    of: x.of && typeof x.of === "object" ? x.of : {},
+    loose: x.loose !== false,
+  };
+}
+/** Whether a block is in a bin that is in this round. */
+export function inRound(bins: Bins, e: Entry) {
+  const id = bins.of[binKey(e)];
+  const b = id ? bins.list.find((x) => x.id === id) : undefined;
+  return b ? b.on : bins.loose;
+}
+
+/** This account's bins, and how many blocks sit in each (Unsorted under ""). */
+export async function readBins(owner?: string | null): Promise<{ bins: Bins; counts: Record<string, number> }> {
+  const db = await openEvidence(owner);
+  const empty = { bins: normalizeBins(null), counts: {} as Record<string, number> };
+  if (!db) return empty;
+  try {
+    if (!db.objectStoreNames.contains("kv")) return empty;
+    const [raw, index] = await new Promise<[any, Entry[]]>((resolve) => {
+      const t = db.transaction("kv", "readonly");
+      const a = t.objectStore("kv").get("bins");
+      const b = t.objectStore("kv").get("index");
+      t.oncomplete = () => resolve([a.result, Array.isArray(b.result) ? b.result : []]);
+      t.onerror = () => resolve([null, []]);
+    });
+    const bins = normalizeBins(raw);
+    const counts: Record<string, number> = {};
+    index.forEach((e) => {
+      const id = bins.of[binKey(e)];
+      const k = id && bins.list.some((x) => x.id === id) ? id : "";
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    return { bins, counts };
+  } catch { return empty; } finally { try { db.close(); } catch { /* closed */ } }
+}
+
+/** Put a bin in the round or take it out ("" is Unsorted). */
+export async function setBinUse(owner: string | null | undefined, id: string, on: boolean): Promise<boolean> {
+  const db = await openEvidence(owner);
+  if (!db) return false;
+  try {
+    return await new Promise<boolean>((resolve) => {
+      const t = db.transaction("kv", "readwrite");
+      const st = t.objectStore("kv");
+      const req = st.get("bins");
+      req.onsuccess = () => {
+        const bins = normalizeBins(req.result);
+        if (id === "") bins.loose = on;
+        else bins.list.forEach((b) => { if (b.id === id) b.on = on; });
+        st.put(bins, "bins");
+      };
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => resolve(false);
+    });
+  } catch { return false; } finally { try { db.close(); } catch { /* closed */ } }
+}
+
+/**
+ * The index of this account's library — only the blocks in bins that are in
+ * this round, unless `all` — or nothing at all.
+ */
+export async function library(owner?: string | null, all = false): Promise<Entry[]> {
   if (typeof indexedDB === "undefined") return [];
   const db = await new Promise<IDBDatabase | null>((resolve) => {
     let req: IDBOpenDBRequest;
@@ -58,12 +131,16 @@ export async function library(owner?: string | null): Promise<Entry[]> {
   if (!db) return [];
   try {
     if (!db.objectStoreNames.contains("kv")) return [];
-    const index = await new Promise<Entry[]>((resolve) => {
-      const req = db.transaction("kv", "readonly").objectStore("kv").get("index");
-      req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
-      req.onerror = () => resolve([]);
+    const [index, raw] = await new Promise<[Entry[], any]>((resolve) => {
+      const t = db.transaction("kv", "readonly");
+      const a = t.objectStore("kv").get("index");
+      const b = t.objectStore("kv").get("bins");
+      t.oncomplete = () => resolve([Array.isArray(a.result) ? a.result : [], b.result]);
+      t.onerror = () => resolve([[], null]);
     });
-    return index;
+    if (all || !raw) return index;
+    const bins = normalizeBins(raw);
+    return index.filter((e) => inRound(bins, e));
   } catch {
     return [];
   } finally {

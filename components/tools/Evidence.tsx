@@ -6,6 +6,7 @@ import DocEditor from "./DocEditor";
 import { polish } from "@/lib/evidence/polish";
 import "./evidence.css";
 import "./finish.css";
+import ThemePicker from "./ThemePicker";
 
 /**
  * Evidence, mounted.
@@ -156,6 +157,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         <button className="btn roombtn" data-act="room" title="Share the send doc with your partner's flow">
           <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
         </button>
+        <ThemePicker />
         <button className={"btn docbtn" + (doc ? " on" : "")} onClick={toggleDoc}
           aria-expanded={doc} title="Show the document as it will paste">
           <span id="doclabel">Send doc</span> {doc ? "›" : "‹"}
@@ -169,6 +171,8 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
             <input id="q" type="text" placeholder="search evidence" autoComplete="off" spellCheck={false} />
             <span className="searchmeta mono" id="searchmeta" />
           </div>
+          {/* the bins this round searches — the engine draws them */}
+          <div className="binbar" id="binbar" hidden />
           <div className="indexhead mono">
             <i>Outline</i>
             <i className="c3"><button className="link" data-act="groups">Fold all</button></i>

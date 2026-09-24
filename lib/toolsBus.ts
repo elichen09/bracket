@@ -18,7 +18,9 @@ import { scoped } from "./owner";
 export type BusMessage =
   | { kind: "send-changed"; title?: string }
   | { kind: "sent"; title: string; trigger: string; tags: string[] }
-  | { kind: "senddoc"; by: string; at: number; blocks: DocBlock[] };
+  | { kind: "senddoc"; by: string; at: number; blocks: DocBlock[] }
+  /** Evidence bins switched in or out of the round, from any of the tools. */
+  | { kind: "bins-changed" };
 
 /** One block of a send doc, as Flow needs it: its header and its tags. */
 export interface DocBlock { head: string; section: string; tags: { tag: string; cite: string }[] }

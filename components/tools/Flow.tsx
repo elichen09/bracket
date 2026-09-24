@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { polish } from "@/lib/evidence/polish";
+import ThemePicker from "./ThemePicker";
 import "./flow.css";
 import "./finish.css";
 
@@ -67,6 +68,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span id="share-state">Not shared</span>
         </button>
+        <ThemePicker />
         <button className="btn" id="drawer-btn" aria-pressed="false">Drawer <kbd data-key="drawer">Ctrl+J</kbd></button>
       </header>
 
@@ -183,6 +185,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
             <input id="pal-q" placeholder="Run a command, go somewhere — or / to search your evidence" aria-label="Search commands" autoComplete="off" spellCheck={false} />
           </div>
           <div className="palsrc" id="pal-src" hidden />
+          <div className="palbins mono" id="pal-bins" hidden />
           <ul id="pal-list" />
           <div className="palfoot mono" id="pal-foot" />
         </div>
