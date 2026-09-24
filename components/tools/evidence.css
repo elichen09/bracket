@@ -744,6 +744,16 @@
 }
 .evi #q:focus-visible, .evi .sheet:focus-visible { outline: none; }
 
+/* ---------- sharing the send doc into a flow room ---------- */
+.evi .roombtn { display: inline-flex; align-items: center; gap: 7px; }
+.evi .roombtn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; transition: background .2s var(--ease); }
+.evi .roombtn .dot.waiting { background: #0F766E; animation: eviRoomBlink 1.6s steps(2) infinite; }
+.evi .roombtn .dot.live { background: #1F7A4B; box-shadow: 0 0 0 3px rgba(31, 122, 75, .18); }
+@keyframes eviRoomBlink { 50% { opacity: .25; } }
+.evi #room-name { width: 200px; }
+.evi #room-code { width: 140px; font-family: var(--mono); letter-spacing: .2em; text-transform: uppercase; }
+.evi #room-st { margin-top: 16px; color: var(--ink); }
+
 /* Everything above moves. Anyone who has asked their system not to gets the
    same tool without the movement. */
 @media (prefers-reduced-motion: reduce) {

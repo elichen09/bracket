@@ -106,6 +106,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
             <button type="button" role="tab" aria-selected="true" data-p="notes">Notes</button>
             <button type="button" role="tab" aria-selected="false" data-p="cards">Cards</button>
             <button type="button" role="tab" aria-selected="false" data-p="vision">Round vision</button>
+            <button type="button" role="tab" aria-selected="false" data-p="doc">Send doc</button>
             <button type="button" className="x" id="drawer-x" aria-label="Close">×</button>
           </div>
           <div className="pane" id="p-notes">
@@ -131,6 +132,9 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
               <kbd data-key="stop.prev">Ctrl+[</kbd> back · drag to reorder · double-click to rename.
               While speaking, Page Down — or a clicker — walks it.
             </p>
+          </div>
+          <div className="pane" id="p-doc" hidden>
+            <div id="sdoc" />
           </div>
         </aside>
 
@@ -221,6 +225,10 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
               <button className="btn" type="button" id="share-copy">Copy link</button>
             </div>
             <div id="share-peers" className="peers" />
+            <div className="row evirow">
+              <span className="small">Partner building the send doc?</span>
+              <button className="btn" type="button" id="share-evi" hidden>Copy the Evidence link</button>
+            </div>
             <div className="row">
               <button className="btn go" type="button" id="share-start">Start a room</button>
               <span className="small or">or</span>

@@ -9,13 +9,19 @@
  *
  *   send-changed  Flow put a card in the send list; Evidence reloads it.
  *   sent          Evidence sent a card; Flow offers to put its tags in the flow.
+ *   senddoc       Evidence's send doc, as an outline of blocks and tags, so a
+ *                 Flow tab can show it and flow it.
  */
 
 import { scoped } from "./owner";
 
 export type BusMessage =
   | { kind: "send-changed"; title?: string }
-  | { kind: "sent"; title: string; trigger: string; tags: string[] };
+  | { kind: "sent"; title: string; trigger: string; tags: string[] }
+  | { kind: "senddoc"; by: string; at: number; blocks: DocBlock[] };
+
+/** One block of a send doc, as Flow needs it: its header and its tags. */
+export interface DocBlock { head: string; section: string; tags: { tag: string; cite: string }[] }
 
 export interface Bus {
   post: (m: BusMessage) => void;

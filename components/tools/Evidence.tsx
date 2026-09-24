@@ -30,7 +30,7 @@ const DOCW_KEY = "evidence.docw";
 const MIN_SIDE = 300, MAX_SIDE = 820, DEFAULT_SIDE = 420;
 const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
 
-export default function Evidence({ owner }: { owner?: string }) {
+export default function Evidence({ owner, me, room }: { owner?: string; me?: string; room?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const engine = useRef<any>(null);
   const [side, setSide] = useState(DEFAULT_SIDE);
@@ -52,10 +52,10 @@ export default function Evidence({ owner }: { owner?: string }) {
       if (dead) return;
       engine.current = m;
       // Whose library: the engine opens this account's database, not a shared one.
-      off = m.boot(el, { owner });
+      off = m.boot(el, { owner, me, room });
     });
     return () => { dead = true; unpolish(); if (off) off(); };
-  }, [owner]);
+  }, [owner, me, room]);
 
   // How it was left last time. Read after mount so the server and the first
   // paint agree on the defaults.
@@ -151,6 +151,10 @@ export default function Evidence({ owner }: { owner?: string }) {
         {/* Its own tab, reused: the two tools talk across tabs, and the send
             list Flow writes into is this one. */}
         <a className="btn" href="/tools/flow" target="break-flow" title="Open Flow beside this">Flow ↗</a>
+        {/* Share the send doc into a flow room, for a partner flowing on another computer. */}
+        <button className="btn roombtn" data-act="room" title="Share the send doc with your partner's flow">
+          <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
+        </button>
         <button className={"btn docbtn" + (doc ? " on" : "")} onClick={toggleDoc}
           aria-expanded={doc} title="Show the document as it will paste">
           <span id="doclabel">Send doc</span> {doc ? "›" : "‹"}

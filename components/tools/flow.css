@@ -929,6 +929,37 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .kout { padding: 12px 18px; border-top: 1px solid var(--line-soft); display: flex; justify-content: flex-end; background: var(--surface-2); }
 .flw [data-key].unset { opacity: .45; }
 
+/* ---- the send doc, as your partner builds it ---- */
+.flw #sdoc { display: flex; flex-direction: column; gap: 10px; }
+.flw .sdwait { font-family: var(--display); font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 0; }
+.flw .sdhow { font-size: 13px; line-height: 1.65; color: var(--muted); margin: 0; }
+.flw .sdhead { display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft); }
+.flw .sdswitch { display: inline-flex; border: 1px solid var(--line); align-self: flex-start; }
+.flw .sdswitch button { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; padding: 5px 10px; color: var(--muted); }
+.flw .sdswitch button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.flw .sdsec { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--vision); margin-top: 6px; }
+.flw .sdblock {
+  border: 1px solid var(--line-soft); background: var(--surface-2); padding: 10px 10px 8px;
+  animation: flwIn .26s var(--spring) both; animation-delay: calc(var(--i, 0) * 25ms);
+}
+.flw .sdh { display: flex; align-items: center; gap: 10px; }
+.flw .sdh b { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+.flw .sdh .ins { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; padding: 5px 9px; color: #fff; border: 1px solid transparent; }
+.flw .sdh .ins { background: linear-gradient(135deg, #16161b, #10302d); flex-shrink: 0; transition: background .15s var(--ease), transform .15s var(--spring); }
+.flw .sdh .ins:hover { background: linear-gradient(135deg, #14958A, var(--vision-2)); transform: translateY(-1px); }
+.flw .sdh .ins:active { transform: scale(.96); }
+.flw .sdtags { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; }
+.flw .sdtag {
+  width: 100%; text-align: left; display: flex; flex-direction: column; gap: 1px;
+  padding: 6px 8px; border: 1px solid transparent; background: var(--surface); font-size: 13px; line-height: 1.35;
+  transition: border-color .15s var(--ease), background .15s var(--ease), transform .15s var(--spring);
+}
+.flw .sdtag small { font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em; color: var(--dim); }
+.flw .sdtag:hover { border-color: var(--ink); transform: translateX(2px); }
+.flw .sdtag:active { transform: scale(.98); }
+.flw .evirow { align-items: center; }
+.flw .peer.evi { background: var(--vision); }
+
 /* ---- room at the foot ----
    Windows names its keys in words — Backspace, Ctrl+ — which take three
    times the room of the symbols, so the key hints give way before the

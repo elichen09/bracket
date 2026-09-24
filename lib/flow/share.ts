@@ -26,9 +26,13 @@ export type Status = "joining" | "live" | "alone" | "error";
 
 export interface Caret { sheet: string; row: string; col: number }
 
+export type Kind = "flow" | "evidence";
+
 export interface Peer {
   id: string;
   name: string;
+  /** A flow, or an Evidence tab sharing its send doc into the room. */
+  kind: Kind;
   /** A hue of their own, so two carets are never the same colour. */
   hue: number;
   caret: Caret | null;
@@ -62,7 +66,12 @@ export const tidyCode = (s: string) => String(s || "").toUpperCase().replace(/[^
 
 const HUES = [18, 210, 145, 275, 340, 45];
 
-export function joinFlow(code: string, who: string, h: Handlers): Session {
+/**
+ * Into a room. A flow tab takes part in the flow; an Evidence tab only
+ * publishes its send doc there, so it never answers a newcomer's ask for the
+ * flow — it is handed the ask instead, to publish the doc again.
+ */
+export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "flow"): Session {
   const me = newCode(8);
   const hue = HUES[Math.floor(Math.random() * HUES.length)];
   let channel: RealtimeChannel | null = null;
@@ -77,7 +86,7 @@ export function joinFlow(code: string, who: string, h: Handlers): Session {
     peers = Object.entries(state)
       .flatMap(([, entries]) => entries)
       .filter((e: any) => e && e.id && e.id !== me)
-      .map((e: any) => ({ id: e.id, name: e.name || "Partner", hue: e.hue ?? 210, caret: carets.get(e.id) || null }));
+      .map((e: any) => ({ id: e.id, name: e.name || "Partner", hue: e.hue ?? 210, kind: (e.kind || "flow") as Kind, caret: carets.get(e.id) || null }));
     h.onPeers(peers);
     h.onStatus(peers.length ? "live" : "alone");
   };
@@ -93,11 +102,12 @@ export function joinFlow(code: string, who: string, h: Handlers): Session {
       const { type, data } = payload;
 
       if (type === "ask") {
+        if (kind !== "flow") { h.onEvent("ask", null); return; }
         // Everyone in the room hears this, so only one answers: the peer whose
         // id sorts first. The wait lets presence settle before that is decided.
         setTimeout(() => {
           if (gone) return;
-          const others = peers.map((p) => p.id).filter((id) => id !== payload.from);
+          const others = peers.filter((p) => p.kind === "flow").map((p) => p.id).filter((id) => id !== payload.from);
           const first = [me, ...others].sort()[0];
           if (first === me) send("full", { to: payload.from, doc: h.snapshot() });
         }, 220);
@@ -118,11 +128,11 @@ export function joinFlow(code: string, who: string, h: Handlers): Session {
     .subscribe(async (status: string, err?: Error) => {
       if (gone) return;
       if (status === "SUBSCRIBED") {
-        await channel!.track({ id: me, name: who || "Partner", hue });
+        await channel!.track({ id: me, name: who || "Partner", hue, kind });
         h.onStatus("alone");
         // Ask for the room's flow. If nobody answers, this browser's copy is
         // the room's copy and the ask cost nothing.
-        send("ask", null);
+        if (kind === "flow") send("ask", null);
         return;
       }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
