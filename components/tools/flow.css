@@ -5,7 +5,7 @@
    forest green, bone, a red accent, rounded pills. None of that is here.
    What is here is the same grid wearing The Break's clothes — the paper
    ground, the hairline rules, the uppercase mono for anything that is a
-   label rather than a word someone said, and the one accent (gold, in here) doing
+   label rather than a word someone said, and the two sides' colours and ink doing
    the job the red did: this is live, this was dropped, this is where the
    answer should have gone.
 
@@ -130,7 +130,7 @@
 
 /* the share light */
 .flw #share-btn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
-.flw #share-btn .dot.waiting { background: var(--gold); animation: flwBlink 1.6s steps(2) infinite; }
+.flw #share-btn .dot.waiting { background: var(--vision, #0F766E); animation: flwBlink 1.6s steps(2) infinite; }
 .flw #share-btn .dot.live { background: var(--good); }
 
 /* --------------------------------------------------------------- body */
@@ -174,7 +174,7 @@
    bold type with its side in small caps beside it; the arguments in plain
    15px sans with room around them; the marks as rounded chips you can see
    from the podium; headings with a number, a label and an italic title. The
-   paper, the ink and the type are still the site's; the accent is gold. */
+   paper, the ink and the type are still the site's; states are drawn in ink. */
 .flw .flow { min-width: 0; min-height: 0; overflow: auto; outline: 0; position: relative; }
 .flw .grid { position: relative; display: grid; width: 100%; transition: grid-template-columns .35s var(--spring); }
 /* a sheet arriving */
@@ -716,8 +716,9 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
      blue    Pro          #2E5FAE
      garnet  Con          #A93650
-     gold    live / act   #9C6B0E   (the clock, the live column, a turn, a
-                                     drop, an open argument, writing in a cell)
+     ink     live / act   #17171B   (the clock, a turn, a drop, an open
+                                     argument, writing in a cell — and the
+                                     live column wears its own side's colour)
      teal    round vision #0F766E
 
    The two sides are the ones a flow is read by, so they carry the most: a
@@ -727,7 +728,7 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
    Checked, not guessed: under simulated protanopia and deuteranopia Pro and
    Con stay 15–19 apart in OKLab (×100), and teal stays 10+ from both Pro and
-   the gold. The one close pair, teal and garnet under deuteranopia, only
+   each other. The one close pair, teal and garnet under deuteranopia, only
    meets where a stop's number sits on a Con cell, and the number is what
    says it is a stop. Every coloured thing also says what it is in words.
    White text clears 4.5:1 on all four.
@@ -741,10 +742,11 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   --pro: #2E5FAE;  --pro-ink: #22498A;  --pro-head: #EDF1F9;  --pro-bg: #F5F7FB;
   --con: #A93650;  --con-ink: #86283E;  --con-head: #F8ECEC;  --con-bg: #FBF5F4;
   --vision: #0F766E; --vision-2: #0B5E58;
-  /* The accent, in here, is gold: the site's orange sat between garnet and
-     gold and fought the garnet. Navy, crimson and gold is the old
-     combination for a reason. White on it clears 4.5:1. */
-  --acc: #9C6B0E; --acc-rgb: 156, 107, 14; --acc-hi: #C9921F;
+  /* No accent hue at all, in here. Orange fought the garnet and gold fought
+     everything; the two sides are this tool's colour, so the states — live,
+     writing, a turn, a drop — are drawn in ink instead, and the live column
+     glows in its own side's colour rather than a third one. */
+  --acc: #17171B; --acc-rgb: 23, 23, 27; --acc-hi: #3B3B45;
   --ext: #1F7A4B;  --ext-soft: #DDF0E5;
   --perm: #5B44B2; --perm-soft: #ECE8F8;
   --nuq: #1A6E78;  --nuq-soft: #DCEFF1;
@@ -837,6 +839,50 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .pal.ev li.hl { background: linear-gradient(90deg, var(--acc), var(--acc-hi)); }
 .flw .pal li.grp { color: var(--vision); }
 .flw .pal.ev li.grp { color: var(--acc); }
+
+/* ---- ink, where the accent used to be ----
+   Most of the tool took the ink for free through --acc. These are the
+   places that put the accent on something already dark, and the live
+   column, which now glows in the colour of the side whose speech it is. */
+.flw .c.pro.livecol { background-image: linear-gradient(rgba(46, 95, 174, .085), rgba(46, 95, 174, .085)); }
+.flw .c.con.livecol { background-image: linear-gradient(rgba(169, 54, 80, .08), rgba(169, 54, 80, .08)); }
+.flw .h.pro.live { box-shadow: inset 0 -3px 0 var(--pro); }
+.flw .h.con.live { box-shadow: inset 0 -3px 0 var(--con); }
+.flw .h.pro.live .lv { background: var(--pro); color: #fff; }
+.flw .h.con.live .lv { background: var(--con); color: #fff; }
+.flw .h.live .lv i { background: #fff; }
+
+.flw .c .tg.dropped { color: var(--ink); background: rgba(23, 23, 27, .06); border-color: rgba(23, 23, 27, .5); }
+.flw .c .tg.turn { background: linear-gradient(135deg, #3B3B45, #111114); box-shadow: 0 2px 6px -2px rgba(0, 0, 0, .45); }
+.flw .c .arr { color: var(--ink); }
+
+/* on dark ground: the toast, the speaking strip, the panel's highlight */
+.flw .tst .undo { color: #fff; text-decoration-color: rgba(255, 255, 255, .5); }
+.flw .tst::after { background: linear-gradient(90deg, var(--pro), var(--vision), var(--con)); }
+.flw .speak .bar i { background: linear-gradient(90deg, #14958A, #5EE0D2); }
+.flw .c.stopnow[data-stop]::before { background: #111114; box-shadow: 0 0 0 2px #14958A, 0 3px 10px -3px rgba(0, 0, 0, .6); }
+.flw .pal li.it.on .lb u { color: #fff; text-decoration: underline; text-decoration-color: #5EE0D2; text-underline-offset: 3px; }
+.flw .pal.ev .palin .glyph { background: linear-gradient(135deg, var(--pro), #22498A); }
+.flw .pal.ev li.hl { background: linear-gradient(90deg, #22498A, var(--pro)); }
+.flw .pal.ev li.grp { color: var(--pro); }
+.flw .pal li.it .lb u { color: var(--vision); }
+.flw .dtabs button[aria-selected="true"] { border-image: linear-gradient(90deg, var(--pro), var(--vision), var(--con)) 1; }
+.flw #drawer-btn.ping { animation-name: flwPingInk; }
+@keyframes flwPingInk { 0%, 100% { box-shadow: 0 0 0 0 rgba(15, 118, 110, 0); } 40% { box-shadow: 0 0 0 5px rgba(15, 118, 110, .28); border-color: var(--vision); color: var(--vision); } }
+.flw .card.sent { border-color: var(--vision); background: color-mix(in srgb, var(--vision) 5%, var(--surface)); }
+
+/* ---- a flow can be thrown away from its own tab ---- */
+.flw .tabs .tx {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; margin: 0 -4px 0 2px;
+  border-radius: 50%; font-size: 12px; line-height: 1; font-family: var(--ui); letter-spacing: 0;
+  opacity: 0; transform: scale(.6); align-self: center;
+  transition: opacity .15s var(--ease), transform .18s var(--pop), background .15s var(--ease), color .15s var(--ease);
+}
+.flw .tabs button:hover .tx, .flw .tabs button:focus-visible .tx, .flw .tabs button[aria-selected="true"] .tx { opacity: .75; transform: none; }
+.flw .tabs .tx:hover { opacity: 1; background: rgba(0, 0, 0, .12); }
+.flw .tabs button[aria-selected="true"] .tx:hover { background: rgba(255, 255, 255, .25); }
+.flw .tabs button.going { animation: flwTabGo .17s var(--ease) forwards; pointer-events: none; }
+@keyframes flwTabGo { to { opacity: 0; transform: scale(.85) translateY(4px); } }
 
 /* ---- room at the foot ----
    Windows names its keys in words — Backspace, Ctrl+ — which take three

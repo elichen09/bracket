@@ -72,7 +72,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
         <section className="pw active" data-p="0">
           <div className="phead">
             <span className="pn">A</span>
-            <select className="psheet" aria-label="Sheet on screen A" />
+            <select className="psheet" aria-label="Flow on screen A" />
             <span className="pside" />
             <span className="pact">writing here</span>
             <button type="button" className="pclose" aria-label="Close this screen">×</button>
@@ -88,7 +88,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
         <section className="pw" data-p="1" hidden>
           <div className="phead">
             <span className="pn">B</span>
-            <select className="psheet" aria-label="Sheet on screen B" />
+            <select className="psheet" aria-label="Flow on screen B" />
             <span className="pside" />
             <span className="pact">writing here</span>
             <button type="button" className="pclose" aria-label="Close this screen">×</button>
