@@ -42,6 +42,16 @@ export const TOOLS: Tool[] = [
       "This browser, kept apart per account — localStorage. A shared room passes changes straight between the two " +
       "browsers in it and stores nothing on the way.",
   },
+  {
+    slug: "docflow",
+    name: "Doc flow",
+    blurb: "Flow a round the way a Google Doc gets flowed — boxed sides, their points in red, your answers under them.",
+    about:
+      "A document that knows it is a flow. Tab answers a line and changes the speaker, the numbering is Docs' own, " +
+      "and every one of their points with nothing under it is marked and counted, so a rebuttal is prepped by " +
+      "clearing the marks. Pastes a flow straight out of Google Docs and copies one back in.",
+    storage: "This browser, kept apart per account — localStorage, one flow per round.",
+  },
 ];
 
 export const toolBySlug = (slug: string) => TOOLS.find((t) => t.slug === slug) || null;

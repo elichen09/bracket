@@ -1,0 +1,282 @@
+/* =====================================================================
+   Doc flow — a flow written as a document.
+
+   The same clothes as Flow and Evidence: the site's paper and ink, the
+   uppercase mono for anything that is a label, hairline rules. The page
+   itself is a page, white and lifted off the desk the way a Doc is, because
+   this replaces one.
+
+   Two colours carry the meaning, the same two a debater's Doc uses: their
+   words in red, yours in ink. A highlight is a highlight — softer here than
+   Docs' fluorescent yellow and green, which it still writes out when the flow
+   is copied back.
+   ===================================================================== */
+
+.dfl {
+  --ground: #EDEAE3;
+  --surface: #FFFFFF;
+  --surface-2: #F6F3EC;
+  --line: #C6C1B5;
+  --line-soft: #DAD5C9;
+  --ink: #16161A;
+  --muted: #55534E;
+  --dim: #7C7A73;
+  --them: #CF2A22;
+  --them-soft: rgba(207, 42, 34, .08);
+  --step: 28px;
+  --spring: cubic-bezier(.22, 1, .36, 1);
+  --pop: cubic-bezier(.34, 1.56, .64, 1);
+
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  background: var(--ground); color: var(--ink);
+  font-size: 14px; line-height: 1.45;
+  position: relative;
+}
+.dfl *, .dfl *::before, .dfl *::after { box-sizing: border-box; }
+.dfl button { border: 0; padding: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.dfl input { font: inherit; color: inherit; }
+.dfl ::selection { background: rgba(22, 22, 26, .16); }
+.dfl kbd { font-family: var(--mono); font-size: 9.5px; letter-spacing: .02em; border: 1px solid var(--line); padding: 1px 5px; color: var(--muted); border-radius: 4px; background: var(--surface); }
+.dfl .mono { font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+
+/* ------------------------------------------------------------ toolbar */
+.dfl .dtop {
+  display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 54px; flex-shrink: 0;
+  background: var(--surface); border-bottom: 1px solid var(--line); position: relative;
+}
+/* them, to us: the whole tool in a line */
+.dfl .dtop::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, var(--them), #6b2330 45%, var(--ink));
+}
+.dfl .back { font-size: 13px; color: var(--dim); transition: color .16s, transform .16s; }
+.dfl .back:hover { color: var(--ink); transform: translateX(-2px); }
+.dfl .brand { font-size: 11px; }
+.dfl .spacer { flex: 1 1 auto; }
+
+.dfl .dclock { display: flex; align-items: center; gap: 2px; border: 1px solid var(--line); padding: 3px 4px; font-size: 10.5px; white-space: nowrap; }
+.dfl .dclock button { height: 25px; min-width: 24px; padding: 0 7px; color: var(--muted); position: relative; overflow: hidden; transition: background .15s, color .15s; }
+.dfl .dclock button:hover { background: var(--surface-2); color: var(--ink); }
+.dfl .dclock .sp { min-width: 84px; color: var(--ink); }
+.dfl .dclock .tm { font-size: 16px; min-width: 54px; text-align: center; letter-spacing: 0; text-transform: none; }
+.dfl .dclock .tm.on { color: var(--them); }
+.dfl .dclock .tm.low { animation: dflLow 1s ease-in-out infinite; }
+@keyframes dflLow { 50% { opacity: .5; } }
+.dfl .dclock .play { background: var(--ink); color: #fff; }
+.dfl .dclock .play:hover { background: #2b2b31; color: #fff; }
+.dfl .dclock .play.on { background: var(--them); }
+.dfl .dclock .pp { border-left: 1px solid var(--line-soft); margin-left: 4px; }
+.dfl .dclock .pp.on { background: var(--them); color: #fff; }
+
+.dfl .dbtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 7px 12px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap;
+  position: relative; overflow: hidden; text-decoration: none;
+  transition: color .18s, border-color .18s, background .18s, transform .18s var(--spring);
+}
+.dfl .dbtn:hover { color: var(--ink); border-color: var(--ink); transform: translateY(-1px); }
+.dfl .dbtn:active { transform: scale(.96); }
+.dfl .dbtn.ink { background: linear-gradient(135deg, #16161a, #3a1d22); color: #fff; border-color: #16161a; box-shadow: 0 6px 18px -10px rgba(58, 29, 34, .8); }
+.dfl .dbtn.ink:hover { color: #fff; }
+.dfl .dbtn kbd { border-color: rgba(255, 255, 255, .3); background: none; color: inherit; opacity: .7; }
+
+.dfl .tally {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 10.5px; padding: 7px 12px;
+  border: 1px solid var(--line); background: var(--surface); animation: dflBump .45s var(--pop);
+  transition: border-color .2s, background .2s;
+}
+.dfl .tally .dot { width: 8px; height: 8px; border-radius: 50%; background: #1F7A4B; }
+.dfl .tally.has { border-color: rgba(207, 42, 34, .45); background: var(--them-soft); color: var(--them); }
+.dfl .tally.has .dot { background: var(--them); box-shadow: 0 0 0 3px rgba(207, 42, 34, .15); }
+.dfl .tally .of { color: var(--dim); letter-spacing: .06em; }
+.dfl .tally:hover { border-color: var(--ink); }
+@keyframes dflBump { 0% { transform: scale(1); } 35% { transform: scale(1.08); } 100% { transform: scale(1); } }
+
+/* ------------------------------------------------------------ the two panes */
+.dfl .dbody { flex: 1; min-height: 0; display: flex; }
+.dfl .dside {
+  width: 270px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0;
+  background: var(--surface-2); border-right: 1px solid var(--line);
+  transition: width .3s var(--spring), opacity .2s;
+}
+.dfl.noside .dside { width: 0; opacity: 0; overflow: hidden; border: 0; }
+.dfl .dsec { padding: 14px 14px 6px; border-bottom: 1px solid var(--line-soft); }
+.dfl .dsec.grow { flex: 1; min-height: 0; overflow: auto; }
+.dfl .dsh { display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: var(--dim); margin-bottom: 8px; }
+.dfl .dsh button { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; color: var(--ink); padding: 3px 7px; border: 1px solid var(--line); transition: background .15s, color .15s; }
+.dfl .dsh button:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+.dfl .dlist { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 2px; max-height: 34vh; overflow: auto; }
+.dfl .dlist li { display: flex; align-items: center; border-radius: 6px; transition: background .15s; animation: dflIn .22s var(--spring) both; }
+.dfl .dlist li:hover { background: rgba(22, 22, 26, .05); }
+.dfl .dlist li.on { background: var(--ink); color: #fff; }
+.dfl .dname { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 7px 9px; text-align: left; }
+.dfl .dname span { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dfl .dname small { font-size: 9px; color: var(--dim); flex-shrink: 0; }
+.dfl .dlist li.on .dname small { color: rgba(255, 255, 255, .55); }
+.dfl .dlist input { flex: 1; margin: 3px; padding: 5px 8px; border: 1px solid var(--them); outline: none; font-size: 13.5px; background: #fff; color: var(--ink); border-radius: 4px; }
+.dfl .dx { width: 26px; height: 26px; display: grid; place-items: center; font-size: 15px; color: var(--dim); opacity: 0; transition: opacity .15s, color .15s; }
+.dfl .dlist li:hover .dx, .dfl .dlist li.on .dx { opacity: .8; }
+.dfl .dlist li.on .dx { color: rgba(255, 255, 255, .7); }
+.dfl .dx:hover { color: var(--them) !important; opacity: 1; }
+
+.dfl .dout { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.dfl .dout li button { width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 8px; text-align: left; border-radius: 5px; transition: background .15s, transform .15s var(--spring); }
+.dfl .dout li button:hover { background: rgba(22, 22, 26, .05); transform: translateX(2px); }
+.dfl .dout li.box button span { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.dfl .dout li.head button { padding-left: 18px; }
+.dfl .dout li.head button span { font-size: 13px; }
+.dfl .dout li.them button span { color: var(--them); }
+.dfl .dout small { font-size: 9px; color: #1F7A4B; flex-shrink: 0; }
+.dfl .dout small.open { color: var(--them); }
+.dfl .dnone { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin: 0; }
+.dfl .dkeys { padding: 12px 14px 14px; display: grid; gap: 5px; font-size: 9px; color: var(--dim); border-top: 1px solid var(--line-soft); }
+.dfl .dkeys span { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------ the page */
+.dfl .dpage { display: block; flex: 1; min-width: 0; overflow: auto; padding: 28px 24px 120px; }
+.dfl .dpaper {
+  max-width: 880px; margin: 0 auto; background: #fff; padding: 44px 72px 90px;
+  box-shadow: 0 1px 3px 1px rgba(60, 64, 67, .12), 0 1px 2px rgba(60, 64, 67, .25);
+  min-height: calc(100% - 20px);
+  animation: dflIn .35s var(--spring) both;
+}
+.dfl .dtitle {
+  width: 100%; border: 0; outline: none; background: none; padding: 0 0 14px; margin-bottom: 8px;
+  font-family: var(--display); font-weight: 800; font-size: 30px; letter-spacing: -.03em; color: var(--ink);
+  border-bottom: 1px solid var(--line-soft);
+}
+.dfl .dtitle::placeholder { color: var(--line); }
+.dfl .ddoc.ProseMirror { outline: none; font-family: var(--ui); font-size: 15.5px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; word-wrap: break-word; padding-bottom: 40vh; }
+
+/* boxed titles and headings, the way the Doc draws them */
+.dfl .df-box {
+  text-align: center; font-weight: 800; font-size: 25px; letter-spacing: -.01em;
+  border: 3px solid var(--ink); padding: 8px 16px; margin: 30px 0 16px;
+  animation: dflIn .26s var(--spring) both; transition: color .2s;
+}
+.dfl .df-box:first-child { margin-top: 18px; }
+.dfl .df-box[data-who="them"] { color: var(--them); }
+.dfl .df-head {
+  text-align: center; font-weight: 700; font-size: 17.5px; text-decoration: underline; text-underline-offset: 4px;
+  margin: 24px 0 8px; animation: dflIn .26s var(--spring) both; transition: color .2s;
+}
+.dfl .df-head[data-who="them"] { color: var(--them); }
+.dfl .df-p { margin: 8px 0; line-height: 1.62; }
+
+/* ---- a flow line ----
+   Indented by its depth, numbered by the survey, coloured by who said it.
+   The line is updated in place, so an indent slides and a speaker changes
+   with a fade rather than a redraw. */
+.dfl .df-item { --d: 0; position: relative; padding: 2px 8px 2px calc(38px + var(--d) * var(--step)); margin: 1px -8px; border-radius: 5px;
+  transition: padding-left .22s var(--spring), color .2s ease, background .2s ease;
+  animation: dflLine .18s var(--spring) both;
+}
+.dfl .df-item[data-depth="1"] { --d: 1; } .dfl .df-item[data-depth="2"] { --d: 2; } .dfl .df-item[data-depth="3"] { --d: 3; }
+.dfl .df-item[data-depth="4"] { --d: 4; } .dfl .df-item[data-depth="5"] { --d: 5; } .dfl .df-item[data-depth="6"] { --d: 6; }
+.dfl .df-item[data-depth="7"] { --d: 7; } .dfl .df-item[data-depth="8"] { --d: 8; }
+@keyframes dflLine { from { opacity: 0; transform: translateY(-3px); } }
+.dfl .df-item::before {
+  content: attr(data-label); position: absolute; top: 2px;
+  left: calc(8px + var(--d) * var(--step)); width: 26px; text-align: right;
+  font-variant-numeric: tabular-nums; cursor: pointer; border-radius: 4px;
+  transition: left .22s var(--spring), background .15s, color .2s;
+}
+.dfl .df-item::before:hover { background: var(--them-soft); }
+.dfl .df-item[data-who="them"] { color: var(--them); }
+.dfl .df-item[data-who="us"] { color: var(--ink); }
+.dfl .df-t { border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; transition: background .2s; }
+.dfl .df-item[data-hl="yellow"] .df-t, .dfl mark[data-hl="yellow"] { background: rgba(255, 226, 40, .55); }
+.dfl .df-item[data-hl="green"] .df-t, .dfl mark[data-hl="green"] { background: rgba(60, 214, 110, .38); }
+.dfl .df-item[data-hl="cyan"] .df-t, .dfl mark[data-hl="cyan"] { background: rgba(40, 200, 230, .32); }
+.dfl .df-item[data-hl="pink"] .df-t, .dfl mark[data-hl="pink"] { background: rgba(240, 90, 200, .3); }
+.dfl .df-item[data-hl] .df-t { padding: 1px 2px; color: var(--ink); }
+.dfl .df-item[data-hl][data-who="them"] .df-t { color: #a8170f; }
+.dfl mark { color: inherit; padding: 0 1px; border-radius: 2px; }
+.dfl .df-red { color: var(--them); }
+.dfl u { text-underline-offset: 2px; }
+
+/* the line being written in */
+.dfl .df-here { background: rgba(22, 22, 26, .035); }
+.dfl .df-item.df-here[data-who="them"] { background: var(--them-soft); }
+
+/* one of theirs with nothing under it yet */
+.dfl .df-item.df-open::after {
+  content: ""; position: absolute; top: .62em;
+  left: calc(var(--d) * var(--step) - 6px); width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid var(--them); background: #fff;
+  animation: dflOpen .5s var(--pop) both;
+}
+@keyframes dflOpen { from { transform: scale(0); } }
+
+/* what an empty line is for, shown only where the cursor is */
+.dfl .df-item.df-here.df-empty .df-t::before { font-style: italic; color: var(--dim); pointer-events: none; }
+.dfl .df-item.df-here.df-empty[data-who="them"] .df-t::before { content: "their point — Tab to answer it"; color: rgba(207, 42, 34, .5); }
+.dfl .df-item.df-here.df-empty[data-who="us"] .df-t::before { content: "your answer"; }
+.dfl .df-box.df-empty::before { content: "Title"; color: var(--line); }
+.dfl .df-head.df-empty::before { content: "Heading"; color: var(--line); }
+.dfl .df-p.df-here.df-empty::before { content: "Write, or type / for a box, a heading or evidence"; color: var(--dim); font-style: italic; }
+
+/* where a jump landed */
+.dfl .df-flash { animation: dflFlash .9s ease-out; }
+@keyframes dflFlash { 0% { box-shadow: 0 0 0 3px rgba(22, 22, 26, .25); background: rgba(22, 22, 26, .06); } 100% { box-shadow: 0 0 0 12px rgba(22, 22, 26, 0); } }
+@keyframes dflIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------------------ the / menu */
+.dfl .dslash {
+  position: absolute; z-index: 30; width: 290px; padding: 5px; background: #fff;
+  border: 1px solid var(--ink); box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .45);
+  display: grid; gap: 1px; animation: dflPop .16s var(--spring) both; transform-origin: top left;
+}
+@keyframes dflPop { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
+.dfl .dslash button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; text-align: left; border-radius: 4px; transition: background .12s; }
+.dfl .dslash button b { font-size: 13.5px; font-weight: 600; }
+.dfl .dslash button small { font-size: 11.5px; color: var(--dim); }
+.dfl .dslash button:hover { background: var(--surface-2); }
+.dfl .dslash button.on { background: var(--ink); color: #fff; }
+.dfl .dslash button.on small { color: rgba(255, 255, 255, .6); }
+
+/* ------------------------------------------------------------ the command panel */
+.dfl .dscrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: start center; padding: 12vh 16px 16px; background: rgba(22, 22, 26, .34); backdrop-filter: blur(4px); animation: dflFade .18s ease both; }
+@keyframes dflFade { from { opacity: 0; } }
+.dfl .dpal { width: min(620px, 100%); background: #fff; border: 1px solid var(--ink); box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .45); display: flex; flex-direction: column; max-height: 72vh; animation: dflPop .26s var(--pop) both; }
+.dfl .dpin { display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+.dfl .dpin .glyph { width: 26px; height: 26px; display: grid; place-items: center; background: linear-gradient(135deg, #16161a, #3a1d22); color: #fff; font-size: 13px; letter-spacing: 0; }
+.dfl .dpal.ev .dpin .glyph { background: linear-gradient(135deg, var(--them), #8f1c16); }
+.dfl .dpin input { flex: 1; border: 0; outline: 0; padding: 17px 0; font-size: 17px; background: none; font-family: var(--ui); }
+.dfl .dpsrc { padding: 9px 18px; font-size: 12.5px; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--line-soft); }
+.dfl .dpsrc b { color: var(--them); font-weight: 600; }
+.dfl .dpal ul { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1; }
+.dfl .dpal li { display: flex; align-items: center; gap: 12px; padding: 9px 12px; cursor: pointer; border-radius: 4px; animation: dflIn .2s var(--spring) both; transition: background .1s, color .1s; }
+.dfl .dpal li .lb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.dfl .dpal li small { font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; color: var(--dim); text-transform: uppercase; }
+.dfl .dpal li.on { background: var(--ink); color: #fff; }
+.dfl .dpal.ev li.on { background: linear-gradient(90deg, #8f1c16, var(--them)); }
+.dfl .dpal li.on small, .dfl .dpal li.on kbd { color: rgba(255, 255, 255, .65); border-color: rgba(255, 255, 255, .3); background: none; }
+.dfl .dpal li.empty { justify-content: center; color: var(--dim); cursor: default; padding: 24px; }
+.dfl .dpfoot { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 18px; border-top: 1px solid var(--line-soft); background: var(--surface-2); font-size: 9.5px; color: var(--dim); }
+.dfl .dpfoot span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ------------------------------------------------------------ the toast */
+.dfl .dtoast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 50;
+  background: var(--ink); color: #fff; padding: 10px 16px; font-size: 10.5px;
+  display: flex; align-items: center; gap: 14px; overflow: hidden;
+  animation: dflToast .32s var(--pop) both;
+}
+.dfl .dtoast::after { content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 100%; background: linear-gradient(90deg, var(--them), #fff); transform-origin: left; animation: dflLife var(--life, 2200ms) linear forwards; }
+.dfl .dtoast button { color: #fff; text-decoration: underline; text-underline-offset: 3px; font: inherit; letter-spacing: inherit; text-transform: inherit; }
+@keyframes dflToast { from { opacity: 0; transform: translate(-50%, 14px); } }
+@keyframes dflLife { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+.dfl .rip { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: currentColor; pointer-events: none; }
+.dfl button:focus-visible, .dfl a:focus-visible, .dfl input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.dfl .dtitle:focus-visible, .dfl .dpin input:focus-visible { outline: none; }
+
+@media (max-width: 1180px) { .dfl .dclock .pp { display: none; } }
+@media (max-width: 1000px) { .dfl .dside { display: none; } .dfl .dpaper { padding: 32px 28px 80px; } }
+@media (prefers-reduced-motion: reduce) {
+  .dfl *, .dfl *::before, .dfl *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
