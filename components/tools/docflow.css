@@ -53,7 +53,7 @@
 .dfl .back { font-size: 13px; color: var(--dim); transition: color .16s, transform .16s; }
 .dfl .back:hover { color: var(--ink); transform: translateX(-2px); }
 .dfl .brand { font-size: 11px; }
-.dfl .spacer { flex: 1 1 auto; }
+.dfl .dgap { flex: 1 1 auto; }
 
 .dfl .dclock { display: flex; align-items: center; gap: 2px; border: 1px solid var(--line); padding: 3px 4px; font-size: 10.5px; white-space: nowrap; }
 .dfl .dclock button { height: 25px; min-width: 24px; padding: 0 7px; color: var(--muted); position: relative; overflow: hidden; transition: background .15s, color .15s; }
@@ -82,17 +82,6 @@
 .dfl .dbtn.ink:hover { color: #fff; }
 .dfl .dbtn kbd { border-color: rgba(255, 255, 255, .3); background: none; color: inherit; opacity: .7; }
 
-.dfl .tally {
-  display: inline-flex; align-items: center; gap: 8px; font-size: 10.5px; padding: 7px 12px;
-  border: 1px solid var(--line); background: var(--surface); animation: dflBump .45s var(--pop);
-  transition: border-color .2s, background .2s;
-}
-.dfl .tally .dot { width: 8px; height: 8px; border-radius: 50%; background: #1F7A4B; }
-.dfl .tally.has { border-color: rgba(207, 42, 34, .45); background: var(--them-soft); color: var(--them); }
-.dfl .tally.has .dot { background: var(--them); box-shadow: 0 0 0 3px rgba(207, 42, 34, .15); }
-.dfl .tally .of { color: var(--dim); letter-spacing: .06em; }
-.dfl .tally:hover { border-color: var(--ink); }
-@keyframes dflBump { 0% { transform: scale(1); } 35% { transform: scale(1.08); } 100% { transform: scale(1); } }
 
 /* ------------------------------------------------------------ the two panes */
 .dfl .dbody { flex: 1; min-height: 0; display: flex; }
@@ -129,8 +118,6 @@
 .dfl .dout li.head button { padding-left: 18px; }
 .dfl .dout li.head button span { font-size: 13px; }
 .dfl .dout li.them button span { color: var(--them); }
-.dfl .dout small { font-size: 9px; color: #1F7A4B; flex-shrink: 0; }
-.dfl .dout small.open { color: var(--them); }
 .dfl .dnone { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin: 0; }
 .dfl .dkeys { padding: 12px 14px 14px; display: grid; gap: 5px; font-size: 9px; color: var(--dim); border-top: 1px solid var(--line-soft); }
 .dfl .dkeys span { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -154,7 +141,7 @@
 /* boxed titles and headings, the way the Doc draws them */
 .dfl .df-box {
   text-align: center; font-weight: 800; font-size: 25px; letter-spacing: -.01em;
-  border: 3px solid var(--ink); padding: 8px 16px; margin: 30px 0 16px;
+  border: 4px solid var(--ink); padding: 8px 16px; margin: 30px 0 16px;
   animation: dflIn .26s var(--spring) both; transition: color .2s;
 }
 .dfl .df-box:first-child { margin-top: 18px; }
@@ -202,14 +189,6 @@
 .dfl .df-here { background: rgba(22, 22, 26, .035); }
 .dfl .df-item.df-here[data-who="them"] { background: var(--them-soft); }
 
-/* one of theirs with nothing under it yet */
-.dfl .df-item.df-open::after {
-  content: ""; position: absolute; top: .62em;
-  left: calc(var(--d) * var(--step) - 6px); width: 7px; height: 7px; border-radius: 50%;
-  border: 1.5px solid var(--them); background: #fff;
-  animation: dflOpen .5s var(--pop) both;
-}
-@keyframes dflOpen { from { transform: scale(0); } }
 
 /* what an empty line is for, shown only where the cursor is */
 .dfl .df-item.df-here.df-empty .df-t::before { font-style: italic; color: var(--dim); pointer-events: none; }
@@ -217,26 +196,166 @@
 .dfl .df-item.df-here.df-empty[data-who="us"] .df-t::before { content: "your answer"; }
 .dfl .df-box.df-empty::before { content: "Title"; color: var(--line); }
 .dfl .df-head.df-empty::before { content: "Heading"; color: var(--line); }
-.dfl .df-p.df-here.df-empty::before { content: "Write, or type / for a box, a heading or evidence"; color: var(--dim); font-style: italic; }
+.dfl .df-p.df-here.df-empty::before { content: "Write, or type / for a box, a heading or your rhetoric"; color: var(--dim); font-style: italic; }
 
 /* where a jump landed */
 .dfl .df-flash { animation: dflFlash .9s ease-out; }
 @keyframes dflFlash { 0% { box-shadow: 0 0 0 3px rgba(22, 22, 26, .25); background: rgba(22, 22, 26, .06); } 100% { box-shadow: 0 0 0 12px rgba(22, 22, 26, 0); } }
 @keyframes dflIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-/* ------------------------------------------------------------ the / menu */
+/* ------------------------------------------------------------ the / menu
+   Fixed to the window, opening above the line when the line is low, and
+   scrolling inside itself — so it is never cut off by the page's edge. */
 .dfl .dslash {
-  position: absolute; z-index: 30; width: 290px; padding: 5px; background: #fff;
+  position: fixed; z-index: 30; width: 320px; padding: 5px; background: #fff; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent;
   border: 1px solid var(--ink); box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .45);
-  display: grid; gap: 1px; animation: dflPop .16s var(--spring) both; transform-origin: top left;
+  display: flex; flex-direction: column; gap: 1px; animation: dflPop .16s var(--spring) both;
 }
 @keyframes dflPop { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
-.dfl .dslash button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; text-align: left; border-radius: 4px; transition: background .12s; }
+.dfl .dslash button { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; text-align: left; border-radius: 4px; transition: background .12s; }
 .dfl .dslash button b { font-size: 13.5px; font-weight: 600; }
-.dfl .dslash button small { font-size: 11.5px; color: var(--dim); }
+.dfl .dslash button small { font-size: 11.5px; color: var(--dim); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dfl .dslash button:hover { background: var(--surface-2); }
+.dfl .dslash button.rh b::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 7px 2px 0; border-radius: 50%; background: var(--ink); vertical-align: middle; }
 .dfl .dslash button.on { background: var(--ink); color: #fff; }
 .dfl .dslash button.on small { color: rgba(255, 255, 255, .6); }
+.dfl .dslash button.on.rh b::before { background: #fff; }
+
+/* ------------------------------------------------------------ sharing */
+.dfl .dsharewrap { position: relative; }
+.dfl .droom.live { color: var(--ink); border-color: var(--ink); background: var(--surface); }
+.dfl .droom .pulse { width: 8px; height: 8px; border-radius: 50%; background: #1F7A4B; position: relative; }
+.dfl .droom .pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid #1F7A4B; animation: dflPulse 1.8s ease-out infinite; }
+.dfl .droom.joining .pulse, .dfl .droom.alone .pulse { background: #B45309; }
+.dfl .droom.joining .pulse::after, .dfl .droom.alone .pulse::after { border-color: #B45309; }
+.dfl .droom.error .pulse { background: var(--them); }
+@keyframes dflPulse { from { opacity: .7; transform: scale(.6); } to { opacity: 0; transform: scale(1.6); } }
+.dfl .droom small { font-size: 9px; color: var(--dim); letter-spacing: .08em; }
+.dfl .dfaces { display: inline-flex; }
+.dfl .dfaces b, .dfl .mate b {
+  width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center;
+  color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0; font-family: var(--ui);
+  box-shadow: 0 0 0 2px #fff; animation: dflPopIn .4s var(--pop) both;
+}
+.dfl .dfaces b + b { margin-left: -5px; }
+@keyframes dflPopIn { from { transform: scale(0); } }
+.dfl .dsharepop {
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 35; width: 320px; padding: 16px;
+  background: #fff; border: 1px solid var(--ink); box-shadow: 0 30px 70px -28px rgba(0, 0, 0, .5);
+  display: grid; gap: 10px; animation: dflPop .22s var(--pop) both; transform-origin: top right;
+}
+.dfl .dsp-h { font-size: 9.5px; color: var(--dim); }
+.dfl .dsp-code { font-size: 34px; letter-spacing: .28em; color: var(--ink); line-height: 1; padding: 4px 0 2px; }
+.dfl .dsp-p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.dfl .dsp-mates { display: grid; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.dfl .mate { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.dfl .mate small { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.dfl .mate.dim { color: var(--dim); font-style: italic; }
+.dfl .dsp-row { display: flex; gap: 8px; }
+.dfl .dsp-row input { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--line); outline: none; font-size: 14px; letter-spacing: .24em; }
+.dfl .dsp-row input:focus { border-color: var(--ink); }
+.dfl .dbtn.wide { justify-content: center; width: 100%; }
+.dfl .dsp-or { font-size: 9px; color: var(--dim); text-align: center; display: flex; align-items: center; gap: 10px; }
+.dfl .dsp-or::before, .dfl .dsp-or::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
+.dfl .dbtn.on { color: var(--ink); border-color: var(--ink); background: var(--surface-2); }
+
+/* joining: the flow is on its way */
+.dfl .dwait { display: grid; justify-items: center; gap: 6px; padding: 70px 0; color: var(--muted); animation: dflIn .3s var(--spring) both; }
+.dfl .dwait b { font-size: 15px; font-weight: 600; color: var(--ink); }
+.dfl .dwait small { font-size: 12.5px; }
+.dfl .dwait .spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-soft); border-top-color: var(--ink); animation: dflSpin .8s linear infinite; margin-bottom: 6px; }
+@keyframes dflSpin { to { transform: rotate(360deg); } }
+
+/* your partner, in the document */
+.dfl .df-caret { position: relative; margin: 0 -1px; border-left: 2px solid var(--c); pointer-events: none; }
+.dfl .df-caret-name {
+  position: absolute; left: -2px; top: -1.35em; padding: 1px 6px; white-space: nowrap; border-radius: 3px 3px 3px 0;
+  background: var(--c); color: #fff; font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; line-height: 1.5;
+  animation: dflIn .2s var(--spring) both;
+}
+.dfl .df-sel { border-radius: 2px; }
+.dfl .dlist li.shared .dname small { color: #1F7A4B; }
+.dfl .dlist li.on.shared .dname small { color: #8fe0b4; }
+
+/* ------------------------------------------------------------ rhetoric */
+.dfl .dright {
+  width: 300px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0;
+  background: var(--surface-2); border-left: 1px solid var(--line);
+  transition: width .3s var(--spring), opacity .2s;
+}
+.dfl.noright .dright { width: 0; opacity: 0; overflow: hidden; border: 0; }
+.dfl .drh { padding: 14px 14px 8px; border-bottom: 1px solid var(--line-soft); }
+.dfl .drh .dsh { margin-bottom: 0; }
+.dfl .drh .dsh em { font-style: normal; color: var(--ink); margin-left: 4px; }
+.dfl .drq { width: 100%; margin-top: 10px; padding: 7px 10px; border: 1px solid var(--line); background: #fff; outline: none; font-size: 13px; border-radius: 4px; }
+.dfl .drq:focus { border-color: var(--ink); }
+.dfl .drlist { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.dfl .rp {
+  flex-shrink: 0; background: #fff; border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px 12px 11px;
+  cursor: grab; user-select: none; position: relative;
+  transition: transform .18s var(--spring), box-shadow .18s, border-color .18s;
+  animation: dflIn .24s var(--spring) both;
+}
+.dfl .rp::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--ink); opacity: 0; transition: opacity .18s; }
+.dfl .rp:hover { border-color: var(--ink); transform: translateY(-1px); box-shadow: 0 10px 24px -16px rgba(0, 0, 0, .45); }
+.dfl .rp:hover::before { opacity: 1; }
+.dfl .rp:active { cursor: grabbing; transform: scale(.985); }
+.dfl .rp.lift { opacity: .45; transform: scale(.97); }
+.dfl .rp-h { display: flex; align-items: flex-start; gap: 8px; }
+.dfl .rp-h b { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+.dfl .rp-act { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.dfl .rp:hover .rp-act { opacity: 1; }
+.dfl .rp-act button { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 4px; color: var(--dim); font-size: 13px; transition: background .12s, color .12s; }
+.dfl .rp-act button:hover { background: var(--surface-2); color: var(--ink); }
+.dfl .rp-act button:last-child:hover { color: var(--them); }
+.dfl .rp-lines { margin-top: 5px; font-size: 12px; color: var(--muted); line-height: 1.45; max-height: 5.9em; overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.dfl .rp-lines div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dfl .rp.editing { cursor: default; border-color: var(--ink); display: grid; gap: 8px; box-shadow: 0 12px 30px -18px rgba(0, 0, 0, .5); }
+.dfl .rp.editing:hover { transform: none; }
+.dfl .rp.editing input { border: 0; border-bottom: 1px solid var(--line-soft); outline: none; padding: 2px 0 6px; font-size: 14px; font-weight: 700; }
+.dfl .rp.editing textarea { width: 100%; resize: vertical; border: 1px solid var(--line-soft); border-radius: 4px; outline: none; padding: 8px; font: 12.5px/1.5 var(--ui); color: var(--ink); background: var(--surface-2); tab-size: 2; }
+.dfl .rp.editing textarea:focus { border-color: var(--ink); background: #fff; }
+.dfl .rp-row { display: flex; align-items: center; gap: 6px; }
+.dfl .rp-row small { margin-left: auto; font-size: 9px; color: var(--dim); }
+.dfl .drnone { padding: 16px 6px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.dfl .drnone b { display: block; font-size: 15px; color: var(--ink); margin-bottom: 4px; }
+.dfl .drnone p { margin: 0 0 10px; }
+.dfl .drfoot { padding: 10px 14px 12px; border-top: 1px solid var(--line-soft); }
+.dfl .drfoot button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 9.5px; padding: 8px; border: 1px dashed var(--line); color: var(--muted); border-radius: 5px; transition: border-color .15s, color .15s, background .15s; }
+.dfl .drfoot button:hover { border-color: var(--ink); border-style: solid; color: var(--ink); background: #fff; }
+
+/* where a dragged piece will land, and what it will do there */
+.dfl .df-drop { box-shadow: inset 0 0 0 1.5px var(--ink); background: rgba(22, 22, 26, .04) !important; }
+.dfl .df-drop::after {
+  content: "drop to answer"; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  background: var(--ink); color: #fff; padding: 2px 7px; border-radius: 3px; pointer-events: none;
+  animation: dflPop .16s var(--spring) both;
+}
+.dfl .df-drop[data-drop="fill"]::after { content: "drop here"; }
+.dfl .df-drop[data-drop="after"]::after { content: "drop under this"; }
+.dfl .df-box.df-drop, .dfl .df-head.df-drop, .dfl .df-p.df-drop { position: relative; }
+
+/* ------------------------------------------------------------ keys */
+.dfl .dkedit { justify-self: start; margin-top: 4px; font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); padding: 4px 8px; border: 1px solid var(--line); transition: background .15s, color .15s; }
+.dfl .dkedit:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
+.dfl .dkeyed { width: min(640px, 100%); max-height: 80vh; }
+.dfl .dkh { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.dfl .dkh b { font-size: 17px; font-family: var(--display); font-weight: 800; letter-spacing: -.02em; }
+.dfl .dkh small { flex: 1; min-width: 200px; font-size: 12px; color: var(--dim); }
+.dfl .dkl { overflow-y: auto; padding: 6px 18px 18px; }
+.dfl .dkg { padding-top: 12px; }
+.dfl .dkgh { font-size: 9px; color: var(--dim); padding-bottom: 4px; border-bottom: 1px solid var(--line-soft); margin-bottom: 2px; }
+.dfl .dkr { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 4px; border-radius: 4px; font-size: 13.5px; transition: background .12s; }
+.dfl .dkr:hover { background: var(--surface-2); }
+.dfl .dkk { min-width: 96px; text-align: center; font-size: 10px; letter-spacing: .04em; text-transform: none; padding: 5px 9px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); transition: border-color .15s, background .15s, color .15s; }
+.dfl button.dkk:hover { border-color: var(--ink); }
+.dfl .dkk.changed { border-color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
+.dfl .dkk.none { color: var(--dim); border-style: dashed; }
+.dfl .dkr.cap .dkk { background: var(--ink); color: #fff; border-color: var(--ink); animation: dflLow 1s ease-in-out infinite; }
+.dfl .dkr.fixed { color: var(--dim); }
+.dfl .dkr.fixed .dkk { border-style: dotted; color: var(--dim); background: none; }
 
 /* ------------------------------------------------------------ the command panel */
 .dfl .dscrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: start center; padding: 12vh 16px 16px; background: rgba(22, 22, 26, .34); backdrop-filter: blur(4px); animation: dflFade .18s ease both; }
@@ -276,7 +395,9 @@
 .dfl .dtitle:focus-visible, .dfl .dpin input:focus-visible { outline: none; }
 
 @media (max-width: 1180px) { .dfl .dclock .pp { display: none; } }
-@media (max-width: 1000px) { .dfl .dside { display: none; } .dfl .dpaper { padding: 32px 28px 80px; } }
+@media (max-width: 1360px) { .dfl .dside { width: 230px; } .dfl .dright { width: 270px; } }
+@media (max-width: 1100px) { .dfl .dside { display: none; } .dfl .dpaper { padding: 32px 28px 80px; } }
+@media (max-width: 860px) { .dfl .dright { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   .dfl *, .dfl *::before, .dfl *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }

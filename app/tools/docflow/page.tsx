@@ -8,9 +8,16 @@ import "../tools.css";
 export const metadata = { title: "Doc flow · The Break" };
 export const dynamic = "force-dynamic";
 
-/** The flow as a document gets the window, like the other tools. */
-export default async function DocFlowTool() {
-  if (!isAdmin()) {
+/**
+ * The flow as a document gets the window, like the other tools — and, as
+ * with Flow, a link carrying a room code opens without the admin key, since
+ * the person you flow with is your partner, not an administrator.
+ */
+export default async function DocFlowTool({ searchParams }: { searchParams?: { join?: string | string[] } }) {
+  const raw = searchParams?.join;
+  const join = (Array.isArray(raw) ? raw[0] : raw) || undefined;
+
+  if (!isAdmin() && !join) {
     return (
       <>
         <Nav />
@@ -24,7 +31,7 @@ export default async function DocFlowTool() {
     <>
       <Nav />
       <main>
-        <div className="toolpage"><DocFlow owner={user?.id} me={user ? displayName(user) : undefined} /></div>
+        <div className="toolpage"><DocFlow join={join} owner={user?.id} me={user ? displayName(user) : undefined} /></div>
       </main>
     </>
   );

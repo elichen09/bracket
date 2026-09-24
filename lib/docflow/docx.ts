@@ -58,7 +58,7 @@ export async function flowDocx(doc: PMNode, name: string): Promise<{ blob: Blob;
     inList = false;
     const red = n.attrs && n.attrs.who === "them";
     if (n.type === schema.nodes.box) {
-      const edge = { style: BorderStyle.SINGLE, size: 24, color: "000000", space: 6 };
+      const edge = { style: BorderStyle.SINGLE, size: 32, color: "000000", space: 6 };
       children.push(new Paragraph({
         children: runs(n, red, null, { bold: true, size: 48 }),
         alignment: AlignmentType.CENTER,

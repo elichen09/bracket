@@ -5,13 +5,22 @@ import Link from "next/link";
 import { EditorState, TextSelection, Plugin, type Command } from "prosemirror-state";
 import { EditorView, Decoration, DecorationSet } from "prosemirror-view";
 import { Node as PMNode } from "prosemirror-model";
-import { history, undo, redo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark, chainCommands } from "prosemirror-commands";
-import { schema, surveyPlugin, blankDoc, HIGHLIGHTS, type Tally, type Hl } from "@/lib/docflow/schema";
+import * as Y from "yjs";
+import { Awareness } from "y-protocols/awareness";
+import {
+  ySyncPlugin, yUndoPlugin, yCursorPlugin, undoCommand, redoCommand,
+  initProseMirrorDoc, prosemirrorJSONToYXmlFragment, prosemirrorToYXmlFragment,
+} from "y-prosemirror";
+import { schema, surveyPlugin, blankDoc, type Hl } from "@/lib/docflow/schema";
 import * as C from "@/lib/docflow/commands";
 import { fromDocsHtml, toDocsHtml, toPlainText } from "@/lib/docflow/io";
 import { listDocs, loadDoc, saveDoc, renameDoc, removeDoc, restoreDoc, newId, type DocMeta } from "@/lib/docflow/store";
+import { ACTIONS, ACTION, comboOf, keyLabel, refuse, loadKeys, saveKeys, keyFor, actionFor, bind, type Overrides } from "@/lib/docflow/keys";
+import { loadPieces, savePieces, newPieceId, titleFrom, type Piece } from "@/lib/docflow/rhetoric";
+import { openRoom, MATE_COLORS, type Room, type RoomStatus, type Mate } from "@/lib/docflow/room";
+import { newCode, tidyCode } from "@/lib/flow/share";
 import { library, find, sendToEvidence, type Entry, type Hit } from "@/lib/flow/cards";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { speeches, clock, PREP_DEFAULT } from "@/lib/flow/format";
@@ -25,22 +34,25 @@ import "./docflow.css";
  * The page is a document: boxed titles for each side, section headings, and
  * a numbered outline of the round. Their points are red and yours are black,
  * and the colour looks after itself — Tab answers a line, so it goes in a
- * level and changes speaker; Shift+Tab backs out. The numbering is Docs'
- * own, 1. a. i., and every one of their points that nothing has been said
- * under yet is marked, and counted at the top, so a rebuttal can be prepped
- * by clearing the marks.
+ * level and changes speaker; Shift+Tab backs out. The numbering is Docs' own.
  *
- * It pastes a flow straight out of Google Docs and copies one back in, and
- * everything is kept in this browser, per account, one flow per round.
+ * Beside it is your rhetoric, the things you say every round, ready to drop
+ * onto a line or call up with /. A room code puts your partner in the same
+ * document, typing into it with you. Every key can be moved.
+ *
+ * The document is a Yjs CRDT under ProseMirror, so that two people can type
+ * into it at once; alone, that costs nothing. What is kept is ProseMirror's
+ * JSON, in this browser, per account, one flow per round.
  */
 
-const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || "");
-const K = () => (isMac() ? "⌘" : "Ctrl+");
-const A = () => (isMac() ? "⌥" : "Alt+");
-
-interface Section { pos: number; kind: "box" | "head"; text: string; who: string; theirs: number; open: number }
-interface SlashState { q: string; x: number; y: number; i: number }
+interface Section { pos: number; kind: "box" | "head"; text: string; who: string }
+interface SlashState { q: string; x: number; top: number; bottom: number; i: number }
+interface SlashItem { id: string; label: string; hint: string; rhetoric?: boolean }
 interface Cmd { id: string; group: string; label: string; key?: string; run: () => void }
+interface Live { flowId: string; ydoc: Y.Doc; awareness: Awareness; room: Room | null; ready: boolean; code: string }
+
+const RHET_MIME = "application/x-docflow-rhetoric";
+const FRAGMENT = "flow";
 
 /** A flow line that updates in place, so indenting slides and a speaker change fades. */
 class ItemView {
@@ -84,61 +96,105 @@ const herePlugin = new Plugin({
   },
 });
 
-const SLASH = [
-  { id: "box-neg", label: "Box — NEG", hint: "a boxed title", run: () => C.setBlock("box", { who: "us" }, "NEG") },
-  { id: "box-aff", label: "Box — AFF", hint: "a boxed title", run: () => C.setBlock("box", { who: "them" }, "AFF") },
-  { id: "box-weigh", label: "Box — Weighing", hint: "a boxed title", run: () => C.setBlock("box", { who: "us" }, "Weighing") },
-  { id: "box", label: "Box", hint: "a boxed title of your own", run: () => C.setBlock("box", { who: "us" }, "") },
-  { id: "ov", label: "Heading — OV", hint: "their overview", run: () => C.setBlock("head", { who: "them" }, "OV") },
-  { id: "head", label: "Heading", hint: "a section: 1--water demand", run: () => C.setBlock("head", { who: "them" }, "") },
-  { id: "theirs", label: "Their point", hint: "a new red line at the top level", run: () => C.setBlock("item", { depth: 0, who: "them" }, "") },
-  { id: "para", label: "Paragraph", hint: "prose — a pre-written block", run: () => C.setBlock("para", {}, "") },
-  { id: "evidence", label: "Evidence…", hint: "search your library by header", run: null as null | (() => Command) },
+/** Your partner's caret: a thin bar in their colour, their name above it. */
+function caret(user: { name: string; color: string }) {
+  const el = document.createElement("span");
+  el.className = "df-caret";
+  el.style.setProperty("--c", user.color);
+  const tag = document.createElement("span");
+  tag.className = "df-caret-name";
+  tag.textContent = user.name;
+  el.append("⁠", tag, "⁠");
+  return el;
+}
+
+const BUILTIN: SlashItem[] = [
+  { id: "box-neg", label: "Box — NEG", hint: "a boxed title" },
+  { id: "box-aff", label: "Box — AFF", hint: "a boxed title" },
+  { id: "box-weigh", label: "Box — Weighing", hint: "a boxed title" },
+  { id: "box", label: "Box", hint: "a boxed title of your own" },
+  { id: "ov", label: "Heading — OV", hint: "their overview" },
+  { id: "head", label: "Heading", hint: "a section: 1--water demand" },
+  { id: "theirs", label: "Their point", hint: "a new red line at the top level" },
+  { id: "evidence", label: "Evidence…", hint: "search your library by header" },
 ];
 
-export default function DocFlow({ owner, me }: { owner?: string; me?: string }) {
+const preview = (text: string) => C.parseLines(text);
+
+export default function DocFlow({ owner, me, join }: { owner?: string; me?: string; join?: string }) {
   const root = useRef<HTMLDivElement>(null);
   const mount = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
+  const ycur = useRef<{ ydoc: Y.Doc; awareness: Awareness } | null>(null);
   const bus = useRef<Bus | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openCursor = useRef(-1);
 
   const [docs, setDocs] = useState<DocMeta[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [tally, setTally] = useState<Tally>({ theirs: 0, open: 0, ours: 0, openAt: [] });
-  const [bump, setBump] = useState(0);
+  const nameRef = useRef(name);
+  nameRef.current = name;
   const [outline, setOutline] = useState<Section[]>([]);
   const [slash, setSlash] = useState<SlashState | null>(null);
   const slashRef = useRef<SlashState | null>(null);
   slashRef.current = slash;
+  const slashBox = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<{ q: string; i: number } | null>(null);
+  const panelRef = useRef(panel);
+  panelRef.current = panel;
   const [hits, setHits] = useState<Hit[]>([]);
   const index = useRef<Entry[] | null>(null);
   const [toastMsg, setToastMsg] = useState<{ text: string; undo?: () => void; n: number } | null>(null);
   const [side, setSide] = useState(true);
   const [renaming, setRenaming] = useState<string | null>(null);
 
+  // keys
+  const [keys, setKeys] = useState<Overrides>({});
+  const keysRef = useRef(keys);
+  keysRef.current = keys;
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [capturing, setCapturing] = useState<string | null>(null);
+  const capturingRef = useRef(capturing);
+  capturingRef.current = capturing;
+  const K = useCallback((id: string) => keyLabel(keyFor(keys, id)), [keys]);
+
+  // rhetoric
+  const [pieces, setPieces] = useState<Piece[]>([]);
+  const piecesRef = useRef(pieces);
+  piecesRef.current = pieces;
+  const [right, setRight] = useState(true);
+  const [rq, setRq] = useState("");
+  const [editing, setEditing] = useState<{ id: string | null; title: string; text: string } | null>(null);
+
+  // the room
+  const live = useRef<Live | null>(null);
+  const [gate, setGate] = useState(0);
+  const [roomStatus, setRoomStatus] = useState<RoomStatus | null>(null);
+  const [mates, setMates] = useState<Mate[]>([]);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const color = useMemo(() => MATE_COLORS[Math.floor(Math.random() * MATE_COLORS.length)], []);
+
   /* ------------------------------------------------------------ toast */
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useCallback((text: string, undoFn?: () => void) => {
     setToastMsg({ text, undo: undoFn, n: Date.now() });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastMsg(null), undoFn ? 4200 : 2200);
+    toastTimer.current = setTimeout(() => setToastMsg(null), undoFn ? 4200 : 2400);
   }, []);
 
-  /* ------------------------------------------------------------ the flows this account keeps */
+  /* ------------------------------------------------------------ what this account keeps */
   useEffect(() => {
     let list = listDocs(owner);
     if (!list.length) {
-      const id = newId();
-      saveDoc(owner, id, blankDoc().toJSON(), "Round 1");
+      saveDoc(owner, newId(), blankDoc().toJSON(), "Round 1");
       list = listDocs(owner);
     }
     setDocs(list);
     setCurrent(list[0].id);
     setName(list[0].name);
+    setKeys(loadKeys(owner));
+    setPieces(loadPieces(owner));
   }, [owner]);
 
   const run = useCallback((cmd: Command) => {
@@ -149,66 +205,73 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
     return ok;
   }, []);
 
-  /* ------------------------------------------------------------ outline: boxes, headings, what is open under each */
-  const survey = useCallback((doc: PMNode) => {
+  /* ------------------------------------------------------------ outline: boxes and headings */
+  const outlineOf = useCallback((doc: PMNode) => {
     const secs: Section[] = [];
-    let sec: Section | null = null;
-    const items: PMNode[] = [];
-    doc.forEach((n, pos, i) => {
+    doc.forEach((n, pos) => {
       if (n.type === schema.nodes.box || n.type === schema.nodes.head) {
-        sec = { pos, kind: n.type === schema.nodes.box ? "box" : "head", text: n.textContent || (n.type === schema.nodes.box ? "Untitled box" : "Untitled heading"), who: n.attrs.who, theirs: 0, open: 0 };
-        secs.push(sec);
-        return;
+        secs.push({ pos, kind: n.type === schema.nodes.box ? "box" : "head", text: n.textContent || (n.type === schema.nodes.box ? "Untitled box" : "Untitled heading"), who: n.attrs.who });
       }
-      if (n.type === schema.nodes.item && sec && n.attrs.who === "them" && n.textContent.trim()) {
-        sec.theirs++;
-        const next = i + 1 < doc.childCount ? doc.child(i + 1) : null;
-        if (!(next && next.type === schema.nodes.item && next.attrs.depth > n.attrs.depth)) sec.open++;
-      }
-      items.push(n);
     });
     setOutline(secs);
+  }, []);
+
+  /* ------------------------------------------------------------ the slash menu's contents */
+  const slashList = useCallback((q: string): SlashItem[] => {
+    const s = q.toLowerCase();
+    const built = BUILTIN.filter((x) => !s || x.label.toLowerCase().includes(s) || x.id.includes(s));
+    const mine = piecesRef.current
+      .filter((p) => !s || p.title.toLowerCase().includes(s) || p.text.toLowerCase().includes(s))
+      .map((p) => ({ id: "r:" + p.id, label: p.title, hint: p.text.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 1).join(""), rhetoric: true }));
+    // what you wrote yourself first once you are typing a name
+    return s ? [...mine, ...built] : [...built, ...mine];
   }, []);
 
   /* ------------------------------------------------------------ the editor, one per flow */
   useEffect(() => {
     if (!current || !mount.current) return;
-    const json = loadDoc(owner, current);
-    let doc: PMNode;
-    try { doc = json ? PMNode.fromJSON(schema, json) : blankDoc(); } catch { doc = blankDoc(); }
+    const lv = live.current && live.current.flowId === current ? live.current : null;
+    if (lv && !lv.ready) return; // joining: the flow has not arrived yet
 
-    let lastOpen = -1;
-    const onTally = (t: Tally) => {
-      setTally(t);
-      if (lastOpen !== -1 && t.open !== lastOpen) setBump((b) => b + 1);
-      lastOpen = t.open;
-    };
+    let ydoc: Y.Doc, awareness: Awareness;
+    if (lv) ({ ydoc, awareness } = lv);
+    else {
+      ydoc = new Y.Doc();
+      awareness = new Awareness(ydoc);
+      const json = loadDoc(owner, current);
+      try { prosemirrorJSONToYXmlFragment(schema, json || blankDoc().toJSON(), ydoc.getXmlFragment(FRAGMENT)); }
+      catch { prosemirrorJSONToYXmlFragment(schema, blankDoc().toJSON(), ydoc.getXmlFragment(FRAGMENT)); }
+    }
+    awareness.setLocalStateField("user", { name: me || "Partner", color });
+    ycur.current = { ydoc, awareness };
+    const frag = ydoc.getXmlFragment(FRAGMENT);
+    const { doc, mapping } = initProseMirrorDoc(frag, schema);
 
     const slashPlugin = new Plugin({
       view: () => ({
         update(v) {
           const { $from, empty } = v.state.selection;
-          const node = $from.parent;
-          const text = node.textContent;
-          if (empty && $from.depth === 1 && text.startsWith("/") && $from.parentOffset === text.length && !/\s/.test(text)) {
+          const text = $from.parent.textContent;
+          if (empty && $from.depth === 1 && text.startsWith("/") && $from.parentOffset === text.length && text.length < 40) {
             const c = v.coordsAtPos($from.pos);
-            const box = root.current?.getBoundingClientRect();
-            setSlash((s) => ({ q: text.slice(1).toLowerCase(), x: c.left - (box?.left || 0), y: c.bottom - (box?.top || 0) + 6, i: s && s.q === text.slice(1).toLowerCase() ? s.i : 0 }));
+            const q = text.slice(1).toLowerCase();
+            setSlash((s) => ({ q, x: c.left, top: c.top, bottom: c.bottom, i: s && s.q === q ? s.i : 0 }));
           } else if (slashRef.current) setSlash(null);
         },
       }),
       props: {
-        handleKeyDown(v, e) {
+        handleKeyDown(_v, e) {
           const s = slashRef.current;
           if (!s) return false;
-          const items = SLASH.filter((x) => !s.q || x.label.toLowerCase().includes(s.q) || x.id.includes(s.q));
+          const items = slashList(s.q);
+          if (!items.length) return false;
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
-            setSlash({ ...s, i: (s.i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % Math.max(1, items.length) });
+            setSlash({ ...s, i: (s.i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length });
             return true;
           }
           if (e.key === "Enter" || e.key === "Tab") {
-            const it = items[s.i];
+            const it = items[Math.min(s.i, items.length - 1)];
             if (!it) return false;
             e.preventDefault();
             chooseSlash(it.id);
@@ -220,37 +283,81 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
       },
     });
 
+    // Only the keys a document always has. Everything else is in the key
+    // table, handled on the window, so it can be moved.
     const km = keymap({
       Enter: C.enter,
-      "Shift-Enter": C.answer,
-      Tab: C.tab,
-      "Shift-Tab": C.outdent,
-      "Mod-Enter": C.nextPoint,
       Backspace: chainCommands(C.backspace, baseKeymap.Backspace),
       "Mod-b": toggleMark(schema.marks.strong),
       "Mod-i": toggleMark(schema.marks.em),
       "Mod-u": toggleMark(schema.marks.underline),
-      "Mod-z": undo,
-      "Mod-y": redo,
-      "Shift-Mod-z": redo,
-      "Alt-t": C.toggleWho,
-      "Alt-y": C.highlight("yellow"),
-      "Alt-g": C.highlight("green"),
-      "Alt-b": C.highlight("cyan"),
-      "Alt-p": C.highlight("pink"),
-      "Alt-ArrowUp": moveLine(-1),
-      "Alt-ArrowDown": moveLine(1),
+      "Mod-z": undoCommand,
+      "Mod-y": redoCommand,
+      "Shift-Mod-z": redoCommand,
     });
 
+    let dropAt: HTMLElement | null = null;
+    const clearDrop = () => { if (dropAt) { dropAt.classList.remove("df-drop"); dropAt.removeAttribute("data-drop"); dropAt = null; } };
+    const blockAt = (vw: EditorView, e: DragEvent | MouseEvent) => {
+      const hit = vw.posAtCoords({ left: e.clientX, top: e.clientY });
+      if (!hit) return -1;
+      const $p = vw.state.doc.resolve(Math.min(hit.pos, vw.state.doc.content.size));
+      return $p.depth >= 1 ? $p.index(0) : Math.min($p.index(0), vw.state.doc.childCount - 1);
+    };
+
     const state = EditorState.create({
+      schema,
       doc,
-      plugins: [history(), slashPlugin, km, keymap(baseKeymap), surveyPlugin(onTally), herePlugin],
+      plugins: [
+        ySyncPlugin(frag, { mapping }),
+        yCursorPlugin(awareness, { cursorBuilder: caret, selectionBuilder: (u: { color: string }) => ({ style: `background-color: ${u.color}26`, class: "df-sel" }) }),
+        yUndoPlugin(),
+        slashPlugin, km, keymap(baseKeymap), surveyPlugin, herePlugin,
+      ],
     });
     const v = new EditorView({ mount: mount.current }, {
       state,
+      attributes: { spellcheck: "false", autocorrect: "off", autocapitalize: "off" },
       nodeViews: { item: (node) => new ItemView(node) },
       transformPastedHTML: (html) => fromDocsHtml(html),
+      handleDrop(vw, e) {
+        const de = e as DragEvent;
+        const id = de.dataTransfer?.getData(RHET_MIME);
+        clearDrop();
+        if (!id) return false;
+        const p = piecesRef.current.find((x) => x.id === id);
+        if (!p) return true;
+        e.preventDefault();
+        const i = blockAt(vw, de);
+        if (i < 0) return true;
+        C.insertLines(preview(p.text), i)(vw.state, vw.dispatch);
+        vw.focus();
+        toast(`“${p.title}” is in`);
+        return true;
+      },
       handleDOMEvents: {
+        dragover(vw, e) {
+          if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes(RHET_MIME)) return false;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          const i = blockAt(vw, e);
+          const dom = i >= 0 ? (vw.nodeDOM(C.posOf(vw.state.doc, i)) as HTMLElement | null) : null;
+          if (dom !== dropAt) {
+            clearDrop();
+            if (dom && dom.classList) {
+              const n = vw.state.doc.child(i);
+              dom.classList.add("df-drop");
+              dom.setAttribute("data-drop", n.content.size === 0 ? "fill" : n.type === schema.nodes.item ? "answer" : "after");
+              dropAt = dom;
+            }
+          }
+          return true;
+        },
+        dragleave(vw, e) {
+          const to = e.relatedTarget as Node | null;
+          if (!to || !vw.dom.contains(to)) clearDrop();
+          return false;
+        },
         // The number in front of a line is a switch: click it and the line
         // changes speaker.
         mousedown(vw, e) {
@@ -258,7 +365,7 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
           const item = t.closest && (t.closest(".df-item") as HTMLElement | null);
           if (!item || t.closest(".df-t")) return false;
           const text = item.querySelector(".df-t") as HTMLElement;
-          if (!text || (e as MouseEvent).clientX >= text.getBoundingClientRect().left - 2) return false;
+          if (!text || e.clientX >= text.getBoundingClientRect().left - 2) return false;
           const pos = vw.posAtDOM(text, 0) - 1;
           const node = vw.state.doc.nodeAt(pos);
           if (!node || node.type !== schema.nodes.item) return false;
@@ -271,7 +378,7 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
         const next = v.state.apply(tr);
         v.updateState(next);
         if (tr.docChanged) {
-          survey(next.doc);
+          outlineOf(next.doc);
           if (saveTimer.current) clearTimeout(saveTimer.current);
           saveTimer.current = setTimeout(() => {
             saveDoc(owner, current, next.doc.toJSON());
@@ -281,22 +388,26 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
       },
     });
     view.current = v;
-    survey(doc);
-    // Somewhere to start typing: the end of the first empty line, or the end.
+    outlineOf(doc);
+    if (lv) saveDoc(owner, current, doc.toJSON());
+    // Somewhere to start typing: the first empty line, or the end.
     let at = doc.content.size - 1;
     doc.forEach((n, pos) => { if (n.type === schema.nodes.item && n.content.size === 0 && at === doc.content.size - 1) at = pos + 1; });
-    v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(Math.max(1, at)))));
+    try { v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(Math.max(1, at))))); } catch { /* an empty flow */ }
     v.focus();
     return () => {
-      if (saveTimer.current) { clearTimeout(saveTimer.current); saveDoc(owner, current, v.state.doc.toJSON()); }
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; saveDoc(owner, current, v.state.doc.toJSON()); }
+      clearDrop();
       v.destroy();
       view.current = null;
+      ycur.current = null;
+      if (!live.current || live.current.ydoc !== ydoc) { awareness.destroy(); ydoc.destroy(); }
     };
-    // chooseSlash reads state through refs; the editor is rebuilt only for a different flow.
+    // chooseSlash and toast read through refs; the editor is rebuilt only for another flow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, owner, survey]);
+  }, [current, owner, gate, outlineOf, slashList]);
 
-  /* ------------------------------------------------------------ the rest of the room */
+  /* ------------------------------------------------------------ the rest of the page */
   useEffect(() => {
     const el = root.current;
     if (!el) return;
@@ -328,16 +439,33 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
     const v = view.current;
     if (!v) return;
     setSlash(null);
-    if (id === "evidence") {
-      // clear the "/..." first, then search
-      const { $from } = v.state.selection;
-      v.dispatch(v.state.tr.delete($from.start(), $from.end()));
-      openPanel("/");
+    const { $from } = v.state.selection;
+    const clear = () => v.dispatch(v.state.tr.delete($from.start(), $from.end()));
+    if (id === "evidence") { clear(); openPanel("/"); return; }
+    if (id.startsWith("r:")) {
+      const p = piecesRef.current.find((x) => x.id === id.slice(2));
+      if (!p) return;
+      clear();
+      run(C.insertLines(preview(p.text)));
       return;
     }
-    const it = SLASH.find((x) => x.id === id);
-    if (it && it.run) run(it.run());
+    const cmd = ({
+      "box-neg": C.setBlock("box", { who: "us" }, "NEG"),
+      "box-aff": C.setBlock("box", { who: "them" }, "AFF"),
+      "box-weigh": C.setBlock("box", { who: "us" }, "Weighing"),
+      box: C.setBlock("box", { who: "us" }, ""),
+      ov: C.setBlock("head", { who: "them" }, "OV"),
+      head: C.setBlock("head", { who: "them" }, ""),
+      theirs: C.setBlock("item", { depth: 0, who: "them" }, ""),
+    } as Record<string, Command>)[id];
+    if (cmd) run(cmd);
   }
+
+  // keep the chosen slash item in view as the arrows move through a long list
+  useEffect(() => {
+    const el = slashBox.current?.querySelector(".on") as HTMLElement | null;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [slash?.i, slash?.q]);
 
   /* ------------------------------------------------------------ jumping */
   const jump = useCallback((pos: number) => {
@@ -349,16 +477,6 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
     const dom = v.nodeDOM(pos) as HTMLElement | null;
     if (dom && dom.classList) { dom.classList.remove("df-flash"); void dom.offsetWidth; dom.classList.add("df-flash"); }
   }, []);
-  const nextOpen = useCallback(() => {
-    const v = view.current;
-    if (!v) return;
-    const at = tally.openAt;
-    if (!at.length) { toast("Everything of theirs has an answer"); return; }
-    const here = v.state.selection.from;
-    const next = at.find((p) => p > here) ?? at[0];
-    openCursor.current = next;
-    jump(next);
-  }, [tally.openAt, jump, toast]);
 
   /* ------------------------------------------------------------ copy and save */
   const copyForDocs = useCallback(async () => {
@@ -380,66 +498,212 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
     const v = view.current;
     if (!v) return;
     const { flowDocx } = await import("@/lib/docflow/docx");
-    const { blob, filename } = await flowDocx(v.state.doc, name);
+    const { blob, filename } = await flowDocx(v.state.doc, nameRef.current);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = filename; a.style.display = "none";
     document.body.appendChild(a); a.click();
     setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 2000);
     toast("Saved " + filename);
-  }, [name, toast]);
+  }, [toast]);
+
+  /* ------------------------------------------------------------ the room */
+  const leaveRoom = useCallback((quiet = false) => {
+    const lv = live.current;
+    if (!lv) return;
+    lv.room?.leave();
+    live.current = null;
+    setRoomStatus(null); setMates([]);
+    if (!quiet) toast(`Left room ${lv.code} — the flow stays here`);
+  }, [toast]);
+
+  const roomHandlers = useCallback((lv: Live) => ({
+    onStatus: (s: RoomStatus, detail?: string) => { if (live.current === lv) setRoomStatus(s); if (s === "error") toast("The room would not connect" + (detail ? ` — ${detail}` : "")); },
+    onMates: (m: Mate[]) => { if (live.current === lv) setMates(m); },
+    onTitle: (t: string) => { renameDoc(owner, lv.flowId, t); setDocs(listDocs(owner)); if (live.current === lv) setName(t); },
+  }), [owner, toast]);
+
+  const startRoom = useCallback(() => {
+    const y = ycur.current;
+    if (!y || !current) return;
+    leaveRoom(true);
+    const code = newCode(5);
+    const lv: Live = { flowId: current, ydoc: y.ydoc, awareness: y.awareness, room: null, ready: true, code };
+    live.current = lv;
+    setRoomStatus("joining");
+    lv.room = openRoom({
+      code, ydoc: y.ydoc, awareness: y.awareness, title: () => nameRef.current, fresh: false,
+      ...roomHandlers(lv),
+      onSynced: () => {},
+      onSeed: () => {},
+    });
+    setShareOpen(true);
+  }, [current, leaveRoom, roomHandlers]);
+
+  const joinRoom = useCallback((raw: string) => {
+    const code = tidyCode(raw);
+    if (code.length < 4) { toast("That code is too short"); return; }
+    leaveRoom(true);
+    const id = newId();
+    saveDoc(owner, id, blankDoc().toJSON(), `Room ${code}`);
+    const ydoc = new Y.Doc();
+    const awareness = new Awareness(ydoc);
+    const lv: Live = { flowId: id, ydoc, awareness, room: null, ready: false, code };
+    live.current = lv;
+    setRoomStatus("joining");
+    setDocs(listDocs(owner));
+    setCurrent(id); setName(`Room ${code}`);
+    lv.room = openRoom({
+      code, ydoc, awareness, title: () => nameRef.current, fresh: true,
+      ...roomHandlers(lv),
+      onSeed: () => { prosemirrorToYXmlFragment(blankDoc(), ydoc.getXmlFragment(FRAGMENT)); },
+      onSynced: (title) => {
+        if (live.current !== lv) return;
+        lv.ready = true;
+        if (title) { renameDoc(owner, id, title); setName(title); }
+        setDocs(listDocs(owner));
+        setGate((g) => g + 1);
+        toast(title ? `In room ${code} — flowing “${title}” together` : `Room ${code} was empty — you started it`);
+      },
+    });
+    setShareOpen(false); setJoinCode("");
+  }, [owner, leaveRoom, roomHandlers, toast]);
+
+  // a link with a room code in it goes straight in
+  const joined = useRef(false);
+  useEffect(() => {
+    if (!join || joined.current || !docs.length) return;
+    joined.current = true;
+    joinRoom(join);
+  }, [join, docs.length, joinRoom]);
+  useEffect(() => () => { live.current?.room?.leave(); }, []);
+
+  const copyLink = useCallback(async () => {
+    const lv = live.current;
+    if (!lv) return;
+    const url = `${location.origin}/tools/docflow?join=${lv.code}`;
+    try { await navigator.clipboard.writeText(url); toast("Link copied — send it to your partner"); } catch { toast(url); }
+  }, [toast]);
 
   /* ------------------------------------------------------------ flows: new, open, rename, delete */
   const newFlow = useCallback(() => {
+    leaveRoom(true);
     const id = newId();
     const n = `Round ${docs.length + 1}`;
     saveDoc(owner, id, blankDoc().toJSON(), n);
     setDocs(listDocs(owner));
     setCurrent(id); setName(n);
     toast("New flow — " + n);
-  }, [docs.length, owner, toast]);
+  }, [docs.length, owner, toast, leaveRoom]);
   const openFlow = useCallback((d: DocMeta) => {
     if (d.id === current) return;
+    if (live.current) leaveRoom();
     setCurrent(d.id); setName(d.name);
-  }, [current]);
+  }, [current, leaveRoom]);
   const commitName = useCallback((id: string, value: string) => {
     const v = value.trim() || "Untitled flow";
     renameDoc(owner, id, v);
     setDocs(listDocs(owner));
     if (id === current) setName(v);
+    if (live.current && live.current.flowId === id) live.current.room?.rename(v);
     setRenaming(null);
   }, [owner, current]);
   const deleteFlow = useCallback((d: DocMeta) => {
+    if (live.current && live.current.flowId === d.id) leaveRoom(true);
     const gone = removeDoc(owner, d.id);
     let list = listDocs(owner);
-    if (!list.length) { const id = newId(); saveDoc(owner, id, blankDoc().toJSON(), "Round 1"); list = listDocs(owner); }
+    if (!list.length) { saveDoc(owner, newId(), blankDoc().toJSON(), "Round 1"); list = listDocs(owner); }
     setDocs(list);
     if (d.id === current) { setCurrent(list[0].id); setName(list[0].name); }
     toast(`Deleted “${d.name}”`, gone ? () => { restoreDoc(owner, gone.meta, gone.json); setDocs(listDocs(owner)); setCurrent(gone.meta.id); setName(gone.meta.name); } : undefined);
-  }, [owner, current, toast]);
+  }, [owner, current, toast, leaveRoom]);
+
+  /* ------------------------------------------------------------ rhetoric */
+  const putPieces = useCallback((list: Piece[]) => { setPieces(list); savePieces(owner, list); }, [owner]);
+  const saveEditing = useCallback(() => {
+    if (!editing) return;
+    const text = editing.text.replace(/\s+$/, "");
+    if (!text.trim()) { setEditing(null); return; }
+    const title = editing.title.trim() || titleFrom(text);
+    const now = Date.now();
+    if (editing.id) putPieces(piecesRef.current.map((p) => (p.id === editing.id ? { ...p, title, text, updated: now } : p)));
+    else putPieces([{ id: newPieceId(), title, text, updated: now }, ...piecesRef.current]);
+    setEditing(null);
+    toast(`Kept “${title}” — type /${title.split(/\s+/)[0].toLowerCase()} to use it`);
+  }, [editing, putPieces, toast]);
+  const deletePiece = useCallback((p: Piece) => {
+    const before = piecesRef.current;
+    putPieces(before.filter((x) => x.id !== p.id));
+    toast(`Deleted “${p.title}”`, () => putPieces(before));
+  }, [putPieces, toast]);
+  const usePiece = useCallback((p: Piece) => {
+    if (!view.current) return;
+    run(C.insertLines(preview(p.text)));
+    toast(`“${p.title}” is in`);
+  }, [run, toast]);
+  const keepSelection = useCallback(() => {
+    const v = view.current;
+    if (!v) return;
+    const { from, to } = v.state.selection;
+    const text = C.linesText(v.state.doc, from, to);
+    if (!text.trim()) { toast("Select the lines to keep first"); return; }
+    setRight(true);
+    setEditing({ id: null, title: titleFrom(text), text });
+  }, [toast]);
+  const shownPieces = useMemo(() => {
+    const q = rq.trim().toLowerCase();
+    return q ? pieces.filter((p) => p.title.toLowerCase().includes(q) || p.text.toLowerCase().includes(q)) : pieces;
+  }, [pieces, rq]);
 
   /* ------------------------------------------------------------ the command panel, and evidence */
   const openPanel = useCallback((q = "") => { setPanel({ q, i: 0 }); }, []);
   const closePanel = useCallback(() => { setPanel(null); view.current?.focus(); }, []);
 
+  /** Every action in the key table, by id. */
+  const act = useCallback((id: string) => {
+    const hl = (h: Hl) => run(C.highlight(h));
+    switch (id) {
+      case "tab": return run(C.tab);
+      case "outdent": return run(C.outdent);
+      case "next": return run(C.nextPoint);
+      case "answer": return run(C.answer);
+      case "who": return run(C.toggleWho);
+      case "up": return run(moveLine(-1));
+      case "down": return run(moveLine(1));
+      case "hl-yellow": return hl("yellow");
+      case "hl-green": return hl("green");
+      case "hl-cyan": return hl("cyan");
+      case "hl-pink": return hl("pink");
+      case "box-neg": return run(C.setBlock("box", { who: "us" }, "NEG"));
+      case "box-aff": return run(C.setBlock("box", { who: "them" }, "AFF"));
+      case "box-weigh": return run(C.setBlock("box", { who: "us" }, "Weighing"));
+      case "head": return run(C.setBlock("head", { who: "them" }, ""));
+      case "keep": return keepSelection();
+      case "rhetoric": return setRight((r) => !r);
+      case "commands": return panelRef.current ? closePanel() : openPanel();
+      case "evidence": return openPanel("/");
+      case "share": return setShareOpen((s) => !s);
+      case "keys": return setKeysOpen(true);
+      case "copy": return copyForDocs();
+      case "docx": return saveDocx();
+    }
+    return undefined;
+    // moveLine is a plain function of its argument
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, keepSelection, closePanel, openPanel, copyForDocs, saveDocx]);
+  const actRef = useRef(act);
+  actRef.current = act;
+
   const commands: Cmd[] = useMemo(() => [
-    { id: "next", group: "Flow", label: "Their next point", key: K() + "Enter", run: () => run(C.nextPoint) },
-    { id: "answer", group: "Flow", label: "Answer this line", key: "Shift+Enter", run: () => run(C.answer) },
-    { id: "who", group: "Flow", label: "Swap who said it", key: A() + "T", run: () => run(C.toggleWho) },
-    { id: "open", group: "Flow", label: "Next thing of theirs with no answer", key: A() + "N", run: () => nextOpen() },
-    { id: "evidence", group: "Evidence", label: "Answer this from your evidence", key: K() + "/", run: () => openPanel("/") },
-    ...(Object.keys(HIGHLIGHTS) as Hl[]).map((h) => ({ id: "hl-" + h, group: "Highlight", label: `Highlight ${HIGHLIGHTS[h].label.toLowerCase()}`, key: A() + ({ yellow: "Y", green: "G", cyan: "B", pink: "P" } as Record<Hl, string>)[h], run: () => run(C.highlight(h)) })),
-    { id: "box-neg", group: "Insert", label: "Box — NEG", run: () => run(C.setBlock("box", { who: "us" }, "NEG")) },
-    { id: "box-aff", group: "Insert", label: "Box — AFF", run: () => run(C.setBlock("box", { who: "them" }, "AFF")) },
-    { id: "box-weigh", group: "Insert", label: "Box — Weighing", run: () => run(C.setBlock("box", { who: "us" }, "Weighing")) },
-    { id: "head", group: "Insert", label: "Heading", run: () => run(C.setBlock("head", { who: "them" }, "")) },
-    { id: "para", group: "Insert", label: "Paragraph", run: () => run(C.setBlock("para", {}, undefined)) },
-    { id: "copy", group: "Out", label: "Copy for Google Docs", run: () => copyForDocs() },
-    { id: "docx", group: "Out", label: "Save as .docx", run: () => saveDocx() },
+    ...ACTIONS.filter((a) => !["tab", "outdent", "commands"].includes(a.id)).map((a) => ({
+      id: a.id, group: a.group, label: a.id === "rhetoric" ? (right ? "Hide your rhetoric" : "Show your rhetoric") : a.label,
+      key: keyLabel(keyFor(keys, a.id)) || undefined, run: () => { act(a.id); },
+    })),
+    ...pieces.map((p) => ({ id: "r-" + p.id, group: "Rhetoric", label: "Put in · " + p.title, run: () => usePiece(p) })),
     { id: "new", group: "Flows", label: "New flow", run: () => newFlow() },
     ...docs.filter((d) => d.id !== current).map((d) => ({ id: "go-" + d.id, group: "Flows", label: "Open · " + d.name, run: () => openFlow(d) })),
-    { id: "side", group: "View", label: side ? "Hide the side panel" : "Show the side panel", run: () => setSide((s) => !s) },
-  ], [run, nextOpen, openPanel, copyForDocs, saveDocx, newFlow, docs, current, openFlow, side]);
+    { id: "side", group: "View", label: side ? "Hide the flows list" : "Show the flows list", run: () => setSide((s) => !s) },
+  ], [keys, act, right, pieces, usePiece, newFlow, docs, current, openFlow, side]);
 
   const evMode = !!panel && panel.q.startsWith("/");
   const listed: Cmd[] = useMemo(() => {
@@ -494,17 +758,44 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
     }
   };
 
-  /* ------------------------------------------------------------ keys that work anywhere on the page */
+  /* ------------------------------------------------------------ the keys, all of them, on the window */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const mod = isMac() ? e.metaKey : e.ctrlKey;
-      if (mod && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); panel ? closePanel() : openPanel(); return; }
-      if (mod && e.key === "/") { e.preventDefault(); openPanel("/"); return; }
-      if (e.altKey && !mod && e.code === "KeyN") { e.preventDefault(); nextOpen(); return; }
+      // choosing a new key for something
+      const cap = capturingRef.current;
+      if (cap) {
+        if (["Control", "Shift", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
+        e.preventDefault(); e.stopPropagation();
+        if (e.key === "Escape") { setCapturing(null); return; }
+        const spec = (e.key === "Backspace" || e.key === "Delete") && !e.ctrlKey && !e.altKey ? null : comboOf(e);
+        if (spec) { const why = refuse(spec); if (why) { toast(why); return; } }
+        const { next, moved } = bind(keysRef.current, cap, spec);
+        setKeys(next); saveKeys(owner, next); setCapturing(null);
+        toast(spec
+          ? `${ACTION.get(cap)?.label} — ${keyLabel(spec)}` + (moved ? ` (taken from “${ACTION.get(moved)?.label}”)` : "")
+          : `${ACTION.get(cap)?.label} has no key now`);
+        return;
+      }
+      const spec = comboOf(e);
+      if (!spec) return;
+      const id = actionFor(keysRef.current, spec);
+      if (!id) return;
+      const a = ACTION.get(id)!;
+      const ed = view.current?.dom;
+      const inDoc = !!ed && ed.contains(document.activeElement);
+      if (a.scope === "doc" && !inDoc) return;
+      // with a menu open under the cursor, its own keys come first
+      if (slashRef.current && /^(Enter|Tab|↑|↓|Escape|shift\+Tab)$/.test(spec)) return;
+      if (a.scope === "any" && !inDoc && !/mod|alt/.test(spec)) {
+        const t = document.activeElement as HTMLElement | null;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      }
+      e.preventDefault(); e.stopPropagation();
+      actRef.current(id);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [panel, openPanel, closePanel, nextOpen]);
+  }, [owner, toast]);
 
   /* ------------------------------------------------------------ the clock */
   const SP = useMemo(() => speeches("pro"), []);
@@ -523,10 +814,23 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
   const toSpeech = (i: number) => { const n = (i + SP.length) % SP.length; setSp(n); setLeft(SP[n].secs); setRunning(null); };
 
   /* ------------------------------------------------------------ drawing */
-  const slashItems = slash ? SLASH.filter((x) => !slash.q || x.label.toLowerCase().includes(slash.q) || x.id.includes(slash.q)) : [];
+  const slashItems = slash ? slashList(slash.q) : [];
+  // the menu opens below the line, or above it when the line is near the bottom
+  const slashPos = (() => {
+    if (!slash || typeof window === "undefined") return null;
+    const below = window.innerHeight - slash.bottom - 16;
+    const above = slash.top - 16;
+    const up = below < 260 && above > below;
+    const room = Math.max(160, Math.min(380, up ? above : below));
+    const left = Math.max(12, Math.min(slash.x, window.innerWidth - 332));
+    return up ? { left, bottom: window.innerHeight - slash.top + 6, maxHeight: room } : { left, top: slash.bottom + 6, maxHeight: room };
+  })();
+  const roomCode = live.current?.code || "";
+  const waiting = !!live.current && live.current.flowId === current && !live.current.ready;
+  const inRoom = !!roomStatus;
 
   return (
-    <div className={"dfl" + (side ? "" : " noside")} ref={root}>
+    <div className={"dfl" + (side ? "" : " noside") + (right ? "" : " noright")} ref={root}>
       <header className="dtop">
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
         <div className="brand mono">Doc flow</div>
@@ -540,17 +844,56 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
           <button type="button" className={"pp" + (running === "pro" ? " on" : "")} onClick={() => setRunning((r) => (r === "pro" ? null : "pro"))}>Pro prep {clock(prep.pro)}</button>
           <button type="button" className={"pp" + (running === "con" ? " on" : "")} onClick={() => setRunning((r) => (r === "con" ? null : "con"))}>Con prep {clock(prep.con)}</button>
         </div>
-        <div className="spacer" />
-        <button type="button" key={bump} className={"tally mono" + (tally.open ? " has" : " clear")} onClick={nextOpen}
-          title={`${A()}N goes to the next one`}>
-          <i className="dot" />
-          {tally.open ? `${tally.open} unanswered` : "all answered"}
-          <span className="of">{tally.theirs} of theirs</span>
-        </button>
-        <button type="button" className="dbtn ink" onClick={() => openPanel()}>Commands <kbd>{K()}K</kbd></button>
+        <div className="dgap" />
+        <div className="dsharewrap">
+          <button type="button" className={"dbtn droom" + (inRoom ? " live " + roomStatus : "")} onClick={() => setShareOpen((s) => !s)}>
+            {inRoom ? (
+              <>
+                <i className="pulse" />
+                <span className="mono">{roomCode}</span>
+                {mates.length ? (
+                  <span className="dfaces">{mates.slice(0, 3).map((m) => <b key={m.client} style={{ background: m.color }} title={m.name}>{m.name.slice(0, 1).toUpperCase()}</b>)}</span>
+                ) : <small>{roomStatus === "joining" ? "connecting" : "waiting"}</small>}
+              </>
+            ) : <>Share</>}
+          </button>
+          {shareOpen && (
+            <div className="dsharepop" role="dialog" aria-label="Flow with your partner">
+              {inRoom ? (
+                <>
+                  <div className="dsp-h mono">Room</div>
+                  <div className="dsp-code mono">{roomCode}</div>
+                  <p className="dsp-p">Your partner types this code in Doc flow, or opens the link. You are both writing this flow.</p>
+                  <div className="dsp-mates">
+                    <span className="mate"><b style={{ background: color }}>{(me || "Y").slice(0, 1).toUpperCase()}</b>{me || "You"} <small>you</small></span>
+                    {mates.map((m) => <span className="mate" key={m.client}><b style={{ background: m.color }}>{m.name.slice(0, 1).toUpperCase()}</b>{m.name}</span>)}
+                    {!mates.length && <span className="mate dim">Waiting for your partner…</span>}
+                  </div>
+                  <div className="dsp-row">
+                    <button type="button" className="dbtn ink" onClick={copyLink}>Copy link</button>
+                    <button type="button" className="dbtn" onClick={() => { leaveRoom(); setShareOpen(false); }}>Leave</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="dsp-h mono">Flow with your partner</div>
+                  <p className="dsp-p">Start a room on this flow and read out the code. Whatever either of you types shows up for both.</p>
+                  <button type="button" className="dbtn ink wide" onClick={startRoom}>Start a room on “{name || "this flow"}”</button>
+                  <div className="dsp-or mono">or join theirs</div>
+                  <form className="dsp-row" onSubmit={(e) => { e.preventDefault(); joinRoom(joinCode); }}>
+                    <input className="mono" value={joinCode} onChange={(e) => setJoinCode(tidyCode(e.target.value))} placeholder="CODE" maxLength={8} aria-label="Room code" autoFocus />
+                    <button type="submit" className="dbtn">Join</button>
+                  </form>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <button type="button" className="dbtn ink" onClick={() => openPanel()}>Commands {K("commands") && <kbd>{K("commands")}</kbd>}</button>
         <button type="button" className="dbtn" onClick={copyForDocs} title="Numbered, red and highlighted, as a Doc">Copy for Docs</button>
         <button type="button" className="dbtn" onClick={saveDocx}>.docx</button>
         <a className="dbtn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
+        <button type="button" className={"dbtn" + (right ? " on" : "")} onClick={() => setRight((r) => !r)} title={K("rhetoric") ? `Rhetoric — ${K("rhetoric")}` : "Rhetoric"}>Rhetoric</button>
       </header>
 
       <div className="dbody">
@@ -559,7 +902,7 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
             <div className="dsh mono"><span>Your flows</span><button type="button" onClick={newFlow} title="A new flow">+ New</button></div>
             <ul className="dlist">
               {docs.map((d) => (
-                <li key={d.id} className={d.id === current ? "on" : ""}>
+                <li key={d.id} className={(d.id === current ? "on" : "") + (live.current?.flowId === d.id ? " shared" : "")}>
                   {renaming === d.id ? (
                     <input autoFocus defaultValue={d.name} maxLength={60}
                       onBlur={(e) => commitName(d.id, e.target.value)}
@@ -568,7 +911,7 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
                     <button type="button" className="dname" onClick={() => (d.id === current ? setRenaming(d.id) : openFlow(d))}
                       title={d.id === current ? "Click again to rename" : "Open"}>
                       <span>{d.name}</span>
-                      <small className="mono">{new Date(d.updated).toLocaleDateString([], { month: "short", day: "numeric" })}</small>
+                      <small className="mono">{live.current?.flowId === d.id ? "live" : new Date(d.updated).toLocaleDateString([], { month: "short", day: "numeric" })}</small>
                     </button>
                   )}
                   <button type="button" className="dx" onClick={() => deleteFlow(d)} aria-label={`Delete ${d.name}`} title="Delete this flow">×</button>
@@ -582,22 +925,18 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
               <ul className="dout">
                 {outline.map((s) => (
                   <li key={s.pos} className={s.kind + " " + s.who}>
-                    <button type="button" onClick={() => jump(s.pos)}>
-                      <span>{s.text}</span>
-                      {s.theirs ? <small className={"mono" + (s.open ? " open" : "")}>{s.open ? `${s.open} open` : "✓"}</small> : null}
-                    </button>
+                    <button type="button" onClick={() => jump(s.pos)}><span>{s.text}</span></button>
                   </li>
                 ))}
               </ul>
             ) : <p className="dnone">Boxes and headings you add show up here to jump between.</p>}
           </div>
           <div className="dkeys mono">
-            <span><kbd>Tab</kbd> answer</span>
-            <span><kbd>Shift+Tab</kbd> back out</span>
-            <span><kbd>{K()}Enter</kbd> their next point</span>
-            <span><kbd>/</kbd> boxes, headings, evidence</span>
-            <span><kbd>{A()}T</kbd> or click a number — swap speaker</span>
-            <span><kbd>{A()}Y</kbd><kbd>{A()}G</kbd> highlight</span>
+            {[["tab", "answer"], ["outdent", "back out"], ["next", "their next point"], ["who", "swap speaker"], ["hl-yellow", "highlight"], ["keep", "keep as rhetoric"]]
+              .filter(([id]) => K(id))
+              .map(([id, what]) => <span key={id}><kbd>{K(id)}</kbd> {what}</span>)}
+            <span><kbd>/</kbd> boxes, rhetoric, evidence</span>
+            <button type="button" className="dkedit" onClick={() => setKeysOpen(true)}>Change keys</button>
           </div>
         </aside>
 
@@ -607,17 +946,98 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
               onChange={(e) => setName(e.target.value)}
               onBlur={(e) => current && commitName(current, e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); view.current?.focus(); } }} />
-            <div className="ddoc" ref={mount} />
+            {waiting && (
+              <div className="dwait">
+                <i className="spin" />
+                <b>Joining room <span className="mono">{roomCode}</span></b>
+                <small>Your partner&apos;s flow will appear here.</small>
+              </div>
+            )}
+            <div className="ddoc" ref={mount} key={current + ":" + gate} />
           </div>
         </main>
+
+        <aside className="dright" aria-label="Your rhetoric">
+          <div className="drh">
+            <div className="dsh mono"><span>Rhetoric <em>{pieces.length || ""}</em></span>
+              <button type="button" onClick={() => setEditing({ id: null, title: "", text: "" })} title="Write a new piece">+ New</button>
+            </div>
+            {pieces.length > 3 && (
+              <input className="drq" value={rq} onChange={(e) => setRq(e.target.value)} placeholder="Find…" spellCheck={false} />
+            )}
+          </div>
+          <div className="drlist">
+            {editing && (
+              <form className="rp editing" onSubmit={(e) => { e.preventDefault(); saveEditing(); }}>
+                <input autoFocus value={editing.title} placeholder="Name it — Probability weighing"
+                  onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+                <textarea value={editing.text} rows={Math.min(14, Math.max(5, editing.text.split("\n").length + 1))}
+                  placeholder={"One line per flow line.\n  Two spaces in, and it goes under the line above."}
+                  spellCheck={false}
+                  onChange={(e) => setEditing({ ...editing, text: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); saveEditing(); return; }
+                    if (e.key === "Escape") { e.preventDefault(); setEditing(null); return; }
+                    if (e.key === "Tab") {
+                      // Tab indents the line, as it does in the flow
+                      e.preventDefault();
+                      const ta = e.currentTarget;
+                      const s = ta.selectionStart, val = ta.value;
+                      const ls = val.lastIndexOf("\n", s - 1) + 1;
+                      let next: string, caretAt: number;
+                      if (e.shiftKey) { const cut = val.slice(ls, ls + 2) === "  " ? 2 : 0; next = val.slice(0, ls) + val.slice(ls + cut); caretAt = s - cut; }
+                      else { next = val.slice(0, ls) + "  " + val.slice(ls); caretAt = s + 2; }
+                      setEditing({ ...editing, text: next });
+                      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = Math.max(ls, caretAt); });
+                    }
+                  }} />
+                <div className="rp-row">
+                  <button type="submit" className="dbtn ink">Keep it</button>
+                  <button type="button" className="dbtn" onClick={() => setEditing(null)}>Cancel</button>
+                  <small className="mono">Ctrl+Enter</small>
+                </div>
+              </form>
+            )}
+            {shownPieces.map((p) => (
+              <div key={p.id} className="rp" draggable
+                onDragStart={(e) => { e.dataTransfer.setData(RHET_MIME, p.id); e.dataTransfer.setData("text/plain", p.text); e.dataTransfer.effectAllowed = "copy"; e.currentTarget.classList.add("lift"); }}
+                onDragEnd={(e) => e.currentTarget.classList.remove("lift")}
+                onMouseDown={(e) => { if ((e.target as HTMLElement).closest("button")) return; e.preventDefault(); }}
+                onClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; usePiece(p); }}
+                title="Click to put it at the cursor · drag it onto a line">
+                <div className="rp-h">
+                  <b>{p.title}</b>
+                  <span className="rp-act">
+                    <button type="button" onClick={() => setEditing({ id: p.id, title: p.title, text: p.text })} aria-label={`Edit ${p.title}`} title="Edit">✎</button>
+                    <button type="button" onClick={() => deletePiece(p)} aria-label={`Delete ${p.title}`} title="Delete">×</button>
+                  </span>
+                </div>
+                <div className="rp-lines">
+                  {preview(p.text).slice(0, 4).map((l, i) => <div key={i} style={{ paddingLeft: l.d * 12 }}>{l.text}</div>)}
+                </div>
+              </div>
+            ))}
+            {!pieces.length && !editing && (
+              <div className="drnone">
+                <b>Write it once.</b>
+                <p>Weighing, framing, the frontline you always need. Keep it here, then drag it onto a line, click it, or type <kbd>/</kbd> and its name.</p>
+                <p>Or select lines in your flow and press {K("keep") ? <kbd>{K("keep")}</kbd> : "Keep"} to keep them.</p>
+              </div>
+            )}
+            {pieces.length > 0 && !shownPieces.length && <p className="dnone">Nothing called that.</p>}
+          </div>
+          <div className="drfoot mono">
+            <button type="button" onClick={keepSelection}>Keep selected lines{K("keep") && <kbd>{K("keep")}</kbd>}</button>
+          </div>
+        </aside>
       </div>
 
-      {slash && slashItems.length > 0 && (
-        <div className="dslash" style={{ left: slash.x, top: slash.y }}>
+      {slash && slashItems.length > 0 && slashPos && (
+        <div className="dslash" ref={slashBox} style={slashPos}>
           {slashItems.map((it, i) => (
-            <button type="button" key={it.id} className={i === slash.i ? "on" : ""}
+            <button type="button" key={it.id} className={(i === slash.i ? "on" : "") + (it.rhetoric ? " rh" : "")}
               onMouseDown={(e) => { e.preventDefault(); chooseSlash(it.id); }}>
-              <b>{it.label}</b><small>{it.hint}</small>
+              <b>{it.label}</b><small>{it.rhetoric ? "rhetoric · " + it.hint : it.hint}</small>
             </button>
           ))}
         </div>
@@ -656,8 +1076,46 @@ export default function DocFlow({ owner, me }: { owner?: string; me?: string }) 
         </div>
       )}
 
+      {keysOpen && (
+        <div className="dscrim" onMouseDown={(e) => { if (e.target === e.currentTarget) { setKeysOpen(false); setCapturing(null); view.current?.focus(); } }}>
+          <div className="dpal dkeyed" role="dialog" aria-label="Keys">
+            <div className="dkh">
+              <b>Keys</b>
+              <small>Click a key, then press the new one. Backspace leaves it with none.</small>
+              <button type="button" className="dbtn" onClick={() => { setKeys({}); saveKeys(owner, {}); setCapturing(null); toast("Every key is back to how it started"); }}>Reset all</button>
+              <button type="button" className="dbtn ink" onClick={() => { setKeysOpen(false); setCapturing(null); view.current?.focus(); }}>Done</button>
+            </div>
+            <div className="dkl">
+              {Array.from(new Set(ACTIONS.map((a) => a.group))).map((g) => (
+                <div key={g} className="dkg">
+                  <div className="dkgh mono">{g}</div>
+                  {ACTIONS.filter((a) => a.group === g).map((a) => {
+                    const k = keyFor(keys, a.id);
+                    const changed = a.id in keys;
+                    return (
+                      <div key={a.id} className={"dkr" + (capturing === a.id ? " cap" : "")}>
+                        <span>{a.label}</span>
+                        <button type="button" className={"dkk mono" + (changed ? " changed" : "") + (k ? "" : " none")} onClick={() => setCapturing((c) => (c === a.id ? null : a.id))}>
+                          {capturing === a.id ? "press a key…" : k ? keyLabel(k) : "no key"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              <div className="dkg">
+                <div className="dkgh mono">Always</div>
+                {[["Enter", "Next line"], ["Ctrl+Z / Ctrl+Y", "Undo / redo"], ["Ctrl+B / I / U", "Bold, italic, underline"], ["/", "Boxes, rhetoric, evidence"]].map(([k, l]) => (
+                  <div key={k} className="dkr fixed"><span>{l}</span><span className="dkk mono">{k}</span></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toastMsg && (
-        <div className="dtoast mono" key={toastMsg.n} style={{ ["--life" as any]: toastMsg.undo ? "4200ms" : "2200ms" }}>
+        <div className="dtoast mono" key={toastMsg.n} style={{ ["--life" as any]: toastMsg.undo ? "4200ms" : "2400ms" }}>
           {toastMsg.text}
           {toastMsg.undo && <button type="button" onClick={() => { toastMsg.undo?.(); setToastMsg(null); }}>Undo</button>}
         </div>

@@ -203,7 +203,7 @@ export function toDocsHtml(doc: PMNode): string {
       close();
       const color = n.attrs && n.attrs.who === "them" ? `color:${RED};` : "";
       if (n.type === schema.nodes.box) {
-        html += `<h1 style="text-align:center;border:3px solid #000000;padding:4pt 8pt;font-size:24pt;font-weight:700;${color}">${inlineOut(n, n.attrs.who)}</h1>`;
+        html += `<h1 style="text-align:center;border:4px solid #000000;padding:4pt 8pt;font-size:24pt;font-weight:700;${color}">${inlineOut(n, n.attrs.who)}</h1>`;
       } else if (n.type === schema.nodes.head) {
         html += `<h3 style="text-align:center;font-size:14pt;font-weight:700;text-decoration:underline;${color}">${inlineOut(n, n.attrs.who)}</h3>`;
       } else {

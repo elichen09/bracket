@@ -113,7 +113,7 @@ export const schema = new Schema({
 });
 
 /* ------------------------------------------------------------------
-   Numbering, and what is still unanswered.
+   Numbering.
    ------------------------------------------------------------------ */
 
 const alpha = (n: number) => { let s = ""; while (n > 0) { n--; s = String.fromCharCode(97 + (n % 26)) + s; n = Math.floor(n / 26); } return s; };
@@ -125,53 +125,32 @@ export const labelFor = (n: number, depth: number) => {
   return (k === 0 ? String(n) : k === 1 ? alpha(n) : roman(n)) + ".";
 };
 
-export interface Tally { theirs: number; open: number; ours: number; openAt: number[] }
-
 /**
- * Walk the lines once: number each one, and mark each of their points that
- * nothing has been said under yet. A box, a heading or a paragraph starts
- * the numbering again, as a new list does in Docs.
+ * Walk the lines once and number each one. A box, a heading or a paragraph
+ * starts the numbering again, as a new list does in Docs.
  */
-export function survey(doc: PMNode): { decos: Decoration[]; tally: Tally } {
+export function survey(doc: PMNode): Decoration[] {
   const decos: Decoration[] = [];
-  const tally: Tally = { theirs: 0, open: 0, ours: 0, openAt: [] };
   const counters: number[] = [];
-  const blocks: { node: PMNode; pos: number }[] = [];
-  doc.forEach((node, pos) => blocks.push({ node, pos }));
-  blocks.forEach(({ node, pos }, i) => {
+  doc.forEach((node, pos) => {
     if (node.type !== schema.nodes.item) { counters.length = 0; return; }
     const d = node.attrs.depth as number;
     counters.length = d + 1;
     for (let k = 0; k < d; k++) if (!counters[k]) counters[k] = 1;
     counters[d] = (counters[d] || 0) + 1;
-    const next = blocks[i + 1];
-    const answered = !!(next && next.node.type === schema.nodes.item && next.node.attrs.depth > d);
-    const open = node.attrs.who === "them" && !answered && node.textContent.trim().length > 0;
-    if (node.attrs.who === "them") tally.theirs++; else tally.ours++;
-    if (open) { tally.open++; tally.openAt.push(pos); }
-    decos.push(Decoration.node(pos, pos + node.nodeSize, {
-      "data-label": labelFor(counters[d], d),
-      class: open ? "df-open" : "",
-    }));
+    decos.push(Decoration.node(pos, pos + node.nodeSize, { "data-label": labelFor(counters[d], d) }));
   });
-  return { decos, tally };
+  return decos;
 }
 
-/** Keeps the numbering and the open marks current, and says when the tally changes. */
-export function surveyPlugin(onTally: (t: Tally) => void) {
-  return new Plugin({
-    state: {
-      init: (_, state) => { const s = survey(state.doc); onTally(s.tally); return DecorationSet.create(state.doc, s.decos); },
-      apply(tr, old, _prev, state) {
-        if (!tr.docChanged) return old;
-        const s = survey(state.doc);
-        onTally(s.tally);
-        return DecorationSet.create(state.doc, s.decos);
-      },
-    },
-    props: { decorations(state) { return this.getState(state); } },
-  });
-}
+/** Keeps the numbering current. */
+export const surveyPlugin = new Plugin({
+  state: {
+    init: (_, state) => DecorationSet.create(state.doc, survey(state.doc)),
+    apply: (tr, old, _prev, state) => (tr.docChanged ? DecorationSet.create(state.doc, survey(state.doc)) : old),
+  },
+  props: { decorations(state) { return this.getState(state); } },
+});
 
 /** An empty flow: a box to start from and a first line to type into. */
 export function blankDoc() {

@@ -311,4 +311,76 @@ export function answerWith(lines: string[]): Command {
   };
 }
 
+/* ---------------------------------------------------------------- rhetoric */
+
+export interface Line { d: number; text: string }
+
+/**
+ * Pre-written text as flow lines. One line of text is one flow line; a tab
+ * or two spaces in front of it puts it a level under the line above, and a
+ * bullet or number someone typed out of habit is dropped, since the flow
+ * numbers itself.
+ */
+export function parseLines(text: string): Line[] {
+  const out: Line[] = [];
+  for (const raw of text.replace(/\r/g, "").split("\n")) {
+    if (!raw.trim()) continue;
+    const lead = (raw.match(/^[\t ]*/) || [""])[0].replace(/\t/g, "  ");
+    const body = raw.trim().replace(/^(?:[-•*]|\d{1,2}[.)]|[a-z][.)]|[ivx]{1,4}[.)])\s+/, "");
+    let d = Math.floor(lead.length / 2);
+    d = Math.min(d, out.length ? out[out.length - 1].d + 1 : 0);
+    out.push({ d, text: body });
+  }
+  return out;
+}
+
+/** The lines back out as text, in the form parseLines reads. */
+export function linesText(doc: PMNode, from: number, to: number) {
+  const picked: { d: number; text: string }[] = [];
+  doc.forEach((n, pos) => {
+    if (pos + n.nodeSize <= from || pos >= to || !n.textContent.trim()) return;
+    picked.push({ d: n.type === T.item ? (n.attrs.depth as number) : 0, text: n.textContent.trim() });
+  });
+  const base = picked.length ? Math.min(...picked.map((l) => l.d)) : 0;
+  return picked.map((l) => "  ".repeat(l.d - base) + l.text).join("\n");
+}
+
+/**
+ * Put your pre-written lines into the flow where they belong. On one of their
+ * points they answer it, after whatever answers it already has; on an empty
+ * line they fill it at its level; after a title they start its list. It is
+ * all yours, so it is all black.
+ */
+export function insertLines(lines: Line[], blockIndex?: number): Command {
+  return (state, dispatch) => {
+    if (!lines.length) return false;
+    const doc = state.doc;
+    const i = blockIndex ?? state.selection.$from.index(0);
+    if (i < 0 || i >= doc.childCount) return false;
+    const node = doc.child(i);
+    const empty = node.content.size === 0;
+    let base = 0;
+    let at: number;
+    let replace = false;
+    if (node.type === T.item && empty) { base = node.attrs.depth; at = posOf(doc, i); replace = true; }
+    else if (node.type === T.para && empty) { at = posOf(doc, i); replace = true; }
+    else if (node.type === T.item) {
+      base = Math.min(MAX_DEPTH, (node.attrs.depth as number) + 1);
+      let j = i + 1;
+      while (j < doc.childCount && doc.child(j).type === T.item && doc.child(j).attrs.depth >= base) j++;
+      at = posOf(doc, j);
+    } else at = posOf(doc, i + 1);
+    if (!dispatch) return true;
+    const nodes = lines.map((l) => T.item.create(
+      { depth: Math.min(MAX_DEPTH, base + l.d), who: "us" as Who, hl: null },
+      l.text ? schema.text(l.text) : undefined,
+    ));
+    let tr = replace ? state.tr.replaceWith(at, at + node.nodeSize, nodes) : state.tr.insert(at, nodes);
+    const end = at + nodes.reduce((s, n) => s + n.nodeSize, 0);
+    tr = tr.setSelection(TextSelection.create(tr.doc, end - 1));
+    dispatch(tr.scrollIntoView());
+    return true;
+  };
+}
+
 export const EMPTY_LINE = { depth: 0, who: "them" as Who };
