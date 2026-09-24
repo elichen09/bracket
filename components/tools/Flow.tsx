@@ -57,7 +57,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
 
         <div className="spacer" />
         <button className="btn cmd" id="cmd-btn" type="button" title="Everything this does, and your evidence">
-          Commands <kbd>⌘K</kbd>
+          Commands <kbd data-kb="mod+K">Ctrl+K</kbd>
         </button>
         {/* Its own tab, reused: the tools talk across tabs, and Evidence's send
             list is the one Flow sends into. */}
@@ -65,7 +65,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span id="share-state">Not shared</span>
         </button>
-        <button className="btn" id="drawer-btn" aria-pressed="false">Drawer <kbd>⌘J</kbd></button>
+        <button className="btn" id="drawer-btn" aria-pressed="false">Drawer <kbd data-kb="mod+J">Ctrl+J</kbd></button>
       </header>
 
       <div className="panes" id="panes">
@@ -125,10 +125,11 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
               <button className="btn go" type="button" id="v-speak">Speak ▸</button>
             </div>
             <ol className="vlist" id="vlist" />
-            <button className="addstop" type="button" id="v-add">+ Add the selected cell <kbd>⌘B</kbd></button>
+            <button className="addstop" type="button" id="v-add">+ Add the selected cell <kbd data-kb="mod+B">Ctrl+B</kbd></button>
             <p className="small vkeys">
-              ⌥1–9 jumps to a stop · ⌘] next · ⌘[ back · drag to reorder · double-click to rename.
-              While speaking, a clicker&apos;s Page Down walks it.
+              <kbd data-kb="alt+1">Alt+1</kbd>–9 jumps to a stop · <kbd data-kb="mod+]">Ctrl+]</kbd> next ·{" "}
+              <kbd data-kb="mod+[">Ctrl+[</kbd> back · drag to reorder · double-click to rename.
+              While speaking, Page Down — or a clicker — walks it.
             </p>
           </div>
         </aside>
@@ -149,14 +150,14 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
       <footer className="bottom">
         <div className="tabs" role="tablist" id="tabs" />
         <div className="keys mono" aria-label="Keys">
-          <span><kbd>↵</kbd> next line</span>
-          <span><kbd>⇥</kbd> answer</span>
-          <span><kbd>⌫</kbd> clear</span>
-          <span className="k2"><kbd>⌥↑↓</kbd> move row</span>
-          <span className="k2"><kbd>⌘\</kbd> split</span>
-          <span className="k2"><kbd>⌘B</kbd> vision stop</span>
-          <span><kbd>⌘/</kbd> answer from evidence</span>
-          <span><kbd>⌘K</kbd> everything</span>
+          <span><kbd data-kb="enter">Enter</kbd> next line</span>
+          <span><kbd data-kb="tab">Tab</kbd> answer</span>
+          <span><kbd data-kb="back">Backspace</kbd> clear</span>
+          <span className="k2"><kbd data-kb="alt+↑↓">Alt+↑↓</kbd> move row</span>
+          <span className="k2"><kbd data-kb="mod+\">Ctrl+\</kbd> split</span>
+          <span className="k2"><kbd data-kb="mod+B">Ctrl+B</kbd> vision stop</span>
+          <span><kbd data-kb="mod+/">Ctrl+/</kbd> answer from evidence</span>
+          <span><kbd data-kb="mod+K">Ctrl+K</kbd> everything</span>
         </div>
         <div className="vw">
           <button type="button" id="v-split" aria-pressed="false" title="Two flows side by side">Split</button>
@@ -171,7 +172,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
       <div className="scrim" id="scrim" hidden>
         <div className="pal" id="pal" role="dialog" aria-modal="true" aria-label="Command panel">
           <div className="palin">
-            <span className="glyph mono" aria-hidden="true">⌘</span>
+            <span className="glyph mono" aria-hidden="true">›</span>
             <input id="pal-q" placeholder="Run a command, go somewhere — or / to search your evidence" aria-label="Search commands" autoComplete="off" spellCheck={false} />
           </div>
           <div className="palsrc" id="pal-src" hidden />

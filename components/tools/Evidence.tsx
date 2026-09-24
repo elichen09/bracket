@@ -195,7 +195,7 @@ export default function Evidence({ owner }: { owner?: string }) {
       <div className="foothint mono">
         <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
         <span><kbd>→</kbd> arguments</span>
-        <span><kbd>↵</kbd> copy + send</span>
+        <span><kbd>Enter</kbd> copy + send</span>
         <span><kbd>esc</kbd> clear</span>
         <span><kbd>del</kbd> remove from library</span>
         <span className="drift">drag a sent block to reorder it · type in the document to edit it</span>

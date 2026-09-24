@@ -33,9 +33,7 @@
   --flw-micro: 10.5px;
   --flw-fs: 15px;
   --flw-pad: 11px 13px;
-  /* the two sides of the pad, a shade apart, and the rule between cells */
-  --pro-bg: #F8F5EF;
-  --con-bg: #EFEBE3;
+  /* the rule between cells (the sides' own colours are set in Colour, below) */
   --rule: #DDD7CB;
   --spring: cubic-bezier(.22, 1, .36, 1);
   --pop: cubic-bezier(.34, 1.56, .64, 1);
@@ -538,9 +536,6 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   transition: background .2s var(--ease);
 }
 .flw .pal.ev .palin .glyph { background: var(--acc); }
-.flw .pal.ev .palin .glyph::before { content: "/"; position: absolute; }
-.flw .pal.ev .palin .glyph { color: transparent; position: relative; }
-.flw .pal.ev .palin .glyph::before { color: #fff; }
 .flw .palin input { flex: 1; min-width: 0; border: 0; background: none; padding: 17px 0; font-size: 17px; outline: 0; font-family: var(--ui); }
 .flw .palsrc {
   padding: 9px 18px; font-size: 12.5px; color: var(--muted);
@@ -713,6 +708,142 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   outline: 2px solid var(--acc); outline-offset: 2px;
 }
 .flw .flow:focus-visible { outline: none; }
+
+/* =====================================================================
+   Colour
+
+   Four colours do all the work, and each means exactly one thing:
+
+     blue    Pro          #2E5FAE
+     garnet  Con          #A93650
+     orange  live / act   #C4531F   (the site's accent: the clock, the live
+                                     column, a turn, a drop, an open argument)
+     teal    round vision #0F766E
+
+   The two sides are the ones a flow is read by, so they carry the most: a
+   band across the top of every column, the side's name as a filled pill, the
+   paper under each column a breath cooler or warmer, the cursor in the
+   colour of whichever side's column it is in, and a dot on every sheet tab.
+
+   Checked, not guessed: under simulated protanopia and deuteranopia Pro and
+   Con stay 15–19 apart in OKLab (×100), and teal stays 10+ from both Pro and
+   the orange. The one close pair, teal and garnet under deuteranopia, only
+   meets where a stop's number sits on a Con cell, and the number is what
+   says it is a stop. Every coloured thing also says what it is in words.
+   White text clears 4.5:1 on all four.
+
+   The marks get their own soft fills so they read at a glance from the
+   podium — extension green, permutation violet, non-unique teal — and turn
+   and drop stay in the accent, because those are the ones that decide a
+   round.
+   ===================================================================== */
+.flw {
+  --pro: #2E5FAE;  --pro-ink: #22498A;  --pro-head: #EDF1F9;  --pro-bg: #F5F7FB;
+  --con: #A93650;  --con-ink: #86283E;  --con-head: #F8ECEC;  --con-bg: #FBF5F4;
+  --vision: #0F766E; --vision-2: #0B5E58;
+  --ext: #1F7A4B;  --ext-soft: #DDF0E5;
+  --perm: #5B44B2; --perm-soft: #ECE8F8;
+  --nuq: #1A6E78;  --nuq-soft: #DCEFF1;
+  --glow: 0 6px 18px -8px;
+}
+
+/* ---- a thin signature under the toolbar: Pro, through vision, to Con ---- */
+.flw .topbar { position: relative; }
+.flw .topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, var(--pro) 0%, var(--vision) 50%, var(--con) 100%);
+  pointer-events: none;
+}
+
+/* ---- the columns ---- */
+.flw .h { border-top: 3px solid transparent; }
+.flw .h.pro { background: var(--pro-head); border-top-color: var(--pro); }
+.flw .h.con { background: var(--con-head); border-top-color: var(--con); }
+.flw .h.pro b { color: var(--pro-ink); }
+.flw .h.con b { color: var(--con-ink); }
+.flw .h .sd {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: #fff; padding: 2px 7px 1px; border-radius: 999px; line-height: 1.4; align-self: center;
+}
+.flw .h.pro .sd { background: var(--pro); }
+.flw .h.con .sd { background: var(--con); }
+.flw .h.live .lv { background: rgba(196, 83, 31, .1); padding: 2px 7px 1px; border-radius: 999px; }
+.flw .c.pro { background-color: var(--pro-bg); }
+.flw .c.con { background-color: var(--con-bg); }
+
+/* ---- the cursor takes its column's side; writing turns it the accent ---- */
+.flw .cursor.pro { border-color: var(--pro); box-shadow: 0 0 0 4px rgba(46, 95, 174, .12); }
+.flw .cursor.pro .lab { background: var(--pro); color: #fff; }
+.flw .cursor.con { border-color: var(--con); box-shadow: 0 0 0 4px rgba(169, 54, 80, .12); }
+.flw .cursor.con .lab { background: var(--con); color: #fff; }
+.flw .cursor.editing { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(196, 83, 31, .15), var(--glow) rgba(196, 83, 31, .55); }
+.flw .cursor.editing .lab { background: linear-gradient(90deg, #D9652E, #B8441B); color: #fff; }
+
+/* ---- the marks ---- */
+.flw .c .tg.ext { color: var(--ext); background: var(--ext-soft); border-color: transparent; }
+.flw .c .tg.perm { color: var(--perm); background: var(--perm-soft); border-color: transparent; }
+.flw .c .tg.nuq { color: var(--nuq); background: var(--nuq-soft); border-color: transparent; }
+.flw .c .tg.dropped { color: #B8441B; background: rgba(196, 83, 31, .1); border-color: rgba(196, 83, 31, .45); }
+.flw .c .tg.turn { color: #fff; background: linear-gradient(135deg, #DB6A30, #B8441B); border-color: transparent; box-shadow: 0 2px 6px -2px rgba(184, 68, 27, .6); }
+.flw .c .tg.xa, .flw .c .tg.cx { color: #4A5160; background: #E8EAEE; border-color: transparent; }
+
+/* ---- headings across the flow ---- */
+.flw .rh { background: linear-gradient(90deg, rgba(15, 118, 110, .07), transparent 45%), var(--ground); box-shadow: inset 3px 0 0 var(--vision); }
+.flw .rh .k { color: var(--vision); }
+
+/* ---- round vision ---- */
+.flw .c[data-stop]::before { background: linear-gradient(135deg, #14958A, var(--vision-2)); color: #fff; box-shadow: 0 3px 9px -3px rgba(11, 94, 88, .7); }
+.flw .c.stopnow[data-stop]::before { background: linear-gradient(135deg, #DB6A30, #B8441B); box-shadow: 0 3px 10px -3px rgba(184, 68, 27, .8); }
+.flw .vlist li .n { background: linear-gradient(135deg, #14958A, var(--vision-2)); color: #fff; }
+.flw .vlist li.vs.now { background: linear-gradient(120deg, #111114, #0E3B37); border-color: #0E3B37; }
+.flw .vlist li.vs:hover { border-color: var(--vision); }
+.flw .vhead i { color: var(--vision); }
+.flw #v-speak { background: linear-gradient(135deg, #14958A, var(--vision-2)); border-color: var(--vision-2); color: #fff; }
+.flw #v-speak:hover { box-shadow: var(--glow) rgba(11, 94, 88, .7); opacity: 1; }
+.flw .speak .spk { background: linear-gradient(115deg, #111114 0%, #10302d 62%, #0E3B37 100%); box-shadow: 0 30px 70px -26px rgba(11, 60, 55, .8), 0 0 0 1px rgba(255, 255, 255, .06) inset; }
+.flw .speak .n { color: #5EE0D2; }
+.flw .speak .bar i { background: linear-gradient(90deg, #14958A, #5EE0D2 60%, var(--acc)); }
+
+/* ---- sheet tabs: a dot in the side's colour, filled when it is the one open ---- */
+.flw .tabs button.pro::before, .flw .tabs button.con::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%; align-self: center; flex-shrink: 0;
+}
+.flw .tabs button.pro::before { background: var(--pro); }
+.flw .tabs button.con::before { background: var(--con); }
+.flw .tabs button.pro[aria-selected="true"] { background: var(--pro); border-color: var(--pro); color: #fff; box-shadow: var(--glow) rgba(46, 95, 174, .7); }
+.flw .tabs button.con[aria-selected="true"] { background: var(--con); border-color: var(--con); color: #fff; box-shadow: var(--glow) rgba(169, 54, 80, .7); }
+.flw .tabs button[aria-selected="true"]::before { background: #fff; }
+
+/* ---- the controls that start things ---- */
+.flw .btn.cmd { background: linear-gradient(135deg, #16161b, #10302d); border-color: #10302d; box-shadow: var(--glow) rgba(11, 60, 55, .7); }
+.flw .btn.cmd:hover { background: linear-gradient(135deg, #1d1d24, #0E3B37); }
+.flw .tbar.live { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(196, 83, 31, .12); }
+.flw .tbar .play.on { background: linear-gradient(135deg, #DB6A30, #B8441B); box-shadow: var(--glow) rgba(184, 68, 27, .8); }
+.flw .prep button[aria-pressed="true"] { background: linear-gradient(135deg, #DB6A30, #B8441B); border-color: #B8441B; box-shadow: var(--glow) rgba(184, 68, 27, .6); }
+.flw .btn.go { background: linear-gradient(135deg, #16161b, #2b2b33); }
+.flw .card .ins.go { background: linear-gradient(135deg, #16161b, #10302d); border-color: #10302d; }
+.flw .card .ins.go:hover { background: linear-gradient(135deg, #DB6A30, #B8441B); border-color: #B8441B; }
+.flw .card.shr h2 { background: linear-gradient(115deg, #111114, #10302d); }
+.flw .dtabs button[aria-selected="true"] { border-image: linear-gradient(90deg, var(--vision), var(--acc)) 1; }
+
+/* ---- the command panel ---- */
+.flw .palin .glyph { background: linear-gradient(135deg, #14958A, var(--vision-2)); color: #fff; }
+.flw .pal.ev .palin .glyph { background: linear-gradient(135deg, #DB6A30, #B8441B); }
+.flw .pal li.hl { background: linear-gradient(90deg, #111114, #10302d); }
+.flw .pal.ev li.hl { background: linear-gradient(90deg, #B8441B, #D9652E); }
+.flw .pal li.grp { color: var(--vision); }
+.flw .pal.ev li.grp { color: var(--acc); }
+
+/* ---- room at the foot ----
+   Windows names its keys in words — Backspace, Ctrl+ — which take three
+   times the room of the symbols, so the key hints give way before the
+   sheet tabs do, and the least-used ones go first. */
+.flw .tabs { flex: 0 1 auto; }
+.flw .keys { flex: 1 1 0; min-width: 0; justify-content: flex-end; }
+@media (max-width: 1760px) { .flw .keys .k2 { display: none; } }
+
+/* on the top row the cursor's label would sit under the column headers, so it hangs below */
+.flw .cursor.top .lab { bottom: auto; top: 100%; border-radius: 0 0 3px 3px; }
 
 @media (max-width: 1500px) { .flw .keys .k2 { display: none; } }
 @media (max-width: 1280px) { .flw .crumb { display: none; } }

@@ -307,8 +307,8 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
   return (
     <>
       <div className="docbar">
-        <Btn label="↶" title="Undo — Ctrl/⌘+Z" act={() => run(undo)} style={canUndo ? undefined : { opacity: .35 }} />
-        <Btn label="↷" title="Redo — Ctrl/⌘+Y" act={() => run(redo)} style={canRedo ? undefined : { opacity: .35 }} />
+        <Btn label="↶" title="Undo — Ctrl+Z" act={() => run(undo)} style={canUndo ? undefined : { opacity: .35 }} />
+        <Btn label="↷" title="Redo — Ctrl+Y" act={() => run(redo)} style={canRedo ? undefined : { opacity: .35 }} />
         <span className="fdiv" />
 
         <select className="fsel style" value={level} title="Style"
@@ -327,11 +327,11 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
         </select>
 
         <span className="fdiv" />
-        <Btn on={markActive(schema.marks.strong)} label="B" title="Bold — Ctrl/⌘+B"
+        <Btn on={markActive(schema.marks.strong)} label="B" title="Bold — Ctrl+B"
           act={() => run(toggleMark(schema.marks.strong))} style={{ fontWeight: 700 }} />
-        <Btn on={markActive(schema.marks.em)} label="I" title="Italic — Ctrl/⌘+I"
+        <Btn on={markActive(schema.marks.em)} label="I" title="Italic — Ctrl+I"
           act={() => run(toggleMark(schema.marks.em))} style={{ fontStyle: "italic", fontFamily: "Georgia, serif" }} />
-        <Btn on={markActive(schema.marks.underline)} label="U" title="Underline — Ctrl/⌘+U"
+        <Btn on={markActive(schema.marks.underline)} label="U" title="Underline — Ctrl+U"
           act={() => run(toggleMark(schema.marks.underline))} style={{ textDecoration: "underline" }} />
         <Btn on={markActive(schema.marks.strike)} label="S" title="Strike through"
           act={() => run(toggleMark(schema.marks.strike))} style={{ textDecoration: "line-through" }} />
