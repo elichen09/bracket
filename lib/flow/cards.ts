@@ -12,6 +12,8 @@
  * are flowing.
  */
 
+import { scoped } from "../owner";
+
 export interface Entry {
   id: string;
   /** Block title. */
@@ -33,12 +35,12 @@ export interface Hit {
   text: string;
 }
 
-/** The whole index, or nothing at all. */
-export async function library(): Promise<Entry[]> {
+/** The whole index of this account's library, or nothing at all. */
+export async function library(owner?: string | null): Promise<Entry[]> {
   if (typeof indexedDB === "undefined") return [];
   const db = await new Promise<IDBDatabase | null>((resolve) => {
     let req: IDBOpenDBRequest;
-    try { req = indexedDB.open("evidence", 1); } catch { return resolve(null); }
+    try { req = indexedDB.open(scoped("evidence", owner), 1); } catch { return resolve(null); }
     // Opening at the same version Evidence uses will not create the stores if
     // the database is not there; an upgrade means it was not.
     req.onupgradeneeded = () => { try { req.transaction?.abort(); } catch { /* nothing to abort */ } };

@@ -30,7 +30,7 @@ const DOCW_KEY = "evidence.docw";
 const MIN_SIDE = 300, MAX_SIDE = 820, DEFAULT_SIDE = 420;
 const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
 
-export default function Evidence() {
+export default function Evidence({ owner }: { owner?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const engine = useRef<any>(null);
   const [side, setSide] = useState(DEFAULT_SIDE);
@@ -51,10 +51,11 @@ export default function Evidence() {
     import("@/lib/evidence/engine").then((m: any) => {
       if (dead) return;
       engine.current = m;
-      off = m.boot(el);
+      // Whose library: the engine opens this account's database, not a shared one.
+      off = m.boot(el, { owner });
     });
     return () => { dead = true; unpolish(); if (off) off(); };
-  }, []);
+  }, [owner]);
 
   // How it was left last time. Read after mount so the server and the first
   // paint agree on the defaults.
@@ -184,7 +185,7 @@ export default function Evidence() {
             tabIndex={0} onPointerDown={grab("doc")} onKeyDown={nudge("doc")}><i /></div>
         )}
         <aside className="pane docpane" aria-hidden={!doc}>
-          <DocEditor host={ref} width={docW} />
+          <DocEditor host={ref} width={docW} owner={owner} />
         </aside>
       </div>
 

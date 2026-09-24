@@ -16,7 +16,7 @@ import "./flow.css";
  * Everything here is markup the engine fills: the grid, the tabs, the clock's
  * numbers, the drawer's panes, the palette and the share room.
  */
-export default function Flow({ join }: { join?: string }) {
+export default function Flow({ join, owner, me }: { join?: string; owner?: string; me?: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,10 +27,11 @@ export default function Flow({ join }: { join?: string }) {
     const unpolish = polish(el);
     import("@/lib/flow/engine").then((m: any) => {
       if (dead) return;
-      off = m.boot(el, { join });
+      // Whose flow, and the name a partner sees on your cursor by default.
+      off = m.boot(el, { join, owner, me });
     });
     return () => { dead = true; unpolish(); if (off) off(); };
-  }, [join]);
+  }, [join, owner, me]);
 
   return (
     <div className="flw" ref={ref}>

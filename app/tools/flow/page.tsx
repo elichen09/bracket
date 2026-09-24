@@ -2,6 +2,7 @@ import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import Flow from "@/components/tools/Flow";
 import { isAdmin } from "@/lib/admin";
+import { currentUser, displayName } from "@/lib/auth";
 import "../tools.css";
 
 export const metadata = { title: "Flow · The Break" };
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
  * share feature would only work between two people who both hold the key,
  * which is nobody's partnership.
  */
-export default function FlowTool({ searchParams }: { searchParams?: { join?: string | string[] } }) {
+export default async function FlowTool({ searchParams }: { searchParams?: { join?: string | string[] } }) {
   const raw = searchParams?.join;
   const join = (Array.isArray(raw) ? raw[0] : raw) || undefined;
 
@@ -29,11 +30,13 @@ export default function FlowTool({ searchParams }: { searchParams?: { join?: str
       </>
     );
   }
+  // Your flows are yours: another account on the same browser opens its own.
+  const user = await currentUser();
   return (
     <>
       <Nav />
       <main>
-        <div className="toolpage"><Flow join={join} /></div>
+        <div className="toolpage"><Flow join={join} owner={user?.id} me={user ? displayName(user) : undefined} /></div>
       </main>
     </>
   );

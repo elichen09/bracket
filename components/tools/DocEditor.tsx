@@ -8,6 +8,7 @@ import { history, undo, redo, undoDepth, redoDepth } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark, setBlockType } from "prosemirror-commands";
 import { schema, LEVELS } from "@/lib/evidence/docSchema";
+import { scoped, adoptLocal } from "@/lib/owner";
 
 /**
  * The document panel: a real editor.
@@ -54,7 +55,7 @@ function htmlFromDoc(state: EditorState) {
   return holder.innerHTML;
 }
 
-export default function DocEditor({ host, width }: { host: React.RefObject<HTMLDivElement>; width: number }) {
+export default function DocEditor({ host, width, owner }: { host: React.RefObject<HTMLDivElement>; width: number; owner?: string }) {
   const mount = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const save = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -223,7 +224,7 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
 
   /** The room code is the same one all weekend, so it is remembered. */
   useEffect(() => {
-    try { setRoom(localStorage.getItem("evidence.room") || ""); } catch { /* private */ }
+    try { setRoom(adoptLocal("evidence.room", owner) || ""); } catch { /* private */ }
   }, []);
 
   /** The document as a file, built once and then either saved or sent. */
@@ -249,7 +250,7 @@ export default function DocEditor({ host, width }: { host: React.RefObject<HTMLD
     try {
       const made = await file();
       if (!made) throw new Error("nothing to send");
-      try { localStorage.setItem("evidence.room", code); } catch { /* private */ }
+      try { localStorage.setItem(scoped("evidence.room", owner), code); } catch { /* private */ }
       const body = new FormData();
       body.append("room", code);
       body.append("file", made.blob, made.filename);

@@ -27,7 +27,7 @@ export const TOOLS: Tool[] = [
       "Paste an evidence document straight out of Google Docs. Headings become blocks and taglines, " +
       "so the whole file is searchable by trigger; sending a card copies it ready to paste, and the " +
       "read document is built from the highlighting you already did.",
-    storage: "This browser only — IndexedDB. Nothing is uploaded and nothing reaches the server.",
+    storage: "This browser, kept apart per account — IndexedDB. Nothing is uploaded and nothing reaches the server.",
   },
   {
     slug: "flow",
@@ -39,7 +39,7 @@ export const TOOLS: Tool[] = [
       "column that is live. Start a room, read the code to your partner, and you are both writing " +
       "the same flow.",
     storage:
-      "This browser only — localStorage. A shared room passes changes straight between the two " +
+      "This browser, kept apart per account — localStorage. A shared room passes changes straight between the two " +
       "browsers in it and stores nothing on the way.",
   },
 ];
