@@ -29,6 +29,19 @@ export const TOOLS: Tool[] = [
       "read document is built from the highlighting you already did.",
     storage: "This browser only — IndexedDB. Nothing is uploaded and nothing reaches the server.",
   },
+  {
+    slug: "flow",
+    name: "Flow",
+    blurb: "Flow a Public Forum round on a real grid, on the clock, with your partner in the same flow.",
+    about:
+      "One column per speech in PF's own order, one row per argument, and the answer to something " +
+      "sits to the right of it. The clock knows every speech and both prep clocks, and marks the " +
+      "column that is live. Start a room, read the code to your partner, and you are both writing " +
+      "the same flow.",
+    storage:
+      "This browser only — localStorage. A shared room passes changes straight between the two " +
+      "browsers in it and stores nothing on the way.",
+  },
 ];
 
 export const toolBySlug = (slug: string) => TOOLS.find((t) => t.slug === slug) || null;

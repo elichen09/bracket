@@ -48,10 +48,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(to);
   }
   if (user && path === "/login") {
-    const to = req.nextUrl.clone();
-    to.pathname = req.nextUrl.searchParams.get("next") || "/";
-    to.search = "";
-    return NextResponse.redirect(to);
+    // `next` is a path *and* its query — a flow room's link is
+    // /tools/flow?join=CODE, and the code is the whole point of it — so it is
+    // resolved as a URL rather than written into the pathname, where the "?"
+    // would be escaped and the query lost. Same-origin paths only.
+    const next = req.nextUrl.searchParams.get("next") || "/";
+    const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    return NextResponse.redirect(new URL(safe, req.url));
   }
   return res;
 }

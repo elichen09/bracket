@@ -1,0 +1,40 @@
+import Nav from "@/components/Nav";
+import AdminGate from "@/components/AdminGate";
+import Flow from "@/components/tools/Flow";
+import { isAdmin } from "@/lib/admin";
+import "../tools.css";
+
+export const metadata = { title: "Flow · The Break" };
+export const dynamic = "force-dynamic";
+
+/**
+ * The flow gets the window, the same as Evidence does.
+ *
+ * One exception to the lock: a link carrying a room code opens without the
+ * admin key. The tools are for whoever runs the thing, but the person you are
+ * flowing with is your partner, not an administrator — and a room code is
+ * already the thing that decides who may see that round. Without this the
+ * share feature would only work between two people who both hold the key,
+ * which is nobody's partnership.
+ */
+export default function FlowTool({ searchParams }: { searchParams?: { join?: string | string[] } }) {
+  const raw = searchParams?.join;
+  const join = (Array.isArray(raw) ? raw[0] : raw) || undefined;
+
+  if (!isAdmin() && !join) {
+    return (
+      <>
+        <Nav />
+        <main><section className="view enter"><AdminGate what="Flow" /></section></main>
+      </>
+    );
+  }
+  return (
+    <>
+      <Nav />
+      <main>
+        <div className="toolpage"><Flow join={join} /></div>
+      </main>
+    </>
+  );
+}
