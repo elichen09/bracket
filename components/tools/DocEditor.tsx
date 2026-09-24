@@ -87,6 +87,8 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
   const [shared, setShared] = useState<Shared | null>(null);
   const sharedRef = useRef<Shared | null>(null);
   sharedRef.current = shared;
+  /** The editor on screen is bound to the room's send doc. */
+  const boundRef = useRef(false);
 
   /** Hand the document back to the engine, which owns saving and the clipboard. */
   const push = useCallback(() => {
@@ -154,9 +156,10 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
       },
     });
     view.current = v;
+    boundRef.current = !!bound;
     // The engine announced the document before this existed, so ask again.
     if (!bound) (window as any).EV?.renderDoc?.();
-    return () => { v.destroy(); view.current = null; };
+    return () => { v.destroy(); view.current = null; boundRef.current = false; };
   }, [push, read, shared]);
 
   // ---- joining or leaving a room's send doc ---------------------------------
@@ -181,6 +184,11 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
       const v = view.current;
       // the room's send doc is already in the editor, bound
       if (!v || quiet.current || isShared || html == null) return;
+      // An editor bound to the room's send doc is never handed anything else:
+      // pouring the Read tab into it wrote the read version over the shared
+      // send doc, for both partners. The Read tab gets an editor of its own
+      // (the one made when `read` changes), which asks for it again.
+      if (boundRef.current) return;
       const current = htmlFromDoc(v.state);
       if (current === html) return;             // nothing to do; keep the cursor
       const doc = docFromHtml(html || "");
