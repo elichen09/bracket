@@ -56,10 +56,16 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
         </div>
 
         <div className="spacer" />
+        <button className="btn cmd" id="cmd-btn" type="button" title="Everything this does, and your evidence">
+          Commands <kbd>⌘K</kbd>
+        </button>
+        {/* Its own tab, reused: the tools talk across tabs, and Evidence's send
+            list is the one Flow sends into. */}
+        <a className="btn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span id="share-state">Not shared</span>
         </button>
-        <button className="btn" id="drawer-btn" aria-pressed="false">Notes <kbd>J</kbd></button>
+        <button className="btn" id="drawer-btn" aria-pressed="false">Drawer <kbd>⌘J</kbd></button>
       </header>
 
       <div className="panes" id="panes">
@@ -95,11 +101,11 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
           </div>
         </section>
 
-        <aside className="drawer" id="drawer" aria-label="Notes, cards and roadmap">
+        <aside className="drawer" id="drawer" aria-label="Notes, cards and round vision">
           <div className="dtabs" role="tablist">
             <button type="button" role="tab" aria-selected="true" data-p="notes">Notes</button>
             <button type="button" role="tab" aria-selected="false" data-p="cards">Cards</button>
-            <button type="button" role="tab" aria-selected="false" data-p="road">Roadmap</button>
+            <button type="button" role="tab" aria-selected="false" data-p="vision">Round vision</button>
             <button type="button" className="x" id="drawer-x" aria-label="Close">×</button>
           </div>
           <div className="pane" id="p-notes">
@@ -107,17 +113,37 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
             <textarea id="notes" placeholder="The judge, the flip, what to go for." />
           </div>
           <div className="pane" id="p-cards" hidden>
+            <div id="inbox" className="inbox" hidden />
             <div className="search">
               <input id="q" type="search" placeholder="search your cut file" aria-label="Search the evidence library" />
             </div>
             <div id="cardlist" />
           </div>
-          <div className="pane" id="p-road" hidden>
-            <span className="small" id="road-for">Roadmap for the next speech</span>
-            <ol className="road" id="road" />
-            <button className="addstop" type="button" id="road-add">+ Add the selected cell</button>
+          <div className="pane" id="p-vision" hidden>
+            <div className="vhead">
+              <span className="small">The speech, as a path <i id="v-count" /></span>
+              <button className="btn go" type="button" id="v-speak">Speak ▸</button>
+            </div>
+            <ol className="vlist" id="vlist" />
+            <button className="addstop" type="button" id="v-add">+ Add the selected cell <kbd>⌘B</kbd></button>
+            <p className="small vkeys">
+              ⌥1–9 jumps to a stop · ⌘] next · ⌘[ back · drag to reorder · double-click to rename.
+              While speaking, a clicker&apos;s Page Down walks it.
+            </p>
           </div>
         </aside>
+
+        {/* Speaking through round vision: where you are in the speech, over the flow. */}
+        <div className="speak" id="speak" hidden>
+          <div className="spk">
+            <button type="button" id="sp-prev" aria-label="The stop before">‹</button>
+            <span className="n mono" id="sp-n">1 / 1</span>
+            <span className="what"><b id="sp-name">—</b><span className="where mono" id="sp-where" /></span>
+            <button type="button" id="sp-next" aria-label="The next stop">›</button>
+            <button type="button" className="x" id="sp-x" aria-label="Stop speaking">×</button>
+            <i className="bar"><i id="sp-bar" /></i>
+          </div>
+        </div>
       </div>
 
       <footer className="bottom">
@@ -128,6 +154,8 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
           <span><kbd>⌫</kbd> clear</span>
           <span className="k2"><kbd>⌥↑↓</kbd> move row</span>
           <span className="k2"><kbd>⌘\</kbd> split</span>
+          <span className="k2"><kbd>⌘B</kbd> vision stop</span>
+          <span><kbd>⌘/</kbd> answer from evidence</span>
           <span><kbd>⌘K</kbd> everything</span>
         </div>
         <div className="vw">
@@ -141,10 +169,22 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
       </footer>
 
       <div className="scrim" id="scrim" hidden>
-        <div className="pal" role="dialog" aria-modal="true" aria-label="Everything this does">
-          <input id="pal-q" placeholder="Type a command…" aria-label="Search commands" />
+        <div className="pal" id="pal" role="dialog" aria-modal="true" aria-label="Command panel">
+          <div className="palin">
+            <span className="glyph mono" aria-hidden="true">⌘</span>
+            <input id="pal-q" placeholder="Run a command, go somewhere — or / to search your evidence" aria-label="Search commands" autoComplete="off" spellCheck={false} />
+          </div>
+          <div className="palsrc" id="pal-src" hidden />
           <ul id="pal-list" />
+          <div className="palfoot mono" id="pal-foot" />
         </div>
+      </div>
+
+      {/* Asks for a name next to the thing being named, instead of prompt(). */}
+      <div className="namer" id="namer" hidden>
+        <span className="small" id="namer-t">Name</span>
+        <input id="namer-in" autoComplete="off" spellCheck={false} />
+        <span className="small hint" id="namer-h" />
       </div>
 
       <div className="scrim" id="sharebox" hidden>

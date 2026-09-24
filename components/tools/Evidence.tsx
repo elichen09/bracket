@@ -148,6 +148,9 @@ export default function Evidence({ owner }: { owner?: string }) {
         <button className="btn" data-act="case">Case</button>
         <button className="btn" data-act="export">Export</button>
         <button className="btn" data-act="settings">Settings</button>
+        {/* Its own tab, reused: the two tools talk across tabs, and the send
+            list Flow writes into is this one. */}
+        <a className="btn" href="/tools/flow" target="break-flow" title="Open Flow beside this">Flow ↗</a>
         <button className={"btn docbtn" + (doc ? " on" : "")} onClick={toggleDoc}
           aria-expanded={doc} title="Show the document as it will paste">
           <span id="doclabel">Send doc</span> {doc ? "›" : "‹"}

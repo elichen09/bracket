@@ -13,6 +13,8 @@
  */
 
 import { scoped } from "../owner";
+// @ts-ignore — a plain JS module shared with the Evidence engine
+import { makeSendItem } from "../evidence/sendItem";
 
 export interface Entry {
   id: string;
@@ -33,6 +35,9 @@ export interface Hit {
   path: string;
   /** The line this puts in the flow. */
   text: string;
+  /** The block it came from, and which argument in it (-1: the whole block). */
+  id?: string;
+  ai?: number;
 }
 
 /** The whole index of this account's library, or nothing at all. */
@@ -64,25 +69,106 @@ export async function library(owner?: string | null): Promise<Entry[]> {
   }
 }
 
+/** Words too common to tell one argument from another. */
+const STOP = new Set(("a an and are as at be but by can for from had has have in into is it its no not " +
+  "of on or our so than that the their them then they this to was were what when who why will with " +
+  "would you your".split(" ")));
+
+/** The words of a query that are worth matching on. */
+export function termsOf(query: string): string[] {
+  return String(query || "").toLowerCase()
+    .replace(/\b(dropped|ext|turn|perm|nuq|xa|cx)\b/g, " ")
+    .split(/[^a-z0-9$%]+/)
+    .filter((w) => w.length > 1 && !STOP.has(w));
+}
+
 /**
- * Every argument whose tag, block or trigger carries all of the words typed.
+ * Arguments in the library, best match first.
  *
- * Not the fuzzy search Evidence does — in a round you know what you are
- * looking for and you have twenty seconds, so this is the plain one.
+ * Two kinds of query come in. One is typed — two or three words, and every
+ * one of them should match. The other is the text of a cell on the flow —
+ * "No impact — warming not existential" — when you ask for evidence that
+ * answers it, and there the right card shares some of those words and not
+ * all of them. So short queries must match every word, long ones most of
+ * them, and the ranking does the rest.
  */
 export function find(index: Entry[], query: string, max = 24): Hit[] {
-  const terms = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
+  const terms = termsOf(query);
   if (!terms.length) return [];
-  const out: Hit[] = [];
+  const need = terms.length <= 2 ? terms.length : Math.ceil(terms.length * 0.4);
+  const out: (Hit & { score: number })[] = [];
   for (const e of index) {
     const path = [e.c1, e.c2].filter(Boolean).join(" › ");
     const args = e.a && e.a.length ? e.a : [e.t];
-    for (const a of args) {
-      const hay = `${a} ${e.t} ${e.g} ${path}`.toLowerCase();
-      if (!terms.every((t) => hay.includes(t))) continue;
-      out.push({ title: a || e.t, trigger: e.g, path, text: a || e.t });
-      if (out.length >= max) return out;
-    }
+    args.forEach((a, ai) => {
+      const tag = (a || e.t || "").toLowerCase();
+      const hay = `${tag} ${(e.t || "").toLowerCase()} ${(e.g || "").toLowerCase()} ${path.toLowerCase()}`;
+      const matched = terms.filter((t) => hay.includes(t)).length;
+      if (matched < need) return;
+      // Words in the tag itself count for more than words in the block's
+      // title or its filing path.
+      const inTag = terms.filter((t) => tag.includes(t)).length;
+      out.push({
+        title: a || e.t, trigger: e.g, path, text: a || e.t,
+        id: e.id, ai: e.a && e.a.length ? ai : -1,
+        score: matched * 10 + inTag * 4,
+      });
+    });
   }
-  return out;
+  out.sort((x, y) => y.score - x.score);
+  return out.slice(0, max);
+}
+
+/**
+ * Put a card in Evidence's send list, from the flow.
+ *
+ * Written straight into this account's Evidence database, so it is there the
+ * next time Evidence opens; if Evidence is open in another tab, the caller
+ * tells it over the bus and it redraws. The block is built by the same
+ * function Evidence uses, so it lands exactly as if it had been sent there.
+ */
+export async function sendToEvidence(owner: string | null | undefined, hit: Hit): Promise<boolean> {
+  if (typeof indexedDB === "undefined" || !hit.id) return false;
+  let includeHead = true;
+  try {
+    const s = localStorage.getItem(scoped("evidence.settings", owner));
+    if (s) { const j = JSON.parse(s); if (typeof j.head === "boolean") includeHead = j.head; }
+  } catch { /* defaults */ }
+
+  const db = await new Promise<IDBDatabase | null>((resolve) => {
+    let req: IDBOpenDBRequest;
+    try { req = indexedDB.open(scoped("evidence", owner), 1); } catch { return resolve(null); }
+    req.onupgradeneeded = () => { try { req.transaction?.abort(); } catch { /* nothing */ } };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+  if (!db) return false;
+  try {
+    return await new Promise<boolean>((resolve) => {
+      const t = db.transaction(["kv", "blocks"], "readwrite");
+      let ok = false;
+      const blockReq = t.objectStore("blocks").get(hit.id as string);
+      blockReq.onsuccess = () => {
+        const block = blockReq.result;
+        if (!block) return;
+        const item = makeSendItem(block, hit.ai != null && hit.ai >= 0 ? hit.ai : null, includeHead);
+        if (!item) return;
+        const sendReq = t.objectStore("kv").get("send");
+        sendReq.onsuccess = () => {
+          const list = Array.isArray(sendReq.result) ? sendReq.result : [];
+          list.push(item);
+          t.objectStore("kv").put(list, "send");
+          ok = true;
+        };
+      };
+      t.oncomplete = () => resolve(ok);
+      t.onerror = () => resolve(false);
+      t.onabort = () => resolve(false);
+    });
+  } catch {
+    return false;
+  } finally {
+    try { db.close(); } catch { /* closed */ }
+  }
 }

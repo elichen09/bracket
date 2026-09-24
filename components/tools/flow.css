@@ -31,8 +31,12 @@
   --dim: #7C7A73;
 
   --flw-micro: 10.5px;
-  --flw-fs: 13.5px;
-  --flw-pad: 7px 9px;
+  --flw-fs: 15px;
+  --flw-pad: 11px 13px;
+  /* the two sides of the pad, a shade apart, and the rule between cells */
+  --pro-bg: #F8F5EF;
+  --con-bg: #EFEBE3;
+  --rule: #DDD7CB;
   --spring: cubic-bezier(.22, 1, .36, 1);
   --pop: cubic-bezier(.34, 1.56, .64, 1);
 
@@ -44,7 +48,7 @@
   font-variant-numeric: tabular-nums;
   position: relative;
 }
-.flw.compact { --flw-fs: 12.5px; --flw-pad: 4px 8px; }
+.flw.compact { --flw-fs: 13px; --flw-pad: 6px 10px; }
 .flw *, .flw *::before, .flw *::after { box-sizing: border-box; border-radius: 0; }
 .flw button { border: 0; padding: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
 .flw input, .flw textarea, .flw select { font: inherit; color: inherit; border-radius: 0; }
@@ -165,102 +169,122 @@
 .flw .pw:not(.active) .phead .pclose { margin-left: auto; }
 .flw .phead .pclose:hover { color: var(--bad); }
 
-/* ---------------------------------------------------------- the grid */
+/* ---------------------------------------------------------- the grid
+   The grid is the one place this tool departs from the site's small-mono
+   everything: it is read at speed, mid-speech, from a foot further back than
+   the rest of the site, so it is set like a good flow pad. The speech in large
+   bold type with its side in small caps beside it; the arguments in plain
+   15px sans with room around them; the marks as rounded chips you can see
+   from the podium; headings with a number, a label and an italic title. The
+   paper, the ink and the one orange accent are still the site's. */
 .flw .flow { min-width: 0; min-height: 0; overflow: auto; outline: 0; position: relative; }
 .flw .grid { position: relative; display: grid; width: 100%; transition: grid-template-columns .35s var(--spring); }
+/* a sheet arriving */
+.flw .grid.swap > .c, .flw .grid.swap > .r > .c, .flw .grid.swap > .rh, .flw .grid.swap > .r > .g { animation: flwSwap .36s var(--spring) both; }
+@keyframes flwSwap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 .flw .h {
   position: sticky; top: 0; z-index: 3;
-  display: flex; align-items: baseline; gap: 7px;
-  padding: 9px 9px 8px; cursor: pointer; white-space: nowrap; overflow: hidden;
-  border-bottom: 1px solid var(--ink); border-right: 1px solid var(--line-soft);
-  background: var(--surface-2);
-  transition: background .16s var(--ease);
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 13px 13px 10px; cursor: pointer; white-space: nowrap; overflow: hidden;
+  border-bottom: 1px solid var(--ink); border-right: 1px solid var(--rule);
+  background: var(--con-bg);
+  transition: background .16s var(--ease), box-shadow .25s var(--ease);
 }
-.flw .h.pro { background: var(--surface); }
-.flw .h:hover { background: var(--ground); }
-.flw .h b { font-family: var(--mono); font-size: var(--flw-micro); letter-spacing: .12em; font-weight: 500; color: var(--ink); }
-.flw .h .ct { margin-left: auto; font-size: 9.5px; color: var(--dim); }
-.flw .h .lv { display: none; font-size: 9px; color: var(--acc); }
+.flw .h.pro { background: var(--pro-bg); }
+.flw .h:hover b { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.flw .h b {
+  font-family: var(--ui); font-size: 17px; font-weight: 700; letter-spacing: -.01em;
+  color: var(--ink); text-transform: none;
+}
+.flw .h .sd { font-size: 9.5px; letter-spacing: .14em; color: var(--dim); }
+.flw .h .ct { margin-left: auto; font-size: 10px; color: var(--dim); letter-spacing: .04em; }
+.flw .h .lv { display: none; align-items: center; gap: 5px; font-size: 9.5px; letter-spacing: .12em; color: var(--acc); }
+.flw .h .lv i { width: 5px; height: 5px; border-radius: 50%; background: var(--acc); animation: flwBlink 1.1s steps(2) infinite; }
 .flw .h.live { box-shadow: inset 0 -3px 0 var(--acc); }
-.flw .h.live .lv { display: inline; }
+.flw .h.live .lv { display: inline-flex; }
 .flw .h.gh { padding: 0; background: var(--ground); cursor: default; }
 
 .flw .r { display: contents; }
 .flw .c {
-  position: relative; min-height: calc(var(--flw-fs) * 2.4);
+  position: relative; min-height: calc(var(--flw-fs) * 2.9);
   padding: var(--flw-pad);
-  border-bottom: 1px solid var(--line-soft); border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--rule); border-right: 1px solid var(--rule);
   outline: 0; white-space: pre-wrap; word-break: break-word;
-  font-size: var(--flw-fs); line-height: 1.4; cursor: text;
-  background: var(--surface-2);
+  font-family: var(--ui); font-size: var(--flw-fs); line-height: 1.42; cursor: text;
+  color: #1b1b19; background: var(--con-bg);
+  transition: background-color .2s var(--ease);
 }
-.flw .c.pro { background: var(--surface); }
-.flw .c.livecol { background-image: linear-gradient(rgba(196, 83, 31, .05), rgba(196, 83, 31, .05)); }
-.flw .r:hover > .c { background-image: linear-gradient(rgba(14, 14, 13, .028), rgba(14, 14, 13, .028)); }
+.flw .c.pro { background: var(--pro-bg); }
+.flw .c.livecol { background-image: linear-gradient(rgba(196, 83, 31, .055), rgba(196, 83, 31, .055)); }
+.flw .r:hover > .c { background-image: linear-gradient(rgba(14, 14, 13, .025), rgba(14, 14, 13, .025)); }
 .flw .c.editing { background-image: none !important; }
 .flw .c.sel:empty::before {
   content: "type to flow"; color: var(--dim);
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
 }
 .flw .c.editing:empty::before { content: ""; }
 .flw .c .arr { color: var(--acc); font-weight: 600; }
 
-/* the marks a flow is written in */
+/* the marks a flow is written in: rounded, so they read as marks and not words */
 .flw .c .tg {
-  display: inline-block; font-family: var(--mono); font-size: .76em;
-  letter-spacing: .08em; border: 1px solid currentColor;
-  padding: 0 4px; margin-right: 3px; vertical-align: .08em; line-height: 1.45;
+  display: inline-block; font-family: var(--mono); font-size: .64em; font-weight: 500;
+  letter-spacing: .1em; border: 1px solid currentColor; border-radius: 999px;
+  padding: 1px 7px 0; margin-right: 5px; vertical-align: .14em; line-height: 1.5;
 }
 .flw .c .tg.dropped { color: var(--acc); }
 .flw .c .tg.turn { background: var(--acc); color: #fff; border-color: var(--acc); }
+.flw .c .tg.ext { color: #2b2b28; }
 .flw .c .tg.perm, .flw .c .tg.nuq, .flw .c .tg.xa, .flw .c .tg.cx { color: var(--muted); }
 
 /* an argument nobody answered, and the empty cell where the answer belongs */
 .flw .c.open::after {
-  content: ""; position: absolute; right: -1px; top: 5px; bottom: 5px;
-  width: 3px; background: var(--acc); opacity: .8;
+  content: ""; position: absolute; right: -2px; top: 7px; bottom: 7px;
+  width: 3px; border-radius: 2px; background: var(--acc); opacity: .85;
 }
-.flw .c.miss { background-image: repeating-linear-gradient(135deg, transparent 0 7px, rgba(196, 83, 31, .07) 7px 8px); }
+.flw .c.miss { background-image: repeating-linear-gradient(135deg, transparent 0 7px, rgba(196, 83, 31, .075) 7px 8px); }
 
-/* a heading across the flow */
+/* a heading across the flow: [01]  ADV 1  Climate */
 .flw .rh {
-  grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px;
-  padding: 11px 12px 6px; background: var(--ground);
-  border-bottom: 1px solid var(--line-soft); cursor: pointer;
+  grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px;
+  padding: 16px 14px 9px; background: var(--ground);
+  border-bottom: 1px solid var(--rule); cursor: pointer;
 }
-.flw .rh .k { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
-.flw .rh .hn { font-family: var(--mono); font-size: var(--flw-micro); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
-.flw .rh em { font-family: var(--serif); font-size: 15px; font-style: italic; color: var(--muted); }
+.flw .rh .k { font-family: var(--mono); font-size: 10px; color: var(--dim); letter-spacing: .04em; }
+.flw .rh .hn { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.flw .rh em { font-family: var(--serif); font-size: 19px; font-style: italic; color: var(--muted); line-height: 1; }
+.flw .rh:hover em { color: var(--ink); }
+.flw .rh.born { animation: flwBorn .32s var(--pop); }
 .flw .end { grid-column: 1 / -1; height: 140px; }
 
 /* the row's own gutter: drag it, or take it away */
 .flw .g {
-  display: flex; flex-direction: column; align-items: center; gap: 1px; padding-top: 4px;
-  border-bottom: 1px solid var(--line-soft); border-right: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 8px;
+  border-bottom: 1px solid var(--rule); border-right: 1px solid var(--rule);
   background: var(--ground);
 }
 .flw .g .grip { cursor: grab; color: var(--dim); font-size: 10px; line-height: 1; padding: 2px 3px; opacity: .3; touch-action: none; transition: opacity .15s var(--ease), color .15s var(--ease); }
 .flw .g .grip:active { cursor: grabbing; }
-.flw .g .del { color: var(--dim); font-size: 13px; line-height: 1; padding: 0 4px; opacity: 0; transition: opacity .15s var(--ease), color .15s var(--ease); }
+.flw .g .del { color: var(--dim); font-size: 13px; line-height: 1; padding: 0 4px; opacity: 0; transition: opacity .15s var(--ease), color .15s var(--ease), transform .15s var(--pop); }
 .flw .r:hover .grip, .flw .r:hover .del { opacity: 1; }
 .flw .g .grip:hover { color: var(--ink); }
-.flw .g .del:hover { color: var(--bad); }
+.flw .g .del:hover { color: var(--bad); transform: scale(1.2); }
 
 /* ---------- the cursor, and your partner's ---------- */
 .flw .cursor {
   position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2;
-  border: 2px solid var(--ink); box-shadow: 0 0 0 4px rgba(14, 14, 13, .06);
-  transition: transform .14s cubic-bezier(.2,.8,.2,1), width .14s cubic-bezier(.2,.8,.2,1),
-              height .14s cubic-bezier(.2,.8,.2,1), border-color .15s, box-shadow .15s;
+  border: 2px solid var(--ink); border-radius: 3px;
+  box-shadow: 0 0 0 4px rgba(14, 14, 13, .06);
+  transition: transform .16s cubic-bezier(.2,.8,.2,1), width .16s cubic-bezier(.2,.8,.2,1),
+              height .16s cubic-bezier(.2,.8,.2,1), border-color .15s, box-shadow .2s;
 }
 .flw .cursor .lab {
   position: absolute; left: -2px; bottom: 100%;
-  font-size: 9px; letter-spacing: .1em;
-  background: var(--ink); color: var(--ground); padding: 1px 6px; white-space: nowrap;
+  font-size: 9px; letter-spacing: .12em; border-radius: 3px 3px 0 0;
+  background: var(--ink); color: var(--ground); padding: 2px 7px 1px; white-space: nowrap;
   transition: background .15s var(--ease);
 }
-.flw .cursor.editing { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(196, 83, 31, .13); }
+.flw .cursor.editing { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(196, 83, 31, .14), 0 10px 26px -14px rgba(196, 83, 31, .5); }
 .flw .cursor.editing .lab { background: var(--acc); color: #fff; }
 .flw .cursor.range { border-style: dashed; }
 .flw .pw:not(.active) .cursor { border-color: var(--dim); box-shadow: none; opacity: .55; }
@@ -268,14 +292,43 @@
 
 .flw .pcaret {
   position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2;
-  border: 2px dashed hsl(var(--hue) 62% 42%);
+  border: 2px dashed hsl(var(--hue) 62% 42%); border-radius: 3px;
   background: hsl(var(--hue) 62% 42% / .07);
   transition: transform .18s var(--spring), width .18s var(--spring), height .18s var(--spring);
 }
 .flw .pcaret span {
-  position: absolute; right: -2px; top: 100%;
+  position: absolute; right: -2px; top: 100%; border-radius: 0 0 3px 3px;
   font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
   background: hsl(var(--hue) 62% 42%); color: #fff; padding: 1px 6px; white-space: nowrap;
+}
+
+/* ---------- round vision on the grid ----------
+   A stop carries its number in its own corner, and a jump lands in a ring
+   drawn on the cell itself. Both belong to the cell rather than floating over
+   the grid at a pixel position: the columns change width whenever the
+   selection moves, and anything placed by coordinates would be left behind. */
+.flw .c[data-stop] { padding-right: 32px; }
+.flw .c[data-stop]::before {
+  content: attr(data-stop);
+  position: absolute; right: 7px; bottom: 7px; z-index: 1;
+  min-width: 18px; height: 16px; padding: 0 5px; border-radius: 999px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 600; line-height: 1;
+  letter-spacing: 0; text-transform: none;
+  background: var(--ink); color: var(--ground);
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, .35);
+  animation: flwBadge .4s var(--pop) both;
+}
+.flw .c.stopnow[data-stop]::before { background: var(--acc); color: #fff; animation: flwBadgeNow .5s var(--pop) both; }
+@keyframes flwBadge { from { opacity: 0; transform: scale(.4); } }
+@keyframes flwBadgeNow { 0% { transform: scale(.6); } 50% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+.flw .c.spot { z-index: 3; animation: flwSpot .9s cubic-bezier(.2, .8, .2, 1); }
+@keyframes flwSpot {
+  0% { box-shadow: 0 0 0 12px rgba(196, 83, 31, 0), 0 0 0 0 rgba(196, 83, 31, .35); }
+  18% { box-shadow: 0 0 0 2px rgba(196, 83, 31, 1), 0 0 0 0 rgba(196, 83, 31, .35); }
+  70% { box-shadow: 0 0 0 2px rgba(196, 83, 31, 1), 0 0 0 24px rgba(196, 83, 31, 0); }
+  100% { box-shadow: 0 0 0 2px rgba(196, 83, 31, 0), 0 0 0 24px rgba(196, 83, 31, 0); }
 }
 
 /* ---------- picking things up ---------- */
@@ -411,15 +464,6 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   transition: background .16s var(--ease), color .16s var(--ease), border-color .16s var(--ease);
 }
 .flw .card .ins:hover { background: var(--ink); color: var(--ground); border-color: var(--ink); }
-.flw .road { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
-.flw .road li {
-  display: grid; grid-template-columns: 26px 1fr auto; align-items: baseline; gap: 6px;
-  padding: 9px; background: var(--surface-2); border: 1px solid var(--line-soft); font-size: 13px;
-}
-.flw .road li.none { grid-template-columns: 1fr; }
-.flw .road li .n { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
-.flw .road li .x { color: var(--dim); font-size: 14px; line-height: 1; }
-.flw .road li .x:hover { color: var(--bad); }
 .flw .addstop {
   border: 1px dashed var(--line); padding: 9px; font-size: var(--flw-micro); color: var(--muted);
   transition: border-color .16s var(--ease), color .16s var(--ease);
@@ -436,16 +480,6 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 }
 @keyframes flwVeil { from { opacity: 0; } }
 .flw .scrim[hidden] { display: none; }
-.flw .pal {
-  width: min(560px, 100%); background: var(--surface); border: 1px solid var(--ink);
-  box-shadow: 0 30px 80px -24px rgba(0, 0, 0, .4);
-  animation: flwCard .28s var(--pop) both;
-}
-@keyframes flwCard { from { opacity: 0; transform: translateY(12px) scale(.985); } }
-.flw .pal input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 15px 16px; font-size: 16px; outline: 0; }
-.flw .pal ul { list-style: none; margin: 0; padding: 5px; max-height: 56vh; overflow: auto; }
-.flw .pal li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 12px; cursor: pointer; font-size: 13.5px; }
-.flw .pal li:hover, .flw .pal li.on { background: var(--surface-2); }
 
 .flw .card.shr {
   width: min(560px, 100%); background: var(--surface); border: 1px solid var(--ink);
@@ -485,6 +519,172 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 }
 .flw .card.shr .or { color: var(--dim); }
 
+/* ---------- the command panel ----------
+   Everything the tool does, every place on the flow, and the evidence
+   library, behind one box. The highlight slides between rows rather than
+   jumping; rows arrive in a quick stagger; the letters you typed are marked
+   in the results so you can see why each one matched. */
+.flw .pal {
+  width: min(640px, 100%); background: var(--surface); border: 1px solid var(--ink);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .45), 0 0 0 6px rgba(14, 14, 13, .04);
+  animation: flwCard .3s var(--pop) both; overflow: hidden;
+  display: flex; flex-direction: column; max-height: 74vh;
+}
+@keyframes flwCard { from { opacity: 0; transform: translateY(12px) scale(.985); } }
+.flw .palin { display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+.flw .palin .glyph {
+  width: 26px; height: 26px; display: grid; place-items: center; flex-shrink: 0;
+  background: var(--ink); color: var(--ground); font-size: 13px;
+  transition: background .2s var(--ease);
+}
+.flw .pal.ev .palin .glyph { background: var(--acc); }
+.flw .pal.ev .palin .glyph::before { content: "/"; position: absolute; }
+.flw .pal.ev .palin .glyph { color: transparent; position: relative; }
+.flw .pal.ev .palin .glyph::before { color: #fff; }
+.flw .palin input { flex: 1; min-width: 0; border: 0; background: none; padding: 17px 0; font-size: 17px; outline: 0; font-family: var(--ui); }
+.flw .palsrc {
+  padding: 9px 18px; font-size: 12.5px; color: var(--muted);
+  background: var(--surface-2); border-bottom: 1px solid var(--line-soft);
+}
+.flw .palsrc b { color: var(--ink); font-weight: 600; }
+.flw .pal ul { list-style: none; margin: 0; padding: 6px; overflow: auto; position: relative; flex: 1; min-height: 60px; }
+.flw .pal li.grp {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dim); padding: 12px 12px 5px;
+}
+.flw .pal li.grp:first-child { padding-top: 6px; }
+.flw .pal li.it {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 12px; padding: 9px 12px; cursor: pointer;
+  font-size: 14px; animation: flwIn .22s var(--spring) both; animation-delay: calc(var(--i, 0) * 12ms);
+  transition: color .12s var(--ease);
+}
+.flw .pal li.it .lb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.flw .pal li.it .lb u { text-decoration: none; color: var(--acc); font-weight: 600; }
+.flw .pal li.it small {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.flw .pal li.it .gtag { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.flw .pal li.it.on .gtag, .flw .pal li.it.on small { color: rgba(255, 255, 255, .6); }
+.flw .pal li.it.on { color: var(--ground); }
+.flw .pal li.it.on .lb u { color: #ffb48f; }
+.flw .pal li.it.on kbd { color: var(--ground); border-color: rgba(255, 255, 255, .3); }
+.flw .pal li.hl {
+  position: absolute; left: 6px; right: 6px; top: 0; z-index: 0; pointer-events: none;
+  background: var(--ink); opacity: 0;
+  transition: transform .16s var(--spring), height .16s var(--spring), opacity .12s;
+}
+.flw .pal.ev li.hl { background: var(--acc); }
+.flw .pal.ev li.it.on .lb u { color: #fff; text-decoration: underline; }
+.flw .pal li.empty { padding: 26px 14px; color: var(--dim); font-size: 13px; text-align: center; }
+.flw .palfoot {
+  display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 18px; border-top: 1px solid var(--line-soft);
+  background: var(--surface-2); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim);
+}
+.flw .palfoot span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---------- the naming box ---------- */
+.flw .namer {
+  position: fixed; z-index: 45; width: 320px;
+  display: grid; gap: 7px; padding: 12px 12px 10px;
+  background: var(--surface); border: 1px solid var(--ink);
+  box-shadow: 0 24px 50px -20px rgba(0, 0, 0, .4);
+  animation: flwNamer .2s var(--pop) both;
+}
+.flw .namer[hidden] { display: none; }
+@keyframes flwNamer { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
+.flw .namer input {
+  border: 1px solid var(--line); background: var(--surface-2); padding: 8px 10px;
+  font-size: 15px; outline: none; font-family: var(--ui);
+}
+.flw .namer input:focus { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(196, 83, 31, .12); }
+.flw .namer .hint { font-size: 9px; }
+
+/* ---------- speaking through round vision ---------- */
+.flw .speak { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 9; display: flex; justify-content: center; pointer-events: none; }
+.flw .speak[hidden] { display: none; }
+.flw .speak .spk {
+  pointer-events: auto; position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 12px 12px 12px; min-width: 420px; max-width: calc(100% - 40px);
+  background: var(--ink); color: var(--ground);
+  box-shadow: 0 26px 60px -22px rgba(0, 0, 0, .55);
+  animation: flwRise .4s var(--pop) both;
+}
+@keyframes flwRise { from { opacity: 0; transform: translateY(24px) scale(.96); } }
+.flw .speak .spk.turn .what { animation: flwTurn .34s var(--spring); }
+@keyframes flwTurn { from { opacity: 0; transform: translateX(14px); } }
+.flw .speak button { width: 32px; height: 32px; display: grid; place-items: center; font-size: 17px; color: var(--ground); border: 1px solid rgba(255, 255, 255, .22); position: relative; overflow: hidden; transition: background .15s var(--ease), border-color .15s var(--ease); }
+.flw .speak button:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .5); }
+.flw .speak .x { border: 0; opacity: .6; }
+.flw .speak .n { font-size: 11px; letter-spacing: .1em; color: var(--acc); white-space: nowrap; }
+.flw .speak .what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.flw .speak .what b { font-family: var(--ui); font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flw .speak .where { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; opacity: .55; }
+.flw .speak .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, .12); }
+.flw .speak .bar i { display: block; height: 100%; background: var(--acc); transform-origin: left; transition: transform .4s var(--spring); }
+.flw.speaking .h.live { box-shadow: inset 0 -3px 0 var(--acc); }
+
+/* ---------- the round vision list ---------- */
+.flw .vhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.flw .vhead i { font-style: normal; color: var(--acc); margin-left: 6px; }
+.flw .vlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.flw .vlist li.vs {
+  display: grid; grid-template-columns: 26px 1fr auto auto; align-items: center; gap: 8px;
+  padding: 9px 8px 9px 10px; background: var(--surface-2); border: 1px solid var(--line-soft);
+  cursor: pointer; position: relative; overflow: hidden;
+  animation: flwIn .24s var(--spring) both; animation-delay: calc(var(--i, 0) * 25ms);
+  transition: border-color .15s var(--ease), background .15s var(--ease), transform .18s var(--spring), box-shadow .18s var(--ease);
+}
+.flw .vlist li.vs:hover { border-color: var(--ink); transform: translateX(2px); }
+.flw .vlist li.vs.now { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.flw .vlist li.vs.now .where, .flw .vlist li.vs.now kbd { color: rgba(255, 255, 255, .6); border-color: rgba(255, 255, 255, .3); }
+.flw .vlist li.vs.gone { opacity: .55; }
+.flw .vlist li.vs.lift { opacity: .4; }
+.flw .vlist li.vs.over { box-shadow: inset 0 3px 0 var(--acc); }
+.flw .vlist li .n {
+  width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 10px; font-weight: 600; background: var(--ink); color: var(--ground);
+}
+.flw .vlist li.vs.now .n { background: var(--acc); color: #fff; }
+.flw .vlist li .nm { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.flw .vlist li .nm b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flw .vlist li .where { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flw .vlist li .x { color: var(--dim); font-size: 14px; line-height: 1; padding: 0 3px; }
+.flw .vlist li .x:hover { color: var(--bad); }
+.flw .vlist li.none { list-style: none; }
+.flw .vkeys { line-height: 1.7; text-transform: none; letter-spacing: .02em; font-family: var(--ui); font-size: 12px; }
+.flw .addstop kbd { margin-left: 6px; }
+
+/* ---------- evidence in the drawer ---------- */
+.flw .card { animation-delay: calc(var(--i, 0) * 30ms); }
+.flw .card .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.flw .card .ins.go { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.flw .card .ins.go:hover { background: var(--acc); border-color: var(--acc); }
+.flw .inbox { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line-soft); }
+.flw .inbox[hidden] { display: none; }
+.flw .card.sent { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 5%, var(--surface)); }
+.flw .card .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.flw .card .tagbtn {
+  font-size: 12px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); text-align: left; max-width: 100%;
+  transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.flw .card .tagbtn:hover { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+
+/* the drawer button, when Evidence has just sent something */
+.flw #drawer-btn.ping { animation: flwPing 1.1s var(--ease) 2; }
+@keyframes flwPing { 0%, 100% { box-shadow: 0 0 0 0 rgba(196, 83, 31, 0); } 40% { box-shadow: 0 0 0 5px rgba(196, 83, 31, .3); border-color: var(--acc); color: var(--acc); } }
+
+/* the command button, the one way in that says what it is */
+.flw .btn.cmd { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.flw .btn.cmd:hover { color: var(--ground); background: #2a2a27; }
+
+/* the clock in its last thirty seconds */
+.flw .tbar .tm.low { animation: flwLow 1s ease-in-out infinite; }
+@keyframes flwLow { 50% { opacity: .55; } }
+
 /* --------------------------------------------------------- the toast */
 .flw .tst {
   position: fixed; left: 50%; bottom: 66px; z-index: 30;
@@ -495,6 +695,8 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   transition: opacity .25s var(--ease), transform .3s var(--pop);
 }
 .flw .tst.on { opacity: 1; transform: translate(-50%, 0); }
+/* above the speaking strip, not on top of it */
+.flw.speaking .tst { bottom: 150px; }
 .flw .tst.act { pointer-events: auto; }
 .flw .tst .undo { margin-left: 14px; color: var(--acc); text-decoration: underline; text-underline-offset: 3px; font: inherit; letter-spacing: inherit; text-transform: inherit; }
 .flw .tst::after {
