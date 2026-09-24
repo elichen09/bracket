@@ -23,11 +23,12 @@ import { loadPieces, savePieces, newPieceId, titleFrom, fromDoc, merge, type Pie
 import { stopsOf, toggleStop, setStop, reorder, clearStops, visionPlugin, visionKey, type Stop } from "@/lib/docflow/vision";
 import { openRoom, MATE_COLORS, type Room, type RoomStatus, type Mate } from "@/lib/docflow/room";
 import { newCode, tidyCode } from "@/lib/flow/share";
-import { library, find, sendToEvidence, type Entry, type Hit } from "@/lib/flow/cards";
+import { library, find, sendToEvidence, blockTags, type Entry, type Hit, type Tag } from "@/lib/flow/cards";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { speeches, clock, PREP_DEFAULT } from "@/lib/flow/format";
 import { polish } from "@/lib/evidence/polish";
 import "./docflow.css";
+import "./finish.css";
 
 /**
  * Doc flow — flowing the way a Google Doc gets flowed, with the tool doing
@@ -148,6 +149,8 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
   const panelRef = useRef(panel);
   panelRef.current = panel;
   const [hits, setHits] = useState<Hit[]>([]);
+  // a block chosen from the search, open to its cards
+  const [pick, setPick] = useState<null | { hit: Hit; tags: Tag[]; sel: number[]; q: string; i: number; back: string }>(null);
   const index = useRef<Entry[] | null>(null);
   const [toastMsg, setToastMsg] = useState<{ text: string; undo?: () => void; n: number } | null>(null);
   const [side, setSide] = useState(true);
@@ -815,7 +818,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
 
   /* ------------------------------------------------------------ the command panel, and evidence */
   const openPanel = useCallback((q = "") => { setPanel({ q, i: 0 }); }, []);
-  const closePanel = useCallback(() => { setPanel(null); view.current?.focus(); }, []);
+  const closePanel = useCallback(() => { setPanel(null); setPick(null); view.current?.focus(); }, []);
 
   /** Every action in the key table, by id. */
   const act = useCallback((id: string) => {
@@ -899,19 +902,65 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
     return () => { dead = true; };
   }, [panel, evMode, answering, owner]);
 
-  const takeHit = useCallback(async (h: Hit, send: boolean) => {
-    setPanel(null);
-    const entry = (index.current || []).find((e) => e.id === h.id);
-    const tags = entry && entry.a && entry.a.length ? entry.a : [h.title];
-    run(C.answerWith(tags));
-    if (!send) { toast(`${tags.length} answer${tags.length === 1 ? "" : "s"} from “${h.title}”`); return; }
-    const ok = await sendToEvidence(owner, h);
-    if (ok) { bus.current?.post({ kind: "send-changed", title: h.title }); toast(`Answered from “${h.title}” — and it is in your send doc`); }
-    else toast(`Answered from “${h.title}” — Evidence could not send it`);
+  /** Answer with some of a block's cards (or all of them), and send those cards along. */
+  const answerFrom = useCallback(async (h: Hit, lines: string[], picks: number[] | undefined, send: boolean) => {
+    setPanel(null); setPick(null);
+    run(C.answerWith(lines));
+    const what = `${lines.length} answer${lines.length === 1 ? "" : "s"}`;
+    if (!send) { toast(`${what} from “${h.title}”`); return; }
+    const ok = await sendToEvidence(owner, h, picks);
+    if (ok) { bus.current?.post({ kind: "send-changed", title: h.title }); toast(`${what} from “${h.title}” — and ${picks ? (picks.length === 1 ? "that card is" : "those cards are") : "the block is"} in your send doc`); }
+    else toast(`${what} from “${h.title}” — Evidence could not send it`);
   }, [owner, run, toast]);
+
+  /** A block chosen from the search opens to its cards, to take one, several or all. */
+  const takeHit = useCallback(async (h: Hit, send: boolean) => {
+    const tags = await blockTags(owner, h.id);
+    if (!tags.length) {
+      const entry = (index.current || []).find((e) => e.id === h.id);
+      answerFrom(h, entry && entry.a && entry.a.length ? entry.a : [h.title], undefined, send);
+      return;
+    }
+    setPick({ hit: h, tags, sel: [], q: "", i: 1, back: panel?.q || "/" });
+  }, [owner, answerFrom, panel]);
+
+  const pickRows = useMemo(() => {
+    if (!pick) return [];
+    const f = pick.q.trim().toLowerCase();
+    const rows: { all: boolean; tag: Tag | null }[] = [{ all: true, tag: null }];
+    pick.tags.filter((t) => !f || (t.title + " " + t.cite).toLowerCase().includes(f)).forEach((t) => rows.push({ all: false, tag: t }));
+    return rows;
+  }, [pick]);
+  const togglePick = (i: number) => {
+    if (!pick) return;
+    const row = pickRows[i];
+    if (!row) return;
+    let sel = pick.sel.slice();
+    if (row.all) sel = sel.length === pick.tags.length ? [] : pick.tags.map((t) => t.i);
+    else if (row.tag) sel = sel.includes(row.tag.i) ? sel.filter((x) => x !== row.tag!.i) : [...sel, row.tag.i];
+    setPick({ ...pick, sel, i });
+  };
+  const commitPick = (send: boolean, at = pick?.i ?? 0) => {
+    if (!pick) return;
+    const row = pickRows[at];
+    let picks = pick.sel.slice();
+    if (!picks.length && row) picks = row.all ? pick.tags.map((t) => t.i) : row.tag ? [row.tag.i] : [];
+    if (!picks.length) return;
+    picks.sort((a, b) => a - b);
+    const lines = picks.map((i) => pick.tags.find((t) => t.i === i)!.title);
+    answerFrom(pick.hit, lines, picks.length === pick.tags.length ? undefined : picks, send);
+  };
 
   const panelKey = (e: React.KeyboardEvent) => {
     if (!panel) return;
+    if (pick) {
+      const n = pickRows.length;
+      if (e.key === "Escape") { e.preventDefault(); setPanel({ q: pick.back, i: 0 }); setPick(null); return; }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); if (n) setPick({ ...pick, i: (pick.i + (e.key === "ArrowDown" ? 1 : -1) + n) % n }); return; }
+      if (e.key === "Tab" || (e.key === " " && !pick.q)) { e.preventDefault(); togglePick(pick.i); return; }
+      if (e.key === "Enter") { e.preventDefault(); commitPick(!e.shiftKey); }
+      return;
+    }
     const n = evMode ? hits.length : listed.length;
     if (e.key === "Escape") { e.preventDefault(); closePanel(); return; }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -1334,15 +1383,31 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
 
       {panel && (
         <div className="dscrim" onMouseDown={(e) => { if (e.target === e.currentTarget) closePanel(); }}>
-          <div className={"dpal" + (evMode ? " ev" : "")}>
+          <div className={"dpal" + (evMode ? " ev" : "") + (pick ? " pick" : "")}>
             <div className="dpin">
-              <span className="glyph mono">{evMode ? "/" : "›"}</span>
-              <input autoFocus value={panel.q} placeholder="Run a command — or / to answer from your evidence"
-                onChange={(e) => setPanel({ q: e.target.value, i: 0 })} onKeyDown={panelKey} spellCheck={false} />
+              <span className="glyph mono">{pick ? "✓" : evMode ? "/" : "›"}</span>
+              {pick ? (
+                <input autoFocus key="pick" value={pick.q} placeholder="Filter the cards in this block"
+                  onChange={(e) => setPick({ ...pick, q: e.target.value, i: 1 })} onKeyDown={panelKey} spellCheck={false} />
+              ) : (
+                <input autoFocus key="q" value={panel.q} placeholder="Run a command — or / to answer from your evidence"
+                  onChange={(e) => setPanel({ q: e.target.value, i: 0 })} onKeyDown={panelKey} spellCheck={false} />
+              )}
             </div>
-            {evMode && answering && <div className="dpsrc">Answering <b>{answering}</b></div>}
+            {pick ? (
+              <div className="dpsrc"><b className="ink">{pick.hit.title}</b> · {pick.sel.length ? `${pick.sel.length} picked` : "Enter takes the card you are on"}{answering ? <> · answering <b>{answering}</b></> : null}</div>
+            ) : evMode && answering && <div className="dpsrc">Answering <b>{answering}</b></div>}
             <ul>
-              {evMode
+              {pick ? pickRows.map((r, i) => {
+                const ticked = r.all ? pick.sel.length === pick.tags.length : !!r.tag && pick.sel.includes(r.tag.i);
+                return (
+                  <li key={r.all ? "all" : r.tag!.i} className={(i === pick.i ? "on" : "") + (r.all ? " all" : "")} onMouseEnter={() => setPick({ ...pick, i })}
+                    onMouseDown={(e) => { e.preventDefault(); if ((e.target as HTMLElement).closest(".ck") || e.ctrlKey) togglePick(i); else commitPick(!e.shiftKey, i); }}>
+                    <span className={"ck" + (ticked ? " on" : "")} aria-hidden="true" />
+                    <span className="lb">{r.all ? `Every card in the block — all ${pick.tags.length}` : r.tag!.title}<small>{r.all ? pick.hit.title : r.tag!.cite}</small></span>
+                  </li>
+                );
+              }) : evMode
                 ? (hits.length ? hits.map((h, i) => (
                   <li key={(h.id || "") + i} className={i === panel.i ? "on" : ""} onMouseEnter={() => setPanel({ ...panel, i })}
                     onMouseDown={(e) => { e.preventDefault(); takeHit(h, !e.shiftKey); }}>
@@ -1357,8 +1422,13 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
                 ))}
             </ul>
             <div className="dpfoot mono">
-              {evMode
-                ? <><span><kbd>Enter</kbd> answer + send the block</span><span><kbd>Shift+Enter</kbd> answer only</span><span><kbd>Esc</kbd> close</span></>
+              {pick
+                ? <><span><kbd>Space</kbd> or <kbd>Tab</kbd> pick more than one</span>
+                  <button type="button" className="dgo" onClick={() => commitPick(true)}><kbd>Enter</kbd> answer + send{pick.sel.length ? ` ${pick.sel.length}` : ""}</button>
+                  <button type="button" className="dgo" onClick={() => commitPick(false)}><kbd>Shift+Enter</kbd> answer only</button>
+                  <span><kbd>Esc</kbd> back</span></>
+                : evMode
+                ? <><span><kbd>Enter</kbd> open the block&apos;s cards</span><span><kbd>Esc</kbd> close</span></>
                 : <><span><kbd>↑↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>/</kbd> your evidence</span><span><kbd>Esc</kbd> close</span></>}
             </div>
           </div>

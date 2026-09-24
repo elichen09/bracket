@@ -5,6 +5,7 @@ import Link from "next/link";
 import DocEditor from "./DocEditor";
 import { polish } from "@/lib/evidence/polish";
 import "./evidence.css";
+import "./finish.css";
 
 /**
  * Evidence, mounted.

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { polish } from "@/lib/evidence/polish";
 import "./flow.css";
+import "./finish.css";
 
 /**
  * Flow, mounted.

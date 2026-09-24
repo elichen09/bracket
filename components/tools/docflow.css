@@ -538,3 +538,22 @@
 .dfl .dpast:hover span { transform: translateX(3px); }
 .dfl .dlive { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; font-size: 9px; color: #1F7A4B; }
 .dfl .dlive i { width: 7px; height: 7px; border-radius: 50%; background: #1F7A4B; }
+
+/* a block's cards, to pick from */
+.dfl .dpal li .ck {
+  width: 16px; height: 16px; flex-shrink: 0; border: 1.5px solid var(--line); border-radius: 3px; background: #fff;
+  display: grid; place-items: center; transition: background .15s, border-color .15s, transform .2s var(--pop);
+}
+.dfl .dpal li .ck.on { background: var(--ink); border-color: var(--ink); transform: scale(1.08); }
+.dfl .dpal li .ck.on::after { content: ""; width: 7px; height: 4px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: translateY(-1px) rotate(-45deg); }
+.dfl .dpal li.on .ck { border-color: rgba(255, 255, 255, .55); background: transparent; }
+.dfl .dpal li.on .ck.on { background: #fff; border-color: #fff; }
+.dfl .dpal li.on .ck.on::after { border-color: var(--ink); }
+.dfl .dpal li.all { border-bottom: 1px dashed var(--line-soft); margin-bottom: 4px; border-radius: 4px 4px 0 0; }
+.dfl .dpal li.all .lb { font-weight: 600; }
+.dfl .dpal.pick li small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; text-transform: none; letter-spacing: .02em; font-family: var(--ui); font-size: 11.5px; }
+.dfl .dpal.pick li.on { background: var(--ink); }
+.dfl .dpal.pick .dpin .glyph { background: var(--ink); }
+.dfl .dpsrc b.ink { color: var(--ink); }
+.dfl .dpfoot .dgo { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); border: 1px solid var(--line); padding: 3px 8px 3px 4px; text-transform: uppercase; letter-spacing: .1em; font-family: var(--mono); font-size: 9.5px; transition: background .15s, color .15s; }
+.dfl .dpfoot .dgo:hover { background: var(--ink); color: #fff; }

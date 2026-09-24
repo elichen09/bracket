@@ -7,10 +7,11 @@ import {
   listRounds, patchRound, deleteRound, restoreRound, putRound, onArchive, summarizeGrid, gridHasWriting, type Round,
 } from "@/lib/pastflows";
 import { archiveAll, renameDoc, removeDoc, restoreDoc, listDocs } from "@/lib/docflow/store";
-import { columns } from "@/lib/flow/format";
+import { columns, sheetColumns } from "@/lib/flow/format";
 import { scoped } from "@/lib/owner";
 import { polish } from "@/lib/evidence/polish";
 import "./pastflows.css";
+import "./finish.css";
 
 /**
  * Past flows — every round, in either tool, in one place.
@@ -88,7 +89,8 @@ function DocPage({ data, q }: { data: any; q: string[] }) {
 
 /** A grid round, sheet by sheet, only the rows with writing in them. */
 function GridSheets({ data, q }: { data: any; q: string[] }) {
-  const cols = columns(data?.first === "con" ? "con" : "pro");
+  // rounds kept before each sheet had its own seven columns still read the old way
+  const colsFor = (side?: string) => (data?.layout === 2 ? sheetColumns(side === "con" ? "con" : "pro") : columns(data?.first === "con" ? "con" : "pro"));
   const sheets = (data?.sheets || []) as { id: string; name: string; side?: string; rows: { id: string; c: string[] }[] }[];
   return (
     <div className="pf-grid">
@@ -96,6 +98,7 @@ function GridSheets({ data, q }: { data: any; q: string[] }) {
         <p className="pf-gmeta mono">{[data.meta.tourn, data.meta.round, data.meta.side ? `we were ${data.meta.side}` : ""].filter(Boolean).join(" · ")}</p>
       )}
       {sheets.map((sh) => {
+        const cols = colsFor(sh.side);
         const rows = (sh.rows || []).filter((r) => (r.c || []).some((c) => c && c.trim()));
         const used = cols.map((_, i) => rows.some((r) => r.c?.[i]?.trim()));
         const last = used.lastIndexOf(true);

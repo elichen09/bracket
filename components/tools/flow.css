@@ -987,3 +987,42 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   .flw *, .flw *::before, .flw *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   .flw .btn:hover, .flw .tabs button:hover { transform: none; }
 }
+
+/* ---------- a block's cards, to pick from ----------
+   In the palette, choosing a block opens its cards; in the drawer, a block's
+   title opens them in place. A tick is a small square that fills. */
+.flw .pal li.it .ck {
+  width: 16px; height: 16px; flex-shrink: 0; border: 1.5px solid var(--line); border-radius: 3px; background: var(--surface);
+  display: grid; place-items: center; transition: background .15s var(--ease), border-color .15s var(--ease), transform .2s var(--pop);
+}
+.flw .pal li.it .ck.on { background: var(--ink); border-color: var(--ink); transform: scale(1.08); }
+.flw .pal li.it .ck.on::after { content: ""; width: 7px; height: 4px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: translateY(-1px) rotate(-45deg); }
+.flw .pal li.it.on .ck { border-color: rgba(255, 255, 255, .55); background: transparent; }
+.flw .pal li.it.on .ck.on { background: #fff; border-color: #fff; }
+.flw .pal li.it.on .ck.on::after { border-color: var(--ink); }
+.flw .pal li.it.all { border-bottom: 1px dashed var(--line-soft); margin-bottom: 4px; }
+.flw .pal li.it.all .lb { font-weight: 600; }
+.flw .pal.pick li.it small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; letter-spacing: .02em; text-transform: none; font-family: var(--ui); font-size: 11.5px; }
+.flw .pal.pick .palin .glyph { background: var(--ink); }
+.flw .pal.pick li.hl { background: var(--ink); }
+.flw .palfoot .pf-go {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--ink);
+  border: 1px solid var(--line); padding: 3px 8px 3px 4px; transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.flw .palfoot .pf-go:hover { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.flw .palfoot .pf-go:hover kbd { color: inherit; border-color: rgba(255, 255, 255, .35); }
+
+.flw .card .ctag.open-tags { display: flex; align-items: flex-start; gap: 8px; text-align: left; font: inherit; font-weight: 600; font-size: 13.5px; line-height: 1.35; color: var(--ink); }
+.flw .card .ctag .chev { margin-left: auto; margin-top: 4px; width: 7px; height: 7px; flex-shrink: 0; border-right: 1.5px solid var(--dim); border-bottom: 1.5px solid var(--dim); transform: rotate(45deg); transition: transform .22s var(--spring); }
+.flw .card.open .ctag .chev { transform: rotate(-135deg) translate(-2px, -2px); }
+.flw .card .ctag.open-tags:hover .chev { border-color: var(--ink); }
+.flw .card .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.flw .tagpick { display: grid; gap: 2px; max-height: 280px; overflow-y: auto; margin: 2px -4px; padding: 4px; background: var(--surface); border: 1px solid var(--line-soft); }
+.flw .tagpick .tp-h { padding: 2px 4px 6px; }
+.flw .tagpick .tp { display: flex; align-items: flex-start; gap: 8px; padding: 6px 6px; cursor: pointer; border-radius: 3px; transition: background .12s var(--ease); animation: flwIn .2s var(--spring) both; }
+.flw .tagpick .tp:hover { background: var(--surface-2); }
+.flw .tagpick .tp input { margin: 2px 0 0; accent-color: var(--ink); width: 14px; height: 14px; flex-shrink: 0; }
+.flw .tagpick .tp span { display: grid; gap: 1px; min-width: 0; }
+.flw .tagpick .tp b { font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+.flw .tagpick .tp small { font-size: 11px; color: var(--dim); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flw .tagpick .tp:has(input:checked) { background: rgba(14, 14, 13, .06); }

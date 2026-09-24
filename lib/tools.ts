@@ -34,8 +34,8 @@ export const TOOLS: Tool[] = [
     name: "Flow",
     blurb: "Flow a Public Forum round on a real grid, on the clock, with your partner in the same flow.",
     about:
-      "One column per speech in PF's own order, one row per argument, and the answer to something " +
-      "sits to the right of it. The clock knows every speech and both prep clocks, and marks the " +
+      "One sheet per case, its columns the chain of answers — the case, their rebuttal, your rebuttal, " +
+      "through both final focuses — one row per argument, and the answer to something sits to the right of it. The clock knows every speech and both prep clocks, and marks the " +
       "column that is live. Start a room, read the code to your partner, and you are both writing " +
       "the same flow.",
     storage:

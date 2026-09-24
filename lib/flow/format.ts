@@ -58,6 +58,28 @@ export function columns(first: Side): Column[] {
 }
 
 /**
+ * The seven columns of one sheet, in the order the argument is answered.
+ *
+ * A sheet is one side's case, so the other side's constructive never belongs
+ * on it — that is the other sheet. What does is the chain of answers: their
+ * rebuttal to this case, this side's rebuttal back, and so on down to the
+ * final focuses. The chain runs the same way whichever team speaks first, so
+ * flipping the speaking order moves nothing on the flow.
+ */
+export function sheetColumns(side: Side): Column[] {
+  const other = OTHER(side);
+  const col = (s: Side, leg: (typeof LEGS)[number]): Column => ({ key: `${SHORT(s)} ${leg.key}`, long: `${s === "pro" ? "Pro" : "Con"} ${leg.long}`, side: s });
+  return [col(side, LEGS[0]), ...LEGS.slice(1).flatMap((leg) => [col(other, leg), col(side, leg)])];
+}
+
+/** Where a speech is written on a sheet: its column there, or -1 if it has none. */
+export function columnOn(side: Side, first: Side, speechCol: number): number {
+  if (speechCol < 0) return -1;
+  const key = columns(first)[speechCol]?.key;
+  return sheetColumns(side).findIndex((c) => c.key === key);
+}
+
+/**
  * Every speech in order, crossfire included.
  *
  * Crossfire follows the two constructives and the two rebuttals; grand

@@ -74,7 +74,7 @@ export async function library(owner?: string | null): Promise<Entry[]> {
 /** Words too common to tell one argument from another. */
 const STOP = new Set(("a an and are as at be but by can for from had has have in into is it its no not " +
   "of on or our so than that the their them then they this to was were what when who why will with " +
-  "would you your".split(" ")));
+  "would you your").split(" "));
 
 /** The words of a query that are worth matching on. */
 export function termsOf(query: string): string[] {
@@ -123,6 +123,45 @@ export function find(index: Entry[], query: string, max = 24): Hit[] {
   return out.slice(0, max);
 }
 
+/** One card in a block: its tag, and whose card it is. */
+export interface Tag { i: number; title: string; cite: string }
+
+const runsText = (el: any) => (el && Array.isArray(el.runs) ? el.runs.map((r: any) => r.t || "").join("") : "").replace(/\s+/g, " ").trim();
+
+async function openEvidence(owner?: string | null) {
+  if (typeof indexedDB === "undefined") return null;
+  return new Promise<IDBDatabase | null>((resolve) => {
+    let req: IDBOpenDBRequest;
+    try { req = indexedDB.open(scoped("evidence", owner), 1); } catch { return resolve(null); }
+    req.onupgradeneeded = () => { try { req.transaction?.abort(); } catch { /* nothing */ } };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+}
+
+/**
+ * The cards in a block, to choose from: each argument's tag and the first
+ * line under it, which is the cite. A block with no arguments has nothing to
+ * choose between, and comes back empty.
+ */
+export async function blockTags(owner: string | null | undefined, id: string | undefined): Promise<Tag[]> {
+  if (!id) return [];
+  const db = await openEvidence(owner);
+  if (!db) return [];
+  try {
+    if (!db.objectStoreNames.contains("blocks")) return [];
+    const block = await new Promise<any>((resolve) => {
+      const req = db.transaction("blocks", "readonly").objectStore("blocks").get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+    return ((block && block.args) || []).map((a: any, i: number) => ({
+      i, title: String(a.title || runsText(a.head) || "(untitled)").trim(), cite: runsText((a.body || [])[0]).slice(0, 160),
+    }));
+  } catch { return []; } finally { try { db.close(); } catch { /* closed */ } }
+}
+
 /**
  * Put a card in Evidence's send list, from the flow.
  *
@@ -131,7 +170,7 @@ export function find(index: Entry[], query: string, max = 24): Hit[] {
  * tells it over the bus and it redraws. The block is built by the same
  * function Evidence uses, so it lands exactly as if it had been sent there.
  */
-export async function sendToEvidence(owner: string | null | undefined, hit: Hit): Promise<boolean> {
+export async function sendToEvidence(owner: string | null | undefined, hit: Hit, picks?: number[]): Promise<boolean> {
   if (typeof indexedDB === "undefined" || !hit.id) return false;
   let includeHead = true;
   try {
@@ -156,7 +195,7 @@ export async function sendToEvidence(owner: string | null | undefined, hit: Hit)
       blockReq.onsuccess = () => {
         const block = blockReq.result;
         if (!block) return;
-        const item = makeSendItem(block, hit.ai != null && hit.ai >= 0 ? hit.ai : null, includeHead);
+        const item = makeSendItem(block, picks && picks.length ? picks : hit.ai != null && hit.ai >= 0 ? hit.ai : null, includeHead);
         if (!item) return;
         const sendReq = t.objectStore("kv").get("send");
         sendReq.onsuccess = () => {
