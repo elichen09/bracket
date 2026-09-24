@@ -831,3 +831,10 @@
 .evi .binmenu button:hover { background: var(--ink); color: var(--ground); }
 .evi .binmenu button small { color: var(--dim); margin-left: 6px; }
 .evi .binmenu .bm-new { border-top: 1px solid var(--line-soft); margin-top: 3px; color: var(--muted); }
+
+/* a partner in the shared send doc: their caret and name */
+.evi .evi-caret { position: relative; margin: 0 -1px; border-left: 2px solid var(--c); pointer-events: none; }
+.evi .evi-caret-name {
+  position: absolute; left: -2px; top: -1.4em; padding: 1px 6px; white-space: nowrap;
+  background: var(--c); color: #fff; font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; line-height: 1.5;
+}

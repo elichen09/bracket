@@ -29,6 +29,8 @@ export interface Mate { client: number; name: string; color: string }
 
 export interface RoomOptions {
   code: string;
+  /** The channel's prefix — Doc flow's rooms by default; Evidence shares its send doc on its own. */
+  channel?: string;
   ydoc: Y.Doc;
   awareness: Awareness;
   /** The flow's name, to hand to a newcomer. */
@@ -115,7 +117,7 @@ export function openRoom(o: RoomOptions): Room {
   const hello = () => send("hello", { sv: b64(Y.encodeStateVector(ydoc)) });
 
   const supabase = supabaseBrowser();
-  channel = supabase.channel(`docflow-${o.code}`, { config: { broadcast: { self: false }, presence: { key: me } } });
+  channel = supabase.channel(`${o.channel || "docflow"}-${o.code}`, { config: { broadcast: { self: false }, presence: { key: me } } });
 
   const readPresence = () => {
     if (!channel) return;

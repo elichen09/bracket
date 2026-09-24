@@ -9,6 +9,22 @@ import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark, setBlockType } from "prosemirror-commands";
 import { schema, LEVELS } from "@/lib/evidence/docSchema";
 import { scoped, adoptLocal } from "@/lib/owner";
+import { ySyncPlugin, yCursorPlugin, yUndoPlugin, undoCommand, redoCommand, initProseMirrorDoc } from "y-prosemirror";
+
+/** The room's send doc, when there is one: the editor binds to it instead of holding its own. */
+interface Shared { ydoc: unknown; frag: any; awareness: any }
+
+/** A partner's caret: a bar in their colour, their name over it. */
+function caret(user: { name: string; color: string }) {
+  const el = document.createElement("span");
+  el.className = "evi-caret";
+  el.style.setProperty("--c", user.color);
+  const tag = document.createElement("span");
+  tag.className = "evi-caret-name";
+  tag.textContent = user.name;
+  el.append("\u2060", tag, "\u2060");
+  return el;
+}
 
 /**
  * The document panel: a real editor.
@@ -68,6 +84,9 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
   const [room, setRoom] = useState("");
   const [sending, setSending] = useState(false);
   const [, force] = useState(0);
+  const [shared, setShared] = useState<Shared | null>(null);
+  const sharedRef = useRef<Shared | null>(null);
+  sharedRef.current = shared;
 
   /** Hand the document back to the engine, which owns saving and the clipboard. */
   const push = useCallback(() => {
@@ -83,7 +102,24 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
   // ---- the editor itself -------------------------------------------------
   useEffect(() => {
     if (!mount.current || view.current) return;
-    const state = EditorState.create({
+    const bound = shared && !read ? shared : null;
+    const fmt = {
+      "Mod-b": toggleMark(schema.marks.strong),
+      "Mod-i": toggleMark(schema.marks.em),
+      "Mod-u": toggleMark(schema.marks.underline),
+    };
+    const start = bound ? initProseMirrorDoc(bound.frag, schema) : null;
+    const state = bound && start ? EditorState.create({
+      schema,
+      doc: start.doc,
+      plugins: [
+        ySyncPlugin(bound.frag, { mapping: start.mapping }),
+        yCursorPlugin(bound.awareness, { cursorBuilder: caret, selectionBuilder: (u: { color: string }) => ({ style: `background-color: ${u.color}2e`, class: "evi-sel" }) }),
+        yUndoPlugin(),
+        keymap({ "Mod-z": undoCommand, "Mod-y": redoCommand, "Shift-Mod-z": redoCommand, ...fmt }),
+        keymap(baseKeymap),
+      ],
+    }) : EditorState.create({
       doc: docFromHtml("<p></p>"),
       plugins: [
         history(),
@@ -111,28 +147,40 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
         // A document handed to us by the engine is not an edit of the draft.
         // Saving it would let the read view, or a rebuild, overwrite what was
         // written — which is exactly how switching tabs used to lose it.
-        if (!tr.docChanged || tr.getMeta("external")) return;
+        // a shared doc is kept by the room, not saved from here
+        if (!tr.docChanged || tr.getMeta("external") || bound) return;
         if (save.current) clearTimeout(save.current);
         save.current = setTimeout(push, 250);
       },
     });
     view.current = v;
     // The engine announced the document before this existed, so ask again.
-    (window as any).EV?.renderDoc?.();
+    if (!bound) (window as any).EV?.renderDoc?.();
     return () => { v.destroy(); view.current = null; };
-  }, [push, read]);
+  }, [push, read, shared]);
+
+  // ---- joining or leaving a room's send doc ---------------------------------
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    setShared((window as any).EV?.sharedDoc?.() || null);
+    const onShared = (e: Event) => setShared(((e as CustomEvent).detail as Shared) || null);
+    el.addEventListener("evi:shared", onShared);
+    return () => el.removeEventListener("evi:shared", onShared);
+  }, [host]);
 
   // ---- what the engine says the document is ------------------------------
   useEffect(() => {
     const el = host.current;
     if (!el) return;
     const onDoc = (e: Event) => {
-      const { html, read: isRead, draft: isDraft } = (e as CustomEvent).detail || {};
+      const { html, read: isRead, draft: isDraft, shared: isShared } = (e as CustomEvent).detail || {};
       readRef.current = !!isRead;
       setRead(!!isRead);
       setDraft(!!isDraft);
       const v = view.current;
-      if (!v || quiet.current) return;
+      // the room's send doc is already in the editor, bound
+      if (!v || quiet.current || isShared || html == null) return;
       const current = htmlFromDoc(v.state);
       if (current === html) return;             // nothing to do; keep the cursor
       const doc = docFromHtml(html || "");
@@ -294,8 +342,9 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
   // Fit zooms the page to the panel; the rest are the usual fixed steps.
   const scale = zoom || Math.max(0.3, Math.min(1.1, (width - 34) / 816));
   const v = view.current;
-  const canUndo = v ? undoDepth(v.state) > 0 : false;
-  const canRedo = v ? redoDepth(v.state) > 0 : false;
+  const isShared = !!shared && !read;
+  const canUndo = v ? (isShared ? !!undoCommand(v.state) : undoDepth(v.state) > 0) : false;
+  const canRedo = v ? (isShared ? !!redoCommand(v.state) : redoDepth(v.state) > 0) : false;
 
   const Btn = ({ on, label, title, act, style }: {
     on?: boolean; label: React.ReactNode; title: string; act: () => void; style?: React.CSSProperties;
@@ -307,8 +356,8 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
   return (
     <>
       <div className="docbar">
-        <Btn label="↶" title="Undo — Ctrl+Z" act={() => run(undo)} style={canUndo ? undefined : { opacity: .35 }} />
-        <Btn label="↷" title="Redo — Ctrl+Y" act={() => run(redo)} style={canRedo ? undefined : { opacity: .35 }} />
+        <Btn label="↶" title="Undo — Ctrl+Z" act={() => run(isShared ? undoCommand : undo)} style={canUndo ? undefined : { opacity: .35 }} />
+        <Btn label="↷" title="Redo — Ctrl+Y" act={() => run(isShared ? redoCommand : redo)} style={canRedo ? undefined : { opacity: .35 }} />
         <span className="fdiv" />
 
         <select className="fsel style" value={level} title="Style"
