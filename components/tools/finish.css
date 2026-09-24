@@ -304,3 +304,8 @@ html[data-tool-theme="graphite"] .toolpage {
 .toolpage .dvw .dv-orow.on { border-left-color: var(--t-acc); }
 .toolpage .dvw .dv-tabs button.on { border-bottom-color: var(--t-acc); }
 .toolpage .dvw *:not(.dv-src i):not(.dot) { border-radius: 0 !important; }
+
+/* Flow's SpeechDrop dialog, in the scheme */
+.toolpage .flw .card.sdc h2 { background: var(--t-deep); color: var(--t-deep-ink); }
+.toolpage .flw .card.sdc h2 .x { color: var(--t-deep-ink); }
+.toolpage .flw .card.sdc * { border-radius: 0 !important; }

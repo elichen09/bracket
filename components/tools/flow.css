@@ -1035,3 +1035,51 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .palbins .pbin:hover { border-color: var(--ink); color: var(--ink); }
 .flw .sdhead .sdview { align-self: flex-start; font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); text-decoration: none; border: 1px solid var(--line); padding: 3px 8px; white-space: nowrap; }
 .flw .sdhead .sdview:hover { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+
+/* ---------- their case, from SpeechDrop ---------- */
+.flw .card.sdc {
+  width: min(640px, 100%); max-height: 78vh; background: var(--surface); border: 1px solid var(--ink);
+  display: flex; flex-direction: column; padding: 0; margin: 0; gap: 0;
+  box-shadow: 0 30px 80px -24px rgba(0, 0, 0, .4); animation: flwCard .28s var(--pop) both;
+}
+.flw .card.sdc h2 {
+  display: flex; align-items: center; margin: 0; padding: 14px 18px; flex-shrink: 0;
+  font-family: var(--mono); font-size: var(--flw-micro); letter-spacing: .14em; text-transform: uppercase; font-weight: 500;
+  background: var(--ink); color: var(--ground);
+}
+.flw .card.sdc h2 .x { margin-left: auto; font-size: 17px; color: var(--ground); opacity: .7; }
+.flw .card.sdc h2 .x:hover { opacity: 1; }
+.flw .card.sdc .in { padding: 18px; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: hidden; }
+.flw .sd-blurb { margin: 0; line-height: 1.6; font-size: 12.5px; text-transform: none; letter-spacing: 0; font-family: var(--ui); }
+.flw .sd-row { display: flex; gap: 8px; }
+.flw .sd-row input { flex: 1; border: 1px solid var(--line); background: var(--surface-2); padding: 8px 10px; font-size: 13px; outline: none; font-family: var(--mono); letter-spacing: .16em; }
+.flw .sd-row input:focus { border-color: var(--ink); }
+.flw .sd-err { margin: 0; color: #B3261E; font-size: 12.5px; }
+.flw .sd-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; overflow-y: auto; }
+.flw .sd-files button { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 10px; border: 1px solid var(--line-soft); background: var(--surface-2); transition: border-color .15s var(--ease), transform .15s var(--spring); }
+.flw .sd-files button:hover:not(:disabled) { border-color: var(--ink); transform: translateX(2px); }
+.flw .sd-files button:disabled { opacity: .5; cursor: not-allowed; }
+.flw .sd-files .k { font-family: var(--mono); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; border: 1px solid currentColor; padding: 2px 5px; color: var(--muted); flex-shrink: 0; }
+.flw .sd-files .k.docx { color: var(--pro); }
+.flw .sd-files .n { flex: 1; min-width: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flw .sd-files small { font-family: var(--mono); font-size: 9px; color: var(--dim); }
+.flw .sd-again { align-self: flex-start; }
+.flw .sd-head { display: flex; align-items: center; gap: 12px; }
+.flw .sd-head span { display: grid; min-width: 0; }
+.flw .sd-head b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flw .sd-target { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line-soft); }
+.flw .sd-target label { display: grid; gap: 3px; }
+.flw .sd-target select { border: 1px solid var(--line); background: var(--surface); padding: 6px 8px; font-size: 13px; font-family: var(--ui); }
+.flw .sd-target .sd-chk { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.flw .sd-parts { overflow-y: auto; min-height: 0; flex: 1; border: 1px solid var(--line-soft); padding: 6px 4px; }
+.flw .sd-sec + .sd-sec { margin-top: 6px; border-top: 1px dashed var(--line-soft); padding-top: 6px; }
+.flw .sd-sech, .flw .sd-tag { display: flex; align-items: flex-start; gap: 8px; padding: 4px 8px; cursor: pointer; }
+.flw .sd-sech b { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.flw .sd-tag { padding-left: 26px; font-size: 13px; line-height: 1.4; }
+.flw .sd-tag:hover, .flw .sd-sech:hover { background: var(--surface-2); }
+.flw .sd-tag input, .flw .sd-sech input { margin-top: 3px; accent-color: var(--ink); flex-shrink: 0; }
+.flw .sd-tag:has(input:not(:checked)) span { color: var(--dim); text-decoration: line-through; }
+.flw .sd-out { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.flw .sd-out .btn:disabled { opacity: .45; cursor: default; }
+.flw .tabs .plus.sdp { border-style: solid; }
+.flw .sd-target input[type="checkbox"] { accent-color: var(--ink); }

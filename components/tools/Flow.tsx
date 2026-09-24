@@ -212,6 +212,14 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
         <span className="small hint" id="namer-h" />
       </div>
 
+      {/* The other team's case, off SpeechDrop, down a column: the engine fills it. */}
+      <div className="scrim" id="sdbox" hidden>
+        <div className="card sdc" role="dialog" aria-modal="true" aria-label="Their case from SpeechDrop">
+          <h2 className="mono">Their case, from SpeechDrop<button type="button" className="x" id="sd-x" aria-label="Close">×</button></h2>
+          <div className="in" id="sd-in-box" />
+        </div>
+      </div>
+
       <div className="scrim" id="sharebox" hidden>
         <div className="card shr" role="dialog" aria-modal="true" aria-label="Flow with your partner">
           <h2 className="mono">Flow together<button type="button" className="x" id="share-x" aria-label="Close">×</button></h2>
