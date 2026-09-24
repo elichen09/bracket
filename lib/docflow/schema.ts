@@ -36,6 +36,13 @@ export const HIGHLIGHTS = {
 } as const;
 export type Hl = keyof typeof HIGHLIGHTS;
 
+/**
+ * A round vision stop lives on the line it marks: its name, and its place in
+ * the speech. On the line, it moves when the line moves, goes when the line
+ * goes, is saved with the flow and reaches a partner in the room.
+ */
+const STOP = { stop: { default: null }, stopN: { default: null } };
+
 const who = (el: HTMLElement): Who => (el.getAttribute("data-who") === "us" ? "us" : "them");
 
 export const schema = new Schema({
@@ -47,7 +54,7 @@ export const schema = new Schema({
       group: "block",
       content: "inline*",
       defining: true,
-      attrs: { who: { default: "us" } },
+      attrs: { who: { default: "us" }, ...STOP },
       parseDOM: [{ tag: "div.df-box", getAttrs: (el) => ({ who: who(el as HTMLElement) }) }],
       toDOM(node): DOMOutputSpec { return ["div", { class: "df-box", "data-who": node.attrs.who }, 0]; },
     },
@@ -56,7 +63,7 @@ export const schema = new Schema({
       group: "block",
       content: "inline*",
       defining: true,
-      attrs: { who: { default: "them" } },
+      attrs: { who: { default: "them" }, ...STOP },
       parseDOM: [{ tag: "h3.df-head", getAttrs: (el) => ({ who: who(el as HTMLElement) }) }],
       toDOM(node): DOMOutputSpec { return ["h3", { class: "df-head", "data-who": node.attrs.who }, 0]; },
     },
@@ -64,7 +71,7 @@ export const schema = new Schema({
     item: {
       group: "block",
       content: "inline*",
-      attrs: { depth: { default: 0 }, who: { default: "them" }, hl: { default: null } },
+      attrs: { depth: { default: 0 }, who: { default: "them" }, hl: { default: null }, ...STOP },
       parseDOM: [{
         tag: "div.df-item",
         getAttrs: (el) => {
@@ -85,6 +92,7 @@ export const schema = new Schema({
     para: {
       group: "block",
       content: "inline*",
+      attrs: { ...STOP },
       parseDOM: [{ tag: "p" }],
       toDOM(): DOMOutputSpec { return ["p", { class: "df-p" }, 0]; },
     },

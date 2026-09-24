@@ -18,7 +18,8 @@ import * as C from "@/lib/docflow/commands";
 import { fromDocsHtml, toDocsHtml, toPlainText } from "@/lib/docflow/io";
 import { listDocs, loadDoc, saveDoc, renameDoc, removeDoc, restoreDoc, newId, type DocMeta } from "@/lib/docflow/store";
 import { ACTIONS, ACTION, comboOf, keyLabel, refuse, loadKeys, saveKeys, keyFor, actionFor, bind, type Overrides } from "@/lib/docflow/keys";
-import { loadPieces, savePieces, newPieceId, titleFrom, type Piece } from "@/lib/docflow/rhetoric";
+import { loadPieces, savePieces, newPieceId, titleFrom, fromDoc, merge, type Piece, type Draft } from "@/lib/docflow/rhetoric";
+import { stopsOf, toggleStop, setStop, reorder, clearStops, visionPlugin, visionKey, type Stop } from "@/lib/docflow/vision";
 import { openRoom, MATE_COLORS, type Room, type RoomStatus, type Mate } from "@/lib/docflow/room";
 import { newCode, tidyCode } from "@/lib/flow/share";
 import { library, find, sendToEvidence, type Entry, type Hit } from "@/lib/flow/cards";
@@ -162,9 +163,28 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
   const [pieces, setPieces] = useState<Piece[]>([]);
   const piecesRef = useRef(pieces);
   piecesRef.current = pieces;
-  const [right, setRight] = useState(true);
   const [rq, setRq] = useState("");
   const [editing, setEditing] = useState<{ id: string | null; title: string; text: string } | null>(null);
+  const [importing, setImporting] = useState<null | { drafts: Draft[] | null }>(null);
+
+  // the right panel: open or a rail, and which of its sections are open — per viewer, per browser
+  const [ui, setUi] = useState({ right: true, vis: true, rh: true, shut: [] as string[] });
+  const uiKey = "docflow.ui:" + (owner || "");
+  useEffect(() => { try { const u = JSON.parse(localStorage.getItem(uiKey) || "null"); if (u) setUi((x) => ({ ...x, ...u })); } catch { /* none kept */ } }, [uiKey]);
+  const patchUi = useCallback((p: Partial<typeof ui>) => setUi((x) => { const n = { ...x, ...p }; try { localStorage.setItem(uiKey, JSON.stringify(n)); } catch { /* private */ } return n; }), [uiKey]);
+  const right = ui.right;
+  const setRight = useCallback((f: (r: boolean) => boolean) => setUi((x) => { const n = { ...x, right: f(x.right) }; try { localStorage.setItem(uiKey, JSON.stringify(n)); } catch { /* private */ } return n; }), [uiKey]);
+
+  // round vision
+  const [stops, setStops] = useState<Stop[]>([]);
+  const [visionAt, setVisionAt] = useState(-1);
+  const visionAtRef = useRef(visionAt);
+  visionAtRef.current = visionAt;
+  const [speaking, setSpeaking] = useState(false);
+  const speakingRef = useRef(speaking);
+  speakingRef.current = speaking;
+  const [nameEdit, setNameEdit] = useState<{ pos: number; value: string } | null>(null);
+  const dragStop = useRef<number | null>(null);
 
   // the room
   const live = useRef<Live | null>(null);
@@ -222,7 +242,7 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
     const built = BUILTIN.filter((x) => !s || x.label.toLowerCase().includes(s) || x.id.includes(s));
     const mine = piecesRef.current
       .filter((p) => !s || p.title.toLowerCase().includes(s) || p.text.toLowerCase().includes(s))
-      .map((p) => ({ id: "r:" + p.id, label: p.title, hint: p.text.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 1).join(""), rhetoric: true }));
+      .map((p) => ({ id: "r:" + p.id, label: p.title, hint: (p.group ? p.group + " · " : "") + p.text.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 1).join(""), rhetoric: true }));
     // what you wrote yourself first once you are typing a name
     return s ? [...mine, ...built] : [...built, ...mine];
   }, []);
@@ -312,7 +332,7 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
         ySyncPlugin(frag, { mapping }),
         yCursorPlugin(awareness, { cursorBuilder: caret, selectionBuilder: (u: { color: string }) => ({ style: `background-color: ${u.color}26`, class: "df-sel" }) }),
         yUndoPlugin(),
-        slashPlugin, km, keymap(baseKeymap), surveyPlugin, herePlugin,
+        slashPlugin, km, keymap(baseKeymap), surveyPlugin, herePlugin, visionPlugin,
       ],
     });
     const v = new EditorView({ mount: mount.current }, {
@@ -379,6 +399,7 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
         v.updateState(next);
         if (tr.docChanged) {
           outlineOf(next.doc);
+          setStops(stopsOf(next.doc));
           if (saveTimer.current) clearTimeout(saveTimer.current);
           saveTimer.current = setTimeout(() => {
             saveDoc(owner, current, next.doc.toJSON());
@@ -389,6 +410,8 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
     });
     view.current = v;
     outlineOf(doc);
+    setStops(stopsOf(doc));
+    setVisionAt(-1);
     if (lv) saveDoc(owner, current, doc.toJSON());
     // Somewhere to start typing: the first empty line, or the end.
     let at = doc.content.size - 1;
@@ -477,6 +500,79 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
     const dom = v.nodeDOM(pos) as HTMLElement | null;
     if (dom && dom.classList) { dom.classList.remove("df-flash"); void dom.offsetWidth; dom.classList.add("df-flash"); }
   }, []);
+
+  /* ------------------------------------------------------------ round vision */
+  const noVision = useCallback(() => `No round vision yet — ${keyLabel(keyFor(keysRef.current, "stop")) || "the command panel"} marks a line`, []);
+
+  /** Go to a stop. Speaking, the page moves and the cursor stays out of the way; otherwise the cursor goes there too. */
+  const goStop = useCallback((i: number, speakingNow = speakingRef.current) => {
+    const v = view.current;
+    if (!v) return;
+    const list = stopsOf(v.state.doc);
+    const s = list[i];
+    if (!s) { toast(list.length ? `There is no stop ${i + 1}` : noVision()); return; }
+    const node = v.state.doc.nodeAt(s.pos)!;
+    let tr = v.state.tr.setMeta(visionKey, s.pos);
+    if (!speakingNow) tr = tr.setSelection(TextSelection.near(tr.doc.resolve(s.pos + node.nodeSize - 1), -1));
+    v.dispatch(tr);
+    const dom = v.nodeDOM(s.pos) as HTMLElement | null;
+    if (dom && dom.classList) {
+      dom.scrollIntoView({ block: "center", behavior: "smooth" });
+      dom.classList.remove("df-flash"); void dom.offsetWidth; dom.classList.add("df-flash");
+    }
+    if (speakingNow) v.dom.blur(); else v.focus();
+    setVisionAt(i);
+  }, [toast, noVision]);
+
+  const step = useCallback((d: 1 | -1) => {
+    const v = view.current;
+    if (!v) return;
+    const n = stopsOf(v.state.doc).length;
+    if (!n) { toast(noVision()); return; }
+    const at = visionAtRef.current;
+    const next = at < 0 ? (d > 0 ? 0 : n - 1) : at + d;
+    if (next < 0 || next >= n) { toast(d > 0 ? "That was the last stop" : "That was the first stop"); return; }
+    goStop(next);
+  }, [goStop, toast, noVision]);
+
+  const speak = useCallback((on: boolean) => {
+    const v = view.current;
+    if (on && (!v || !stopsOf(v.state.doc).length)) { toast(noVision()); return; }
+    setSpeaking(on);
+    speakingRef.current = on;
+    if (on) {
+      goStop(visionAtRef.current >= 0 ? visionAtRef.current : 0, true);
+      toast("Page Down or Space for the next stop · Esc to stop");
+    } else if (v) { v.dispatch(v.state.tr.setMeta(visionKey, null)); setVisionAt(-1); v.focus(); }
+  }, [goStop, toast, noVision]);
+
+  /** Mark the line the cursor is in, and put its name up to be changed. */
+  const markStop = useCallback(() => {
+    const v = view.current;
+    if (!v) return;
+    const before = stopsOf(v.state.doc).length;
+    toggleStop(v.state, v.dispatch);
+    const after = stopsOf(v.state.doc);
+    if (after.length > before) {
+      const pos = v.state.selection.$from.before(1);
+      const s = after.find((x) => x.pos === pos);
+      patchUi({ right: true, vis: true });
+      if (s) setNameEdit({ pos, value: s.name });
+      toast(`Stop ${after.length} — name it, or Enter to keep “${s?.name}”`);
+    } else { toast("Taken out of round vision"); v.focus(); }
+  }, [patchUi, toast]);
+
+  const commitStopName = useCallback((back = true) => {
+    const ne = nameEdit;
+    setNameEdit(null);
+    const v = view.current;
+    if (!ne || !v) return;
+    setStop(ne.pos, ne.value)(v.state, v.dispatch);
+    if (back) v.focus();
+  }, [nameEdit]);
+
+  const visRef = useRef({ step, speak });
+  visRef.current = { step, speak };
 
   /* ------------------------------------------------------------ copy and save */
   const copyForDocs = useCallback(async () => {
@@ -647,13 +743,55 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
     const { from, to } = v.state.selection;
     const text = C.linesText(v.state.doc, from, to);
     if (!text.trim()) { toast("Select the lines to keep first"); return; }
-    setRight(true);
+    setRight(() => true);
+    patchUi({ rh: true });
     setEditing({ id: null, title: titleFrom(text), text });
-  }, [toast]);
+  }, [toast, setRight, patchUi]);
   const shownPieces = useMemo(() => {
     const q = rq.trim().toLowerCase();
     return q ? pieces.filter((p) => p.title.toLowerCase().includes(q) || p.text.toLowerCase().includes(q)) : pieces;
   }, [pieces, rq]);
+
+  const grouped = useMemo(() => {
+    const order: string[] = [];
+    const m = new Map<string, Piece[]>();
+    shownPieces.forEach((p) => { const g = p.group || ""; if (!m.has(g)) { m.set(g, []); order.push(g); } m.get(g)!.push(p); });
+    order.sort((a, b) => (a === "" ? -1 : b === "" ? 1 : 0));
+    return order.map((g) => ({ g, items: m.get(g)! }));
+  }, [shownPieces]);
+  const deleteGroup = useCallback((g: string) => {
+    const before = piecesRef.current;
+    const n = before.filter((p) => p.group === g).length;
+    putPieces(before.filter((p) => p.group !== g));
+    toast(`Deleted “${g}” — ${n} piece${n === 1 ? "" : "s"}`, () => putPieces(before));
+  }, [putPieces, toast]);
+  const takeImport = useCallback(() => {
+    if (!importing?.drafts) return;
+    const before = piecesRef.current;
+    const { list, added, updated } = merge(before, importing.drafts);
+    putPieces(list);
+    setImporting(null);
+    toast(`${added} new${updated ? `, ${updated} updated` : ""} — type / and a name to use one`, () => putPieces(before));
+  }, [importing, putPieces, toast]);
+  const pieceCard = (p: Piece) => (
+    <div key={p.id} className="rp" draggable
+      onDragStart={(e) => { e.dataTransfer.setData(RHET_MIME, p.id); e.dataTransfer.setData("text/plain", p.text); e.dataTransfer.effectAllowed = "copy"; e.currentTarget.classList.add("lift"); }}
+      onDragEnd={(e) => e.currentTarget.classList.remove("lift")}
+      onMouseDown={(e) => { if ((e.target as HTMLElement).closest("button")) return; e.preventDefault(); }}
+      onClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; usePiece(p); }}
+      title="Click to put it at the cursor · drag it onto a line">
+      <div className="rp-h">
+        <b>{p.title}</b>
+        <span className="rp-act">
+          <button type="button" onClick={() => setEditing({ id: p.id, title: p.title, text: p.text })} aria-label={`Edit ${p.title}`} title="Edit">✎</button>
+          <button type="button" onClick={() => deletePiece(p)} aria-label={`Delete ${p.title}`} title="Delete">×</button>
+        </span>
+      </div>
+      <div className="rp-lines">
+        {preview(p.text).slice(0, 4).map((l, i) => <div key={i} style={{ paddingLeft: l.d * 12 }}>{l.text}</div>)}
+      </div>
+    </div>
+  );
 
   /* ------------------------------------------------------------ the command panel, and evidence */
   const openPanel = useCallback((q = "") => { setPanel({ q, i: 0 }); }, []);
@@ -679,6 +817,11 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
       case "box-weigh": return run(C.setBlock("box", { who: "us" }, "Weighing"));
       case "head": return run(C.setBlock("head", { who: "them" }, ""));
       case "keep": return keepSelection();
+      case "import": setRight(() => true); patchUi({ rh: true }); return setImporting({ drafts: null });
+      case "stop": return markStop();
+      case "stop-next": return step(1);
+      case "stop-prev": return step(-1);
+      case "speak": return speak(!speakingRef.current);
       case "rhetoric": return setRight((r) => !r);
       case "commands": return panelRef.current ? closePanel() : openPanel();
       case "evidence": return openPanel("/");
@@ -687,23 +830,27 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
       case "copy": return copyForDocs();
       case "docx": return saveDocx();
     }
+    const m = id.match(/^stop-(\d)$/);
+    if (m) return goStop(Number(m[1]) - 1);
     return undefined;
     // moveLine is a plain function of its argument
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run, keepSelection, closePanel, openPanel, copyForDocs, saveDocx]);
+  }, [run, keepSelection, closePanel, openPanel, copyForDocs, saveDocx, markStop, step, speak, goStop, patchUi, setRight]);
   const actRef = useRef(act);
   actRef.current = act;
 
   const commands: Cmd[] = useMemo(() => [
-    ...ACTIONS.filter((a) => !["tab", "outdent", "commands"].includes(a.id)).map((a) => ({
-      id: a.id, group: a.group, label: a.id === "rhetoric" ? (right ? "Hide your rhetoric" : "Show your rhetoric") : a.label,
+    ...ACTIONS.filter((a) => !["tab", "outdent", "commands"].includes(a.id) && !/^stop-\d$/.test(a.id)).map((a) => ({
+      id: a.id, group: a.group, label: a.id === "rhetoric" ? (right ? "Hide the right panel" : "Show the right panel") : a.id === "speak" && speaking ? "Stop speaking" : a.label,
       key: keyLabel(keyFor(keys, a.id)) || undefined, run: () => { act(a.id); },
     })),
+    ...stops.map((s, i) => ({ id: "go-stop-" + s.pos, group: "Round vision", label: "Go to · " + s.name, key: i < 9 ? keyLabel(keyFor(keys, "stop-" + (i + 1))) || undefined : undefined, run: () => goStop(i) })),
+    ...(stops.length ? [{ id: "clear-stops", group: "Round vision", label: "Clear round vision", run: () => { const v = view.current; if (v && confirm("Take every stop out of round vision?")) { clearStops(v.state, v.dispatch); setVisionAt(-1); } } }] : []),
     ...pieces.map((p) => ({ id: "r-" + p.id, group: "Rhetoric", label: "Put in · " + p.title, run: () => usePiece(p) })),
     { id: "new", group: "Flows", label: "New flow", run: () => newFlow() },
     ...docs.filter((d) => d.id !== current).map((d) => ({ id: "go-" + d.id, group: "Flows", label: "Open · " + d.name, run: () => openFlow(d) })),
     { id: "side", group: "View", label: side ? "Hide the flows list" : "Show the flows list", run: () => setSide((s) => !s) },
-  ], [keys, act, right, pieces, usePiece, newFlow, docs, current, openFlow, side]);
+  ], [keys, act, right, speaking, stops, goStop, pieces, usePiece, newFlow, docs, current, openFlow, side]);
 
   const evMode = !!panel && panel.q.startsWith("/");
   const listed: Cmd[] = useMemo(() => {
@@ -776,6 +923,14 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
           : `${ACTION.get(cap)?.label} has no key now`);
         return;
       }
+      // Mid-speech, the keys a presentation clicker sends walk the vision too.
+      if (speakingRef.current && !panelRef.current) {
+        const t = document.activeElement as HTMLElement | null;
+        const typing = !!t && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+        if (e.key === "PageDown" || (e.key === " " && !e.shiftKey && !typing)) { e.preventDefault(); e.stopPropagation(); visRef.current.step(1); return; }
+        if (e.key === "PageUp" || (e.key === " " && e.shiftKey && !typing)) { e.preventDefault(); e.stopPropagation(); visRef.current.step(-1); return; }
+        if (e.key === "Escape" && !slashRef.current) { e.preventDefault(); e.stopPropagation(); visRef.current.speak(false); return; }
+      }
       const spec = comboOf(e);
       if (!spec) return;
       const id = actionFor(keysRef.current, spec);
@@ -830,7 +985,7 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
   const inRoom = !!roomStatus;
 
   return (
-    <div className={"dfl" + (side ? "" : " noside") + (right ? "" : " noright")} ref={root}>
+    <div className={"dfl" + (side ? "" : " noside")} ref={root}>
       <header className="dtop">
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
         <div className="brand mono">Doc flow</div>
@@ -893,7 +1048,6 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
         <button type="button" className="dbtn" onClick={copyForDocs} title="Numbered, red and highlighted, as a Doc">Copy for Docs</button>
         <button type="button" className="dbtn" onClick={saveDocx}>.docx</button>
         <a className="dbtn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
-        <button type="button" className={"dbtn" + (right ? " on" : "")} onClick={() => setRight((r) => !r)} title={K("rhetoric") ? `Rhetoric — ${K("rhetoric")}` : "Rhetoric"}>Rhetoric</button>
       </header>
 
       <div className="dbody">
@@ -932,7 +1086,7 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
             ) : <p className="dnone">Boxes and headings you add show up here to jump between.</p>}
           </div>
           <div className="dkeys mono">
-            {[["tab", "answer"], ["outdent", "back out"], ["next", "their next point"], ["who", "swap speaker"], ["hl-yellow", "highlight"], ["keep", "keep as rhetoric"]]
+            {[["tab", "answer"], ["outdent", "back out"], ["next", "their next point"], ["who", "swap speaker"], ["hl-yellow", "highlight"], ["stop", "mark a stop"], ["stop-next", "next stop"], ["keep", "keep as rhetoric"]]
               .filter(([id]) => K(id))
               .map(([id, what]) => <span key={id}><kbd>{K(id)}</kbd> {what}</span>)}
             <span><kbd>/</kbd> boxes, rhetoric, evidence</span>
@@ -957,80 +1111,209 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
           </div>
         </main>
 
-        <aside className="dright" aria-label="Your rhetoric">
-          <div className="drh">
-            <div className="dsh mono"><span>Rhetoric <em>{pieces.length || ""}</em></span>
-              <button type="button" onClick={() => setEditing({ id: null, title: "", text: "" })} title="Write a new piece">+ New</button>
+        <aside className={"dright" + (right ? "" : " rail")} aria-label="Round vision and rhetoric">
+          {!right ? (
+            <div className="drail">
+              <button type="button" className="drail-open" onClick={() => setRight(() => true)} title={K("rhetoric") ? `Open the panel — ${K("rhetoric")}` : "Open the panel"}>«</button>
+              <button type="button" className="drail-l" onClick={() => patchUi({ right: true, vis: true })}><span className="mono">Round vision</span>{stops.length ? <em>{stops.length}</em> : null}</button>
+              <button type="button" className="drail-l" onClick={() => patchUi({ right: true, rh: true })}><span className="mono">Rhetoric</span>{pieces.length ? <em>{pieces.length}</em> : null}</button>
             </div>
-            {pieces.length > 3 && (
-              <input className="drq" value={rq} onChange={(e) => setRq(e.target.value)} placeholder="Find…" spellCheck={false} />
-            )}
-          </div>
-          <div className="drlist">
-            {editing && (
-              <form className="rp editing" onSubmit={(e) => { e.preventDefault(); saveEditing(); }}>
-                <input autoFocus value={editing.title} placeholder="Name it — Probability weighing"
-                  onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
-                <textarea value={editing.text} rows={Math.min(14, Math.max(5, editing.text.split("\n").length + 1))}
-                  placeholder={"One line per flow line.\n  Two spaces in, and it goes under the line above."}
-                  spellCheck={false}
-                  onChange={(e) => setEditing({ ...editing, text: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); saveEditing(); return; }
-                    if (e.key === "Escape") { e.preventDefault(); setEditing(null); return; }
-                    if (e.key === "Tab") {
-                      // Tab indents the line, as it does in the flow
-                      e.preventDefault();
-                      const ta = e.currentTarget;
-                      const s = ta.selectionStart, val = ta.value;
-                      const ls = val.lastIndexOf("\n", s - 1) + 1;
-                      let next: string, caretAt: number;
-                      if (e.shiftKey) { const cut = val.slice(ls, ls + 2) === "  " ? 2 : 0; next = val.slice(0, ls) + val.slice(ls + cut); caretAt = s - cut; }
-                      else { next = val.slice(0, ls) + "  " + val.slice(ls); caretAt = s + 2; }
-                      setEditing({ ...editing, text: next });
-                      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = Math.max(ls, caretAt); });
-                    }
-                  }} />
-                <div className="rp-row">
-                  <button type="submit" className="dbtn ink">Keep it</button>
-                  <button type="button" className="dbtn" onClick={() => setEditing(null)}>Cancel</button>
-                  <small className="mono">Ctrl+Enter</small>
+          ) : (
+            <>
+              <section className={"dvs" + (ui.vis ? " open" : "")}>
+                <div className="dsech">
+                  <button type="button" className="dsect mono" onClick={() => patchUi({ vis: !ui.vis })} aria-expanded={ui.vis}>
+                    <i className="chev" />Round vision{stops.length ? <em>{stops.length}</em> : null}
+                  </button>
+                  {stops.length > 0 && (
+                    <button type="button" className={"dsmall mono" + (speaking ? " on" : "")} onClick={() => speak(!speaking)}>{speaking ? "Stop" : "Speak ▸"}</button>
+                  )}
+                  <button type="button" className="dfold" onClick={() => setRight(() => false)} title="Fold the panel away" aria-label="Fold the panel away">»</button>
                 </div>
-              </form>
-            )}
-            {shownPieces.map((p) => (
-              <div key={p.id} className="rp" draggable
-                onDragStart={(e) => { e.dataTransfer.setData(RHET_MIME, p.id); e.dataTransfer.setData("text/plain", p.text); e.dataTransfer.effectAllowed = "copy"; e.currentTarget.classList.add("lift"); }}
-                onDragEnd={(e) => e.currentTarget.classList.remove("lift")}
-                onMouseDown={(e) => { if ((e.target as HTMLElement).closest("button")) return; e.preventDefault(); }}
-                onClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; usePiece(p); }}
-                title="Click to put it at the cursor · drag it onto a line">
-                <div className="rp-h">
-                  <b>{p.title}</b>
-                  <span className="rp-act">
-                    <button type="button" onClick={() => setEditing({ id: p.id, title: p.title, text: p.text })} aria-label={`Edit ${p.title}`} title="Edit">✎</button>
-                    <button type="button" onClick={() => deletePiece(p)} aria-label={`Delete ${p.title}`} title="Delete">×</button>
-                  </span>
+                {ui.vis && (
+                  <div className="dvbody">
+                    {stops.length ? (
+                      <ol className="dvlist">
+                        {stops.map((s, i) => (
+                          <li key={s.pos} className={"vs " + s.who + (i === visionAt ? " now" : "")} draggable={!nameEdit}
+                            style={{ ["--i" as any]: Math.min(i, 10) }}
+                            onDragStart={(e) => { dragStop.current = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", s.name); e.currentTarget.classList.add("lift"); }}
+                            onDragEnd={(e) => { dragStop.current = null; e.currentTarget.classList.remove("lift"); }}
+                            onDragOver={(e) => { if (dragStop.current === null) return; e.preventDefault(); e.currentTarget.classList.add("over"); }}
+                            onDragLeave={(e) => e.currentTarget.classList.remove("over")}
+                            onDrop={(e) => {
+                              e.preventDefault(); e.currentTarget.classList.remove("over");
+                              const from = dragStop.current; dragStop.current = null;
+                              if (from === null || from === i) return;
+                              const order = stops.map((x) => x.pos);
+                              const [m] = order.splice(from, 1);
+                              order.splice(i, 0, m);
+                              run(reorder(order));
+                              setVisionAt(-1);
+                            }}>
+                            <button type="button" className="vs-n mono" onClick={() => goStop(i)} title={i < 9 && K("stop-" + (i + 1)) ? `Go — ${K("stop-" + (i + 1))}` : "Go"}>{i + 1}</button>
+                            {nameEdit && nameEdit.pos === s.pos ? (
+                              <input className="vs-in" autoFocus value={nameEdit.value} maxLength={60} spellCheck={false}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => setNameEdit({ pos: s.pos, value: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitStopName(); } if (e.key === "Escape") { e.preventDefault(); setNameEdit(null); view.current?.focus(); } }}
+                                onBlur={() => commitStopName(false)} />
+                            ) : (
+                              <button type="button" className="vs-b" onClick={() => goStop(i)} onDoubleClick={() => setNameEdit({ pos: s.pos, value: s.name })}>
+                                <b>{s.name}</b>
+                                {(s.under || (s.text && s.text !== s.name)) && <small>{[s.under, s.text && s.text !== s.name ? s.text : ""].filter(Boolean).join(" · ")}</small>}
+                              </button>
+                            )}
+                            <span className="vs-act">
+                              <button type="button" onClick={() => setNameEdit({ pos: s.pos, value: s.name })} title="Rename" aria-label={`Rename ${s.name}`}>✎</button>
+                              <button type="button" onClick={() => { run(setStop(s.pos, null)); setVisionAt(-1); }} title="Take out" aria-label={`Take ${s.name} out`}>×</button>
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <div className="dvnone">
+                        Put the cursor on a line you will go to in your speech and press {K("stop") ? <kbd>{K("stop")}</kbd> : "the mark key"}. Name it, mark the rest, drag them into order — then <b>Speak</b> and walk it with Page Down{K("stop-next") ? <> or <kbd>{K("stop-next")}</kbd></> : null}.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              <section className={"drs" + (ui.rh ? " open" : "")}>
+                <div className="dsech">
+                  <button type="button" className="dsect mono" onClick={() => patchUi({ rh: !ui.rh })} aria-expanded={ui.rh}>
+                    <i className="chev" />Rhetoric{pieces.length ? <em>{pieces.length}</em> : null}
+                  </button>
+                  <button type="button" className="dsmall mono" onClick={() => { patchUi({ rh: true }); setImporting({ drafts: null }); }} title="Paste a Google Doc of rhetoric">Paste a doc</button>
+                  <button type="button" className="dsmall mono" onClick={() => { patchUi({ rh: true }); setEditing({ id: null, title: "", text: "" }); }} title="Write a new piece">+ New</button>
                 </div>
-                <div className="rp-lines">
-                  {preview(p.text).slice(0, 4).map((l, i) => <div key={i} style={{ paddingLeft: l.d * 12 }}>{l.text}</div>)}
-                </div>
-              </div>
-            ))}
-            {!pieces.length && !editing && (
-              <div className="drnone">
-                <b>Write it once.</b>
-                <p>Weighing, framing, the frontline you always need. Keep it here, then drag it onto a line, click it, or type <kbd>/</kbd> and its name.</p>
-                <p>Or select lines in your flow and press {K("keep") ? <kbd>{K("keep")}</kbd> : "Keep"} to keep them.</p>
-              </div>
-            )}
-            {pieces.length > 0 && !shownPieces.length && <p className="dnone">Nothing called that.</p>}
-          </div>
-          <div className="drfoot mono">
-            <button type="button" onClick={keepSelection}>Keep selected lines{K("keep") && <kbd>{K("keep")}</kbd>}</button>
-          </div>
+                {ui.rh && (
+                  <>
+                    {pieces.length > 3 && (
+                      <div className="drqw"><input className="drq" value={rq} onChange={(e) => setRq(e.target.value)} placeholder="Find…" spellCheck={false} /></div>
+                    )}
+                    <div className="drlist">
+                      {importing && (
+                        <div className="rp editing rpi">
+                          {!importing.drafts ? (
+                            <>
+                              <b className="rpi-h">Paste a Google Doc</b>
+                              <small className="rpi-p">Headings become pieces, the way Evidence reads a cut file: each block is a piece, the heading above it names its group, and a tag under a block is one of its lines.</small>
+                              <textarea className="rpi-drop" autoFocus rows={4} value="" placeholder="Click here, then Ctrl+V"
+                                onChange={() => {}}
+                                onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setImporting(null); } }}
+                                onPaste={(e) => {
+                                  e.preventDefault();
+                                  const drafts = fromDoc(e.clipboardData.getData("text/html"), e.clipboardData.getData("text/plain"));
+                                  if (!drafts.length) { toast("Nothing in that to keep"); return; }
+                                  setImporting({ drafts });
+                                }} />
+                              <div className="rp-row"><button type="button" className="dbtn" onClick={() => setImporting(null)}>Cancel</button></div>
+                            </>
+                          ) : (
+                            <>
+                              <b className="rpi-h">{importing.drafts.length} piece{importing.drafts.length === 1 ? "" : "s"} in that doc</b>
+                              <ul className="rpi-list">
+                                {importing.drafts.slice(0, 80).map((d, i) => (
+                                  <li key={i} style={{ ["--i" as any]: Math.min(i, 12) }}>
+                                    <b>{d.title}</b>
+                                    <small>{d.group ? d.group + " · " : ""}{d.text.split("\n").length} line{d.text.split("\n").length === 1 ? "" : "s"}</small>
+                                  </li>
+                                ))}
+                              </ul>
+                              <div className="rp-row">
+                                <button type="button" className="dbtn ink" onClick={takeImport}>Keep them</button>
+                                <button type="button" className="dbtn" onClick={() => setImporting({ drafts: null })}>Paste again</button>
+                                <button type="button" className="dbtn" onClick={() => setImporting(null)}>Cancel</button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {editing && (
+                        <form className="rp editing" onSubmit={(e) => { e.preventDefault(); saveEditing(); }}>
+                          <input autoFocus value={editing.title} placeholder="Name it — Probability weighing"
+                            onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+                          <textarea value={editing.text} rows={Math.min(14, Math.max(5, editing.text.split("\n").length + 1))}
+                            placeholder={"One line per flow line.\n  Two spaces in, and it goes under the line above."}
+                            spellCheck={false}
+                            onChange={(e) => setEditing({ ...editing, text: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); saveEditing(); return; }
+                              if (e.key === "Escape") { e.preventDefault(); setEditing(null); return; }
+                              if (e.key === "Tab") {
+                                // Tab indents the line, as it does in the flow
+                                e.preventDefault();
+                                const ta = e.currentTarget;
+                                const st = ta.selectionStart, val = ta.value;
+                                const ls = val.lastIndexOf("\n", st - 1) + 1;
+                                let next: string, caretAt: number;
+                                if (e.shiftKey) { const cut = val.slice(ls, ls + 2) === "  " ? 2 : 0; next = val.slice(0, ls) + val.slice(ls + cut); caretAt = st - cut; }
+                                else { next = val.slice(0, ls) + "  " + val.slice(ls); caretAt = st + 2; }
+                                setEditing({ ...editing, text: next });
+                                requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = Math.max(ls, caretAt); });
+                              }
+                            }} />
+                          <div className="rp-row">
+                            <button type="submit" className="dbtn ink">Keep it</button>
+                            <button type="button" className="dbtn" onClick={() => setEditing(null)}>Cancel</button>
+                            <small className="mono">Ctrl+Enter</small>
+                          </div>
+                        </form>
+                      )}
+                      {grouped.map(({ g, items }) => {
+                        const shut = !rq.trim() && !!g && ui.shut.includes(g);
+                        return (
+                          <div key={g || "·"} className={"rgw" + (shut ? " shut" : "")}>
+                            {g && (
+                              <div className="rg">
+                                <button type="button" className="rg-b" onClick={() => patchUi({ shut: shut ? ui.shut.filter((x) => x !== g) : [...ui.shut, g] })} aria-expanded={!shut}>
+                                  <i className="chev" /><span>{g}</span><em className="mono">{items.length}</em>
+                                </button>
+                                <button type="button" className="rg-x" onClick={() => deleteGroup(g)} title="Delete this group" aria-label={`Delete the group ${g}`}>×</button>
+                              </div>
+                            )}
+                            {!shut && items.map(pieceCard)}
+                          </div>
+                        );
+                      })}
+                      {!pieces.length && !editing && !importing && (
+                        <div className="drnone">
+                          <b>Write it once.</b>
+                          <p>Weighing, framing, the frontline you always need. Keep it here, then drag it onto a line, click it, or type <kbd>/</kbd> and its name.</p>
+                          <p>Already in a Google Doc? <button type="button" className="drlink" onClick={() => setImporting({ drafts: null })}>Paste the doc</button> and its headings become pieces.</p>
+                          <p>Or select lines in your flow and press {K("keep") ? <kbd>{K("keep")}</kbd> : "Keep"} to keep them.</p>
+                        </div>
+                      )}
+                      {pieces.length > 0 && !shownPieces.length && <p className="dnone">Nothing called that.</p>}
+                    </div>
+                    <div className="drfoot mono">
+                      <button type="button" onClick={keepSelection}>Keep selected lines{K("keep") && <kbd>{K("keep")}</kbd>}</button>
+                    </div>
+                  </>
+                )}
+              </section>
+            </>
+          )}
         </aside>
       </div>
+
+      {speaking && stops[visionAt] && (
+        <div className="dspeak" role="status">
+          <div className="sp-bar"><i style={{ transform: `scaleX(${(visionAt + 1) / stops.length})` }} /></div>
+          <div className="sp-in">
+            <button type="button" className="sp-arrow" onClick={() => step(-1)} aria-label="Previous stop">‹</button>
+            <div className="spk" key={visionAt}>
+              <span className="sp-n mono">{visionAt + 1} / {stops.length}</span>
+              <b>{stops[visionAt].name}</b>
+              {stops[visionAt].under && <small>{stops[visionAt].under}</small>}
+            </div>
+            <button type="button" className="sp-arrow" onClick={() => step(1)} aria-label="Next stop">›</button>
+          </div>
+          <button type="button" className="sp-done mono" onClick={() => speak(false)}>Done · Esc</button>
+        </div>
+      )}
 
       {slash && slashItems.length > 0 && slashPos && (
         <div className="dslash" ref={slashBox} style={slashPos}>

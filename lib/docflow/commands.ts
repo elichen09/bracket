@@ -21,6 +21,9 @@ import { schema, MAX_DEPTH, type Who, type Hl } from "./schema";
 const T = schema.nodes;
 const flip = (w: Who): Who => (w === "them" ? "us" : "them");
 
+/** A line's round vision stop, carried across a change of kind. */
+const keepStop = (n: PMNode) => ({ stop: n.attrs.stop ?? null, stopN: n.attrs.stopN ?? null });
+
 /** Where the i-th block of the document starts. */
 export function posOf(doc: PMNode, i: number) {
   let pos = 0;
@@ -59,7 +62,7 @@ function changeDepth(delta: 1 | -1): Command {
       if (node.type === T.para && delta > 0) {
         const prev = i > 0 ? tr.doc.child(i - 1) : null;
         const d = prev && prev.type === T.item ? Math.min(MAX_DEPTH, prev.attrs.depth + 1) : 0;
-        tr.setNodeMarkup(posOf(tr.doc, i), T.item, { depth: d, who: whoFor(tr.doc, i, d), hl: null });
+        tr.setNodeMarkup(posOf(tr.doc, i), T.item, { depth: d, who: whoFor(tr.doc, i, d), hl: null, ...keepStop(node) });
         changed = true;
         continue;
       }
@@ -101,7 +104,7 @@ export const enter: Command = (state, dispatch) => {
       // An empty line: up a level, the way a list in Docs does — and off the
       // top of the list into prose.
       if (node.attrs.depth > 0) return outdent(state, dispatch);
-      if (dispatch) dispatch(state.tr.setNodeMarkup($from.before(), T.para));
+      if (dispatch) dispatch(state.tr.setNodeMarkup($from.before(), T.para, keepStop(node)));
       return true;
     }
     if (dispatch) {
@@ -117,7 +120,7 @@ export const enter: Command = (state, dispatch) => {
     if (!dispatch) return true;
     let tr = state.tr;
     if ($from.parentOffset < node.content.size) {
-      dispatch(splitAs(tr, node.type, node.attrs).scrollIntoView());
+      dispatch(splitAs(tr, node.type, { ...node.attrs, stop: null, stopN: null }).scrollIntoView());
       return true;
     }
     // After a title, the first thing written is one of their points.
@@ -264,7 +267,7 @@ export function setBlock(kind: "box" | "head" | "item" | "para", attrs: Record<s
       base = { depth: d, who: attrs.who ?? whoFor(state.doc, i, d), hl: null };
     } else if (kind === "box" || kind === "head") base = { who: attrs.who ?? (kind === "box" ? "us" : "them") };
     if (!dispatch) return true;
-    let tr = state.tr.setNodeMarkup(at, type, kind === "para" ? null : { ...base, ...attrs });
+    let tr = state.tr.setNodeMarkup(at, type, kind === "para" ? keepStop(node) : { ...base, ...attrs, ...keepStop(node) });
     if (text !== undefined) {
       tr = tr.replaceWith(at + 1, at + 1 + node.content.size, text ? schema.text(text) : []);
     }
