@@ -1,125 +1,179 @@
 /* =====================================================================
-   The finish every tool shares — contrast, and texture.
+   The finish every tool shares — the Flow it look.
 
-   Three things, on all four tools (Evidence .evi, Flow .flw, Doc flow .dfl,
-   Past flows .pfl):
+   Evidence (.evi), Flow (.flw), Doc flow (.dfl) and Past flows (.pfl) sit
+   on one desk and under one banner:
 
-   1. A paper grain. The desk the tools sit on is a surface, not a flat
-      fill: a fine fractal noise, a few percent dark, laid over the ground
-      and the side panels. Pages and cards stay clean white on top of it.
-   2. More contrast. The ground is a shade deeper, the rules a shade firmer,
-      and the white pages and cards lift off it with a real shadow.
-   3. A dark top bar. Each tool's bar is ink, with the same grain, and its
-      controls turn light by the tools' own colour tokens being redefined
-      inside the bar — the few that name a colour outright are set here.
+   · a forest-green banner with a fine grain, cream type, a pill clock with
+     a round play button, and pill buttons;
+   · cream paper, warm beige tints and firm but soft rules below it;
+   · terracotta for whatever is happening now — the live column, the cell
+     being written, a turn, a running clock;
+   · in Flow, the two sides as forest (Pro) and clay (Con). Clay is kept
+     much lighter than forest, so the pair still separates by lightness for
+     colour-blind readers, and every side is named in words as well.
 
-   Loaded after each tool's own sheet, and every rule is scoped under
-   .toolpage so it wins without !important.
+   Loaded after each tool's own sheet; every rule is scoped under .toolpage
+   so it wins without !important.
    ===================================================================== */
 
 .toolpage {
-  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .11 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  --grain-light: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .15  0 0 0 0 .08  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --grain-light: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 .92  0 0 0 .08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --forest: #1F2C24;
+  --forest-2: #2A3B30;
+  --cream: #F3EDE1;
+  --terra: #C4553A;
+  --terra-hi: #D96A4D;
 }
 
-/* ------------------------------------------------------------ 1 + 2: the desk */
+/* ------------------------------------------------------------ the desk */
 .toolpage .evi, .toolpage .flw, .toolpage .dfl, .toolpage .pfl {
-  --ground: #E4DFD5;
-  --surface-2: #F3EFE7;
-  --line: #B4AD9F;
-  --line-soft: #D2CBBE;
+  --ground: #ECE5D8;
+  --surface: #FBF8F2;
+  --surface-2: #F4EEE3;
+  --line: #C8BDAB;
+  --line-soft: #E0D6C5;
+  --ink: #1D1B17;
+  --muted: #5A554B;
+  --dim: #857E71;
   background-color: var(--ground);
   background-image: var(--grain);
 }
-/* side panels carry the grain too, a shade lighter than the desk */
-.toolpage .dfl .dside, .toolpage .dfl .dright, .toolpage .pfl .pf-list,
-.toolpage .evi .left {
-  background-color: #EDE9E0;
+.toolpage .dfl .dside, .toolpage .dfl .dright, .toolpage .pfl .pf-list, .toolpage .evi .left {
+  background-color: #F0EADF;
   background-image: var(--grain);
 }
-.toolpage .dfl .dside { border-right-color: var(--line); box-shadow: inset -1px 0 0 rgba(255, 255, 255, .5); }
-.toolpage .dfl .dright { border-left-color: var(--line); box-shadow: inset 1px 0 0 rgba(255, 255, 255, .5); }
+.toolpage .dfl .dside { border-right-color: var(--line); }
+.toolpage .dfl .dright { border-left-color: var(--line); }
 
-/* pages and cards lift off it */
+/* pages and cards: cream paper that lifts off the desk */
 .toolpage .dfl .dpaper, .toolpage .pfl .pf-vhead, .toolpage .pfl .pf-read {
-  box-shadow: 0 0 0 1px rgba(40, 34, 24, .1), 0 2px 3px rgba(40, 34, 24, .08), 0 22px 44px -26px rgba(40, 34, 24, .45);
+  background: #FFFCF6;
+  box-shadow: 0 0 0 1px rgba(60, 45, 25, .09), 0 2px 3px rgba(60, 45, 25, .07), 0 22px 44px -26px rgba(60, 45, 25, .42);
 }
-.toolpage .dfl .rp, .toolpage .dfl .vs, .toolpage .pfl .pf-row {
-  border-color: #CFC8BA;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 1px 2px rgba(40, 34, 24, .07);
-}
-.toolpage .pfl .pf-row.on, .toolpage .dfl .vs.now { box-shadow: 0 14px 30px -16px rgba(0, 0, 0, .7); }
+.toolpage .dfl .rp, .toolpage .dfl .vs, .toolpage .pfl .pf-row { background: #FFFCF6; border-color: #DDD2C0; box-shadow: 0 1px 2px rgba(60, 45, 25, .06); }
 
-/* ------------------------------------------------------------ 3: the bar */
+/* the one main button, anywhere below the banner: forest, like the banner */
+.toolpage .dfl .dbtn.ink, .toolpage .dfl .dnew, .toolpage .pfl .pf-btn.ink,
+.toolpage .dfl .dsharepop .dbtn.ink {
+  background: linear-gradient(180deg, var(--forest-2), var(--forest)); color: var(--cream); border-color: var(--forest);
+  box-shadow: 0 8px 18px -12px rgba(31, 44, 36, .9);
+}
+.toolpage .dfl .dbtn.ink:hover, .toolpage .dfl .dnew:hover, .toolpage .pfl .pf-btn.ink:hover { color: #fff; }
+.toolpage .pfl .pf-row.on, .toolpage .dfl .vs.now { background: var(--forest); border-color: var(--forest); }
+.toolpage .dfl .dlist li.on { background: var(--forest); }
+
+/* ------------------------------------------------------------ the banner */
 .toolpage .evi > .bar, .toolpage .flw > .topbar, .toolpage .dfl > .dtop, .toolpage .pfl > .pf-top {
-  --ink: #F3EFE6;
-  --ground: #131315;
-  --surface: #1B1B1F;
-  --surface-2: #26262B;
-  --line: rgba(243, 239, 230, .2);
-  --line-soft: rgba(243, 239, 230, .1);
-  --muted: rgba(243, 239, 230, .74);
-  --dim: rgba(243, 239, 230, .5);
-  --acc: #F3EFE6;
+  --ink: #F3EDE1;
+  --ground: #1F2C24;
+  --surface: #26352C;
+  --surface-2: #2E4035;
+  --line: rgba(243, 237, 225, .24);
+  --line-soft: rgba(243, 237, 225, .12);
+  --muted: rgba(243, 237, 225, .78);
+  --dim: rgba(243, 237, 225, .55);
+  --acc: #F3EDE1;
   color: var(--ink);
-  background-color: #131315;
-  background-image: var(--grain-light), linear-gradient(180deg, #1D1D21 0%, #121214 100%);
-  border-bottom: 1px solid #000;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 10px 24px -18px rgba(0, 0, 0, .8);
+  background-color: var(--forest);
+  background-image: var(--grain-light), radial-gradient(120% 180% at 0% 0%, #2B3D31 0%, transparent 60%), linear-gradient(180deg, #243329, #1C271F);
+  border-bottom: 1px solid #16201A;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 10px 22px -18px rgba(20, 30, 24, .9);
   position: relative; z-index: 5;
 }
-/* the red-to-ink rule under the bar, brighter against the dark */
-.toolpage .dfl > .dtop::after, .toolpage .pfl > .pf-top::after {
-  background: linear-gradient(90deg, #E0352C, rgba(224, 53, 44, .25) 55%, transparent);
-}
-.toolpage .evi > .bar::after, .toolpage .flw > .topbar::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none;
-  background: linear-gradient(90deg, #E0352C, rgba(224, 53, 44, .25) 55%, transparent);
-}
+/* no rule under it: the banner's edge is the rule */
+.toolpage .evi > .bar::after, .toolpage .flw > .topbar::after, .toolpage .dfl > .dtop::after, .toolpage .pfl > .pf-top::after { content: none; }
 
-/* buttons in the bar: a hairline that glows on hover */
+/* pill buttons, outlined in cream */
 .toolpage .evi > .bar .btn, .toolpage .flw > .topbar .btn, .toolpage .dfl > .dtop .dbtn, .toolpage .pfl > .pf-top .pf-btn {
-  background-color: rgba(255, 255, 255, .03);
+  border-radius: 999px; background-color: transparent; border-color: rgba(243, 237, 225, .3); color: var(--ink);
 }
 .toolpage .evi > .bar .btn:hover, .toolpage .flw > .topbar .btn:hover, .toolpage .dfl > .dtop .dbtn:hover, .toolpage .pfl > .pf-top .pf-btn:hover {
-  background-color: rgba(255, 255, 255, .09); border-color: rgba(243, 239, 230, .55); color: #fff;
+  background-color: rgba(243, 237, 225, .1); border-color: rgba(243, 237, 225, .7); color: #fff;
 }
-/* the one main button in each bar: light, on the dark */
+/* the main one, filled cream */
 .toolpage .dfl > .dtop .dbtn.ink, .toolpage .flw > .topbar .btn.cmd, .toolpage .evi > .bar .btn.key, .toolpage .evi > .bar .docbtn.on {
-  background: linear-gradient(180deg, #FBF8F2, #E7E1D5); color: #131315; border-color: #FBF8F2;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 8px 18px -10px rgba(0, 0, 0, .9);
+  background: var(--cream); color: var(--forest); border-color: var(--cream);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 8px 18px -12px rgba(0, 0, 0, .8);
 }
 .toolpage .dfl > .dtop .dbtn.ink:hover, .toolpage .flw > .topbar .btn.cmd:hover, .toolpage .evi > .bar .btn.key:hover, .toolpage .evi > .bar .docbtn.on:hover {
-  background: #fff; color: #131315; opacity: 1;
+  background: #fff; color: var(--forest); opacity: 1;
 }
-.toolpage .dfl > .dtop .dbtn.ink kbd, .toolpage .flw > .topbar .btn.cmd kbd { color: #131315; border-color: rgba(19, 19, 21, .25); }
-.toolpage .dfl > .dtop kbd, .toolpage .pfl > .pf-top kbd { background: rgba(255, 255, 255, .06); color: var(--muted); border-color: var(--line); }
+.toolpage .dfl > .dtop .dbtn.ink kbd, .toolpage .flw > .topbar .btn.cmd kbd { color: var(--forest); border-color: rgba(31, 44, 36, .25); background: none; }
+.toolpage .dfl > .dtop kbd, .toolpage .pfl > .pf-top kbd { background: rgba(243, 237, 225, .08); color: var(--muted); border-color: var(--line); }
 
-/* the clock: light digits, and red for anything running — on air */
-.toolpage .dfl > .dtop .dclock, .toolpage .flw > .topbar .tbar { background: rgba(0, 0, 0, .25); border-color: var(--line); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .5); }
-.toolpage .dfl > .dtop .dclock .play, .toolpage .flw > .topbar .tbar .play { background: #F3EFE6; color: #131315; }
-.toolpage .dfl > .dtop .dclock .play.on, .toolpage .flw > .topbar .tbar .play.on,
-.toolpage .dfl > .dtop .dclock .pp.on, .toolpage .flw > .topbar .prep button[aria-pressed="true"] { background: #D8322A; color: #fff; border-color: #D8322A; }
-.toolpage .dfl > .dtop .dclock .tm.on, .toolpage .flw > .topbar .tbar .tm.low, .toolpage .dfl > .dtop .dclock .tm.low { color: #FF6B5E; }
-.toolpage .flw > .topbar .tbar.live { border-color: #D8322A; }
-.toolpage .flw > .topbar .tbar.live .dot { background: #FF4A3F; }
+/* the clock: a pill, with a round play button; red-clay when it runs */
+.toolpage .dfl > .dtop .dclock, .toolpage .flw > .topbar .tbar {
+  border-radius: 999px; padding: 4px 6px; background: rgba(0, 0, 0, .18); border-color: rgba(243, 237, 225, .26);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+}
+.toolpage .dfl > .dtop .dclock button, .toolpage .flw > .topbar .tbar button { border-radius: 999px; }
+.toolpage .dfl > .dtop .dclock button:hover, .toolpage .flw > .topbar .tbar button:hover { background: rgba(243, 237, 225, .1); }
+.toolpage .dfl > .dtop .dclock .play, .toolpage .flw > .topbar .tbar .play {
+  width: 30px; min-width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border-radius: 50%;
+  background: var(--cream); color: var(--forest); box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
+}
+.toolpage .dfl > .dtop .dclock .play:hover, .toolpage .flw > .topbar .tbar .play:hover { background: #fff; color: var(--forest); }
+.toolpage .dfl > .dtop .dclock .play.on, .toolpage .flw > .topbar .tbar .play.on { background: var(--terra); color: #fff; }
+.toolpage .dfl > .dtop .dclock .pp { border-left-color: rgba(243, 237, 225, .2); }
+.toolpage .dfl > .dtop .dclock .pp.on, .toolpage .flw > .topbar .prep button[aria-pressed="true"] { background: var(--terra); color: #fff; border-color: var(--terra); }
+.toolpage .flw > .topbar .prep button { border-radius: 999px; }
+.toolpage .dfl > .dtop .dclock .tm.on, .toolpage .flw > .topbar .tbar .tm.low, .toolpage .dfl > .dtop .dclock .tm.low { color: #F08A6C; }
+.toolpage .flw > .topbar .tbar.live { border-color: var(--terra); }
+.toolpage .flw > .topbar .tbar.live .dot { background: var(--terra-hi); }
 
-/* Doc flow's share button and Past flows' filter */
-.toolpage .dfl > .dtop .droom.live { background: rgba(255, 255, 255, .06); }
-.toolpage .dfl > .dtop .dfaces b { box-shadow: 0 0 0 2px #131315; }
-.toolpage .pfl > .pf-top .pf-seg button.on { background: #F3EFE6; color: #131315; }
-.toolpage .pfl > .pf-top .pf-seg button.on em { color: rgba(19, 19, 21, .55); }
-.toolpage .pfl > .pf-top .pf-search { background: rgba(0, 0, 0, .25); border-color: var(--line); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .45); }
-.toolpage .pfl > .pf-top .pf-search:focus-within { background: rgba(0, 0, 0, .35); border-color: rgba(243, 239, 230, .6); }
+/* Doc flow's share button, Past flows' search and filter */
+.toolpage .dfl > .dtop .droom.live { background: rgba(243, 237, 225, .08); }
+.toolpage .dfl > .dtop .dfaces b { box-shadow: 0 0 0 2px var(--forest); }
+.toolpage .pfl > .pf-top .pf-seg { border-radius: 999px; overflow: hidden; border-color: rgba(243, 237, 225, .3); }
+.toolpage .pfl > .pf-top .pf-seg button.on { background: var(--cream); color: var(--forest); }
+.toolpage .pfl > .pf-top .pf-seg button.on em { color: rgba(31, 44, 36, .55); }
+.toolpage .pfl > .pf-top .pf-search { border-radius: 999px; background: rgba(0, 0, 0, .18); border-color: rgba(243, 237, 225, .26); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35); }
+.toolpage .pfl > .pf-top .pf-search:focus-within { background: rgba(0, 0, 0, .26); border-color: rgba(243, 237, 225, .65); }
 .toolpage .pfl > .pf-top .pf-search input { color: #fff; }
+.toolpage .pfl > .pf-top .pf-search input::placeholder { color: rgba(243, 237, 225, .55); }
 
-/* anything that opens out of a bar is light again: the share popover */
+/* what opens out of the banner is cream paper again: the share popover */
 .toolpage .dfl > .dtop .dsharepop {
-  --ink: #16161A; --ground: #E4DFD5; --surface: #FFFFFF; --surface-2: #F3EFE7;
-  --line: #B4AD9F; --line-soft: #D2CBBE; --muted: #55534E; --dim: #7C7A73;
-  color: var(--ink);
+  --ink: #1D1B17; --ground: #ECE5D8; --surface: #FFFCF6; --surface-2: #F4EEE3;
+  --line: #C8BDAB; --line-soft: #E0D6C5; --muted: #5A554B; --dim: #857E71;
+  color: var(--ink); background: #FFFCF6; border-color: var(--forest);
 }
-.toolpage .dfl > .dtop .dsharepop .dbtn { background: none; }
-.toolpage .dfl > .dtop .dsharepop .dbtn.ink { background: linear-gradient(135deg, #16161a, #3a1d22); color: #fff; border-color: #16161a; }
+.toolpage .dfl > .dtop .dsharepop .dbtn { background: none; border-radius: 0; color: var(--muted); border-color: var(--line); }
 .toolpage .dfl > .dtop .dsharepop .dbtn:hover { color: var(--ink); background: var(--surface-2); border-color: var(--ink); }
-.toolpage .dfl > .dtop .dsharepop .dbtn.ink:hover { color: #fff; background: linear-gradient(135deg, #16161a, #3a1d22); }
+.toolpage .dfl > .dtop .dsharepop .dbtn.ink, .toolpage .dfl > .dtop .dsharepop .dbtn.ink:hover { background: linear-gradient(180deg, var(--forest-2), var(--forest)); color: var(--cream); border-color: var(--forest); }
+
+/* ------------------------------------------------------------ Flow's sides, and now */
+.toolpage .flw {
+  --pro: #2D5A43;  --pro-ink: #234735;  --pro-head: #EAEDE3;  --pro-bg: #F7F5EE;
+  --con: #B8664A;  --con-ink: #8E4A33;  --con-head: #F5E9DF;  --con-bg: #FAF3EC;
+  --vision: #3F5566; --vision-2: #2F4252;
+  --acc: #C4553A; --acc-rgb: 196, 85, 58; --acc-hi: #D96A4D;
+  --rule: #E3D9C9;
+}
+.toolpage .flw .cursor.pro { box-shadow: 0 0 0 4px rgba(45, 90, 67, .14); }
+.toolpage .flw .cursor.con { box-shadow: 0 0 0 4px rgba(184, 102, 74, .16); }
+/* the live column: a warm beige, a terracotta rule under its head, and a dot — as Flow it drew it */
+.toolpage .flw .c.livecol { background-color: #EFE5D6; }
+.toolpage .flw .h.live { box-shadow: inset 0 -3px 0 var(--acc); }
+.toolpage .flw .h.live .lv { background: none; color: var(--acc); }
+.toolpage .flw .rh { background: linear-gradient(90deg, rgba(63, 85, 102, .06), transparent 45%), var(--ground); box-shadow: inset 3px 0 0 var(--vision); }
+/* Past flows names the sides the same way */
+.toolpage .pfl { --pro: #2D5A43; --con: #B8664A; }
+.toolpage .flw .c.pro.livecol, .toolpage .flw .c.con.livecol { background-image: none; background-color: #EFE5D6; }
+.toolpage .flw .h.pro.live, .toolpage .flw .h.con.live { box-shadow: inset 0 -3px 0 var(--acc); }
+.toolpage .flw .h.pro.live .lv, .toolpage .flw .h.con.live .lv { background: none; color: var(--acc); }
+.toolpage .flw .h.live .lv i { background: var(--acc); }
+/* a turn is the thing that decides a round: filled terracotta, as Flow it has it */
+.toolpage .flw .c .tg.turn { color: #fff; background: var(--acc); border-color: transparent; box-shadow: 0 2px 6px -2px rgba(196, 85, 58, .6); }
+.toolpage .flw .c .tg.dropped { color: var(--acc); background: rgba(196, 85, 58, .08); border-color: rgba(196, 85, 58, .5); }
+.toolpage .flw .c .arr { color: var(--acc); }
+
+/* nothing black left below the banner: toggles that are on, and the toasts, are forest */
+.toolpage .flw .btn.on, .toolpage .flw .btn.go { background: var(--forest); color: var(--cream); border-color: var(--forest); }
+.toolpage .flw .tst, .toolpage .evi .toast, .toolpage .dfl .dtoast, .toolpage .pfl .pf-toast {
+  background-color: var(--forest); background-image: var(--grain-light); color: var(--cream);
+  box-shadow: 0 16px 34px -16px rgba(20, 30, 24, .8);
+}
+.toolpage .dfl .dtoast::after, .toolpage .pfl .pf-toast::after { background: linear-gradient(90deg, var(--terra), var(--cream)); }
