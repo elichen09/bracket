@@ -5,7 +5,7 @@
    forest green, bone, a red accent, rounded pills. None of that is here.
    What is here is the same grid wearing The Break's clothes — the paper
    ground, the hairline rules, the uppercase mono for anything that is a
-   label rather than a word someone said, and the one orange accent doing
+   label rather than a word someone said, and the one accent (gold, in here) doing
    the job the red did: this is live, this was dropped, this is where the
    answer should have gone.
 
@@ -174,7 +174,7 @@
    bold type with its side in small caps beside it; the arguments in plain
    15px sans with room around them; the marks as rounded chips you can see
    from the podium; headings with a number, a label and an italic title. The
-   paper, the ink and the one orange accent are still the site's. */
+   paper, the ink and the type are still the site's; the accent is gold. */
 .flw .flow { min-width: 0; min-height: 0; overflow: auto; outline: 0; position: relative; }
 .flw .grid { position: relative; display: grid; width: 100%; transition: grid-template-columns .35s var(--spring); }
 /* a sheet arriving */
@@ -214,7 +214,7 @@
   transition: background-color .2s var(--ease);
 }
 .flw .c.pro { background: var(--pro-bg); }
-.flw .c.livecol { background-image: linear-gradient(rgba(196, 83, 31, .055), rgba(196, 83, 31, .055)); }
+.flw .c.livecol { background-image: linear-gradient(rgba(var(--acc-rgb), .055), rgba(var(--acc-rgb), .055)); }
 .flw .r:hover > .c { background-image: linear-gradient(rgba(14, 14, 13, .025), rgba(14, 14, 13, .025)); }
 .flw .c.editing { background-image: none !important; }
 .flw .c.sel:empty::before {
@@ -240,7 +240,7 @@
   content: ""; position: absolute; right: -2px; top: 7px; bottom: 7px;
   width: 3px; border-radius: 2px; background: var(--acc); opacity: .85;
 }
-.flw .c.miss { background-image: repeating-linear-gradient(135deg, transparent 0 7px, rgba(196, 83, 31, .075) 7px 8px); }
+.flw .c.miss { background-image: repeating-linear-gradient(135deg, transparent 0 7px, rgba(var(--acc-rgb), .075) 7px 8px); }
 
 /* a heading across the flow: [01]  ADV 1  Climate */
 .flw .rh {
@@ -282,7 +282,7 @@
   background: var(--ink); color: var(--ground); padding: 2px 7px 1px; white-space: nowrap;
   transition: background .15s var(--ease);
 }
-.flw .cursor.editing { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(196, 83, 31, .14), 0 10px 26px -14px rgba(196, 83, 31, .5); }
+.flw .cursor.editing { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(var(--acc-rgb), .14), 0 10px 26px -14px rgba(var(--acc-rgb), .5); }
 .flw .cursor.editing .lab { background: var(--acc); color: #fff; }
 .flw .cursor.range { border-style: dashed; }
 .flw .pw:not(.active) .cursor { border-color: var(--dim); box-shadow: none; opacity: .55; }
@@ -323,10 +323,10 @@
 
 .flw .c.spot { z-index: 3; animation: flwSpot .9s cubic-bezier(.2, .8, .2, 1); }
 @keyframes flwSpot {
-  0% { box-shadow: 0 0 0 12px rgba(196, 83, 31, 0), 0 0 0 0 rgba(196, 83, 31, .35); }
-  18% { box-shadow: 0 0 0 2px rgba(196, 83, 31, 1), 0 0 0 0 rgba(196, 83, 31, .35); }
-  70% { box-shadow: 0 0 0 2px rgba(196, 83, 31, 1), 0 0 0 24px rgba(196, 83, 31, 0); }
-  100% { box-shadow: 0 0 0 2px rgba(196, 83, 31, 0), 0 0 0 24px rgba(196, 83, 31, 0); }
+  0% { box-shadow: 0 0 0 12px rgba(var(--acc-rgb), 0), 0 0 0 0 rgba(var(--acc-rgb), .35); }
+  18% { box-shadow: 0 0 0 2px rgba(var(--acc-rgb), 1), 0 0 0 0 rgba(var(--acc-rgb), .35); }
+  70% { box-shadow: 0 0 0 2px rgba(var(--acc-rgb), 1), 0 0 0 24px rgba(var(--acc-rgb), 0); }
+  100% { box-shadow: 0 0 0 2px rgba(var(--acc-rgb), 0), 0 0 0 24px rgba(var(--acc-rgb), 0); }
 }
 
 /* ---------- picking things up ---------- */
@@ -339,9 +339,9 @@
 }
 .flw .hx.on { opacity: 1; transform: none; pointer-events: auto; }
 .flw .hx:hover { color: #fff; background: var(--bad); border-color: var(--bad); }
-.flw .c.inrange { background-image: linear-gradient(rgba(196, 83, 31, .14), rgba(196, 83, 31, .14)) !important; }
+.flw .c.inrange { background-image: linear-gradient(rgba(var(--acc-rgb), .14), rgba(var(--acc-rgb), .14)) !important; }
 .flw .c.dragsrc { opacity: .35; }
-.flw .c.dropt { box-shadow: inset 0 0 0 2px var(--acc); background-image: linear-gradient(rgba(196, 83, 31, .1), rgba(196, 83, 31, .1)) !important; }
+.flw .c.dropt { box-shadow: inset 0 0 0 2px var(--acc); background-image: linear-gradient(rgba(var(--acc-rgb), .1), rgba(var(--acc-rgb), .1)) !important; }
 .flw .dropline { position: absolute; left: 0; right: 0; height: 3px; margin-top: -2px; background: var(--acc); z-index: 4; pointer-events: none; transition: transform .08s; }
 .flw .ghost {
   position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none;
@@ -354,9 +354,9 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
 /* cells that arrive, change or leave */
 .flw .c.born, .flw .g.born { animation: flwBorn .32s var(--pop); }
-@keyframes flwBorn { from { opacity: 0; transform: translateY(-6px); background-image: linear-gradient(rgba(196, 83, 31, .22), rgba(196, 83, 31, .22)); } }
+@keyframes flwBorn { from { opacity: 0; transform: translateY(-6px); background-image: linear-gradient(rgba(var(--acc-rgb), .22), rgba(var(--acc-rgb), .22)); } }
 .flw .c.flash { animation: flwFlash .6s ease-out; }
-@keyframes flwFlash { from { background-image: linear-gradient(rgba(196, 83, 31, .26), rgba(196, 83, 31, .26)); } }
+@keyframes flwFlash { from { background-image: linear-gradient(rgba(var(--acc-rgb), .26), rgba(var(--acc-rgb), .26)); } }
 .flw .c.gone { color: transparent !important; transition: color .14s; }
 .flw .c.gone .tg { opacity: 0; transition: opacity .14s; }
 .flw .dying { animation: flwDie .18s ease-in forwards; }
@@ -563,7 +563,7 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .pal li.it .gtag { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
 .flw .pal li.it.on .gtag, .flw .pal li.it.on small { color: rgba(255, 255, 255, .6); }
 .flw .pal li.it.on { color: var(--ground); }
-.flw .pal li.it.on .lb u { color: #ffb48f; }
+.flw .pal li.it.on .lb u { color: #F2C66D; }
 .flw .pal li.it.on kbd { color: var(--ground); border-color: rgba(255, 255, 255, .3); }
 .flw .pal li.hl {
   position: absolute; left: 6px; right: 6px; top: 0; z-index: 0; pointer-events: none;
@@ -593,7 +593,7 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   border: 1px solid var(--line); background: var(--surface-2); padding: 8px 10px;
   font-size: 15px; outline: none; font-family: var(--ui);
 }
-.flw .namer input:focus { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(196, 83, 31, .12); }
+.flw .namer input:focus { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(var(--acc-rgb), .12); }
 .flw .namer .hint { font-size: 9px; }
 
 /* ---------- speaking through round vision ---------- */
@@ -670,7 +670,7 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
 /* the drawer button, when Evidence has just sent something */
 .flw #drawer-btn.ping { animation: flwPing 1.1s var(--ease) 2; }
-@keyframes flwPing { 0%, 100% { box-shadow: 0 0 0 0 rgba(196, 83, 31, 0); } 40% { box-shadow: 0 0 0 5px rgba(196, 83, 31, .3); border-color: var(--acc); color: var(--acc); } }
+@keyframes flwPing { 0%, 100% { box-shadow: 0 0 0 0 rgba(var(--acc-rgb), 0); } 40% { box-shadow: 0 0 0 5px rgba(var(--acc-rgb), .3); border-color: var(--acc); color: var(--acc); } }
 
 /* the command button, the one way in that says what it is */
 .flw .btn.cmd { background: var(--ink); color: var(--ground); border-color: var(--ink); }
@@ -716,8 +716,8 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
      blue    Pro          #2E5FAE
      garnet  Con          #A93650
-     orange  live / act   #C4531F   (the site's accent: the clock, the live
-                                     column, a turn, a drop, an open argument)
+     gold    live / act   #9C6B0E   (the clock, the live column, a turn, a
+                                     drop, an open argument, writing in a cell)
      teal    round vision #0F766E
 
    The two sides are the ones a flow is read by, so they carry the most: a
@@ -727,7 +727,7 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
    Checked, not guessed: under simulated protanopia and deuteranopia Pro and
    Con stay 15–19 apart in OKLab (×100), and teal stays 10+ from both Pro and
-   the orange. The one close pair, teal and garnet under deuteranopia, only
+   the gold. The one close pair, teal and garnet under deuteranopia, only
    meets where a stop's number sits on a Con cell, and the number is what
    says it is a stop. Every coloured thing also says what it is in words.
    White text clears 4.5:1 on all four.
@@ -741,6 +741,10 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
   --pro: #2E5FAE;  --pro-ink: #22498A;  --pro-head: #EDF1F9;  --pro-bg: #F5F7FB;
   --con: #A93650;  --con-ink: #86283E;  --con-head: #F8ECEC;  --con-bg: #FBF5F4;
   --vision: #0F766E; --vision-2: #0B5E58;
+  /* The accent, in here, is gold: the site's orange sat between garnet and
+     gold and fought the garnet. Navy, crimson and gold is the old
+     combination for a reason. White on it clears 4.5:1. */
+  --acc: #9C6B0E; --acc-rgb: 156, 107, 14; --acc-hi: #C9921F;
   --ext: #1F7A4B;  --ext-soft: #DDF0E5;
   --perm: #5B44B2; --perm-soft: #ECE8F8;
   --nuq: #1A6E78;  --nuq-soft: #DCEFF1;
@@ -767,7 +771,7 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 }
 .flw .h.pro .sd { background: var(--pro); }
 .flw .h.con .sd { background: var(--con); }
-.flw .h.live .lv { background: rgba(196, 83, 31, .1); padding: 2px 7px 1px; border-radius: 999px; }
+.flw .h.live .lv { background: rgba(var(--acc-rgb), .1); padding: 2px 7px 1px; border-radius: 999px; }
 .flw .c.pro { background-color: var(--pro-bg); }
 .flw .c.con { background-color: var(--con-bg); }
 
@@ -776,15 +780,15 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .cursor.pro .lab { background: var(--pro); color: #fff; }
 .flw .cursor.con { border-color: var(--con); box-shadow: 0 0 0 4px rgba(169, 54, 80, .12); }
 .flw .cursor.con .lab { background: var(--con); color: #fff; }
-.flw .cursor.editing { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(196, 83, 31, .15), var(--glow) rgba(196, 83, 31, .55); }
-.flw .cursor.editing .lab { background: linear-gradient(90deg, #D9652E, #B8441B); color: #fff; }
+.flw .cursor.editing { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(var(--acc-rgb), .15), var(--glow) rgba(var(--acc-rgb), .55); }
+.flw .cursor.editing .lab { background: linear-gradient(90deg, var(--acc-hi), var(--acc)); color: #fff; }
 
 /* ---- the marks ---- */
 .flw .c .tg.ext { color: var(--ext); background: var(--ext-soft); border-color: transparent; }
 .flw .c .tg.perm { color: var(--perm); background: var(--perm-soft); border-color: transparent; }
 .flw .c .tg.nuq { color: var(--nuq); background: var(--nuq-soft); border-color: transparent; }
-.flw .c .tg.dropped { color: #B8441B; background: rgba(196, 83, 31, .1); border-color: rgba(196, 83, 31, .45); }
-.flw .c .tg.turn { color: #fff; background: linear-gradient(135deg, #DB6A30, #B8441B); border-color: transparent; box-shadow: 0 2px 6px -2px rgba(184, 68, 27, .6); }
+.flw .c .tg.dropped { color: var(--acc); background: rgba(var(--acc-rgb), .1); border-color: rgba(var(--acc-rgb), .45); }
+.flw .c .tg.turn { color: #fff; background: linear-gradient(135deg, var(--acc-hi), var(--acc)); border-color: transparent; box-shadow: 0 2px 6px -2px rgba(var(--acc-rgb), .6); }
 .flw .c .tg.xa, .flw .c .tg.cx { color: #4A5160; background: #E8EAEE; border-color: transparent; }
 
 /* ---- headings across the flow ---- */
@@ -793,7 +797,7 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
 /* ---- round vision ---- */
 .flw .c[data-stop]::before { background: linear-gradient(135deg, #14958A, var(--vision-2)); color: #fff; box-shadow: 0 3px 9px -3px rgba(11, 94, 88, .7); }
-.flw .c.stopnow[data-stop]::before { background: linear-gradient(135deg, #DB6A30, #B8441B); box-shadow: 0 3px 10px -3px rgba(184, 68, 27, .8); }
+.flw .c.stopnow[data-stop]::before { background: linear-gradient(135deg, var(--acc-hi), var(--acc)); box-shadow: 0 3px 10px -3px rgba(var(--acc-rgb), .8); }
 .flw .vlist li .n { background: linear-gradient(135deg, #14958A, var(--vision-2)); color: #fff; }
 .flw .vlist li.vs.now { background: linear-gradient(120deg, #111114, #0E3B37); border-color: #0E3B37; }
 .flw .vlist li.vs:hover { border-color: var(--vision); }
@@ -817,20 +821,20 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 /* ---- the controls that start things ---- */
 .flw .btn.cmd { background: linear-gradient(135deg, #16161b, #10302d); border-color: #10302d; box-shadow: var(--glow) rgba(11, 60, 55, .7); }
 .flw .btn.cmd:hover { background: linear-gradient(135deg, #1d1d24, #0E3B37); }
-.flw .tbar.live { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(196, 83, 31, .12); }
-.flw .tbar .play.on { background: linear-gradient(135deg, #DB6A30, #B8441B); box-shadow: var(--glow) rgba(184, 68, 27, .8); }
-.flw .prep button[aria-pressed="true"] { background: linear-gradient(135deg, #DB6A30, #B8441B); border-color: #B8441B; box-shadow: var(--glow) rgba(184, 68, 27, .6); }
+.flw .tbar.live { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(var(--acc-rgb), .12); }
+.flw .tbar .play.on { background: linear-gradient(135deg, var(--acc-hi), var(--acc)); box-shadow: var(--glow) rgba(var(--acc-rgb), .8); }
+.flw .prep button[aria-pressed="true"] { background: linear-gradient(135deg, var(--acc-hi), var(--acc)); border-color: var(--acc); box-shadow: var(--glow) rgba(var(--acc-rgb), .6); }
 .flw .btn.go { background: linear-gradient(135deg, #16161b, #2b2b33); }
 .flw .card .ins.go { background: linear-gradient(135deg, #16161b, #10302d); border-color: #10302d; }
-.flw .card .ins.go:hover { background: linear-gradient(135deg, #DB6A30, #B8441B); border-color: #B8441B; }
+.flw .card .ins.go:hover { background: linear-gradient(135deg, var(--acc-hi), var(--acc)); border-color: var(--acc); }
 .flw .card.shr h2 { background: linear-gradient(115deg, #111114, #10302d); }
 .flw .dtabs button[aria-selected="true"] { border-image: linear-gradient(90deg, var(--vision), var(--acc)) 1; }
 
 /* ---- the command panel ---- */
 .flw .palin .glyph { background: linear-gradient(135deg, #14958A, var(--vision-2)); color: #fff; }
-.flw .pal.ev .palin .glyph { background: linear-gradient(135deg, #DB6A30, #B8441B); }
+.flw .pal.ev .palin .glyph { background: linear-gradient(135deg, var(--acc-hi), var(--acc)); }
 .flw .pal li.hl { background: linear-gradient(90deg, #111114, #10302d); }
-.flw .pal.ev li.hl { background: linear-gradient(90deg, #B8441B, #D9652E); }
+.flw .pal.ev li.hl { background: linear-gradient(90deg, var(--acc), var(--acc-hi)); }
 .flw .pal li.grp { color: var(--vision); }
 .flw .pal.ev li.grp { color: var(--acc); }
 

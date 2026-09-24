@@ -38,6 +38,8 @@ export interface Hit {
   /** The block it came from, and which argument in it (-1: the whole block). */
   id?: string;
   ai?: number;
+  /** How many cards the block holds. */
+  cards?: number;
 }
 
 /** The whole index of this account's library, or nothing at all. */
@@ -83,14 +85,19 @@ export function termsOf(query: string): string[] {
 }
 
 /**
- * Arguments in the library, best match first.
+ * Blocks in the library, best match first — matched on the block's header
+ * and its trigger, the way Evidence searches, not on the tags inside it.
+ *
+ * A block's header is what it is for ("AT: Tipping Points"), which is what
+ * you are looking for when an argument needs answering; the tags underneath
+ * are the answer, and matching on them turned up blocks that merely mention
+ * the words. One result per block, and choosing it sends the whole block.
  *
  * Two kinds of query come in. One is typed — two or three words, and every
  * one of them should match. The other is the text of a cell on the flow —
- * "No impact — warming not existential" — when you ask for evidence that
- * answers it, and there the right card shares some of those words and not
- * all of them. So short queries must match every word, long ones most of
- * them, and the ranking does the rest.
+ * "Tipping points = extinction" — when you ask for what answers it, and there
+ * the right header shares some of those words and not all. So short queries
+ * must match every word, long ones most of them, and the ranking does the rest.
  */
 export function find(index: Entry[], query: string, max = 24): Hit[] {
   const terms = termsOf(query);
@@ -98,21 +105,18 @@ export function find(index: Entry[], query: string, max = 24): Hit[] {
   const need = terms.length <= 2 ? terms.length : Math.ceil(terms.length * 0.4);
   const out: (Hit & { score: number })[] = [];
   for (const e of index) {
-    const path = [e.c1, e.c2].filter(Boolean).join(" › ");
-    const args = e.a && e.a.length ? e.a : [e.t];
-    args.forEach((a, ai) => {
-      const tag = (a || e.t || "").toLowerCase();
-      const hay = `${tag} ${(e.t || "").toLowerCase()} ${(e.g || "").toLowerCase()} ${path.toLowerCase()}`;
-      const matched = terms.filter((t) => hay.includes(t)).length;
-      if (matched < need) return;
-      // Words in the tag itself count for more than words in the block's
-      // title or its filing path.
-      const inTag = terms.filter((t) => tag.includes(t)).length;
-      out.push({
-        title: a || e.t, trigger: e.g, path, text: a || e.t,
-        id: e.id, ai: e.a && e.a.length ? ai : -1,
-        score: matched * 10 + inTag * 4,
-      });
+    const head = (e.t || "").toLowerCase();
+    const trig = (e.g || "").toLowerCase();
+    const matched = terms.filter((t) => head.includes(t) || trig.includes(t)).length;
+    if (matched < need) continue;
+    const inHead = terms.filter((t) => head.includes(t)).length;
+    const words = termsOf(e.t || "");
+    out.push({
+      title: e.t, trigger: e.g, path: [e.c1, e.c2].filter(Boolean).join(" › "), text: e.t,
+      id: e.id, ai: -1, cards: e.n ?? (e.a || []).length,
+      // Every word matched, then words in the header itself, then the header
+      // that is mostly made of what was asked for.
+      score: matched * 10 + inHead * 4 + (words.length ? (matched / words.length) * 6 : 0),
     });
   }
   out.sort((x, y) => y.score - x.score);
