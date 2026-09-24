@@ -1037,3 +1037,5 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .palbins .pbin.on i { background: currentColor; }
 .flw .palbins .pbin:not(.on) { text-decoration: line-through; text-decoration-color: rgba(0, 0, 0, .3); }
 .flw .palbins .pbin:hover { border-color: var(--ink); color: var(--ink); }
+.flw .sdhead .sdview { align-self: flex-start; font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); text-decoration: none; border: 1px solid var(--line); padding: 3px 8px; white-space: nowrap; }
+.flw .sdhead .sdview:hover { background: var(--ink); color: var(--ground); border-color: var(--ink); }

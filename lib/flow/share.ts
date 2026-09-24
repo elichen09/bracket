@@ -26,7 +26,8 @@ export type Status = "joining" | "live" | "alone" | "error";
 
 export interface Caret { sheet: string; row: string; col: number }
 
-export type Kind = "flow" | "evidence";
+/** A flow; an Evidence tab sharing its send doc; or a Doc viewer reading that send doc. */
+export type Kind = "flow" | "evidence" | "viewer";
 
 export interface Peer {
   id: string;
@@ -133,6 +134,8 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
         // Ask for the room's flow. If nobody answers, this browser's copy is
         // the room's copy and the ask cost nothing.
         if (kind === "flow") send("ask", null);
+        // a viewer asks for the send doc itself, whole
+        if (kind === "viewer") send("askdoc", null);
         return;
       }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {

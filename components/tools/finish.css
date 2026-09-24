@@ -274,3 +274,33 @@ html[data-tool-theme="graphite"] .toolpage {
 .toolpage .evi .tabs button.on, .toolpage .evi .panes .btn.key, .toolpage .evi .docbar .fbtn.on,
 .toolpage .evi .card h2 { background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep); }
 .toolpage .dfl .dpal li.on, .toolpage .dfl .dslash button.on { background: var(--t-deep); color: var(--t-deep-ink); }
+
+/* ------------------------------------------------------------ Doc viewer (.dvw), in the same scheme */
+.toolpage .dvw {
+  --ground: var(--t-ground); --surface: var(--t-surface); --surface-2: var(--t-surface-2);
+  --line: var(--t-line); --line-soft: var(--t-line-soft);
+  --ink: var(--t-ink); --muted: var(--t-muted); --dim: var(--t-dim); --acc: var(--t-acc);
+  background-color: var(--ground); background-image: var(--grain);
+}
+.toolpage .dvw .dv-side { background-color: var(--t-panel); background-image: var(--grain); }
+.toolpage .dvw .dv-paper { box-shadow: 0 0 0 1px rgba(60, 45, 25, .09), 0 2px 3px rgba(60, 45, 25, .07), 0 22px 44px -26px rgba(60, 45, 25, .42); }
+.toolpage .dvw > .dv-top {
+  --ink: var(--bn-ink); --ground: var(--bn); --surface: var(--bn-top); --surface-2: var(--bn-well);
+  --line: rgba(var(--bn-rgb), .3); --muted: rgba(var(--bn-rgb), .78); --dim: rgba(var(--bn-rgb), .55);
+  color: var(--ink); background-color: var(--bn);
+  background-image: var(--bn-grain), radial-gradient(120% 180% at 0% 0%, var(--bn-glow) 0%, transparent 60%), linear-gradient(180deg, var(--bn-top), var(--bn-bot));
+  border-bottom: 1px solid var(--bn-edge); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 10px 22px -18px rgba(0, 0, 0, .7);
+  position: relative; z-index: 5;
+}
+.toolpage .dvw > .dv-top .dv-now { border-left-color: rgba(var(--bn-rgb), .25); }
+.toolpage .dvw > .dv-top .dv-search { background: var(--bn-well); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25); }
+.toolpage .dvw > .dv-top .dv-search input { color: var(--bn-ink); }
+.toolpage .dvw > .dv-top .dv-search input::placeholder { color: rgba(var(--bn-rgb), .5); }
+.toolpage .dvw > .dv-top .dv-btn:hover { background: rgba(var(--bn-rgb), .1); }
+.toolpage .dvw > .dv-top .dv-btn.on { background: var(--bn-main); color: var(--bn-main-ink); border-color: var(--bn-main); }
+.toolpage .dvw .dv-orow.on, .toolpage .dvw .dv-btn2.ink, .toolpage .dvw .dv-notice button:first-of-type, .toolpage .dvw .dv-toast {
+  background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep);
+}
+.toolpage .dvw .dv-orow.on { border-left-color: var(--t-acc); }
+.toolpage .dvw .dv-tabs button.on { border-bottom-color: var(--t-acc); }
+.toolpage .dvw *:not(.dv-src i):not(.dot) { border-radius: 0 !important; }

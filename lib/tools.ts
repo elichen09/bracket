@@ -62,6 +62,16 @@ export const TOOLS: Tool[] = [
       "in the tool it came from.",
     storage: "This browser, kept apart per account — IndexedDB. Nothing is uploaded.",
   },
+  {
+    slug: "viewer",
+    name: "Doc viewer",
+    blurb: "Read your partner's send doc live, the other team's speech doc off SpeechDrop, or any .docx — searchable, with an outline.",
+    about:
+      "Join the room your partner shares their send doc in and read it as they build it; look in a SpeechDrop room and open " +
+      "any file in it; or open a .docx, a PDF or a pasted Google Doc. Every document gets an outline of its pockets, hats, " +
+      "blocks and tags with how long each block's highlighting takes to read, and a search that marks every match.",
+    storage: "This browser, kept apart per account — IndexedDB, the last fifteen docs opened. A room passes the doc straight between browsers.",
+  },
 ];
 
 export const toolBySlug = (slug: string) => TOOLS.find((t) => t.slug === slug) || null;
