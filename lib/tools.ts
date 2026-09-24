@@ -50,7 +50,17 @@ export const TOOLS: Tool[] = [
       "A document that knows it is a flow. Tab answers a line and changes the speaker, the numbering is Docs' own, " +
       "and your rhetoric sits beside it to drag onto a line or call up with /. Start a room and your partner types " +
       "into the same flow. Pastes a flow straight out of Google Docs and copies one back in.",
-    storage: "This browser, kept apart per account — localStorage, one flow per round. A shared room passes edits straight between the two browsers and stores nothing.",
+    storage: "This browser, kept apart per account — localStorage for the flows you are working on; every one is also kept in Past flows.",
+  },
+  {
+    slug: "flows",
+    name: "Past flows",
+    blurb: "Every round you have flowed, Doc or Grid — searchable, grouped by tournament, one click from opening again.",
+    about:
+      "Flow and Doc flow file every round here as you flow it, so starting the next round never loses the last. " +
+      "Search every word you have flowed, group rounds by tournament, read one back without opening it, and open it " +
+      "in the tool it came from.",
+    storage: "This browser, kept apart per account — IndexedDB. Nothing is uploaded.",
   },
 ];
 

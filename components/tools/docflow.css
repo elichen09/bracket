@@ -522,3 +522,19 @@
 .dfl .rp-row .dbtn { padding: 6px 10px; }
 /* while speaking, a message sits above the card rather than under it */
 .dfl:has(.dspeak) .dtoast { bottom: 170px; }
+
+/* where the list of flows was: a new one, and all the past ones */
+.dfl .dnav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 12px; }
+.dfl .dnew, .dfl .dpast {
+  display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 8px; border-radius: 6px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; text-decoration: none;
+  transition: background .15s, color .15s, border-color .15s, transform .18s var(--spring);
+}
+.dfl .dnew { background: linear-gradient(135deg, #16161a, #3a1d22); color: #fff; box-shadow: 0 8px 18px -12px rgba(58, 29, 34, .9); }
+.dfl .dpast { border: 1px solid var(--line); color: var(--ink); background: #fff; }
+.dfl .dnew:hover, .dfl .dpast:hover { transform: translateY(-1px); }
+.dfl .dpast:hover { border-color: var(--ink); }
+.dfl .dpast span { transition: transform .18s var(--spring); }
+.dfl .dpast:hover span { transform: translateX(3px); }
+.dfl .dlive { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; font-size: 9px; color: #1F7A4B; }
+.dfl .dlive i { width: 7px; height: 7px; border-radius: 50%; background: #1F7A4B; }

@@ -16,7 +16,7 @@ import "./flow.css";
  * Everything here is markup the engine fills: the grid, the tabs, the clock's
  * numbers, the drawer's panes, the palette and the share room.
  */
-export default function Flow({ join, owner, me }: { join?: string; owner?: string; me?: string }) {
+export default function Flow({ join, owner, me, open }: { join?: string; owner?: string; me?: string; open?: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,10 +28,10 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
     import("@/lib/flow/engine").then((m: any) => {
       if (dead) return;
       // Whose flow, and the name a partner sees on your cursor by default.
-      off = m.boot(el, { join, owner, me });
+      off = m.boot(el, { join, owner, me, open });
     });
     return () => { dead = true; unpolish(); if (off) off(); };
-  }, [join, owner, me]);
+  }, [join, owner, me, open]);
 
   return (
     <div className="flw" ref={ref}>
@@ -62,6 +62,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
         {/* Its own tab, reused: the tools talk across tabs, and Evidence's send
             list is the one Flow sends into. */}
         <a className="btn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
+        <Link className="btn" href="/tools/flows" title="Every round you have flowed — this one is kept there as you go">Past flows</Link>
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span id="share-state">Not shared</span>
         </button>

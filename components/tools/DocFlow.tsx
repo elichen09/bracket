@@ -16,7 +16,8 @@ import {
 import { schema, surveyPlugin, blankDoc, type Hl } from "@/lib/docflow/schema";
 import * as C from "@/lib/docflow/commands";
 import { fromDocsHtml, toDocsHtml, toPlainText } from "@/lib/docflow/io";
-import { listDocs, loadDoc, saveDoc, renameDoc, removeDoc, restoreDoc, newId, type DocMeta } from "@/lib/docflow/store";
+import { listDocs, loadDoc, saveDoc, renameDoc, removeDoc, restoreDoc, newId, archiveAll, fetchDoc, type DocMeta } from "@/lib/docflow/store";
+import { deleteRound, restoreRound } from "@/lib/pastflows";
 import { ACTIONS, ACTION, comboOf, keyLabel, refuse, loadKeys, saveKeys, keyFor, actionFor, bind, type Overrides } from "@/lib/docflow/keys";
 import { loadPieces, savePieces, newPieceId, titleFrom, fromDoc, merge, type Piece, type Draft } from "@/lib/docflow/rhetoric";
 import { stopsOf, toggleStop, setStop, reorder, clearStops, visionPlugin, visionKey, type Stop } from "@/lib/docflow/vision";
@@ -122,7 +123,10 @@ const BUILTIN: SlashItem[] = [
 
 const preview = (text: string) => C.parseLines(text);
 
-export default function DocFlow({ owner, me, join }: { owner?: string; me?: string; join?: string }) {
+/** A new flow is named for the day it was flowed; the title renames it. */
+const roundName = () => `Round — ${new Date().toLocaleDateString([], { month: "short", day: "numeric" })}`;
+
+export default function DocFlow({ owner, me, join, open }: { owner?: string; me?: string; join?: string; open?: string }) {
   const root = useRef<HTMLDivElement>(null);
   const mount = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -147,7 +151,6 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
   const index = useRef<Entry[] | null>(null);
   const [toastMsg, setToastMsg] = useState<{ text: string; undo?: () => void; n: number } | null>(null);
   const [side, setSide] = useState(true);
-  const [renaming, setRenaming] = useState<string | null>(null);
 
   // keys
   const [keys, setKeys] = useState<Overrides>({});
@@ -205,16 +208,28 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
 
   /* ------------------------------------------------------------ what this account keeps */
   useEffect(() => {
-    let list = listDocs(owner);
-    if (!list.length) {
-      saveDoc(owner, newId(), blankDoc().toJSON(), "Round 1");
-      list = listDocs(owner);
-    }
-    setDocs(list);
-    setCurrent(list[0].id);
-    setName(list[0].name);
+    let dead = false;
     setKeys(loadKeys(owner));
     setPieces(loadPieces(owner));
+    (async () => {
+      // one asked for by Past flows, brought back from there if need be
+      const wanted = open ? await fetchDoc(owner, open) : null;
+      if (dead) return;
+      if (open) {
+        try { const u = new URL(location.href); u.searchParams.delete("open"); history.replaceState(null, "", u.toString()); } catch { /* fine */ }
+        if (!wanted) toast("That flow is not in Past flows any more");
+      }
+      let list = listDocs(owner);
+      if (!list.length) { saveDoc(owner, newId(), blankDoc().toJSON(), roundName()); list = listDocs(owner); }
+      const first = (wanted && list.find((d) => d.id === open)) || list[0];
+      setDocs(list);
+      setCurrent(first.id);
+      setName(first.name);
+      archiveAll(owner);
+    })();
+    return () => { dead = true; };
+    // toast is stable; the flow to open is read once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [owner]);
 
   const run = useCallback((cmd: Command) => {
@@ -685,12 +700,12 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
   const newFlow = useCallback(() => {
     leaveRoom(true);
     const id = newId();
-    const n = `Round ${docs.length + 1}`;
+    const n = roundName();
     saveDoc(owner, id, blankDoc().toJSON(), n);
     setDocs(listDocs(owner));
     setCurrent(id); setName(n);
     toast("New flow — " + n);
-  }, [docs.length, owner, toast, leaveRoom]);
+  }, [owner, toast, leaveRoom]);
   const openFlow = useCallback((d: DocMeta) => {
     if (d.id === current) return;
     if (live.current) leaveRoom();
@@ -702,16 +717,21 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
     setDocs(listDocs(owner));
     if (id === current) setName(v);
     if (live.current && live.current.flowId === id) live.current.room?.rename(v);
-    setRenaming(null);
   }, [owner, current]);
-  const deleteFlow = useCallback((d: DocMeta) => {
+  const deleteFlow = useCallback(async (d: DocMeta) => {
     if (live.current && live.current.flowId === d.id) leaveRoom(true);
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     const gone = removeDoc(owner, d.id);
+    const rec = await deleteRound(owner, d.id);
     let list = listDocs(owner);
-    if (!list.length) { saveDoc(owner, newId(), blankDoc().toJSON(), "Round 1"); list = listDocs(owner); }
+    if (!list.length) { saveDoc(owner, newId(), blankDoc().toJSON(), roundName()); list = listDocs(owner); }
     setDocs(list);
     if (d.id === current) { setCurrent(list[0].id); setName(list[0].name); }
-    toast(`Deleted “${d.name}”`, gone ? () => { restoreDoc(owner, gone.meta, gone.json); setDocs(listDocs(owner)); setCurrent(gone.meta.id); setName(gone.meta.name); } : undefined);
+    toast(`Deleted “${d.name}”`, gone ? () => {
+      restoreDoc(owner, gone.meta, gone.json);
+      if (rec) restoreRound(owner, rec);
+      setDocs(listDocs(owner)); setCurrent(gone.meta.id); setName(gone.meta.name);
+    } : undefined);
   }, [owner, current, toast, leaveRoom]);
 
   /* ------------------------------------------------------------ rhetoric */
@@ -848,9 +868,11 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
     ...(stops.length ? [{ id: "clear-stops", group: "Round vision", label: "Clear round vision", run: () => { const v = view.current; if (v && confirm("Take every stop out of round vision?")) { clearStops(v.state, v.dispatch); setVisionAt(-1); } } }] : []),
     ...pieces.map((p) => ({ id: "r-" + p.id, group: "Rhetoric", label: "Put in · " + p.title, run: () => usePiece(p) })),
     { id: "new", group: "Flows", label: "New flow", run: () => newFlow() },
-    ...docs.filter((d) => d.id !== current).map((d) => ({ id: "go-" + d.id, group: "Flows", label: "Open · " + d.name, run: () => openFlow(d) })),
+    { id: "past", group: "Flows", label: "Past flows — every round you have flowed", run: () => { location.href = "/tools/flows"; } },
+    ...docs.filter((d) => d.id !== current).slice(0, 8).map((d) => ({ id: "go-" + d.id, group: "Flows", label: "Open · " + d.name, run: () => openFlow(d) })),
+    ...(current ? [{ id: "delete", group: "Flows", label: "Delete this flow", run: () => { const d = docs.find((x) => x.id === current); if (d) deleteFlow(d); } }] : []),
     { id: "side", group: "View", label: side ? "Hide the flows list" : "Show the flows list", run: () => setSide((s) => !s) },
-  ], [keys, act, right, speaking, stops, goStop, pieces, usePiece, newFlow, docs, current, openFlow, side]);
+  ], [keys, act, right, speaking, stops, goStop, pieces, usePiece, newFlow, docs, current, openFlow, deleteFlow, side]);
 
   const evMode = !!panel && panel.q.startsWith("/");
   const listed: Cmd[] = useMemo(() => {
@@ -1052,26 +1074,10 @@ export default function DocFlow({ owner, me, join }: { owner?: string; me?: stri
 
       <div className="dbody">
         <aside className="dside" aria-label="Your flows and this flow's outline">
-          <div className="dsec">
-            <div className="dsh mono"><span>Your flows</span><button type="button" onClick={newFlow} title="A new flow">+ New</button></div>
-            <ul className="dlist">
-              {docs.map((d) => (
-                <li key={d.id} className={(d.id === current ? "on" : "") + (live.current?.flowId === d.id ? " shared" : "")}>
-                  {renaming === d.id ? (
-                    <input autoFocus defaultValue={d.name} maxLength={60}
-                      onBlur={(e) => commitName(d.id, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") commitName(d.id, (e.target as HTMLInputElement).value); if (e.key === "Escape") setRenaming(null); }} />
-                  ) : (
-                    <button type="button" className="dname" onClick={() => (d.id === current ? setRenaming(d.id) : openFlow(d))}
-                      title={d.id === current ? "Click again to rename" : "Open"}>
-                      <span>{d.name}</span>
-                      <small className="mono">{live.current?.flowId === d.id ? "live" : new Date(d.updated).toLocaleDateString([], { month: "short", day: "numeric" })}</small>
-                    </button>
-                  )}
-                  <button type="button" className="dx" onClick={() => deleteFlow(d)} aria-label={`Delete ${d.name}`} title="Delete this flow">×</button>
-                </li>
-              ))}
-            </ul>
+          <div className="dsec dnav">
+            <button type="button" className="dnew" onClick={newFlow} title="Start a new flow — this one stays in Past flows">+ New flow</button>
+            <Link className="dpast" href="/tools/flows" title="Every round you have flowed, Doc and Grid">Past flows <span aria-hidden="true">→</span></Link>
+            {live.current?.flowId === current && <span className="dlive mono"><i />Shared · {live.current?.code}</span>}
           </div>
           <div className="dsec grow">
             <div className="dsh mono"><span>On this flow</span></div>

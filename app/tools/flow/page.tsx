@@ -18,9 +18,11 @@ export const dynamic = "force-dynamic";
  * share feature would only work between two people who both hold the key,
  * which is nobody's partnership.
  */
-export default async function FlowTool({ searchParams }: { searchParams?: { join?: string | string[] } }) {
+export default async function FlowTool({ searchParams }: { searchParams?: { join?: string | string[]; open?: string | string[] } }) {
   const raw = searchParams?.join;
   const join = (Array.isArray(raw) ? raw[0] : raw) || undefined;
+  const rawOpen = searchParams?.open;
+  const open = (Array.isArray(rawOpen) ? rawOpen[0] : rawOpen) || undefined;
 
   if (!isAdmin() && !join) {
     return (
@@ -36,7 +38,7 @@ export default async function FlowTool({ searchParams }: { searchParams?: { join
     <>
       <Nav />
       <main>
-        <div className="toolpage"><Flow join={join} owner={user?.id} me={user ? displayName(user) : undefined} /></div>
+        <div className="toolpage"><Flow join={join} open={open} owner={user?.id} me={user ? displayName(user) : undefined} /></div>
       </main>
     </>
   );
