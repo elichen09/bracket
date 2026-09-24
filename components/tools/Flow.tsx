@@ -57,7 +57,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
 
         <div className="spacer" />
         <button className="btn cmd" id="cmd-btn" type="button" title="Everything this does, and your evidence">
-          Commands <kbd data-kb="mod+K">Ctrl+K</kbd>
+          Commands <kbd data-key="panel">Ctrl+K</kbd>
         </button>
         {/* Its own tab, reused: the tools talk across tabs, and Evidence's send
             list is the one Flow sends into. */}
@@ -65,7 +65,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span id="share-state">Not shared</span>
         </button>
-        <button className="btn" id="drawer-btn" aria-pressed="false">Drawer <kbd data-kb="mod+J">Ctrl+J</kbd></button>
+        <button className="btn" id="drawer-btn" aria-pressed="false">Drawer <kbd data-key="drawer">Ctrl+J</kbd></button>
       </header>
 
       <div className="panes" id="panes">
@@ -125,10 +125,10 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
               <button className="btn go" type="button" id="v-speak">Speak ▸</button>
             </div>
             <ol className="vlist" id="vlist" />
-            <button className="addstop" type="button" id="v-add">+ Add the selected cell <kbd data-kb="mod+B">Ctrl+B</kbd></button>
+            <button className="addstop" type="button" id="v-add">+ Add the selected cell <kbd data-key="stop.toggle">Ctrl+B</kbd></button>
             <p className="small vkeys">
-              <kbd data-kb="alt+1">Alt+1</kbd>–9 jumps to a stop · <kbd data-kb="mod+]">Ctrl+]</kbd> next ·{" "}
-              <kbd data-kb="mod+[">Ctrl+[</kbd> back · drag to reorder · double-click to rename.
+              <kbd data-key="stop.1">Alt+1</kbd>… jumps to a stop · <kbd data-key="stop.next">Ctrl+]</kbd> next ·{" "}
+              <kbd data-key="stop.prev">Ctrl+[</kbd> back · drag to reorder · double-click to rename.
               While speaking, Page Down — or a clicker — walks it.
             </p>
           </div>
@@ -153,11 +153,11 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
           <span><kbd data-kb="enter">Enter</kbd> next line</span>
           <span><kbd data-kb="tab">Tab</kbd> answer</span>
           <span><kbd data-kb="back">Backspace</kbd> clear</span>
-          <span className="k2"><kbd data-kb="alt+↑↓">Alt+↑↓</kbd> move row</span>
-          <span className="k2"><kbd data-kb="mod+\">Ctrl+\</kbd> split</span>
-          <span className="k2"><kbd data-kb="mod+B">Ctrl+B</kbd> vision stop</span>
-          <span><kbd data-kb="mod+/">Ctrl+/</kbd> answer from evidence</span>
-          <span><kbd data-kb="mod+K">Ctrl+K</kbd> everything</span>
+          <span className="k2"><kbd data-key="row.up|row.down">Alt+↑ Alt+↓</kbd> move row</span>
+          <span className="k2"><kbd data-key="split">Ctrl+\</kbd> split</span>
+          <span className="k2"><kbd data-key="stop.toggle">Ctrl+B</kbd> vision stop</span>
+          <span><kbd data-key="answer">Ctrl+/</kbd> answer from evidence</span>
+          <span><kbd data-key="panel">Ctrl+K</kbd> everything</span>
         </div>
         <div className="vw">
           <button type="button" id="v-split" aria-pressed="false" title="Two flows side by side">Split</button>
@@ -166,6 +166,7 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
           <button type="button" id="v-compact" aria-pressed="false" title="Tighter rows">Compact</button>
           <button type="button" className="zm" id="v-minus" aria-label="Smaller">A−</button>
           <button type="button" className="zm" id="v-plus" aria-label="Larger">A+</button>
+          <button type="button" id="keys-btn" title="Change the keyboard shortcuts">Keys</button>
         </div>
       </footer>
 
@@ -178,6 +179,20 @@ export default function Flow({ join, owner, me }: { join?: string; owner?: strin
           <div className="palsrc" id="pal-src" hidden />
           <ul id="pal-list" />
           <div className="palfoot mono" id="pal-foot" />
+        </div>
+      </div>
+
+      {/* The keyboard shortcuts, each one changeable. */}
+      <div className="scrim" id="keysbox" hidden>
+        <div className="card keyed" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+          <h2 className="mono">Keyboard shortcuts<button type="button" className="x" id="keys-x" aria-label="Close">×</button></h2>
+          <div className="kin">
+            <input id="keys-q" placeholder="find a command or a key" autoComplete="off" spellCheck={false} />
+            <p className="small khelp">Click a shortcut and press the keys you want. Backspace takes it off; Esc leaves it as it was.
+              A key can only do one thing — giving it here takes it from wherever it was.</p>
+            <ul id="keys-list" />
+          </div>
+          <div className="kout"><button className="btn" type="button" id="keys-reset">Reset every shortcut</button></div>
         </div>
       </div>
 

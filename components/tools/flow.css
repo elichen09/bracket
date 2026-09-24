@@ -176,7 +176,7 @@
    from the podium; headings with a number, a label and an italic title. The
    paper, the ink and the type are still the site's; states are drawn in ink. */
 .flw .flow { min-width: 0; min-height: 0; overflow: auto; outline: 0; position: relative; }
-.flw .grid { position: relative; display: grid; width: 100%; transition: grid-template-columns .35s var(--spring); }
+.flw .grid { position: relative; display: grid; width: 100%; }  /* widths change in one step: see widths() in the engine */
 /* a sheet arriving */
 .flw .grid.swap > .c, .flw .grid.swap > .r > .c, .flw .grid.swap > .rh, .flw .grid.swap > .r > .g { animation: flwSwap .36s var(--spring) both; }
 @keyframes flwSwap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -883,6 +883,51 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .tabs button[aria-selected="true"] .tx:hover { background: rgba(255, 255, 255, .25); }
 .flw .tabs button.going { animation: flwTabGo .17s var(--ease) forwards; pointer-events: none; }
 @keyframes flwTabGo { to { opacity: 0; transform: scale(.85) translateY(4px); } }
+
+/* ---- keyboard shortcuts ---- */
+.flw .card.keyed {
+  width: min(660px, 100%); max-height: 80vh; margin: 0; padding: 0; gap: 0;
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--ink);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .45); animation: flwCard .3s var(--pop) both;
+}
+.flw .card.keyed h2 {
+  display: flex; align-items: center; margin: 0; padding: 14px 18px; font-family: var(--mono); font-size: var(--flw-micro);
+  letter-spacing: .14em; text-transform: uppercase; font-weight: 500; color: #fff;
+  background: linear-gradient(115deg, #111114, #10302d);
+}
+.flw .card.keyed h2 .x { margin-left: auto; font-size: 17px; color: #fff; opacity: .7; }
+.flw .kin { padding: 16px 18px 4px; display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
+.flw #keys-q { border: 1px solid var(--line); background: var(--surface-2); padding: 9px 11px; font-size: 14px; outline: none; font-family: var(--ui); }
+.flw #keys-q:focus { border-color: var(--vision); box-shadow: 0 0 0 3px rgba(15, 118, 110, .12); }
+.flw .khelp { margin: 0; line-height: 1.6; text-transform: none; letter-spacing: .02em; font-family: var(--ui); font-size: 12px; }
+.flw #keys-list { list-style: none; margin: 0; padding: 0 2px 10px 0; overflow: auto; flex: 1; min-height: 0; }
+.flw .kgrp { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--vision); padding: 16px 4px 6px; }
+.flw .kgrp:first-child { padding-top: 4px; }
+.flw .krow {
+  display: grid; grid-template-columns: 1fr auto 22px; align-items: center; gap: 10px;
+  padding: 7px 4px; border-bottom: 1px solid var(--line-soft); animation: flwIn .2s var(--spring) both;
+}
+.flw .klb { font-size: 13.5px; }
+.flw .krow.changed .klb::after { content: "  changed"; font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--pro); }
+.flw .kbinds { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.flw .kchip {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .02em; padding: 4px 9px; min-width: 44px; text-align: center;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--ink);
+  box-shadow: 0 1px 0 var(--line); position: relative; overflow: hidden;
+  transition: border-color .15s var(--ease), background .15s var(--ease), color .15s var(--ease), box-shadow .2s var(--ease);
+}
+.flw button.kchip:hover { border-color: var(--ink); }
+.flw .kchip.add { border-style: dashed; color: var(--dim); background: none; box-shadow: none; }
+.flw .kchip.listening { border-color: var(--vision); color: var(--vision); background: rgba(15, 118, 110, .08); animation: flwListen 1s ease-in-out infinite; }
+@keyframes flwListen { 50% { box-shadow: 0 0 0 4px rgba(15, 118, 110, .2); } }
+.flw .kreset { color: var(--dim); font-size: 14px; line-height: 1; }
+.flw .kreset:hover { color: var(--ink); }
+.flw .knote { grid-column: 1 / -1; font-size: 12px; color: var(--vision); animation: flwIn .2s var(--spring) both; }
+.flw .knote.bad { color: var(--con); }
+.flw .krow.fixed .kchip { opacity: .65; box-shadow: none; }
+.flw .kempty { padding: 24px; text-align: center; color: var(--dim); }
+.flw .kout { padding: 12px 18px; border-top: 1px solid var(--line-soft); display: flex; justify-content: flex-end; background: var(--surface-2); }
+.flw [data-key].unset { opacity: .45; }
 
 /* ---- room at the foot ----
    Windows names its keys in words — Backspace, Ctrl+ — which take three
