@@ -358,3 +358,65 @@ html[data-tool-theme="graphite"] .toolpage {
 @keyframes fpIn { from { opacity: 0; transform: translateY(10px) scale(.985); } }
 @media (prefers-reduced-motion: reduce) { .toolpage .fpick, .toolpage .fp-card { animation: none; } }
 @media (max-width: 560px) { .toolpage .fpick { padding-top: 6vh; } .toolpage .fp-w { display: none; } }
+
+/* =====================================================================
+   Feel — one layer for every tool.
+   Quiet and quick: nothing moves unless you did something, nothing takes
+   longer than a quarter of a second, nothing bounces. Every rule here is
+   written at zero specificity (:where) or keyed to a state the tools do
+   not style themselves, so a tool's own rule always wins.
+   ===================================================================== */
+.toolpage {
+  --fx-fast: 90ms; --fx: 160ms; --fx-slow: 220ms;
+  --fx-ease: cubic-bezier(.2, .7, .2, 1);        /* out, no overshoot */
+  --fx-ease-in: cubic-bezier(.5, 0, .75, .4);    /* for leaving */
+}
+
+/* Press: a button goes down a pixel under the finger. */
+:where(.toolpage) :where(button, [role="button"], a.btn, a.dbtn, a.pf-btn, a.dv-btn) {
+  transition: transform var(--fx-fast) var(--fx-ease), background-color var(--fx) var(--fx-ease),
+    border-color var(--fx) var(--fx-ease), color var(--fx) var(--fx-ease), box-shadow var(--fx) var(--fx-ease), opacity var(--fx) var(--fx-ease);
+}
+:where(.toolpage) :where(button, [role="button"], a.btn, a.dbtn, a.pf-btn, a.dv-btn):where(:not(:disabled)):active { transform: translateY(1px); }
+
+/* Focus: one ring, in the scheme's accent, only for the keyboard. */
+:where(.toolpage) :where(button, a[href], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--t-acc); outline-offset: 2px;
+}
+
+/* Answer: the button whose action a toast reports gives one short ring. */
+.toolpage .fx-ok, .toolpage .fx-bad { animation: fxRing .5s var(--fx-ease) both; }
+.toolpage .fx-bad { --fx-ring: var(--t-con-rgb); }
+@keyframes fxRing {
+  0% { box-shadow: 0 0 0 0 rgba(var(--fx-ring, var(--t-acc-rgb)), .55); }
+  100% { box-shadow: 0 0 0 7px rgba(var(--fx-ring, var(--t-acc-rgb)), 0); }
+}
+
+/* Leaving: dialogs, menus and popovers go the way they came instead of
+   vanishing. The ones shown by an attribute or a class stay drawn for the
+   length of the exit (display is allowed to wait); the ones React draws are
+   held by <Presence>, which marks them .fx-leave. */
+.toolpage .flw .scrim, .toolpage .flw .menu, .toolpage .flw .namer, .toolpage .evi .veil {
+  transition: display var(--fx) allow-discrete;
+}
+.toolpage .flw .scrim[hidden], .toolpage .flw .menu[hidden], .toolpage .flw .namer[hidden], .toolpage .evi .veil:not(.on) {
+  animation: fxOut var(--fx) var(--fx-ease-in) forwards; pointer-events: none;
+}
+.toolpage .flw .scrim[hidden] > *, .toolpage .evi .veil:not(.on) > .card { animation: fxSink var(--fx) var(--fx-ease-in) forwards; }
+.toolpage .fx-leave > * { animation: fxOut var(--fx) var(--fx-ease-in) forwards !important; pointer-events: none; }
+.toolpage .fx-leave [role="dialog"] { animation: fxSink var(--fx) var(--fx-ease-in) forwards !important; }
+.toolpage .fx-leave > .dsharepop, .toolpage .fx-leave > .th-pop { animation: fxSink var(--fx) var(--fx-ease-in) forwards !important; }
+@keyframes fxOut { to { opacity: 0; } }
+@keyframes fxSink { to { opacity: 0; transform: translateY(6px) scale(.985); } }
+
+/* The Doc viewer's toast rose on a keyframe that forgot it is centred. */
+.toolpage .dvw .dv-toast { animation: fxToastIn var(--fx-slow) var(--fx-ease) both; }
+@keyframes fxToastIn { from { opacity: 0; transform: translate(-50%, 8px); } }
+
+/* A colour scheme changes as a quick crossfade, not a cut. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 220ms; animation-timing-function: ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toolpage *, .toolpage *::before, .toolpage *::after { animation-duration: 1ms !important; animation-delay: 0s !important; transition-duration: 1ms !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

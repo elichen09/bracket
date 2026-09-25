@@ -5,6 +5,7 @@ import Link from "next/link";
 import { polish } from "@/lib/evidence/polish";
 import ThemePicker from "./ThemePicker";
 import FlowPicker, { worthAsking, type PickerCurrent } from "./FlowPicker";
+import Presence from "./Presence";
 import "./flow.css";
 import "./finish.css";
 
@@ -50,11 +51,11 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
 
   return (
     <>
-    {asking && (
+    <Presence show={!!asking}>{asking && (
       <FlowPicker owner={owner} kind="grid" current={asking} onClose={done}
         onOpen={(id) => { setAsking(null); api.current?.open(id); }}
         onNew={() => { setAsking(null); api.current?.fresh(); }} />
-    )}
+    )}</Presence>
     <div className="flw" ref={ref}>
       <header className="topbar">
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>

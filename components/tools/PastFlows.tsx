@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Presence from "./Presence";
 import { useRouter } from "next/navigation";
 import {
   listRounds, patchRound, deleteRound, restoreRound, putRound, onArchive, summarizeGrid, gridHasWriting, type Round,
@@ -392,12 +393,12 @@ export default function PastFlows({ owner }: { owner?: string }) {
         </main>
       </div>
 
-      {toastMsg && (
+      <Presence show={!!toastMsg}>{toastMsg && (
         <div className="pf-toast mono" key={toastMsg.n} style={{ ["--life" as any]: toastMsg.undo ? "4600ms" : "2400ms" }}>
           {toastMsg.text}
           {toastMsg.undo && <button type="button" onClick={() => { toastMsg.undo?.(); setToastMsg(null); }}>Undo</button>}
         </div>
-      )}
+      )}</Presence>
     </div>
   );
 }

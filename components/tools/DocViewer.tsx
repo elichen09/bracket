@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Presence from "./Presence";
 import { sanitize, readDoc, readTime, markHits, clearHits, type Head } from "@/lib/viewer/doc";
 import { listDocs, getDoc, keepDoc, dropDoc, newDocId, type ViewDoc, type ViewMeta, type DocKind } from "@/lib/viewer/store";
 import { readRoom, type ViewerRoom, type RoomDoc } from "@/lib/viewer/room";
@@ -527,7 +528,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
       </div>
 
       {dragging && <div className="dv-drop mono">Drop it to read it</div>}
-      {toastMsg && <div className="dv-toast mono" key={toastMsg.n}>{toastMsg.t}</div>}
+      <Presence show={!!toastMsg}>{toastMsg && <div className="dv-toast mono" key={toastMsg.n}>{toastMsg.t}</div>}</Presence>
     </div>
   );
 }

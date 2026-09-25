@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Presence from "./Presence";
 import { THEME_KEY } from "@/lib/toolTheme";
 
 /**
@@ -46,7 +47,10 @@ export default function ThemePicker() {
 
   const pick = (id: string) => {
     setCur(id);
-    applyTheme(id);
+    // a quick crossfade rather than a cut, where the browser can do one
+    const d = document as Document & { startViewTransition?: (f: () => void) => unknown };
+    if (d.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) d.startViewTransition(() => applyTheme(id));
+    else applyTheme(id);
     try { localStorage.setItem(THEME_KEY, id); } catch { /* private browsing */ }
   };
   const now = THEMES.find((t) => t.id === cur) || THEMES[0];
@@ -57,7 +61,7 @@ export default function ThemePicker() {
         <span className="th-dots" aria-hidden="true">{now.sw.slice(1, 4).map((c) => <i key={c} style={{ background: c }} />)}</span>
         Colours
       </button>
-      {open && (
+      <Presence show={open}>
         <div className="th-pop" role="dialog" aria-label="Colour scheme">
           <div className="th-h">Colour scheme · every tool</div>
           {THEMES.map((t) => (
@@ -70,7 +74,7 @@ export default function ThemePicker() {
             </button>
           ))}
         </div>
-      )}
+      </Presence>
     </div>
   );
 }

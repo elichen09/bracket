@@ -17,6 +17,7 @@ import { schema, surveyPlugin, blankDoc, type Hl } from "@/lib/docflow/schema";
 import * as C from "@/lib/docflow/commands";
 import { fromDocsHtml, toDocsHtml, toPlainText } from "@/lib/docflow/io";
 import FlowPicker, { worthAsking, type PickerCurrent } from "./FlowPicker";
+import Presence from "./Presence";
 import { listDocs, loadDoc, saveDoc, renameDoc, removeDoc, restoreDoc, newId, archiveAll, fetchDoc, type DocMeta } from "@/lib/docflow/store";
 import { deleteRound, restoreRound, summarizeDoc, docHasWriting } from "@/lib/pastflows";
 import { ACTIONS, ACTION, comboOf, keyLabel, refuse, loadKeys, saveKeys, keyFor, actionFor, bind, type Overrides } from "@/lib/docflow/keys";
@@ -1110,7 +1111,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
               </>
             ) : <>Share</>}
           </button>
-          {shareOpen && (
+          <Presence show={!!shareOpen}>{shareOpen && (
             <div className="dsharepop" role="dialog" aria-label="Flow with your partner">
               {inRoom ? (
                 <>
@@ -1140,7 +1141,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
                 </>
               )}
             </div>
-          )}
+          )}</Presence>
         </div>
         <button type="button" className="dbtn ink" onClick={() => openPanel()}>Commands {K("commands") && <kbd>{K("commands")}</kbd>}</button>
         <button type="button" className="dbtn" onClick={copyForDocs} title="Numbered, red and highlighted, as a Doc">Copy for Docs</button>
@@ -1409,7 +1410,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
         </div>
       )}
 
-      {panel && (
+      <Presence show={!!panel}>{panel && (
         <div className="dscrim" onMouseDown={(e) => { if (e.target === e.currentTarget) closePanel(); }}>
           <div className={"dpal" + (evMode ? " ev" : "") + (pick ? " pick" : "")}>
             <div className="dpin">
@@ -1473,9 +1474,9 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
             </div>
           </div>
         </div>
-      )}
+      )}</Presence>
 
-      {keysOpen && (
+      <Presence show={!!keysOpen}>{keysOpen && (
         <div className="dscrim" onMouseDown={(e) => { if (e.target === e.currentTarget) { setKeysOpen(false); setCapturing(null); view.current?.focus(); } }}>
           <div className="dpal dkeyed" role="dialog" aria-label="Keys">
             <div className="dkh">
@@ -1511,9 +1512,9 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
             </div>
           </div>
         </div>
-      )}
+      )}</Presence>
 
-      {asking && (
+      <Presence show={!!asking}>{asking && (
         <FlowPicker owner={owner} kind="doc" current={asking}
           onClose={() => { setAsking(null); view.current?.focus(); }}
           onNew={() => { setAsking(null); newFlow(); }}
@@ -1525,14 +1526,14 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
             openFlow({ id, name: nm, updated: Date.now() });
             toast(`Opened “${nm}”`);
           }} />
-      )}
+      )}</Presence>
 
-      {toastMsg && (
+      <Presence show={!!toastMsg}>{toastMsg && (
         <div className="dtoast mono" key={toastMsg.n} style={{ ["--life" as any]: toastMsg.undo ? "4200ms" : "2400ms" }}>
           {toastMsg.text}
           {toastMsg.undo && <button type="button" onClick={() => { toastMsg.undo?.(); setToastMsg(null); }}>Undo</button>}
         </div>
-      )}
+      )}</Presence>
     </div>
   );
 }
