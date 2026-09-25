@@ -19,6 +19,8 @@ const PATHS: Record<string, string> = {
   cards: "M4 8h12v12H4zM8 4h12v12",
   history: "M3 12a9 9 0 1 0 3-6.7M3 3v5h5M12 7v5l3 3",
   drawer: "M3 4h18v16H3zM15 4v16",
+  search: "M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13zM15.5 15.5L21 21",
+  list: "M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1",
 };
 
 export default function Ico({ n }: { n: keyof typeof PATHS | string }) {

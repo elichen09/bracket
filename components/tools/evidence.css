@@ -110,9 +110,6 @@
 .evi .btn:active { transform: none; }
 .evi .btn.key { background: var(--ink); color: var(--ground); border-color: var(--ink); }
 .evi .btn.key:hover { opacity: .88; }
-.evi .docbtn { margin-left: 6px; border-color: var(--line); }
-.evi .docbtn.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
-.evi .docbtn.on:hover { opacity: .88; color: var(--ground); }
 .evi .btn:disabled { opacity: .4; cursor: default; transform: none; }
 .evi .btn:disabled:hover { color: var(--muted); border-color: var(--line); transform: none; }
 
@@ -765,10 +762,6 @@
   .evi .searchwrap::after, .evi .toast::after { display: none; }
 }
 
-@media (max-width: 1240px) {
-  .evi.withdoc .docpane, .evi.withdoc .panes > .grab:last-of-type { display: none; }
-  .evi.withdoc .foothint { right: calc(var(--evi-side) + 9px); }
-}
 
 @media (max-width: 1100px) {
   .evi { --evi-gut: 20px; }
@@ -969,3 +962,14 @@
 .evi .clbody.clwait i:nth-child(3) { width: 84%; }
 @keyframes clShimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }
 .evi .clbody.clerr { zoom: 1; font-family: var(--mono); font-size: 11px; color: var(--acc); }
+
+/* ---------- which parts are out: search, the send list, the document ----------
+   Search stretches when it is there; without it the document stretches, and
+   without both the send list does. The hint strip belongs to search. */
+.evi.nosearch .left { display: none; }
+.evi.nolist .right { display: none; }
+.evi.nosearch .docpane { flex: 1; width: auto; min-width: 0; }
+.evi.nosearch:not(.withdoc) .right { flex: 1; width: auto; }
+.evi.nosearch .foothint { display: none; }
+.evi.nolist .foothint { right: 0; }
+.evi.nolist.withdoc .foothint { right: calc(var(--evi-doc) + 9px); }

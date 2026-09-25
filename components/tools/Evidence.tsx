@@ -30,6 +30,8 @@ import { useFitBar } from "./fitBar";
 
 const SIDE_KEY = "evidence.side";
 const DOC_KEY = "evidence.doc";
+/** Which of the three show — kept apart for the split view, which wants its own. */
+const PANES_KEY = "evidence.panes";
 const DOCW_KEY = "evidence.docw";
 const MIN_SIDE = 300, MAX_SIDE = 820, DEFAULT_SIDE = 420;
 const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
@@ -41,8 +43,22 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   useFitBar(bar);
   const [side, setSide] = useState(DEFAULT_SIDE);
   const [docW, setDocW] = useState(DEFAULT_DOC);
-  const [doc, setDoc] = useState(true);
+  // Search, the send list, the document: each can be put away, any two or
+  // one of them left — the send doc alone beside Flow, say. One always stays.
+  const [show, setShow] = useState({ search: true, list: true, doc: true });
+  const doc = show.doc;
   const [dragging, setDragging] = useState(false);
+  const panesKey = useRef(PANES_KEY);
+  // the document's real width: it is the one that stretches when search is away
+  const docPane = useRef<HTMLElement>(null);
+  const [docReal, setDocReal] = useState(DEFAULT_DOC);
+  useEffect(() => {
+    const el = docPane.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => { if (el.clientWidth) setDocReal(el.clientWidth); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -71,9 +87,14 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       if (s >= MIN_SIDE && s <= MAX_SIDE) setSide(s);
       const w = Number(localStorage.getItem(DOCW_KEY));
       if (w >= MIN_DOC && w <= MAX_DOC) setDocW(w);
-      const open = localStorage.getItem(DOC_KEY);
-      if (open !== null) setDoc(open === "1");
-      else if (window.innerWidth < 1400) setDoc(false);   // no room to spare
+      if (window.self !== window.top) panesKey.current = PANES_KEY + ".split";
+      const kept = JSON.parse(localStorage.getItem(panesKey.current) || "null");
+      if (kept && (kept.search || kept.list || kept.doc)) setShow({ search: !!kept.search, list: !!kept.list, doc: !!kept.doc });
+      else {
+        const open = localStorage.getItem(DOC_KEY);
+        if (open !== null) setShow((s) => ({ ...s, doc: open === "1" }));
+        else if (window.innerWidth < 1400) setShow((s) => ({ ...s, doc: false }));   // no room to spare
+      }
     } catch { /* private browsing */ }
   }, []);
 
@@ -96,7 +117,11 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
 
     const move = (ev: PointerEvent) => {
       const box = host.getBoundingClientRect();
-      if (which === "doc") {
+      // with search away the send list sits at the left edge, and the line after
+      // it (whichever that is) sets its width from there
+      if (!show.search && show.list) {
+        setSide(Math.min(MAX_SIDE, Math.max(MIN_SIDE, ev.clientX - box.left)));
+      } else if (which === "doc") {
         setDocW(Math.min(MAX_DOC, Math.max(MIN_DOC, box.right - ev.clientX)));
       } else {
         // the send pane is measured from the document panel's left edge
@@ -108,18 +133,22 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       setDragging(false);
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", up);
-      if (which === "doc") setDocW((w) => { remember(DOCW_KEY, String(Math.round(w))); return w; });
+      if (which === "doc" && show.search) setDocW((w) => { remember(DOCW_KEY, String(Math.round(w))); return w; });
       else setSide((w) => { remember(SIDE_KEY, String(Math.round(w))); return w; });
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", up);
-  }, [doc, docW]);
+  }, [doc, docW, show]);
 
   const nudge = (which: "side" | "doc") => (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
     const step = (e.shiftKey ? 60 : 20) * (e.key === "ArrowLeft" ? 1 : -1);
-    if (which === "doc") setDocW((w) => {
+    // measured from the left, the send list grows to the right
+    if (!show.search && show.list) setSide((w) => {
+      const n = Math.min(MAX_SIDE, Math.max(MIN_SIDE, w - step)); remember(SIDE_KEY, String(Math.round(n))); return n;
+    });
+    else if (which === "doc") setDocW((w) => {
       const n = Math.min(MAX_DOC, Math.max(MIN_DOC, w + step)); remember(DOCW_KEY, String(Math.round(n))); return n;
     });
     else setSide((w) => {
@@ -127,23 +156,40 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
     });
   };
 
-  // Opening the panel has to fill it: the engine only redraws it when the send
-  // list changes, and it may not have changed since the panel was closed.
-  const toggleDoc = () => setDoc((was) => {
-    const now = !was;
-    remember(DOC_KEY, now ? "1" : "0");
-    if (now) setTimeout(() => engine.current?.renderDoc?.(), 0);
-    return now;
-  });
+  // Put a part away or bring it back. Opening the document has to fill it: the
+  // engine only redraws it when the send list changes, and it may not have
+  // changed since the panel was closed.
+  const toggle = useCallback((k: "search" | "list" | "doc") => {
+    setShow((s) => {
+      const n = { ...s, [k]: !s[k] };
+      if (!n.search && !n.list && !n.doc) return s;            // one always stays
+      remember(panesKey.current, JSON.stringify(n));
+      if (k === "doc" && n.doc) setTimeout(() => engine.current?.renderDoc?.(), 0);
+      if (k === "search" && n.search) setTimeout(() => (document.getElementById("q") as HTMLInputElement | null)?.focus(), 0);
+      return n;
+    });
+  }, []);
+  // Alt+1, Alt+2, Alt+3: search, the send list, the document
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const k = ({ Digit1: "search", Digit2: "list", Digit3: "doc" } as const)[e.code as "Digit1" | "Digit2" | "Digit3"];
+      if (!k) return;
+      e.preventDefault();
+      toggle(k);
+    };
+    window.addEventListener("keydown", on, true);
+    return () => window.removeEventListener("keydown", on, true);
+  }, [toggle]);
 
   return (
-    <div className={"evi" + (dragging ? " resizing" : "") + (doc ? " withdoc" : "")} ref={ref}
+    <div className={"evi" + (dragging ? " resizing" : "") + (doc ? " withdoc" : "") + (show.search ? "" : " nosearch") + (show.list ? "" : " nolist")} ref={ref}
       style={{
         ["--evi-side" as any]: `${Math.round(side)}px`,
         ["--evi-doc" as any]: `${Math.round(docW)}px`,
         // The page is drawn at its real 816px and zoomed to fit whatever the
         // panel has been dragged to, so the line breaks are the real ones.
-        ["--evi-docscale" as any]: Math.max(0.3, Math.min(1.1, (docW - 34) / 816)).toFixed(3),
+        ["--evi-docscale" as any]: Math.max(0.3, Math.min(1.1, (docReal - 34) / 816)).toFixed(3),
       }}>
       <header className="bar" ref={bar}>
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
@@ -163,10 +209,18 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
           <span className="dot" id="roomdot" /><span className="lbl" id="roomstate">Room</span>
         </button>
         <ThemePicker />
-        <button className={"btn docbtn" + (doc ? " on" : "")} onClick={toggleDoc}
-          aria-expanded={doc} title="Show the document as it will paste">
-          <Ico n="doc" /><span className="lbl" id="doclabel">Send doc</span> {doc ? "›" : "‹"}
-        </button>
+        {/* what is on screen: any of the three, any two, or one alone */}
+        <div className="panesw" role="group" aria-label="Show">
+          <button type="button" className={"btn pv" + (show.search ? " on" : "")} aria-pressed={show.search} onClick={() => toggle("search")} title="Search — Alt+1">
+            <Ico n="search" /><span className="lbl">Search</span>
+          </button>
+          <button type="button" className={"btn pv" + (show.list ? " on" : "")} aria-pressed={show.list} onClick={() => toggle("list")} title="The send list — Alt+2">
+            <Ico n="list" /><span className="lbl">Send list</span>
+          </button>
+          <button type="button" className={"btn pv" + (doc ? " on" : "")} aria-pressed={doc} onClick={() => toggle("doc")} title="The document as it will paste — Alt+3">
+            <Ico n="doc" /><span className="lbl" id="doclabel">Send doc</span>
+          </button>
+        </div>
       </header>
 
       <div className="panes">
@@ -190,8 +244,10 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
           <div id="results" />
         </section>
 
-        <div className="grab" role="separator" aria-orientation="vertical" aria-label="Resize the send list"
-          tabIndex={0} onPointerDown={grab("side")} onKeyDown={nudge("side")}><i /></div>
+        {show.search && show.list && (
+          <div className="grab" role="separator" aria-orientation="vertical" aria-label="Resize the send list"
+            tabIndex={0} onPointerDown={grab("side")} onKeyDown={nudge("side")}><i /></div>
+        )}
 
         <aside className="pane right">
           <div className="tabs mono">
@@ -202,12 +258,12 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
           <div id="sidebody" />
         </aside>
 
-        {doc && (
+        {doc && (show.search || show.list) && (
           <div className="grab" role="separator" aria-orientation="vertical" aria-label="Resize the document"
             tabIndex={0} onPointerDown={grab("doc")} onKeyDown={nudge("doc")}><i /></div>
         )}
-        <aside className="pane docpane" aria-hidden={!doc}>
-          <DocEditor host={ref} width={docW} owner={owner} />
+        <aside className="pane docpane" aria-hidden={!doc} ref={docPane}>
+          <DocEditor host={ref} width={docReal} owner={owner} />
         </aside>
       </div>
 

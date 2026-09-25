@@ -159,11 +159,11 @@ html[data-tool-theme="graphite"] .toolpage {
   background-color: rgba(var(--bn-rgb), .1); border-color: rgba(var(--bn-rgb), .75); color: var(--ink);
 }
 /* the main one, filled */
-.toolpage .dfl > .dtop .dbtn.ink, .toolpage .flw > .topbar .btn.cmd, .toolpage .evi > .bar .btn.key, .toolpage .evi > .bar .docbtn.on {
+.toolpage .dfl > .dtop .dbtn.ink, .toolpage .flw > .topbar .btn.cmd, .toolpage .evi > .bar .btn.key {
   background: var(--bn-main); color: var(--bn-main-ink); border-color: var(--bn-main);
   box-shadow: 0 8px 18px -12px rgba(0, 0, 0, .6);
 }
-.toolpage .dfl > .dtop .dbtn.ink:hover, .toolpage .flw > .topbar .btn.cmd:hover, .toolpage .evi > .bar .btn.key:hover, .toolpage .evi > .bar .docbtn.on:hover {
+.toolpage .dfl > .dtop .dbtn.ink:hover, .toolpage .flw > .topbar .btn.cmd:hover, .toolpage .evi > .bar .btn.key:hover {
   background: var(--bn-main); color: var(--bn-main-ink); opacity: .9;
 }
 .toolpage .dfl > .dtop .dbtn.ink kbd, .toolpage .flw > .topbar .btn.cmd kbd { color: var(--bn-main-ink); border-color: currentColor; background: none; opacity: .6; }
@@ -471,3 +471,9 @@ html.embedded .splitlink, html.embedded .nosplit { display: none !important; }
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   padding-left: 9px; padding-right: 9px; min-width: 34px;
 }
+
+/* Evidence's Search · Send list · Send doc switch: one control, three parts, the shown ones filled */
+.toolpage .evi > .bar .panesw { display: flex; }
+.toolpage .evi > .bar .panesw .btn + .btn { margin-left: -1px; }
+.toolpage .evi > .bar .panesw .btn.on { background: var(--bn-main); color: var(--bn-main-ink); border-color: var(--bn-main); position: relative; }
+.toolpage .evi > .bar .panesw .btn.on:hover { background: var(--bn-main); color: var(--bn-main-ink); opacity: .9; }
