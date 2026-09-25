@@ -80,6 +80,19 @@ export function readDoc(root: HTMLElement): Head[] {
     heads.push({ id: el.id, level, text, words: 0, hlWords: 0 });
   });
 
+  // A .docx names its highlights by Word's palette, and the renderer passes the
+  // names straight to CSS — where they mean other colours. Word's "green" is
+  // bright green; CSS's is a dark one black type cannot be read on. Same for
+  // the rest of Word's list: each is put back to the colour Word shows.
+  const WORD: Record<string, string> = {
+    green: "#00ff00", darkgreen: "#008000", darkblue: "#000080", darkcyan: "#008080", darkmagenta: "#800080",
+    darkred: "#800000", darkyellow: "#808000", darkgray: "#808080", lightgray: "#c0c0c0",
+  };
+  root.querySelectorAll<HTMLElement>("[style]").forEach((el) => {
+    const raw = (el.style.backgroundColor || "").trim().toLowerCase();
+    if (WORD[raw]) el.style.backgroundColor = WORD[raw];
+  });
+
   root.querySelectorAll<HTMLElement>("[style]").forEach((el) => {
     const bg = el.style.backgroundColor || el.style.background;
     if (bg && isHighlight(bg) && el.tagName !== "P" && el.tagName !== "DIV" && el.tagName !== "TABLE" && el.tagName !== "TD") {
