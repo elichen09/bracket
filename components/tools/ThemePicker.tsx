@@ -42,6 +42,20 @@ export default function ThemePicker() {
   useEffect(() => {
     try { setCur(localStorage.getItem(THEME_KEY) || "forest"); } catch { /* private browsing */ }
   }, []);
+  // Pinned to the window under its button, not to the toolbar: a toolbar that
+  // scrolls sideways would clip anything hanging out of it.
+  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const b = box.current?.querySelector(".th-btn")?.getBoundingClientRect();
+      if (b) setAt({ top: Math.round(b.bottom + 10), right: Math.max(8, Math.round(window.innerWidth - b.right)) });
+    };
+    place();
+    const shut = () => setOpen(false);
+    window.addEventListener("resize", shut);
+    return () => window.removeEventListener("resize", shut);
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const off = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
@@ -68,7 +82,7 @@ export default function ThemePicker() {
         <span className="lbl">Colours</span>
       </button>
       <Presence show={open}>
-        <div className="th-pop" role="dialog" aria-label="Colour scheme">
+        <div className="th-pop" role="dialog" aria-label="Colour scheme" style={at ? { position: "fixed", top: at.top, right: at.right } : undefined}>
           <div className="th-h">Colour scheme · every tool</div>
           {THEMES.map((t) => (
             <button type="button" key={t.id} className={"th-opt" + (t.id === cur ? " on" : "")} onClick={() => pick(t.id)} aria-pressed={t.id === cur}>

@@ -1,6 +1,7 @@
 import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import DocFlow from "@/components/tools/DocFlow";
+import Embedded from "@/components/tools/Embedded";
 import { isAdmin } from "@/lib/admin";
 import { currentUser, displayName } from "@/lib/auth";
 import "../tools.css";
@@ -13,7 +14,9 @@ export const dynamic = "force-dynamic";
  * with Flow, a link carrying a room code opens without the admin key, since
  * the person you flow with is your partner, not an administrator.
  */
-export default async function DocFlowTool({ searchParams }: { searchParams?: { join?: string | string[]; open?: string | string[] } }) {
+export default async function DocFlowTool({ searchParams }: { searchParams?: { join?: string | string[]; open?: string | string[]; embed?: string | string[] } }) {
+  // inside Split screen: the split page has the nav, and this is half of it
+  const embed = !!searchParams?.embed;
   const raw = searchParams?.join;
   const join = (Array.isArray(raw) ? raw[0] : raw) || undefined;
   const rawOpen = searchParams?.open;
@@ -31,7 +34,7 @@ export default async function DocFlowTool({ searchParams }: { searchParams?: { j
   const user = await currentUser();
   return (
     <>
-      <Nav />
+      {embed ? <Embedded /> : <Nav />}
       <main>
         <div className="toolpage"><DocFlow join={join} open={open} owner={user?.id} me={user ? displayName(user) : undefined} /></div>
       </main>

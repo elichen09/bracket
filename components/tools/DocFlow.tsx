@@ -1147,6 +1147,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
         <button type="button" className="dbtn" onClick={copyForDocs} title="Numbered, red and highlighted, as a Doc">Copy for Docs</button>
         <button type="button" className="dbtn" onClick={saveDocx}>.docx</button>
         <a className="dbtn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
+        <a className="dbtn splitlink" href="/tools/split?a=docflow" title="Split screen — Doc flow beside another tool">Split ◫</a>
         <ThemePicker />
       </header>
 

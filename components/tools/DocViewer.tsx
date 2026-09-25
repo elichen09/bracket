@@ -395,6 +395,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
             </div>
           </>
         )}
+        <a className="dv-btn splitlink" href="/tools/split?a=viewer" title="Split screen — the Doc viewer beside another tool">Split ◫</a>
         <ThemePicker />
       </header>
 

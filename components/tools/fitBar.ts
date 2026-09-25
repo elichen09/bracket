@@ -33,6 +33,14 @@ export function useFitBar(ref: RefObject<HTMLElement>) {
     mo.observe(bar, { subtree: true, childList: true, characterData: true });
     // the fonts arriving changes every width
     document.fonts?.ready.then(soon).catch(() => {});
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); mo.disconnect(); };
+    // Even as icons it may not fit (half a split, a small window): then it
+    // scrolls sideways, and the wheel scrolls it the way it goes.
+    const wheel = (e: WheelEvent) => {
+      if (bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      bar.scrollLeft += e.deltaY;
+    };
+    bar.addEventListener("wheel", wheel, { passive: false });
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); mo.disconnect(); bar.removeEventListener("wheel", wheel); };
   }, [ref]);
 }

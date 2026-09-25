@@ -32,6 +32,7 @@ const SIDE_KEY = "evidence.side";
 const DOC_KEY = "evidence.doc";
 /** Which of the three show — kept apart for the split view, which wants its own. */
 const PANES_KEY = "evidence.panes";
+const HINTS_KEY = "evidence.hints";
 const DOCW_KEY = "evidence.docw";
 const MIN_SIDE = 300, MAX_SIDE = 820, DEFAULT_SIDE = 420;
 const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
@@ -48,6 +49,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   const [show, setShow] = useState({ search: true, list: true, doc: true });
   const doc = show.doc;
   const [dragging, setDragging] = useState(false);
+  const [hintsShut, setHintsShut] = useState(false);
   const panesKey = useRef(PANES_KEY);
   // the document's real width: it is the one that stretches when search is away
   const docPane = useRef<HTMLElement>(null);
@@ -87,6 +89,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       if (s >= MIN_SIDE && s <= MAX_SIDE) setSide(s);
       const w = Number(localStorage.getItem(DOCW_KEY));
       if (w >= MIN_DOC && w <= MAX_DOC) setDocW(w);
+      if (localStorage.getItem(HINTS_KEY) === "1") setHintsShut(true);
       if (window.self !== window.top) panesKey.current = PANES_KEY + ".split";
       const kept = JSON.parse(localStorage.getItem(panesKey.current) || "null");
       if (kept && (kept.search || kept.list || kept.doc)) setShow({ search: !!kept.search, list: !!kept.list, doc: !!kept.doc });
@@ -203,7 +206,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         {/* Its own tab, reused: the two tools talk across tabs, and the send
             list Flow writes into is this one. */}
         <a className="btn nosplit" href="/tools/flow" target="break-flow" title="Open Flow in its own tab"><Ico n="grid" /><span className="lbl">Flow ↗</span></a>
-        <a className="btn splitlink" href="/tools/split" title="Evidence and Flow side by side"><Ico n="split" /><span className="lbl">Split ◫</span></a>
+        <a className="btn splitlink" href="/tools/split?a=evidence" title="Split screen — Evidence beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         {/* Share the send doc into a flow room, for a partner flowing on another computer. */}
         <button className="btn roombtn" data-act="room" title="Share the send doc with your partner's flow">
           <span className="dot" id="roomdot" /><span className="lbl" id="roomstate">Room</span>
@@ -242,6 +245,23 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
             <i className="c3"><button className="link" data-act="groups">Fold all</button></i>
           </div>
           <div id="results" />
+          {/* the keys, for the search they belong to — one line when the pane is narrow, and yours to put away */}
+          <div className={"foothint mono" + (hintsShut ? " shut" : "")}>
+            {!hintsShut && (
+              <>
+                <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+                <span><kbd>→</kbd> arguments</span>
+                <span><kbd>Enter</kbd> copy + send</span>
+                <span><kbd>esc</kbd> clear</span>
+                <span className="libonly"><kbd>del</kbd> remove from library</span>
+                <span className="drift">drag a sent block to reorder it · type in the document to edit it</span>
+              </>
+            )}
+            <button type="button" className="hintx" onClick={() => setHintsShut((s) => { remember(HINTS_KEY, s ? "0" : "1"); return !s; })}
+              title={hintsShut ? "Show the keys" : "Put the keys away"} aria-label={hintsShut ? "Show the keys" : "Put the keys away"}>
+              {hintsShut ? "keys" : "×"}
+            </button>
+          </div>
         </section>
 
         {show.search && show.list && (
@@ -265,15 +285,6 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         <aside className="pane docpane" aria-hidden={!doc} ref={docPane}>
           <DocEditor host={ref} width={docReal} owner={owner} />
         </aside>
-      </div>
-
-      <div className="foothint mono">
-        <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
-        <span><kbd>→</kbd> arguments</span>
-        <span><kbd>Enter</kbd> copy + send</span>
-        <span><kbd>esc</kbd> clear</span>
-        <span className="libonly"><kbd>del</kbd> remove from library</span>
-        <span className="drift">drag a sent block to reorder it · type in the document to edit it</span>
       </div>
 
       <div className="veil" id="veil"><div className="card" id="card" /></div>

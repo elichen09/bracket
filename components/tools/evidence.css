@@ -565,14 +565,22 @@
   font-family: var(--mono); font-size: var(--evi-micro);
   border: 1px solid var(--line); padding: 2px 5px; color: var(--muted);
 }
+.evi .left { position: relative; }
 .evi .foothint {
-  position: absolute; bottom: 0; left: 0; z-index: 5;
-  right: calc(var(--evi-side) + 9px);
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
   padding: 11px var(--evi-gut); font-size: var(--evi-micro); color: var(--dim);
   background: var(--ground); border-top: 1px solid var(--line-soft);
-  display: flex; gap: 20px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
 }
-.evi.withdoc .foothint { right: calc(var(--evi-side) + var(--evi-doc) + 18px); }
+.evi .foothint .hintx {
+  margin-left: auto; flex: none; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim); background: none; border: 1px solid transparent; padding: 1px 6px; cursor: pointer;
+}
+.evi .foothint .hintx:hover { color: var(--ink); border-color: var(--line); }
+/* put away: just the way to bring it back, in the corner */
+.evi .foothint.shut { left: auto; padding: 6px 10px; border-top: 0; background: none; }
+.evi .foothint.shut .hintx { border-color: var(--line); background: var(--ground); }
+.evi .left:has(.foothint.shut) #results { padding-bottom: 36px; }
 .evi .foothint .drift { color: var(--muted); }
 .evi #clipstage { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; overflow: hidden; }
 
@@ -766,7 +774,6 @@
 @media (max-width: 1100px) {
   .evi { --evi-gut: 20px; }
   .evi .right { width: min(var(--evi-side), 46vw); }
-  .evi .foothint { right: calc(min(var(--evi-side), 46vw) + 9px); }
   .evi .ncount, .evi .meta { display: none; }
   .evi .slash, .evi #q { font-size: 30px; }
 }
@@ -970,6 +977,20 @@
 .evi.nolist .right { display: none; }
 .evi.nosearch .docpane { flex: 1; width: auto; min-width: 0; }
 .evi.nosearch:not(.withdoc) .right { flex: 1; width: auto; }
-.evi.nosearch .foothint { display: none; }
-.evi.nolist .foothint { right: 0; }
-.evi.nolist.withdoc .foothint { right: calc(var(--evi-doc) + 9px); }
+
+/* ---------- a narrow search pane: one line each, sideways ----------
+   In half of the split, or beside the send list and the document, the key
+   hints and the bins no longer wrap into a wall: each keeps to one line and
+   scrolls sideways, and the least used hints step aside. */
+.evi .left { container: evsearch / inline-size; }
+@container evsearch (max-width: 640px) {
+  .evi .foothint { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; white-space: nowrap; gap: 14px; padding: 8px 14px; }
+  .evi .foothint::-webkit-scrollbar { display: none; }
+  .evi .foothint > span { flex: none; }
+  .evi .foothint .drift, .evi .foothint .libonly { display: none; }
+  .evi .foothint .hintx { position: sticky; right: 0; background: var(--ground); }
+  .evi .binbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .evi .binbar::-webkit-scrollbar { display: none; }
+  .evi .binbar > * { flex: none; }
+  .evi .indexhead .c3 .link { white-space: nowrap; }
+}

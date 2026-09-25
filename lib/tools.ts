@@ -31,12 +31,12 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "split",
-    name: "Evidence + Flow",
-    blurb: "Evidence and Flow side by side in one window — search and send on one side, flow on the other.",
+    name: "Split screen",
+    blurb: "Any two tools side by side — Evidence, Flow, the Doc viewer, Doc flow — in one window.",
     about:
-      "The two tools in one window, each whole: drag the line between them to share the room, swap them over, " +
-      "and a card sent from Evidence is ready to flow on the other side.",
-    storage: "Whatever each tool keeps; the split only remembers its widths.",
+      "Two tools in one window, each whole: pick what goes on each side, drag the line between them to share the room, " +
+      "swap them over. A card sent from Evidence is ready to flow on the other side.",
+    storage: "Whatever each tool keeps; the split only remembers which tools and how wide.",
   },
   {
     slug: "flow",

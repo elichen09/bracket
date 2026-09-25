@@ -4,16 +4,17 @@ import Split from "@/components/tools/Split";
 import { isAdmin } from "@/lib/admin";
 import "../tools.css";
 
-export const metadata = { title: "Evidence + Flow · The Break" };
+export const metadata = { title: "Split screen · The Break" };
 export const dynamic = "force-dynamic";
 
-/** Evidence and Flow side by side, each the whole tool, in one window. */
-export default function SplitTool() {
+/** Any two tools side by side, each whole, in one window. `?a=flow` puts that one on the left. */
+export default function SplitTool({ searchParams }: { searchParams?: { a?: string | string[] } }) {
+  const a = (Array.isArray(searchParams?.a) ? searchParams?.a[0] : searchParams?.a) || undefined;
   if (!isAdmin()) {
     return (
       <>
         <Nav />
-        <main><section className="view enter"><AdminGate what="Evidence + Flow" /></section></main>
+        <main><section className="view enter"><AdminGate what="Split screen" /></section></main>
       </>
     );
   }
@@ -21,7 +22,7 @@ export default function SplitTool() {
     <>
       <Nav />
       <main>
-        <div className="toolpage"><Split /></div>
+        <div className="toolpage"><Split first={a} /></div>
       </main>
     </>
   );
