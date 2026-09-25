@@ -1084,3 +1084,21 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .tabs .plus.sdp { border-style: solid; }
 .flw .sd-target input[type="checkbox"] { accent-color: var(--ink); }
 .flw .c.pmark.editing::after { display: none; }   /* your own typing comes first; their outline still shows */
+
+/* ---- the palette label: highlighted letters stay in the line ---- */
+.flw .pal li.it .lb .lt { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- a heading row's own × ---- */
+.flw .rh .del { margin-left: auto; align-self: center; color: var(--dim); font-size: 14px; line-height: 1; padding: 2px 6px; opacity: 0; transition: opacity .15s var(--ease), color .15s var(--ease), transform .15s var(--pop); }
+.flw .rh:hover .del, .flw .rh .del:focus-visible { opacity: 1; }
+.flw .rh .del:hover { color: var(--bad); transform: scale(1.2); }
+
+/* ---- many flows: the tabs scroll, the add buttons stay, the key hints give way ---- */
+.flw .tabs { overflow: visible; flex: 0 1 auto; min-width: 0; }
+.flw .tabs .tscroll { display: flex; gap: 6px; overflow-x: auto; min-width: 0; flex: 0 1 auto; scrollbar-width: none; padding: 2px 0; }
+.flw .tabs .tscroll::-webkit-scrollbar { display: none; }
+.flw .tabs .tscroll.fl { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px); mask-image: linear-gradient(90deg, transparent, #000 28px); }
+.flw .tabs .tscroll.fr { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+.flw .tabs .tscroll.fl.fr { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+.flw .tabs .tadd { display: flex; gap: 6px; flex: none; padding: 2px 0 2px 6px; border-left: 1px solid var(--line); }
+.flw .bottom.crowded .keys { display: none; }
