@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { polish } from "@/lib/evidence/polish";
 import ThemePicker from "./ThemePicker";
+import FlowPicker, { worthAsking, type PickerCurrent } from "./FlowPicker";
 import "./flow.css";
 import "./finish.css";
 
@@ -20,6 +21,9 @@ import "./finish.css";
  */
 export default function Flow({ join, owner, me, open }: { join?: string; owner?: string; me?: string; open?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Which round? — asked on the way in, unless a link already said
+  const [asking, setAsking] = useState<PickerCurrent | null>(null);
+  const api = useRef<any>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -30,12 +34,27 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
     import("@/lib/flow/engine").then((m: any) => {
       if (dead) return;
       // Whose flow, and the name a partner sees on your cursor by default.
-      off = m.boot(el, { join, owner, me, open });
+      off = m.boot(el, {
+        join, owner, me, open,
+        ask: (a: any) => {
+          api.current = a;
+          const cur = a.current();
+          worthAsking(owner, "grid", cur).then((yes) => { if (yes && !dead) setAsking(cur); });
+        },
+      });
     });
     return () => { dead = true; unpolish(); if (off) off(); };
   }, [join, owner, me, open]);
 
+  const done = () => { setAsking(null); api.current?.focus(); };
+
   return (
+    <>
+    {asking && (
+      <FlowPicker owner={owner} kind="grid" current={asking} onClose={done}
+        onOpen={(id) => { setAsking(null); api.current?.open(id); }}
+        onNew={() => { setAsking(null); api.current?.fresh(); }} />
+    )}
     <div className="flw" ref={ref}>
       <header className="topbar">
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
@@ -256,5 +275,6 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
       <div className="tst" id="toast" role="status" />
       <div className="menu" id="menu" role="menu" hidden />
     </div>
+    </>
   );
 }

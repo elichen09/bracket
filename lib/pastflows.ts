@@ -138,6 +138,13 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 interface PMJSON { type: string; attrs?: Record<string, any>; content?: PMJSON[]; text?: string }
 const textOf = (n: PMJSON): string => (n.text || "") + (n.content || []).map(textOf).join("");
 
+/** Whether a Doc flow has been written in: a speech box's label alone is not writing. */
+export const docHasWriting = (json: unknown) =>
+  (((json as PMJSON)?.content || []) as PMJSON[]).some((b) => b.type !== "box" && textOf(b).trim());
+
+/** Whether a round in either tool has anything in it worth going back to. */
+export const roundHasWriting = (r: Round) => (r.kind === "doc" ? docHasWriting(r.data) : gridHasWriting(r.data as GridDoc));
+
 /** A Doc flow: its lines, how many were theirs, and its boxes. */
 export function summarizeDoc(id: string, name: string, json: unknown, created: number, updated: number): Round {
   const blocks = ((json as PMJSON)?.content || []) as PMJSON[];

@@ -16,8 +16,9 @@ import {
 import { schema, surveyPlugin, blankDoc, type Hl } from "@/lib/docflow/schema";
 import * as C from "@/lib/docflow/commands";
 import { fromDocsHtml, toDocsHtml, toPlainText } from "@/lib/docflow/io";
+import FlowPicker, { worthAsking, type PickerCurrent } from "./FlowPicker";
 import { listDocs, loadDoc, saveDoc, renameDoc, removeDoc, restoreDoc, newId, archiveAll, fetchDoc, type DocMeta } from "@/lib/docflow/store";
-import { deleteRound, restoreRound } from "@/lib/pastflows";
+import { deleteRound, restoreRound, summarizeDoc, docHasWriting } from "@/lib/pastflows";
 import { ACTIONS, ACTION, comboOf, keyLabel, refuse, loadKeys, saveKeys, keyFor, actionFor, bind, type Overrides } from "@/lib/docflow/keys";
 import { loadPieces, savePieces, newPieceId, titleFrom, fromDoc, merge, type Piece, type Draft } from "@/lib/docflow/rhetoric";
 import { stopsOf, toggleStop, setStop, reorder, clearStops, visionPlugin, visionKey, type Stop } from "@/lib/docflow/vision";
@@ -202,6 +203,8 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
   const [mates, setMates] = useState<Mate[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
+  // Which flow? — asked on the way in, unless a link already said
+  const [asking, setAsking] = useState<PickerCurrent | null>(null);
   const color = useMemo(() => MATE_COLORS[Math.floor(Math.random() * MATE_COLORS.length)], []);
 
   /* ------------------------------------------------------------ toast */
@@ -232,6 +235,11 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
       setCurrent(first.id);
       setName(first.name);
       archiveAll(owner);
+      if (!open && !join) {
+        const json = loadDoc(owner, first.id);
+        const cur = { id: first.id, name: first.name, stats: summarizeDoc(first.id, first.name, json, 0, 0).stats, blank: !docHasWriting(json) };
+        if (await worthAsking(owner, "doc", cur) && !dead) setAsking(cur);
+      }
     })();
     return () => { dead = true; };
     // toast is stable; the flow to open is read once
@@ -997,6 +1005,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
   /* ------------------------------------------------------------ the keys, all of them, on the window */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (document.querySelector(".fpick")) return;   // Which flow? has the keys
       // choosing a new key for something
       const cap = capturingRef.current;
       if (cap) {
@@ -1502,6 +1511,20 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
             </div>
           </div>
         </div>
+      )}
+
+      {asking && (
+        <FlowPicker owner={owner} kind="doc" current={asking}
+          onClose={() => { setAsking(null); view.current?.focus(); }}
+          onNew={() => { setAsking(null); newFlow(); }}
+          onOpen={async (id) => {
+            setAsking(null);
+            const nm = await fetchDoc(owner, id);
+            if (!nm) { toast("That flow is not in Past flows any more"); return; }
+            setDocs(listDocs(owner));
+            openFlow({ id, name: nm, updated: Date.now() });
+            toast(`Opened “${nm}”`);
+          }} />
       )}
 
       {toastMsg && (
