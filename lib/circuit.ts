@@ -123,7 +123,33 @@ export const COLLEGE_TOURNAMENTS: { name: string; re: RegExp; not?: RegExp }[] =
   { name: "Run for the Roses (Kentucky)", re: /run for the roses/i },
 ];
 
+/**
+ * Tournaments someone has said are college (or are not), by name, from the
+ * ranking-update page: a college tournament missing from the list above is
+ * counted as one without a code change. Loaded from storage by the server
+ * (lib/circuitStore.ts) before rounds are read or ratings are rebuilt.
+ */
+const SAID_COLLEGE = new Map<string, boolean>();
+const key = (name: string) => (name || "").replace(/\s+/g, " ").trim().toLowerCase();
+export function setCollegeOverrides(list: Record<string, boolean>) {
+  SAID_COLLEGE.clear();
+  for (const [name, college] of Object.entries(list || {})) SAID_COLLEGE.set(key(name), !!college);
+}
+export function withCollegeOverride<T>(name: string, college: boolean, run: () => T): T {
+  const k = key(name), had = SAID_COLLEGE.has(k), was = SAID_COLLEGE.get(k);
+  SAID_COLLEGE.set(k, college);
+  const done = () => { if (had) SAID_COLLEGE.set(k, was!); else SAID_COLLEGE.delete(k); };
+  try {
+    const out = run();
+    if (out instanceof Promise) return out.finally(done) as T;
+    done();
+    return out;
+  } catch (e) { done(); throw e; }
+}
+
 export function isCollegeTournament(tournName: string): boolean {
+  const said = SAID_COLLEGE.get(key(tournName));
+  if (said !== undefined) return said;
   return COLLEGE_TOURNAMENTS.some((t) => t.re.test(tournName || "") && !(t.not && t.not.test(tournName || "")));
 }
 

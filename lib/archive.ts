@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { collectGames, type GameRow } from "./ratings";
 import { judgeTallies, saveJudgeHabits, type JudgeBallot } from "./judges";
 import { COLLEGE_TOURNAMENTS, archivable, circuitOf, isCollegeTournament, counts, type Circuit } from "./circuit";
+import { loadCircuitOverrides } from "./circuitStore";
 
 /**
  * Past seasons, through the public API rather than by scraping.
@@ -89,9 +90,12 @@ export interface ArchiveResult {
  * re-run: rows are keyed by round and entry, so a tournament already read costs
  * one wasted pass and changes nothing.
  */
-export async function archiveTournament(db: SupabaseClient, ref: number | string): Promise<ArchiveResult> {
-  const target = await findPublicForumEvents(ref);
-  if (!target) return { tournId: 0, name: String(ref), start: null, events: [], rows: 0, entries: 0, error: "no such tournament on Tabroom" };
+export async function archiveTournament(db: SupabaseClient, ref: number | string, only?: Circuit): Promise<ArchiveResult> {
+  await loadCircuitOverrides(db);
+  const found = await findPublicForumEvents(ref);
+  if (!found) return { tournId: 0, name: String(ref), start: null, events: [], rows: 0, entries: 0, error: "no such tournament on Tabroom" };
+  // just the one ranking's divisions, when that is all that was asked for
+  const target = only ? { ...found, events: found.events.filter((e) => e.circuit === only) } : found;
   if (!target.events.length) {
     const what = isCollegeTournament(target.name) ? "open division" : "top-division debate";
     return { tournId: target.tournId, name: target.name, start: target.start, events: [], rows: 0, entries: 0, error: `no published ${what} results` };
@@ -107,7 +111,7 @@ export async function archiveTournament(db: SupabaseClient, ref: number | string
       // the ingest uses applies here
       rows = rows.concat(out.rows.filter((r) => {
         const c = circuitOf(r.tourn_name, r.event_name);
-        return c !== null && counts(c, r.event_name);
+        return c !== null && counts(c, r.event_name) && (!only || c === only);
       }));
       judgeBallots.set(ev.abbr, out.judgeBallots);
       entries += out.entries;

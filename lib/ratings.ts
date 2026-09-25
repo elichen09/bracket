@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { UNRATED, update, decay, type Rating, type Game } from "./glicko";
 import { ballotsFromRecords, judgeTallies, saveJudgeHabits, type JudgeBallot } from "./judges";
 import { CIRCUITS, circuitOf, counts, type Circuit } from "./circuit";
+import { loadCircuitOverrides } from "./circuitStore";
 
 /**
  * The ratings pipeline.
@@ -222,6 +223,7 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
 
 /** Read one event and store its rounds. Safe to re-run: rows are upserted by round and entry. */
 export async function ingestTournament(db: SupabaseClient, tournId: number, eventAbbr: string): Promise<{ rows: number; entries: number; name: string; skipped: boolean }> {
+  await loadCircuitOverrides(db);   // tournaments said to be college (or not)
   const out = await collectGames(tournId, eventAbbr);
   // A round is stored when it counts towards one of the circuits: top-division
   // Public Forum, or top-division policy at one of the college tournaments. A
@@ -288,6 +290,7 @@ export function currentSeason(now = new Date()): number {
  * are read from — but a team's standing here is what it has done since August.
  */
 export async function recompute(db: SupabaseClient, season = currentSeason(), circuit: Circuit = "pf"): Promise<{ teams: number; debaters: number; periods: number; games: number; skippedSeasons: number }> {
+  await loadCircuitOverrides(db);   // tournaments said to be college (or not)
   const all: GameRow[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
@@ -661,6 +664,7 @@ export interface PastPriors {
 }
 
 export async function pastSeasonPriors(db: SupabaseClient, season = currentSeason(), circuit: Circuit = "pf"): Promise<PastPriors> {
+  await loadCircuitOverrides(db);   // tournaments said to be college (or not)
   const rows: GameRow[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
@@ -712,6 +716,7 @@ export async function pastSeasonPriors(db: SupabaseClient, season = currentSeaso
 
 /** Every past meeting between these teams: code -> opponent code -> {w, l}. */
 export async function headToHead(db: SupabaseClient, codes: string[], circuit: Circuit = "pf"): Promise<Record<string, Record<string, { w: number; l: number }>>> {
+  await loadCircuitOverrides(db);   // tournaments said to be college (or not)
   const out: Record<string, Record<string, { w: number; l: number }>> = {};
   if (!codes.length) return out;
   for (let i = 0; i < codes.length; i += 200) {

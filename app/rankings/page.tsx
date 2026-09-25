@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Nav from "@/components/Nav";
 import { CIRCUITS, CIRCUIT_IDS, type Circuit } from "@/lib/circuit";
 
@@ -52,6 +53,12 @@ export default function RankingsPage() {
   const [err, setErr] = useState("");
   const [query, setQuery] = useState("");
 
+  // /rankings?circuit=cx opens on that table — where "See the rankings" after an update lands
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("circuit") as Circuit | null;
+    if (c && CIRCUIT_IDS.includes(c)) setCircuit(c);
+  }, []);
+
   useEffect(() => {
     let alive = true;
     setRows(null); setErr("");
@@ -78,6 +85,7 @@ export default function RankingsPage() {
               One tournament is one rating period, so a team is rated on its whole weekend at once, and a
               team that has not competed lately is rated less confidently rather than assumed to be where it was.
             </p>
+            <p className="reveal"><Link className="mono" href="/rankings/update" style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", textDecoration: "none", borderBottom: "1px solid var(--line)" }}>Update from a tournament →</Link></p>
           </div>
 
           <div className="controls">

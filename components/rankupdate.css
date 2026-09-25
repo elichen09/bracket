@@ -1,0 +1,67 @@
+/* Update the rankings from a tournament (components/RankUpdate.tsx) */
+.ru { --ru-acc: #E97A3E; max-width: 760px; margin-top: 28px; display: grid; gap: 22px; }
+.ru .mono { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+.ru-link { display: grid; gap: 8px; }
+.ru-link input {
+  font-family: var(--display); font-size: clamp(18px, 2.4vw, 24px); font-weight: 600; letter-spacing: -.01em;
+  padding: 14px 16px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); outline: none;
+  transition: border-color .15s var(--ease);
+}
+.ru-link input:focus { border-color: var(--ink); }
+.ru-link input::placeholder { color: var(--dim); font-weight: 400; font-size: 15px; }
+
+.ru-circ { display: grid; gap: 8px; }
+.ru-circ > div { display: flex; flex-wrap: wrap; }
+.ru-circ button {
+  font-family: var(--ui); font-size: 14px; font-weight: 600; padding: 10px 16px; margin-right: -1px;
+  background: none; color: var(--muted); border: 1px solid var(--line); cursor: pointer;
+  transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.ru-circ button:hover { color: var(--ink); }
+.ru-circ button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); position: relative; }
+.ru-circ button i { font-style: normal; color: var(--ru-acc); margin-left: 6px; }
+
+.ru-card {
+  border: 1px solid var(--line); background: var(--surface); padding: 22px 24px; display: grid; gap: 10px;
+  animation: ruIn .25s var(--ease) both; transition: opacity .2s var(--ease);
+}
+.ru-card.looking { opacity: .6; }
+.ru-kicker { margin: 0; }
+.ru-name { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(26px, 4vw, 40px); letter-spacing: -.03em; line-height: 1.02; }
+.ru-events { margin: 4px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ru-events b { font-weight: 500; color: var(--ink); border: 1px solid var(--line); padding: 3px 8px; }
+.ru-none { margin: 0; color: var(--muted); }
+.ru-note { margin: 0; font-size: 14px; color: var(--ink); border-left: 3px solid var(--ru-acc); padding-left: 10px; }
+.ru-note.quiet { color: var(--muted); border-left-color: var(--line); }
+.ru-err { margin: 0; color: var(--bad); font-size: 14px; }
+.ru-wait { display: grid; gap: 10px; }
+.ru-wait i { display: block; height: 12px; background: linear-gradient(90deg, var(--surface-2), var(--line-soft), var(--surface-2)); background-size: 200% 100%; animation: ruShimmer 1.1s linear infinite; }
+.ru-wait i:nth-child(1) { width: 30%; } .ru-wait i:nth-child(2) { width: 70%; height: 26px; } .ru-wait i:nth-child(3) { width: 50%; }
+
+.ru-go { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.ru-go button.primary { font-size: 15px; padding: 12px 20px; }
+.ru-go button.primary:disabled { opacity: .35; cursor: default; }
+.ru-steps { display: flex; gap: 14px; }
+.ru-steps i { font-style: normal; }
+.ru-steps i.on { color: var(--ink); }
+.ru-bar { height: 2px; background: var(--line-soft); overflow: hidden; position: relative; margin-top: -12px; }
+.ru-bar i { position: absolute; top: 0; bottom: 0; width: 30%; background: var(--ru-acc); animation: ruSlide 1.4s var(--ease) infinite; }
+
+.ru-done { display: grid; gap: 18px; animation: ruIn .3s var(--ease) both; }
+.ru-nums { display: flex; gap: 36px; flex-wrap: wrap; }
+.ru-nums b { display: block; font-family: var(--display); font-weight: 800; font-size: 44px; letter-spacing: -.04em; line-height: 1; }
+.ru-table { width: 100%; border-collapse: collapse; }
+.ru-table th { text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
+.ru-table td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 14.5px; }
+.ru-table td.mono { font-size: 12px; letter-spacing: .04em; text-transform: none; color: var(--ink); }
+.ru-table td.dim { color: var(--dim); }
+.ru-table td.up { color: var(--good); }
+.ru-table td.down { color: var(--bad); }
+.ru-see { color: var(--ink) !important; text-decoration: none; border-bottom: 1px solid var(--line); justify-self: start; padding-bottom: 2px; }
+.ru-see:hover { border-color: var(--ink); }
+
+@keyframes ruIn { from { opacity: 0; transform: translateY(6px); } }
+@keyframes ruShimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }
+@keyframes ruSlide { from { left: -30%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .ru-card, .ru-done { animation: none; } .ru-bar i, .ru-wait i { animation-duration: 3s; } }
