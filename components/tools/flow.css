@@ -1093,19 +1093,22 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .rh:hover .del, .flw .rh .del:focus-visible { opacity: 1; }
 .flw .rh .del:hover { color: var(--bad); transform: scale(1.2); }
 
-/* ---- many flows: the tabs scroll, the add buttons stay, the key hints give way ---- */
-.flw .tabs { overflow: visible; flex: 0 1 auto; min-width: 0; }
-.flw .tabs .tscroll { display: flex; gap: 6px; overflow-x: auto; min-width: 0; flex: 0 1 auto; scrollbar-width: none; padding: 2px 0; }
-.flw .tabs .tscroll::-webkit-scrollbar { display: none; }
-.flw .tabs .tscroll.fl { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px); mask-image: linear-gradient(90deg, transparent, #000 28px); }
-.flw .tabs .tscroll.fr { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
-.flw .tabs .tscroll.fl.fr { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+/* ---- the foot scrolls: everything on it keeps its size and its place ----
+   Nothing is squeezed or hidden to make room. When it is wider than the
+   window it scrolls sideways — the wheel does it too — and fades at the
+   edge that has more. */
+.flw .bottom { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
+.flw .bottom::-webkit-scrollbar { display: none; }
+.flw .bottom > * { flex: none; }
+.flw .bottom .tabs { overflow: visible; min-width: auto; }
+.flw .tabs .tscroll { display: flex; gap: 6px; padding: 2px 0; }
 .flw .tabs .tadd { display: flex; gap: 6px; flex: none; padding: 2px 0 2px 6px; border-left: 1px solid var(--line); }
-.flw .bottom.crowded .keys { display: none; }
+.flw .bottom .keys { flex: none; min-width: auto; overflow: visible; margin-left: auto; padding-left: 16px; }
+.flw .bottom .keys .k2 { display: inline-flex; }
+@media (max-width: 1120px) { .flw .bottom .keys { display: flex; } }
+.flw .bottom.fl { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px); mask-image: linear-gradient(90deg, transparent, #000 32px); }
+.flw .bottom.fr { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); }
+.flw .bottom.fl.fr { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
 
-/* ---- the key hints: whole or not at all ----
-   A hint that does not fit wraps onto a second line, and the strip is one
-   line tall, so it goes out of sight instead of being cut through a word.
-   The first hints are the ones kept. */
-.flw .keys { flex-wrap: wrap; align-content: flex-start; align-self: center; height: 22px; row-gap: 22px; overflow: hidden; }
-.flw .keys span { height: 22px; flex: none; }
+/* ---- a block of cells, dragged: where it came from, where it lands ---- */
+.flw .c.dropb { box-shadow: inset 0 0 0 2px var(--acc); background-image: linear-gradient(rgba(var(--acc-rgb), .08), rgba(var(--acc-rgb), .08)); }
