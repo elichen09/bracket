@@ -292,3 +292,53 @@ export async function sendToEvidence(owner: string | null | undefined, hit: Hit,
     try { db.close(); } catch { /* closed */ }
   }
 }
+
+/**
+ * A block already in hand — a caselist card read out of its document — into
+ * Evidence's send list, the way Evidence would put it there: a block already
+ * in the list takes the card in (by block id) rather than a second copy of
+ * the block turning up under the first.
+ */
+export async function sendBlockToEvidence(owner: string | null | undefined, block: any, argIndex: number | null): Promise<boolean> {
+  if (typeof indexedDB === "undefined" || !block) return false;
+  let includeHead = true;
+  try {
+    const s = localStorage.getItem(scoped("evidence.settings", owner));
+    if (s) { const j = JSON.parse(s); if (typeof j.head === "boolean") includeHead = j.head; }
+  } catch { /* defaults */ }
+  const item = makeSendItem(block, argIndex, includeHead);
+  if (!item) return false;
+  const db = await new Promise<IDBDatabase | null>((resolve) => {
+    let req: IDBOpenDBRequest;
+    try { req = indexedDB.open(scoped("evidence", owner), 1); } catch { return resolve(null); }
+    req.onupgradeneeded = () => { try { req.transaction?.abort(); } catch { /* nothing */ } };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+  if (!db) return false;
+  try {
+    return await new Promise<boolean>((resolve) => {
+      const t = db.transaction(["kv"], "readwrite");
+      let ok = false;
+      const sendReq = t.objectStore("kv").get("send");
+      sendReq.onsuccess = () => {
+        const list = Array.isArray(sendReq.result) ? sendReq.result : [];
+        const same = item.blockId ? list.find((c: any) => c.blockId === item.blockId) : null;
+        if (same) {
+          const have = new Set((same.parts || []).map((p: any) => p.title));
+          item.parts.forEach((p: any) => { if (!have.has(p.title)) same.parts.push(p); });
+        } else list.push(item);
+        t.objectStore("kv").put(list, "send");
+        ok = true;
+      };
+      t.oncomplete = () => resolve(ok);
+      t.onerror = () => resolve(false);
+      t.onabort = () => resolve(false);
+    });
+  } catch {
+    return false;
+  } finally {
+    try { db.close(); } catch { /* closed */ }
+  }
+}

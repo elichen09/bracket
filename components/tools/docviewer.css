@@ -120,7 +120,11 @@
 .dvw .dv-paste:focus { border-color: var(--ink); }
 
 /* ------------------------------------------------------------ the document */
-.dvw .dv-pane { flex: 1; min-width: 0; overflow: auto; padding: 28px 24px 120px; position: relative; scroll-behavior: auto; }
+/* display: block, said out loud — the pane is a <main>, and the tools' own
+   layout makes every <main> a flex column, in which the paper sized itself to
+   its widest line and would not shrink: the page ran off the side of a
+   narrow window instead of fitting it. */
+.dvw .dv-pane { display: block; flex: 1; min-width: 0; overflow: auto; padding: 28px 24px 120px; position: relative; scroll-behavior: auto; }
 .dvw .dv-paper { max-width: 900px; margin: 0 auto; background: #fff; padding: 48px 64px 80px; color: #111; transition: opacity .2s; animation: dvIn .3s var(--spring) both; }
 .dvw .dv-paper.gone { display: none; }
 .dvw .dv-paper.busy { opacity: .45; }
@@ -163,8 +167,29 @@
 .dvw .dv-drop { position: absolute; inset: 8px; z-index: 40; border: 2px dashed var(--ink); background: rgba(255, 255, 255, .55); display: grid; place-items: center; font-size: 13px; pointer-events: none; backdrop-filter: blur(2px); }
 .dvw .dv-toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 50; background: var(--ink); color: var(--ground); padding: 10px 16px; font-size: 10.5px; animation: dvIn .3s var(--spring) both; }
 
-@media (max-width: 1000px) { .dvw .dv-side { width: 260px; } .dvw .dv-paper { padding: 28px 24px 60px; } .dvw .dv-now { display: none; } }
-@media (max-width: 760px) { .dvw .dv-body { flex-direction: column; } .dvw .dv-side { width: auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); } }
+/* Narrow — half of Split screen, a small window: still the whole document with
+   the outline down the side, never stacked over it; the outline just gets slimmer
+   and the page's margins tighter. */
+@media (max-width: 1000px) {
+  .dvw .dv-side { width: clamp(170px, 26vw, 240px); }
+  .dvw .dv-pane { padding: 16px 14px 120px; }
+  .dvw .dv-paper { padding: 28px 24px 60px; }
+  .dvw .dv-now { display: none; }
+}
+@media (max-width: 700px) {
+  .dvw .dv-side { width: clamp(140px, 30vw, 200px); }
+  .dvw .dv-pane { padding: 10px 8px 120px; }
+  .dvw .dv-paper { padding: 18px 16px 48px; }
+}
 /* room under the last page, so any heading can be brought to the top */
 .dvw .dv-pane::after { content: ""; display: block; height: 70vh; }
 .dvw .dv-pane:has(.dv-pdf)::after { display: none; }
+
+/* A .docx laid out here brings Word's page margins with it (an inch a side,
+   on the section) and sometimes things of a fixed width — a table, a picture.
+   The paper is the margin here, and everything fits the width it has. */
+.dvw .dv-doc section.docx { padding: 0 !important; width: auto !important; min-width: 0 !important; min-height: 0 !important; }
+.dvw .dv-doc section.docx > * { min-width: 0; max-width: 100%; }
+.dvw .dv-doc table { max-width: 100%; width: auto !important; table-layout: auto; }
+.dvw .dv-doc img, .dvw .dv-doc svg, .dvw .dv-doc canvas { max-width: 100%; height: auto; }
+.dvw .dv-doc p, .dvw .dv-doc span { max-width: 100%; }

@@ -1112,3 +1112,15 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 
 /* ---- a block of cells, dragged: where it came from, where it lands ---- */
 .flw .c.dropb { box-shadow: inset 0 0 0 2px var(--acc); background-image: linear-gradient(rgba(var(--acc-rgb), .08), rgba(var(--acc-rgb), .08)); }
+/* the whole speech down a column, at the head of the send doc */
+.flw .sdhead .sdall { align-self: flex-start; }
+/* '/' looks in your library or the caselist: a two-part switch ahead of that source's chips */
+.flw .palbins .psrc { display: inline-flex; margin-right: 10px; }
+.flw .palbins .psrc button {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+  padding: 4px 9px; border: 1px solid var(--line); color: var(--dim); background: none; cursor: pointer;
+  transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.flw .palbins .psrc button + button { margin-left: -1px; }
+.flw .palbins .psrc button:hover { color: var(--ink); }
+.flw .palbins .psrc button[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); position: relative; }
