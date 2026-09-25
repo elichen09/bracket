@@ -53,6 +53,10 @@ export default function RankingsPage() {
   const [err, setErr] = useState("");
   const [query, setQuery] = useState("");
 
+  // the way to change the rankings is for whoever holds the admin key, so only they see it
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { fetch("/api/admin").then((r) => r.json()).then((j) => setAdmin(!!j.admin)).catch(() => {}); }, []);
+
   // /rankings?circuit=cx opens on that table — where "See the rankings" after an update lands
   useEffect(() => {
     const c = new URLSearchParams(window.location.search).get("circuit") as Circuit | null;
@@ -85,7 +89,7 @@ export default function RankingsPage() {
               One tournament is one rating period, so a team is rated on its whole weekend at once, and a
               team that has not competed lately is rated less confidently rather than assumed to be where it was.
             </p>
-            <p className="reveal"><Link className="mono" href="/rankings/update" style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", textDecoration: "none", borderBottom: "1px solid var(--line)" }}>Update from a tournament →</Link></p>
+            {admin && <p className="reveal"><Link className="mono" href="/rankings/update" style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", textDecoration: "none", borderBottom: "1px solid var(--line)" }}>Update from a tournament →</Link></p>}
           </div>
 
           <div className="controls">
