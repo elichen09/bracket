@@ -12,15 +12,14 @@
  * admin-only), which the route hands back on the next request.
  *
  * What the API allows, found by asking it:
- *   GET /caselists            the wikis; the current ones are not `archived`
- *   GET /search?q=&shard=     full-text over a wiki's files and cites, 100 at
- *                             most, and FOUR SEARCHES A MINUTE per account —
- *                             a fifth is a 429 "You can only run 4 searches per
- *                             minute"
- *   GET /download?path=       the file, unthrottled
+ *   GET /caselists                   the wikis; the current ones are not `archived`
+ *   GET /caselists/{c}/downloads     weekly archives of every open-source document
+ *   GET /caselists/{c}/schools       school names to show
+ *   GET /search?q=&shard=            full text, FOUR SEARCHES A MINUTE per account
+ *   GET /download?path=              one file, TEN A MINUTE per account
  *
- * A search also finds typed-in cites. Those are free text with no headings, so
- * there is no tag to match, and the Evidence search leaves them out.
+ * Those limits are why Evidence searches an index built weekly from the
+ * archives (scripts/caselist-index.mjs) and uses /download only as a fallback.
  */
 
 const API = "https://api.opencaselist.com/v1";
@@ -67,34 +66,4 @@ export function forget() { kept = null; }
 
 export async function call(path: string, tok: string): Promise<Response> {
   return fetch(API + path, { headers: { cookie: "caselist_token=" + tok }, signal: AbortSignal.timeout(25_000) });
-}
-
-/* ------------------------------------------------------------------ what it says */
-
-export interface Wiki { slug: string; name: string; event: string; year: number }
-
-export interface Hit {
-  type: "file" | "cite";
-  wiki: string;
-  school: string; schoolName: string;
-  team: string; teamName: string; teamId: number;
-  path: string;
-  file?: string;          // download_path, for a file
-  citeId?: number;        // for a cite
-  title: string;
-  snippet: string;
-}
-
-export function toHit(x: any): Hit {
-  return {
-    type: x.type === "cite" ? "cite" : "file",
-    wiki: String(x.caselist || x.shard || ""),
-    school: String(x.school || ""), schoolName: String(x.school_display_name || x.school || ""),
-    team: String(x.team || ""), teamName: String(x.team_display_name || ""), teamId: Number(x.team_id) || 0,
-    path: String(x.path || ""),
-    file: x.download_path ? String(x.download_path) : undefined,
-    citeId: x.cite_id ? Number(x.cite_id) : undefined,
-    title: String(x.title || ""),
-    snippet: String(x.snippet || ""),
-  };
 }

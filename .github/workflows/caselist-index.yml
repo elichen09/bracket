@@ -1,0 +1,31 @@
+# The caselist tag index behind Evidence's Caselist search.
+# openCaselist rebuilds each wiki's whole-wiki archive once a week (Tuesdays,
+# just after midnight UTC). This checks every morning and rebuilds only the
+# wikis whose archive is newer than their index, so most runs take seconds.
+# Uses the same two secrets as the results updater: SITE_URL and UPDATE_SECRET.
+name: Caselist index
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild every wiki even if its index is current"
+        type: boolean
+        default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Build and upload the indexes
+        run: node --max-old-space-size=6144 scripts/caselist-index.mjs --site "$SITE_URL" ${{ inputs.force && '--force' || '' }}
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          UPDATE_SECRET: ${{ secrets.UPDATE_SECRET }}

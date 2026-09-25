@@ -10,7 +10,7 @@ import { createServerClient } from "@supabase/ssr";
  * ADMIN_KEY rather than by a session, the same way the updater is, so whoever
  * runs the pool can shut it or refresh it from a phone without signing in first.
  */
-const PUBLIC = [/^\/$/, /^\/login$/, /^\/about$/, /^\/api\/update$/, /^\/api\/auth\//, /^\/api\/tournaments\/[^/]+\/(close|sync)$/];
+const PUBLIC = [/^\/$/, /^\/login$/, /^\/about$/, /^\/api\/update$/, /^\/api\/tools\/caselist\/index$/, /^\/api\/auth\//, /^\/api\/tournaments\/[^/]+\/(close|sync)$/];
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: { headers: req.headers } });

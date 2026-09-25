@@ -858,7 +858,7 @@
 .evi.cl .binbar, .evi.cl .indexhead { display: none !important; }
 .evi.cl .searchwrap { padding-top: 18px; }
 
-/* the wikis, and what is left of the minute */
+/* the wikis, and how fresh their index is */
 .evi .clbar {
   display: flex; align-items: center; gap: 14px; padding: 10px var(--evi-gut);
   border-bottom: 1px solid var(--line-soft); font-size: 10px;
@@ -879,16 +879,6 @@
 .evi .clst.spin { width: 9px; height: 9px; border: 1.5px solid var(--line); border-top-color: var(--ink); border-radius: 50% !important; animation: clSpin .7s linear infinite; }
 @keyframes clSpin { to { transform: rotate(360deg); } }
 
-.evi .clmeter { display: inline-flex; align-items: center; gap: 3px; cursor: help; }
-.evi .clmeter b { margin-left: 6px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 1ch; }
-.evi .pip { position: relative; width: 8px; height: 12px; background: var(--acc); overflow: hidden; }
-.evi .pip.used { background: var(--line-soft); }
-.evi .pip.used::after {
-  content: ""; position: absolute; inset: 0; background: rgba(var(--acc-rgb, 196, 85, 58), .45);
-  transform-origin: bottom; transform: scaleY(0);
-  animation: clRefill var(--d, 60000ms) linear forwards; animation-delay: var(--e, 0ms);
-}
-@keyframes clRefill { to { transform: scaleY(1); } }
 
 /* what is happening: a line that fills as documents are read */
 .evi .clhead {
@@ -959,3 +949,23 @@
 .evi .clhead.waiting .clprog { background: repeating-linear-gradient(90deg, var(--acc) 0 6px, transparent 6px 10px); }
 .evi .clsec { color: var(--acc); font-weight: 600; font-variant-numeric: tabular-nums; }
 .evi.cl .foothint .libonly { display: none; }
+
+/* ---- the caselist index ---- */
+.evi .clfresh { flex: none; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); cursor: help; }
+.evi .clw.off { opacity: .45; }
+.evi .clst.none { color: var(--dim); }
+.evi .clrounds { font-style: normal; margin-left: 8px; padding: 0 5px; border: 1px solid var(--line); color: var(--muted); letter-spacing: .06em; }
+.evi .clcard.sel .clrounds { border-color: rgba(255, 255, 255, .35); color: var(--ground); }
+.evi .clmore {
+  display: block; width: calc(100% - 2 * var(--evi-gut)); margin: 14px var(--evi-gut) 0; padding: 9px;
+  border: 1px dashed var(--line); background: transparent; color: var(--muted);
+  font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+}
+.evi .clmore:hover { border-style: solid; border-color: var(--ink); color: var(--ink); }
+/* a card's body on its way: three lines of shimmer, the width of real text */
+.evi .clbody.clwait { display: grid; gap: 9px; padding: 16px; zoom: 1; }
+.evi .clbody.clwait i { display: block; height: 9px; background: linear-gradient(90deg, var(--surface-2) 0%, var(--line-soft) 50%, var(--surface-2) 100%); background-size: 200% 100%; animation: clShimmer 1.1s linear infinite; }
+.evi .clbody.clwait i:nth-child(1) { width: 62%; }
+.evi .clbody.clwait i:nth-child(3) { width: 84%; }
+@keyframes clShimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }
+.evi .clbody.clerr { zoom: 1; font-family: var(--mono); font-size: 11px; color: var(--acc); }
