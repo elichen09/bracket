@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The Break: the landing page's strata in miniature. Near-black ground,
+       flat hard-edged bands from the dusk palette, each stepping down at the
+       same angular kink — the bracket's turn, where the field breaks. Few,
+       broad bands, so it still reads at sixteen pixels in a tab. -->
+  <rect width="64" height="64" fill="#0D0D0E"/>
+  <path d="M0 12H21L37 28H64V64H0Z" fill="#2E3153"/>
+  <path d="M0 22H21L37 38H64V64H0Z" fill="#F6E0CD"/>
+  <path d="M0 32H21L37 48H64V64H0Z" fill="#E9925A"/>
+  <path d="M0 42H21L37 58H64V64H0Z" fill="#C95B2E"/>
+</svg>
