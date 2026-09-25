@@ -457,3 +457,17 @@ html[data-tool-theme="graphite"] .toolpage {
 
 /* a tool inside the split has no use for a way to split, or to open the other in a tab */
 html.embedded .splitlink, html.embedded .nosplit { display: none !important; }
+
+/* ---------- toolbars: words while they fit, icons when they do not ----------
+   fitBar.ts lays the bar out with nothing shrinking (.fitm) to see whether its
+   words fit at their natural width; if not, the bar goes .compact and each
+   button shows its icon instead, its name in its tooltip. Status dots and the
+   colour swatches stay — they already say it without words. */
+.toolpage .ico { display: none; width: 15px; height: 15px; flex: none; }
+.toolpage .fitm, .toolpage .fitm * { flex-shrink: 0 !important; }
+.toolpage .compact .ico { display: block; }
+.toolpage .compact .lbl, .toolpage .compact kbd, .toolpage .compact .stat, .toolpage .compact .crumb { display: none !important; }
+.toolpage .compact .btn, .toolpage .compact .th-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding-left: 9px; padding-right: 9px; min-width: 34px;
+}

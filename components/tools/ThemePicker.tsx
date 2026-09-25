@@ -65,7 +65,7 @@ export default function ThemePicker() {
     <div className="themes" ref={box}>
       <button type="button" className="th-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open} title="Colour scheme — every tool, in this browser">
         <span className="th-dots" aria-hidden="true">{now.sw.slice(1, 4).map((c) => <i key={c} style={{ background: c }} />)}</span>
-        Colours
+        <span className="lbl">Colours</span>
       </button>
       <Presence show={open}>
         <div className="th-pop" role="dialog" aria-label="Colour scheme">

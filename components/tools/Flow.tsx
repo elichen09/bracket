@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { polish } from "@/lib/evidence/polish";
 import ThemePicker from "./ThemePicker";
+import Ico from "./Ico";
+import { useFitBar } from "./fitBar";
 import FlowPicker, { worthAsking, type PickerCurrent } from "./FlowPicker";
 import Presence from "./Presence";
 import "./flow.css";
@@ -22,6 +24,8 @@ import "./finish.css";
  */
 export default function Flow({ join, owner, me, open }: { join?: string; owner?: string; me?: string; open?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLElement>(null);
+  useFitBar(bar);
   // Which round? — asked on the way in, unless a link already said
   const [asking, setAsking] = useState<PickerCurrent | null>(null);
   const api = useRef<any>(null);
@@ -57,7 +61,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
         onNew={() => { setAsking(null); api.current?.fresh(); }} />
     )}</Presence>
     <div className="flw" ref={ref}>
-      <header className="topbar">
+      <header className="topbar" ref={bar}>
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
         <div className="brand mono">Flow</div>
         <div className="crumb mono"><span id="crumb">Sheet</span></div>
@@ -79,18 +83,18 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
 
         <div className="spacer" />
         <button className="btn cmd" id="cmd-btn" type="button" title="Everything this does, and your evidence">
-          Commands <kbd data-key="panel">Ctrl+K</kbd>
+          <Ico n="command" /><span className="lbl">Commands</span> <kbd data-key="panel">Ctrl+K</kbd>
         </button>
         {/* Its own tab, reused: the tools talk across tabs, and Evidence's send
             list is the one Flow sends into. */}
-        <a className="btn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
-        <Link className="btn" href="/tools/flows" title="Every round you have flowed — this one is kept there as you go">Past flows</Link>
-        <a className="btn splitlink" href="/tools/split" title="Flow and Evidence side by side">Split ◫</a>
+        <a className="btn nosplit" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this"><Ico n="cards" /><span className="lbl">Evidence ↗</span></a>
+        <Link className="btn" href="/tools/flows" title="Past flows — every round you have flowed, this one kept there as you go"><Ico n="history" /><span className="lbl">Past flows</span></Link>
+        <a className="btn splitlink" href="/tools/split" title="Flow and Evidence side by side"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
-          <span className="dot" id="share-dot" /><span id="share-state">Not shared</span>
+          <span className="dot" id="share-dot" /><span className="lbl" id="share-state">Not shared</span>
         </button>
         <ThemePicker />
-        <button className="btn" id="drawer-btn" aria-pressed="false">Drawer <kbd data-key="drawer">Ctrl+J</kbd></button>
+        <button className="btn" id="drawer-btn" aria-pressed="false" title="Drawer"><Ico n="drawer" /><span className="lbl">Drawer</span> <kbd data-key="drawer">Ctrl+J</kbd></button>
       </header>
 
       <div className="panes" id="panes">

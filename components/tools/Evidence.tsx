@@ -7,6 +7,8 @@ import { polish } from "@/lib/evidence/polish";
 import "./evidence.css";
 import "./finish.css";
 import ThemePicker from "./ThemePicker";
+import Ico from "./Ico";
+import { useFitBar } from "./fitBar";
 
 /**
  * Evidence, mounted.
@@ -35,6 +37,8 @@ const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
 export default function Evidence({ owner, me, room }: { owner?: string; me?: string; room?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const engine = useRef<any>(null);
+  const bar = useRef<HTMLElement>(null);
+  useFitBar(bar);
   const [side, setSide] = useState(DEFAULT_SIDE);
   const [docW, setDocW] = useState(DEFAULT_DOC);
   const [doc, setDoc] = useState(true);
@@ -141,27 +145,27 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         // panel has been dragged to, so the line breaks are the real ones.
         ["--evi-docscale" as any]: Math.max(0.3, Math.min(1.1, (docW - 34) / 816)).toFixed(3),
       }}>
-      <header className="bar">
+      <header className="bar" ref={bar}>
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
         <div className="brand mono">Evidence</div>
         <div className="stat" id="stat" />
         <div className="spacer" />
-        <button className="btn" data-act="import">Import</button>
-        <button className="btn" data-act="case">Case</button>
-        <button className="btn" data-act="export">Export</button>
-        <button className="btn" data-act="settings">Settings</button>
+        <button className="btn" data-act="import" title="Import"><Ico n="import" /><span className="lbl">Import</span></button>
+        <button className="btn" data-act="case" title="Case"><Ico n="case" /><span className="lbl">Case</span></button>
+        <button className="btn" data-act="export" title="Export"><Ico n="export" /><span className="lbl">Export</span></button>
+        <button className="btn" data-act="settings" title="Settings"><Ico n="settings" /><span className="lbl">Settings</span></button>
         {/* Its own tab, reused: the two tools talk across tabs, and the send
             list Flow writes into is this one. */}
-        <a className="btn nosplit" href="/tools/flow" target="break-flow" title="Open Flow in its own tab">Flow ↗</a>
-        <a className="btn splitlink" href="/tools/split" title="Evidence and Flow side by side">Split ◫</a>
+        <a className="btn nosplit" href="/tools/flow" target="break-flow" title="Open Flow in its own tab"><Ico n="grid" /><span className="lbl">Flow ↗</span></a>
+        <a className="btn splitlink" href="/tools/split" title="Evidence and Flow side by side"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         {/* Share the send doc into a flow room, for a partner flowing on another computer. */}
         <button className="btn roombtn" data-act="room" title="Share the send doc with your partner's flow">
-          <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
+          <span className="dot" id="roomdot" /><span className="lbl" id="roomstate">Room</span>
         </button>
         <ThemePicker />
         <button className={"btn docbtn" + (doc ? " on" : "")} onClick={toggleDoc}
           aria-expanded={doc} title="Show the document as it will paste">
-          <span id="doclabel">Send doc</span> {doc ? "›" : "‹"}
+          <Ico n="doc" /><span className="lbl" id="doclabel">Send doc</span> {doc ? "›" : "‹"}
         </button>
       </header>
 
