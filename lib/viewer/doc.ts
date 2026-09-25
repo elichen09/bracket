@@ -90,6 +90,18 @@ export function readDoc(root: HTMLElement): Head[] {
   });
   root.querySelectorAll("mark").forEach((m) => { m.classList.add("dv-hl"); m.closest("p, li")?.classList.add("dv-card"); });
 
+  // What a card is made of, for "Highlighted only": under a tag (Heading 4),
+  // the first paragraph is its cite and everything after it, down to the next
+  // heading, is its text — every paragraph of it, whether or not any of it is
+  // highlighted. A paragraph with no highlight is still card text, unread.
+  let under = 0;                       // 0: not in a card, 1: waiting for the cite, 2: in the text
+  root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6, p, li").forEach((el) => {
+    if (el.classList.contains("dv-head")) { under = levelOf(el) === 4 ? 1 : 0; return; }
+    if (!under || !(el.textContent || "").trim()) return;
+    if (under === 1) { el.classList.add("dv-cite"); under = 2; return; }
+    el.classList.add("dv-ctext");   // not "dv-body": that is the viewer's own layout
+  });
+
   // count, in document order, under whichever heading comes last before the words
   const byId = new Map(heads.map((h) => [h.id, h]));
   let cur: Head | null = null;

@@ -143,9 +143,12 @@
 /* found words, and the one you are on */
 .dvw .dv-doc mark.dv-hit { background: rgba(255, 150, 0, .35); color: inherit; box-shadow: 0 0 0 1px rgba(200, 110, 0, .55); }
 .dvw .dv-doc mark.dv-hit.cur { background: #FF8A00; color: #000; box-shadow: 0 0 0 2px #C25E00; }
-/* highlighted only: the words that get read stay, the rest fade */
-.dvw .dv-paper.hl-only .dv-card, .dvw .dv-paper.hl-only .dv-card * { color: rgba(20, 20, 20, .16) !important; }
-.dvw .dv-paper.hl-only .dv-card .dv-hl, .dvw .dv-paper.hl-only .dv-card .dv-hl * { color: #111 !important; }
+/* highlighted only — every paragraph of a card's text fades — highlighted or not — and the
+   tag and cite stay, so what is left is what a speech reads */
+.dvw .dv-paper.hl-only .dv-ctext, .dvw .dv-paper.hl-only .dv-ctext *,
+.dvw .dv-paper.hl-only .dv-card:not(.dv-cite), .dvw .dv-paper.hl-only .dv-card:not(.dv-cite) * { color: rgba(20, 20, 20, .16) !important; border-color: rgba(20, 20, 20, .16) !important; }
+/* the read words win: more specific than the fade, :not() and all */
+.dvw .dv-paper.hl-only .dv-doc .dv-hl.dv-hl, .dvw .dv-paper.hl-only .dv-doc .dv-hl.dv-hl * { color: #111 !important; border-color: #111 !important; }
 .dvw .dv-pdf { width: 100%; height: calc(100% + 92px); margin: -28px 0 -120px; border: 0; background: #fff; display: block; min-height: 80vh; }
 
 .dvw .dv-empty { max-width: 640px; margin: 8vh auto 0; animation: dvIn .35s var(--spring) both; }
