@@ -30,6 +30,15 @@ export const TOOLS: Tool[] = [
     storage: "This browser, kept apart per account — IndexedDB. Nothing is uploaded and nothing reaches the server.",
   },
   {
+    slug: "split",
+    name: "Evidence + Flow",
+    blurb: "Evidence and Flow side by side in one window — search and send on one side, flow on the other.",
+    about:
+      "The two tools in one window, each whole: drag the line between them to share the room, swap them over, " +
+      "and a card sent from Evidence is ready to flow on the other side.",
+    storage: "Whatever each tool keeps; the split only remembers its widths.",
+  },
+  {
     slug: "flow",
     name: "Flow",
     blurb: "Flow a Public Forum round on a real grid, on the clock, with your partner in the same flow.",

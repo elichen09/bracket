@@ -85,6 +85,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
             list is the one Flow sends into. */}
         <a className="btn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
         <Link className="btn" href="/tools/flows" title="Every round you have flowed — this one is kept there as you go">Past flows</Link>
+        <a className="btn splitlink" href="/tools/split" title="Flow and Evidence side by side">Split ◫</a>
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span id="share-state">Not shared</span>
         </button>

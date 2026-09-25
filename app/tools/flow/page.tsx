@@ -1,6 +1,7 @@
 import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import Flow from "@/components/tools/Flow";
+import Embedded from "@/components/tools/Embedded";
 import { isAdmin } from "@/lib/admin";
 import { currentUser, displayName } from "@/lib/auth";
 import "../tools.css";
@@ -18,7 +19,9 @@ export const dynamic = "force-dynamic";
  * share feature would only work between two people who both hold the key,
  * which is nobody's partnership.
  */
-export default async function FlowTool({ searchParams }: { searchParams?: { join?: string | string[]; open?: string | string[] } }) {
+export default async function FlowTool({ searchParams }: { searchParams?: { join?: string | string[]; open?: string | string[]; embed?: string | string[] } }) {
+  // inside the split view: the split page has the nav, and this is half of it
+  const embed = !!searchParams?.embed;
   const raw = searchParams?.join;
   const join = (Array.isArray(raw) ? raw[0] : raw) || undefined;
   const rawOpen = searchParams?.open;
@@ -36,7 +39,7 @@ export default async function FlowTool({ searchParams }: { searchParams?: { join
   const user = await currentUser();
   return (
     <>
-      <Nav />
+      {embed ? <Embedded /> : <Nav />}
       <main>
         <div className="toolpage"><Flow join={join} open={open} owner={user?.id} me={user ? displayName(user) : undefined} /></div>
       </main>

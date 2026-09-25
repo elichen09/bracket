@@ -31,6 +31,12 @@ export function applyTheme(id: string) {
 export default function ThemePicker() {
   const [open, setOpen] = useState(false);
   const [cur, setCur] = useState("forest");
+  // chosen in another tab, or the other half of the split view: follow it
+  useEffect(() => {
+    const on = (e: StorageEvent) => { if (e.key === THEME_KEY && e.newValue) { applyTheme(e.newValue); setCur(e.newValue); } };
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }, []);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

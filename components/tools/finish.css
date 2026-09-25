@@ -424,3 +424,36 @@ html[data-tool-theme="graphite"] .toolpage {
 /* Evidence's caselist rows take the scheme's selection, like the outline's */
 .toolpage .evi .clcard.sel, .toolpage .evi .srcsw button.on, .toolpage .evi .clrk.top { background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep); }
 .toolpage .evi .clcard.sel::before { background: var(--t-acc); }
+
+/* ---------- Evidence + Flow, side by side (/tools/split) ---------- */
+.toolpage .splitv { flex: 1; min-height: 0; display: flex; background: var(--bn); position: relative; }
+.toolpage .sp-pane { position: relative; min-width: 0; flex-grow: 0; flex-shrink: 0; display: flex; background: var(--t-ground); }
+.toolpage .sp-pane iframe { flex: 1; width: 100%; height: 100%; border: 0; display: block; background: var(--t-ground); }
+/* until a tool has loaded, its half says which it is, quietly */
+.toolpage .sp-wait { position: absolute; inset: 0; display: grid; place-items: center; background: var(--t-ground); pointer-events: none; transition: opacity .25s var(--fx-ease, ease); }
+.toolpage .sp-wait span { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--t-dim); animation: spBreathe 1.4s ease-in-out infinite alternate; }
+@keyframes spBreathe { from { opacity: .35; } to { opacity: 1; } }
+.toolpage .sp-pane.ready .sp-wait { opacity: 0; }
+/* the line between them */
+.toolpage .sp-bar {
+  flex: 0 0 10px; position: relative; cursor: col-resize; outline: none; z-index: 2;
+  background-color: var(--bn); background-image: var(--bn-grain), linear-gradient(180deg, var(--bn-top), var(--bn-bot));
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.toolpage .sp-grip { width: 2px; height: 34px; background: rgba(var(--bn-rgb), .35); box-shadow: 4px 0 0 rgba(var(--bn-rgb), .35), -4px 0 0 rgba(var(--bn-rgb), .35); transform: scaleX(.5); transition: background .15s ease, box-shadow .15s ease; }
+.toolpage .sp-bar:hover .sp-grip, .toolpage .sp-bar:focus-visible .sp-grip, .toolpage .splitv.dragging .sp-grip { background: var(--t-acc); box-shadow: 4px 0 0 var(--t-acc), -4px 0 0 var(--t-acc); }
+.toolpage .sp-bar:focus-visible { box-shadow: inset 0 0 0 2px var(--t-acc); }
+.toolpage .sp-swap {
+  position: absolute; top: 50%; left: 50%; margin-top: 30px; transform: translateX(-50%);
+  width: 24px; height: 24px; display: grid; place-items: center; padding: 0;
+  font-size: 13px; line-height: 1; color: var(--bn-ink); background: var(--bn-top); border: 1px solid rgba(var(--bn-rgb), .3);
+  opacity: 0; cursor: pointer; transition: opacity .15s ease, background .15s ease;
+}
+.toolpage .sp-bar:hover .sp-swap, .toolpage .sp-bar:focus-within .sp-swap { opacity: 1; }
+.toolpage .sp-swap:hover { background: var(--t-acc); border-color: var(--t-acc); color: #fff; }
+.toolpage .sp-swap:active { transform: translateX(-50%) translateY(1px); }
+/* while dragging, the frames would swallow the pointer: a sheet over them keeps it */
+.toolpage .sp-cover { position: fixed; inset: 0; z-index: 60; cursor: col-resize; }
+
+/* a tool inside the split has no use for a way to split, or to open the other in a tab */
+html.embedded .splitlink, html.embedded .nosplit { display: none !important; }

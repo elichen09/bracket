@@ -1,6 +1,7 @@
 import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import Evidence from "@/components/tools/Evidence";
+import Embedded from "@/components/tools/Embedded";
 import { isAdmin } from "@/lib/admin";
 import { currentUser, displayName } from "@/lib/auth";
 import "../tools.css";
@@ -17,9 +18,11 @@ export const dynamic = "force-dynamic";
  * code opens without the admin key. That link is how a partner is sent here
  * to build the send doc for the flow, and a partner is not an administrator.
  */
-export default async function EvidenceTool({ searchParams }: { searchParams?: { room?: string | string[] } }) {
+export default async function EvidenceTool({ searchParams }: { searchParams?: { room?: string | string[]; embed?: string | string[] } }) {
   const raw = searchParams?.room;
   const room = (Array.isArray(raw) ? raw[0] : raw) || undefined;
+  // inside the split view: the split page has the nav, and this is half of it
+  const embed = !!searchParams?.embed;
   if (!isAdmin() && !room) {
     return (
       <>
@@ -33,7 +36,7 @@ export default async function EvidenceTool({ searchParams }: { searchParams?: { 
   const user = await currentUser();
   return (
     <>
-      <Nav />
+      {embed ? <Embedded /> : <Nav />}
       <main>
         <div className="toolpage"><Evidence owner={user?.id} me={user ? displayName(user) : undefined} room={room} /></div>
       </main>

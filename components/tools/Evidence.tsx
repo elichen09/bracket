@@ -152,7 +152,8 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         <button className="btn" data-act="settings">Settings</button>
         {/* Its own tab, reused: the two tools talk across tabs, and the send
             list Flow writes into is this one. */}
-        <a className="btn" href="/tools/flow" target="break-flow" title="Open Flow beside this">Flow ↗</a>
+        <a className="btn nosplit" href="/tools/flow" target="break-flow" title="Open Flow in its own tab">Flow ↗</a>
+        <a className="btn splitlink" href="/tools/split" title="Evidence and Flow side by side">Split ◫</a>
         {/* Share the send doc into a flow room, for a partner flowing on another computer. */}
         <button className="btn roombtn" data-act="room" title="Share the send doc with your partner's flow">
           <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
