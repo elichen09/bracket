@@ -71,8 +71,11 @@ export async function POST(req: Request) {
     // where everyone stood, to say who moved
     const kind = CIRCUITS[circuit].teamKind;
     const standing = (rows: Awaited<ReturnType<typeof loadRatings>>) => {
-      const m = new Map<string, { rank: number; rating: number; display: string }>();
-      rows.filter((x) => x.games > 0).forEach((x, i) => m.set(canonCode(x.display || x.key), { rank: i + 1, rating: Math.round(x.rating), display: x.display || x.key }));
+      const m = new Map<string, { rank: number; rating: number; display: string; played: boolean }>();
+      rows.filter((x) => x.games > 0).forEach((x, i) => m.set(canonCode(x.display || x.key), {
+        rank: i + 1, rating: Math.round(x.rating), display: x.display || x.key,
+        played: (x.history || []).some((h) => h.tourn === seen.tourn.name),
+      }));
       return m;
     };
     const before = standing(await loadRatings(db, kind));
@@ -82,13 +85,13 @@ export async function POST(req: Request) {
     const rebuilt = await recompute(db, undefined, circuit);
     const after = standing(await loadRatings(db, kind));
 
-    // the teams that debated there, and where they went
-    const { data: played } = await db.from("rating_games").select("code").eq("tourn_id", seen.tourn.id);
-    const codes = [...new Set((played || []).map((g) => canonCode(g.code)))];
-    const moved = codes.map((c) => {
-      const a = after.get(c), b = before.get(c);
-      return a ? { team: a.display, rank: a.rank, was: b ? b.rank : null, rating: a.rating, change: b ? a.rating - b.rating : null } : null;
-    }).filter(Boolean).sort((x, y) => x!.rank - y!.rank);
+    // the teams that debated there — by their record, which knows them by their
+    // real names even where the tournament did not ("Emory" at a round robin) —
+    // and where they went
+    const moved = [...after.entries()].filter(([, a]) => a.played).map(([c, a]) => {
+      const b = before.get(c);
+      return { team: a.display, rank: a.rank, was: b ? b.rank : null, rating: a.rating, change: b ? a.rating - b.rating : null };
+    }).sort((x, y) => x.rank - y.rank);
 
     return NextResponse.json({
       tourn: seen.tourn, circuit, events: read.events, rounds: read.rows, entries: read.entries,

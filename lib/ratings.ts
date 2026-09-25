@@ -289,6 +289,55 @@ export function currentSeason(now = new Date()): number {
  * stay in rating_games — they are what past meetings and the prediction's prior
  * are read from — but a team's standing here is what it has done since August.
  */
+/**
+ * One team, one name, whatever a tournament called it.
+ *
+ * A team is keyed by its code, and codes are not always the same: a round robin
+ * lists its entries by school alone ("Emory", not "Emory GY"), and a code can be
+ * written with its initials either way round. The debaters are the same people
+ * in every one, and every round records their Tabroom student ids — so each
+ * entry is renamed to the code its pair of debaters goes by most often,
+ * preferring a code with initials to a bare school name. Both debaters must be
+ * known for a two-person team, so partnerships sharing a school are never run
+ * together; Lincoln-Douglas needs only the one.
+ */
+function sameTeamSameName(rows: GameRow[], circuit: Circuit): Set<string> {
+  const size = circuit === "ld" ? 1 : 2;
+  const pairOf = (r: GameRow) => {
+    const ids = [...new Set(r.student_ids || [])];
+    return ids.length === size ? ids.sort((a, b) => a - b).join("+") : null;
+  };
+  const initialled = (code: string) => /\s[A-Z]{1,4}$/.test(code.trim());
+  // how often each pair has gone by each code
+  const seen = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    const p = pairOf(r);
+    if (!p || !r.code) continue;
+    const m = seen.get(p) || new Map<string, number>();
+    m.set(r.code, (m.get(r.code) || 0) + 1);
+    seen.set(p, m);
+  }
+  const nameOf = new Map<string, string>();
+  for (const [p, m] of seen) {
+    const codes = [...m.entries()].sort((a, b) => Number(initialled(b[0])) - Number(initialled(a[0])) || b[1] - a[1] || a[0].localeCompare(b[0]));
+    nameOf.set(p, codes[0][0]);
+  }
+  // every entry at every tournament, by the name its debaters go by
+  const entry = new Map<string, string>();
+  for (const r of rows) {
+    const p = pairOf(r);
+    if (p && nameOf.has(p)) entry.set(r.tourn_id + ":" + r.entry_id, nameOf.get(p)!);
+  }
+  const renamed = new Set<string>();
+  for (const r of rows) {
+    const mine = entry.get(r.tourn_id + ":" + r.entry_id);
+    if (mine && mine !== r.code) { renamed.add(r.code); r.code = mine; }
+    const theirs = entry.get(r.tourn_id + ":" + r.opp_entry_id);
+    if (theirs) r.opp_code = theirs;
+  }
+  return renamed;              // the names that turned out to be someone else's
+}
+
 export async function recompute(db: SupabaseClient, season = currentSeason(), circuit: Circuit = "pf"): Promise<{ teams: number; debaters: number; periods: number; games: number; skippedSeasons: number }> {
   await loadCircuitOverrides(db);   // tournaments said to be college (or not)
   const all: GameRow[] = [];
@@ -316,6 +365,7 @@ export async function recompute(db: SupabaseClient, season = currentSeason(), ci
   });
   all.length = 0;
   all.push(...counted);
+  const renamed = sameTeamSameName(all, circuit);
 
   // Keep this season only. Earlier rounds stay in the table — past meetings and
   // the prediction's prior read them — but they are not part of this standing.
@@ -440,6 +490,13 @@ export async function recompute(db: SupabaseClient, season = currentSeason(), ci
   ];
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await db.from("ratings").upsert(rows.slice(i, i + 500), { onConflict: "kind,key" });
+    if (error) throw new Error(error.message);
+  }
+  // A name folded into its team's real one ("Emory" into "Emory GY") must not
+  // linger in the table as a team of its own.
+  const gone = [...renamed].filter((k) => !teams.has(k));
+  for (let i = 0; i < gone.length; i += 200) {
+    const { error } = await db.from("ratings").delete().eq("kind", CIRCUITS[circuit].teamKind).in("key", gone.slice(i, i + 200));
     if (error) throw new Error(error.message);
   }
   return { teams: teams.size, debaters: debaters.size, periods: order.length, games: all.length, skippedSeasons };
