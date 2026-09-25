@@ -95,6 +95,13 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
   }, [owner, refreshRecents]);
 
   /* ------------------------------------------------------------ drawing the document */
+  /**
+   * Where an element sits in the scrolling pane, from the top of the document.
+   * Not offsetTop: that counts from the nearest positioned box, and the .docx
+   * renderer puts every section of a document in one — so offsetTop starts
+   * again from nought at each section break, and the outline lost its place.
+   */
+  const topIn = (el: Element, p: HTMLElement) => el.getBoundingClientRect().top - p.getBoundingClientRect().top + p.scrollTop;
   const anchor = useRef<{ id: string; text: string; off: number } | null>(null);
   useEffect(() => {
     const el = paper.current;
@@ -129,7 +136,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
         if (keepPlace && pane.current) {
           const again = hs.find((h) => h.text === keepPlace.text);
           const target = again && document.getElementById(again.id);
-          if (target) pane.current.scrollTop = target.offsetTop - keepPlace.off;
+          if (target) pane.current.scrollTop = topIn(target, pane.current) - keepPlace.off;
         } else if (pane.current) pane.current.scrollTop = 0;
         if (q.trim().length >= 2) runSearch(q, false);
       } catch (e: any) {
@@ -149,15 +156,20 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
     const onScroll = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        let at: Head | null = null;
-        for (const h of heads) {
-          const el = document.getElementById(h.id);
-          if (!el) continue;
-          if (el.offsetTop - p.scrollTop <= 90) at = h; else break;
+        // the last heading at or above a line just under the top of the pane;
+        // headings are in document order, so halve the list rather than walk it
+        const line = p.getBoundingClientRect().top + 90;
+        const rows = heads.map((h) => document.getElementById(h.id));
+        let lo = 0, hi = heads.length - 1, found = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          const el = rows[mid];
+          if (el && el.getBoundingClientRect().top <= line) { found = mid; lo = mid + 1; } else hi = mid - 1;
         }
+        const at: Head | null = found >= 0 ? heads[found] : null;
         setCur(at ? at.id : heads[0]?.id || null);
-        const top = at && document.getElementById(at.id);
-        anchor.current = docRef.current && top ? { id: docRef.current.id, text: at!.text, off: top.offsetTop - p.scrollTop } : null;
+        const top = at && rows[found];
+        anchor.current = docRef.current && top ? { id: docRef.current.id, text: at!.text, off: topIn(top, p) - p.scrollTop } : null;
       });
     };
     p.addEventListener("scroll", onScroll, { passive: true });
@@ -169,7 +181,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
     const el = document.getElementById(id);
     const p = pane.current;
     if (!el || !p) return;
-    p.scrollTo({ top: el.offsetTop - 24, behavior: "smooth" });
+    p.scrollTo({ top: topIn(el, p) - 24, behavior: "smooth" });
     el.classList.remove("dv-flash"); void el.offsetWidth; el.classList.add("dv-flash");
   }, []);
 
