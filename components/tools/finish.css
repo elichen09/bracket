@@ -420,3 +420,7 @@ html[data-tool-theme="graphite"] .toolpage {
   .toolpage *, .toolpage *::before, .toolpage *::after { animation-duration: 1ms !important; animation-delay: 0s !important; transition-duration: 1ms !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* Evidence's caselist rows take the scheme's selection, like the outline's */
+.toolpage .evi .clcard.sel, .toolpage .evi .srcsw button.on, .toolpage .evi .clrk.top { background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep); }
+.toolpage .evi .clcard.sel::before { background: var(--t-acc); }

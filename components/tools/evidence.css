@@ -838,3 +838,124 @@
   position: absolute; left: -2px; top: -1.4em; padding: 1px 6px; white-space: nowrap;
   background: var(--c); color: #fff; font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; line-height: 1.5;
 }
+
+/* =====================================================================
+   The caselist — this season's openCaselist wikis, searched by tag
+   (lib/evidence/caselist.js). Drawn in the outline's own language: the
+   same rows, the same selection, the same gutter.
+   ===================================================================== */
+
+/* where the search looks */
+.evi .srcsw { display: flex; gap: 0; padding: 14px var(--evi-gut) 0; }
+.evi .srcsw button {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  padding: 6px 12px; border: 1px solid var(--line); color: var(--muted); background: transparent;
+  transition: background .16s var(--ease), color .16s var(--ease), border-color .16s var(--ease);
+}
+.evi .srcsw button + button { border-left: 0; }
+.evi .srcsw button:hover { color: var(--ink); }
+.evi .srcsw button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.evi.cl .binbar, .evi.cl .indexhead { display: none !important; }
+.evi.cl .searchwrap { padding-top: 18px; }
+
+/* the wikis, and what is left of the minute */
+.evi .clbar {
+  display: flex; align-items: center; gap: 14px; padding: 10px var(--evi-gut);
+  border-bottom: 1px solid var(--line-soft); font-size: 10px;
+}
+.evi .clbar[hidden] { display: none; }
+.evi .clws { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.evi .clw {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 9px;
+  border: 1px dashed var(--line); color: var(--dim); background: transparent;
+  font: inherit; letter-spacing: .12em; text-transform: uppercase;
+}
+.evi .clw:hover { color: var(--ink); border-color: var(--ink); }
+.evi .clw.on { border-style: solid; border-color: var(--ink); color: var(--ink); background: var(--surface); }
+.evi .clst { font-style: normal; font-size: 9.5px; letter-spacing: .04em; color: var(--dim); }
+.evi .clst.n { color: var(--ink); }
+.evi .clst.wait { color: var(--acc); font-variant-numeric: tabular-nums; }
+.evi .clst.err { color: var(--acc); font-weight: 700; }
+.evi .clst.spin { width: 9px; height: 9px; border: 1.5px solid var(--line); border-top-color: var(--ink); border-radius: 50% !important; animation: clSpin .7s linear infinite; }
+@keyframes clSpin { to { transform: rotate(360deg); } }
+
+.evi .clmeter { display: inline-flex; align-items: center; gap: 3px; cursor: help; }
+.evi .clmeter b { margin-left: 6px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 1ch; }
+.evi .pip { position: relative; width: 8px; height: 12px; background: var(--acc); overflow: hidden; }
+.evi .pip.used { background: var(--line-soft); }
+.evi .pip.used::after {
+  content: ""; position: absolute; inset: 0; background: rgba(var(--acc-rgb, 196, 85, 58), .45);
+  transform-origin: bottom; transform: scaleY(0);
+  animation: clRefill var(--d, 60000ms) linear forwards; animation-delay: var(--e, 0ms);
+}
+@keyframes clRefill { to { transform: scaleY(1); } }
+
+/* what is happening: a line that fills as documents are read */
+.evi .clhead {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: baseline; gap: 12px;
+  padding: 9px var(--evi-gut) 8px; background: var(--ground); border-bottom: 1px solid var(--line-soft);
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--dim);
+}
+.evi .clhead b { color: var(--ink); font-weight: 600; }
+.evi .clcount { flex: 1; }
+.evi .clprog { position: absolute; left: 0; bottom: -1px; height: 2px; width: var(--p, 0%); background: var(--acc); transition: width .35s var(--ease), opacity .4s var(--ease); }
+.evi .clhead:not(.busy) .clprog { opacity: 0; }
+.evi .clhead.busy .clnow { color: var(--ink); }
+
+/* a team, strongest first */
+.evi .clteam {
+  display: flex; align-items: center; gap: 9px; padding: 16px var(--evi-gut) 6px;
+  font-size: 12.5px; color: var(--ink);
+}
+.evi .clteam b { font-weight: 700; letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi .clrk {
+  flex: none; font-family: var(--mono); font-size: 10px; font-variant-numeric: tabular-nums;
+  padding: 2px 6px; border: 1px solid var(--ink); color: var(--ink); cursor: help;
+}
+.evi .clrk.top { background: var(--ink); color: var(--ground); }
+.evi .clrk.none { border-color: var(--line); color: var(--dim); }
+.evi .clwk, .evi .cln { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.evi .cln::before { content: "· "; }
+.evi .clwiki { margin-left: auto; font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); text-decoration: none; white-space: nowrap; }
+.evi .clwiki:hover { color: var(--ink); }
+
+/* a card: its tag, its cite, the round it was read in */
+.evi .clcard {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 9px; cursor: pointer; position: relative;
+  padding: 6px var(--evi-gut) 7px calc(var(--evi-gut) + 17px);
+  transition: background .16s var(--ease), padding-left .2s var(--ease), color .16s var(--ease);
+}
+.evi .clcard:hover:not(.sel) { background: var(--surface); padding-left: calc(var(--evi-gut) + 23px); }
+.evi .clcard.sel { background: var(--ink); color: var(--ground); padding-left: calc(var(--evi-gut) + 23px); }
+.evi .clcard.sel::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--acc); }
+.evi .clcard .chev { flex: none; }
+.evi .clmain { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.evi .cltag { font-size: 13.5px; font-weight: 600; line-height: 1.4; letter-spacing: -.005em; }
+.evi .cltag mark { background: rgba(var(--acc-rgb, 196, 85, 58), .2); color: inherit; padding: 0 1px; }
+.evi .clcard.sel .cltag mark { background: rgba(255, 255, 255, .22); }
+.evi .clcite { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi .clsrc { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi .clcard.sel .clcite, .evi .clcard.sel .clsrc { color: var(--ground); opacity: .72; }
+.evi .clcard.born { animation: clBorn .24s var(--ease) both; }
+@keyframes clBorn { from { opacity: 0; transform: translateY(4px); } }
+
+/* opened: the card as it will paste */
+.evi .clbody {
+  flex-basis: 100%; margin: 10px 0 2px; padding: 12px 16px; max-height: 340px; overflow: auto; cursor: text;
+  background: var(--surface); color: #111; border-left: 3px solid var(--acc); zoom: .84;
+  font-family: Calibri, "Segoe UI", Arial, sans-serif; line-height: 1.35;
+  animation: clBorn .2s var(--ease) both;
+}
+.evi .clbody p { margin: 0 0 6pt; }
+.evi .clacts { flex-basis: 100%; display: flex; gap: 8px; margin-top: 8px; }
+.evi .clacts .btn { font-size: 10px; }
+.evi .clacts kbd { font-family: var(--mono); font-size: 9px; opacity: .7; margin-left: 4px; }
+.evi .clcard.sel .clacts .btn:not(.key) { color: var(--ground); border-color: rgba(255, 255, 255, .4); }
+
+.evi .clkbd { font-family: var(--mono); font-size: 9.5px; border: 1px solid var(--line); padding: 1px 5px; margin-right: 5px; color: var(--ink); }
+.evi .clblank .clsmall { margin-top: 12px; font-size: 12px; color: var(--dim); }
+
+/* out of downloads for the minute: the line waits, and says for how long */
+.evi .clhead.waiting .clprog { background: repeating-linear-gradient(90deg, var(--acc) 0 6px, transparent 6px 10px); }
+.evi .clsec { color: var(--acc); font-weight: 600; font-variant-numeric: tabular-nums; }
+.evi.cl .foothint .libonly { display: none; }

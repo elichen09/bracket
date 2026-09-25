@@ -166,6 +166,11 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
 
       <div className="panes">
         <section className="pane left">
+          {/* where the search looks: your library, or this season's caselist wikis */}
+          <div className="srcsw mono" id="srcsw" role="group" aria-label="Search in">
+            <button type="button" data-src="lib" className="on" aria-pressed="true">Library</button>
+            <button type="button" data-src="cl" aria-pressed="false">Caselist</button>
+          </div>
           <div className="searchwrap">
             <span className="slash">/</span>
             <input id="q" type="text" placeholder="search evidence" autoComplete="off" spellCheck={false} />
@@ -206,7 +211,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         <span><kbd>→</kbd> arguments</span>
         <span><kbd>Enter</kbd> copy + send</span>
         <span><kbd>esc</kbd> clear</span>
-        <span><kbd>del</kbd> remove from library</span>
+        <span className="libonly"><kbd>del</kbd> remove from library</span>
         <span className="drift">drag a sent block to reorder it · type in the document to edit it</span>
       </div>
 

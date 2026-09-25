@@ -41,7 +41,7 @@ export interface Head { id: string; level: number; text: string; words: number; 
 const VERBATIM: Record<string, number> = { pocket: 1, hat: 2, block: 3, tag: 4 };
 
 /** How deep a heading is, or 0 if the element is not one. */
-function levelOf(el: Element): number {
+export function levelOf(el: Element): number {
   const m = /^H([1-6])$/.exec(el.tagName);
   if (m) return Number(m[1]);
   if (el.tagName !== "P") return 0;
