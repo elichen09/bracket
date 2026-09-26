@@ -7,7 +7,8 @@
  * stored: the send list itself lives in Evidence's database, and this only
  * says "it changed" or "this was just sent".
  *
- *   send-changed  Flow put a card in the send list; Evidence reloads it.
+ *   send-changed  Flow (or the Doc viewer) put a card in the send list;
+ *                 Evidence reloads it.
  *   sent          Evidence sent a card; Flow offers to put its tags in the flow.
  *   senddoc       Evidence's send doc, as an outline of blocks and tags, so a
  *                 Flow tab can show it and flow it.
@@ -16,7 +17,7 @@
 import { scoped } from "./owner";
 
 export type BusMessage =
-  | { kind: "send-changed"; title?: string }
+  | { kind: "send-changed"; title?: string; from?: string }
   | { kind: "sent"; title: string; trigger: string; tags: string[] }
   | { kind: "senddoc"; by: string; at: number; blocks: DocBlock[] }
   /** Evidence bins switched in or out of the round, from any of the tools. */

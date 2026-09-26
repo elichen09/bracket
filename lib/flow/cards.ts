@@ -297,9 +297,11 @@ export async function sendToEvidence(owner: string | null | undefined, hit: Hit,
  * A block already in hand — a caselist card read out of its document — into
  * Evidence's send list, the way Evidence would put it there: a block already
  * in the list takes the card in (by block id) rather than a second copy of
- * the block turning up under the first.
+ * the block turning up under the first. With `replace`, a card already there
+ * under the same tag is swapped for this one (a card rehighlighted again)
+ * rather than kept as it was.
  */
-export async function sendBlockToEvidence(owner: string | null | undefined, block: any, argIndex: number | null): Promise<boolean> {
+export async function sendBlockToEvidence(owner: string | null | undefined, block: any, argIndex: number | null, replace = false): Promise<boolean> {
   if (typeof indexedDB === "undefined" || !block) return false;
   let includeHead = true;
   try {
@@ -326,8 +328,12 @@ export async function sendBlockToEvidence(owner: string | null | undefined, bloc
         const list = Array.isArray(sendReq.result) ? sendReq.result : [];
         const same = item.blockId ? list.find((c: any) => c.blockId === item.blockId) : null;
         if (same) {
-          const have = new Set((same.parts || []).map((p: any) => p.title));
-          item.parts.forEach((p: any) => { if (!have.has(p.title)) same.parts.push(p); });
+          const parts: any[] = same.parts || (same.parts = []);
+          item.parts.forEach((p: any) => {
+            const at = parts.findIndex((q: any) => q.title === p.title);
+            if (at < 0) parts.push(p);
+            else if (replace) parts[at] = { ...p, id: parts[at].id };
+          });
         } else list.push(item);
         t.objectStore("kv").put(list, "send");
         ok = true;

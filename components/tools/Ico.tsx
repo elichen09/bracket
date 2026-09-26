@@ -26,6 +26,8 @@ const PATHS: Record<string, string> = {
   share: "M18 3a3 3 0 1 0 0 6a3 3 0 0 0 0-6zM6 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6zM18 15a3 3 0 1 0 0 6a3 3 0 0 0 0-6zM8.7 10.5l6.6-3.8M8.7 13.5l6.6 3.8",
   copy: "M9 9h11v11H9zM5 15H4V4h11v1",
   highlight: "M4 20h16M6 16l2-5 7-7 4 4-7 7-5 2zM13 6l4 4",
+  rehl: "M3 20h8M14 20h7M6 16l2-5 7-7 4 4-7 7-5 2zM13 6l4 4",
+  pop: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
 };
 
 export default function Ico({ n }: { n: keyof typeof PATHS | string }) {

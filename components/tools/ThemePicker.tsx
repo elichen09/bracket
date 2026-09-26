@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Presence from "./Presence";
-import { THEME_KEY } from "@/lib/toolTheme";
+import { SHAPE_KEY, THEME_KEY } from "@/lib/toolTheme";
 
 /**
  * The tools' colour scheme — one button in every tool's banner.
@@ -12,6 +12,9 @@ import { THEME_KEY } from "@/lib/toolTheme";
  * <html data-tool-theme> so every tool open here wears the same one. The
  * tools layout sets it before the page paints, so there is no flash of the
  * default.
+ *
+ * Under the colours, the shape: Sharp (square edges, the default) or Cozy
+ * (rounded corners, softer panels) — on <html data-tool-shape>, the same way.
  */
 
 const THEMES = [
@@ -28,19 +31,28 @@ export function applyTheme(id: string) {
   else document.documentElement.setAttribute("data-tool-theme", t);
 }
 
+export function applyShape(id: string) {
+  if (id === "cozy") document.documentElement.setAttribute("data-tool-shape", "cozy");
+  else document.documentElement.removeAttribute("data-tool-shape");
+}
+
 export default function ThemePicker() {
   const [open, setOpen] = useState(false);
   const [cur, setCur] = useState("forest");
+  const [shape, setShape] = useState("sharp");
   // chosen in another tab, or the other half of the split view: follow it
   useEffect(() => {
-    const on = (e: StorageEvent) => { if (e.key === THEME_KEY && e.newValue) { applyTheme(e.newValue); setCur(e.newValue); } };
+    const on = (e: StorageEvent) => {
+      if (e.key === THEME_KEY && e.newValue) { applyTheme(e.newValue); setCur(e.newValue); }
+      if (e.key === SHAPE_KEY) { applyShape(e.newValue || "sharp"); setShape(e.newValue || "sharp"); }
+    };
     window.addEventListener("storage", on);
     return () => window.removeEventListener("storage", on);
   }, []);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try { setCur(localStorage.getItem(THEME_KEY) || "forest"); } catch { /* private browsing */ }
+    try { setCur(localStorage.getItem(THEME_KEY) || "forest"); setShape(localStorage.getItem(SHAPE_KEY) || "sharp"); } catch { /* private browsing */ }
   }, []);
   // Pinned to the window under its button, not to the toolbar: a toolbar that
   // scrolls sideways would clip anything hanging out of it.
@@ -73,6 +85,13 @@ export default function ThemePicker() {
     else applyTheme(id);
     try { localStorage.setItem(THEME_KEY, id); } catch { /* private browsing */ }
   };
+  const pickShape = (id: string) => {
+    setShape(id);
+    const d = document as Document & { startViewTransition?: (f: () => void) => unknown };
+    if (d.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) d.startViewTransition(() => applyShape(id));
+    else applyShape(id);
+    try { localStorage.setItem(SHAPE_KEY, id); } catch { /* private browsing */ }
+  };
   const now = THEMES.find((t) => t.id === cur) || THEMES[0];
 
   return (
@@ -93,6 +112,15 @@ export default function ThemePicker() {
               <span className="th-name">{t.name}<small>{t.note}</small></span>
             </button>
           ))}
+          <div className="th-h th-h2">Shape · every tool</div>
+          <div className="th-shapes">
+            {([["sharp", "Sharp", "Square edges"], ["cozy", "Cozy", "Rounded and soft"]] as const).map(([id, name, note]) => (
+              <button type="button" key={id} className={"th-shape" + (shape === id ? " on" : "")} onClick={() => pickShape(id)} aria-pressed={shape === id}>
+                <i className={"th-shp " + id} aria-hidden="true" />
+                <span className="th-name">{name}<small>{note}</small></span>
+              </button>
+            ))}
+          </div>
         </div>
       </Presence>
     </div>

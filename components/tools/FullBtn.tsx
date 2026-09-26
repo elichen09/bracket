@@ -25,13 +25,14 @@ export function useFullscreen(target: RefObject<HTMLElement>, onRefused?: () => 
   return { full, toggle };
 }
 
-/** The button: words while the bar has room for them, an icon when it does not (fitBar.ts). */
+/** The button: an icon, its name in its tooltip (finish.css, .icoonly). */
 export default function FullBtn({ full, toggle, className, keyHint }: {
   full: boolean; toggle: () => void; className: string; keyHint?: string;
 }) {
   const how = keyHint ? ` (${keyHint}; Esc to leave)` : " (Esc to leave)";
   return (
-    <button type="button" className={className + " fullbtn" + (full ? " on" : "")} onClick={toggle} aria-pressed={full}
+    <button type="button" className={className + " fullbtn icoonly" + (full ? " on" : "")} onClick={toggle} aria-pressed={full}
+      aria-label={full ? "Exit full screen" : "Full screen"}
       title={full ? "Leave full screen" + (keyHint ? ` (Esc or ${keyHint})` : " (Esc)") : "Full screen — just this tool" + how}>
       <Ico n={full ? "unfull" : "full"} /><span className="lbl">{full ? "Exit full screen" : "Full screen"}</span>
     </button>

@@ -265,6 +265,17 @@ html[data-tool-theme="graphite"] .toolpage {
 .toolpage .themes .th-sw span i { display: block; }
 .toolpage .themes .th-name { font-family: var(--ui); font-size: 13.5px; font-weight: 600; letter-spacing: 0; text-transform: none; }
 .toolpage .themes .th-name small { display: block; font-weight: 400; font-size: 11px; color: var(--t-dim); }
+.toolpage .themes .th-h2 { padding-top: 8px; }
+.toolpage .themes .th-shapes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.toolpage .themes .th-shape {
+  display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px;
+  border: 1px solid var(--t-line-soft); background: none; cursor: pointer; color: var(--t-ink); font: inherit;
+  transition: border-color .15s, background .15s;
+}
+.toolpage .themes .th-shape:hover { border-color: var(--t-ink); }
+.toolpage .themes .th-shape.on { border-color: var(--t-ink); box-shadow: inset 3px 0 0 var(--t-acc); background: var(--t-surface-2); }
+.toolpage .themes .th-shp { flex: none; width: 22px; height: 22px; border: 2px solid var(--t-ink); background: var(--t-surface-2); }
+.toolpage .themes .th-shape .th-shp.cozy { border-radius: 8px !important; }
 
 /* ------------------------------------------------------------ the last of the black, in the scheme's deep colour */
 .toolpage .flw .pal.ev .palin .glyph, .toolpage .flw .pal.pick .palin .glyph { background: var(--t-deep); color: var(--t-deep-ink); }
@@ -515,3 +526,42 @@ html.embedded .splitlink, html.embedded .nosplit { display: none !important; }
 /* a tool in full screen (FullBtn.tsx) keeps its own ground, not the browser's black */
 .toolpage .evi:fullscreen, .toolpage .flw:fullscreen, .toolpage .dfl:fullscreen { background-color: var(--t-ground); }
 .toolpage .dvw:fullscreen { background-color: var(--ground); }
+
+/* Full screen and Pop out are icons always, their names in their tooltips: two
+   more words each would push a full toolbar into its icons (fitBar.ts) sooner */
+.toolpage .icoonly .ico { display: block; }
+.toolpage .icoonly .lbl { display: none !important; }
+.toolpage .icoonly { display: inline-flex; align-items: center; justify-content: center; padding-left: 9px !important; padding-right: 9px !important; min-width: 34px; }
+/* Full screen, Pop out and Split sit together, a little closer than the rest */
+.toolpage .icoonly + .icoonly { margin-left: -5px; }
+
+/* a tool popped out into a window of its own (PopBtn.tsx) has no Pop out */
+html.popped .popbtn { display: none !important; }
+
+/* ---------- Cozy (Colours › Shape): the same tools, rounded and soft ----------
+   Not the default — the square look is. Every rule here is keyed on
+   <html data-tool-shape="cozy"> and is !important, because the tools reset
+   corners to square with !important of their own. Groups of joined controls
+   (a clock, a search box, a switch) round on the outside only. */
+:root[data-tool-shape="cozy"] { --cz-s: 8px; --cz-m: 11px; --cz-l: 16px; }
+:root[data-tool-shape="cozy"] .toolpage :is(button, input, textarea, select, a.btn, a.dbtn, a.dv-btn, a.pf-btn, .btn, .dbtn, .dv-btn, .dv-btn2, .pf-btn, .th-btn, .sp-tool, .sp-close, .th-opt, .th-shape) { border-radius: var(--cz-s) !important; }
+:root[data-tool-shape="cozy"] .toolpage kbd { border-radius: 5px !important; }
+:root[data-tool-shape="cozy"] .toolpage .themes .th-dots i { border-radius: 50% !important; }
+:root[data-tool-shape="cozy"] .toolpage .themes .th-sw { border-radius: 6px !important; overflow: hidden; }
+/* joined controls: round outside, square seams */
+:root[data-tool-shape="cozy"] .toolpage :is(.tbar, .dclock, .dv-search) { border-radius: var(--cz-m) !important; overflow: hidden; }
+:root[data-tool-shape="cozy"] .toolpage :is(.tbar, .dclock, .dv-search) :is(button, input, .btn) { border-radius: 0 !important; }
+:root[data-tool-shape="cozy"] .toolpage :is(.dv-zoom, .panesw) > * { border-radius: 0 !important; }
+:root[data-tool-shape="cozy"] .toolpage :is(.dv-zoom, .panesw) > :first-child { border-top-left-radius: var(--cz-s) !important; border-bottom-left-radius: var(--cz-s) !important; }
+:root[data-tool-shape="cozy"] .toolpage :is(.dv-zoom, .panesw) > :last-child { border-top-right-radius: var(--cz-s) !important; border-bottom-right-radius: var(--cz-s) !important; }
+/* things that float: popovers, dialogs, pickers, toasts */
+:root[data-tool-shape="cozy"] .toolpage :is(.th-pop, .dsharepop, .fp-card, [role="dialog"], .dv-toast, .dtoast, .toast, #toast, .dv-rhbar, .dv-notice, .dv-drop) { border-radius: var(--cz-l) !important; }
+:root[data-tool-shape="cozy"] .toolpage .dv-rhbar { border-top: 1px solid var(--line); margin-top: 10px; }
+/* pages, panels and pieces in each tool */
+:root[data-tool-shape="cozy"] .toolpage :is(.dpage, .dslash, .dpal, .dspeak, .rp, .paper, .sent, .menu, .flw .card, .flw .pal, .flw .palin) { border-radius: var(--cz-l) !important; }
+:root[data-tool-shape="cozy"] .toolpage :is(.dv-paper, .dv-src-box, .dv-ways > button, .dv-files button, .dv-recent li, .dv-orow, .dv-ohead input, .dv-paste) { border-radius: var(--cz-m) !important; }
+/* the split screen's strip and its line */
+:root[data-tool-shape="cozy"] .toolpage .sp-pane { border-radius: var(--cz-m) var(--cz-m) 0 0 !important; overflow: hidden; }
+:root[data-tool-shape="cozy"] .toolpage .sp-swap { border-radius: 50% !important; }
+/* status dots stay round in either shape */
+:root[data-tool-shape="cozy"] .toolpage :is(.dot, .pulse) { border-radius: 50% !important; }

@@ -15,6 +15,9 @@ export default function Embedded() {
   useEffect(() => {
     const html = document.documentElement;
     html.classList.add("embedded");
+    // a tool popped out into a window of its own (PopBtn.tsx) has no Pop out of its own
+    const popped = new URLSearchParams(location.search).has("pop");
+    if (popped) html.classList.add("popped");
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
@@ -26,7 +29,7 @@ export default function Embedded() {
       (window.top || window).location.assign(url.href);
     };
     document.addEventListener("click", onClick, true);
-    return () => { document.removeEventListener("click", onClick, true); html.classList.remove("embedded"); };
+    return () => { document.removeEventListener("click", onClick, true); html.classList.remove("embedded", "popped"); };
   }, []);
   return null;
 }

@@ -15,7 +15,11 @@ import ThemePicker from "./ThemePicker";
 import Ico from "./Ico";
 import { useFitBar } from "./fitBar";
 import FullBtn, { useFullscreen } from "./FullBtn";
-import { markHop } from "@/lib/toolsHop";
+import PopBtn from "./PopBtn";
+import { cardAt, greyOut, snapshot, restore, paint, clearGreen, greenWords, cardHtml, type Card } from "@/lib/viewer/rehighlight";
+import { sendBlockToEvidence } from "@/lib/flow/cards";
+import { openBus } from "@/lib/toolsBus";
+import { justHopped, markHop } from "@/lib/toolsHop";
 
 /**
  * Doc viewer — reading someone else's document properly.
@@ -25,7 +29,8 @@ import { markHop } from "@/lib/toolsHop";
  * paste. Whatever it is, it is laid out as the document it is, with an
  * outline down the side built from its headings (pocket, hat, block, tag),
  * how long each block's highlighting takes to read, and a search that marks
- * every place the words appear.
+ * every place the words appear. And the other team's cards, rehighlighted:
+ * their highlighting greyed, yours over it in green, off to your send doc.
  */
 
 interface SdFile { i: number; name: string; ctime: number }
@@ -67,6 +72,13 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
   const [toastMsg, setToastMsg] = useState<{ t: string; n: number } | null>(null);
   const [pasting, setPasting] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // rehighlighting: choosing a card, then the card being worked on
+  const [picking, setPicking] = useState(false);
+  const [rh, setRh] = useState<{ card: Card; orig: string[]; undo: string[][]; green: number; sending?: boolean } | null>(null);
+  const rhRef = useRef(rh);
+  rhRef.current = rh;
+  const pickingRef = useRef(picking);
+  pickingRef.current = picking;
 
   // a partner's send doc
   const [roomCode, setRoomCode] = useState(room ? tidyCode(room) : "");
@@ -112,6 +124,8 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
     if (!el) return;
     let dead = false;
     if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); }
+    // a new drawing of the document: any rehighlighting in the old one is gone with it
+    setRh(null); setPicking(false);
     if (!doc) { el.innerHTML = ""; setHeads([]); return; }
     // the same doc, newer: keep your place by the heading at the top
     const keepPlace = anchor.current && anchor.current.id === doc.id ? anchor.current : null;
@@ -235,6 +249,132 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
   const bar = useRef<HTMLElement>(null);
   useFitBar(bar);
 
+  /* ------------------------------------------------------------ rehighlighting
+     The other team's card, read your way (lib/viewer/rehighlight.ts). Pick
+     the card — have the cursor or a selection in it when you press
+     Rehighlight, or press it and click the card — and its highlighting goes
+     grey. Select words to highlight them green; select green to take it off.
+     Then Send to send doc. */
+  const begin = useCallback((card: Card) => {
+    if (paper.current) { clearHits(paper.current); hits.current = []; setHitCount(0); }
+    setQ("");
+    paper.current?.querySelectorAll(".dv-rh-hover").forEach((n) => n.classList.remove("dv-rh-hover"));
+    const orig = snapshot(card);
+    greyOut(card);
+    card.els.forEach((el) => el.classList.add("dv-rh"));
+    setPicking(false);
+    setRh({ card, orig, undo: [], green: greenWords(card) });
+    getSelection()?.removeAllRanges();
+  }, []);
+  const finishRh = useCallback((back?: string[]) => {
+    const r = rhRef.current;
+    if (!r) return;
+    if (back) restore(r.card, back);
+    r.card.els.forEach((el) => el.classList.remove("dv-rh"));
+    setRh(null);
+  }, []);
+  const startRehl = useCallback(() => {
+    if (rhRef.current) return;
+    if (pickingRef.current) { setPicking(false); return; }
+    const sel = getSelection();
+    const node = sel && sel.rangeCount ? sel.getRangeAt(0).startContainer : null;
+    const card = paper.current && node && paper.current.contains(node) ? cardAt(paper.current, node) : null;
+    if (card) { begin(card); return; }
+    setPicking(true);
+  }, [begin]);
+  const undoRh = useCallback(() => {
+    const r = rhRef.current;
+    if (!r || !r.undo.length) return;
+    restore(r.card, r.undo[r.undo.length - 1]);
+    setRh({ ...r, undo: r.undo.slice(0, -1), green: greenWords(r.card) });
+  }, []);
+  const clearRh = useCallback(() => {
+    const r = rhRef.current;
+    if (!r) return;
+    const before = snapshot(r.card);
+    clearGreen(r.card);
+    setRh({ ...r, undo: [...r.undo, before], green: 0 });
+  }, []);
+  // choosing: the card under the pointer lights up whole, and a click takes it
+  const hoverRaf = useRef(0);
+  const onPaperMove = useCallback((e: React.MouseEvent) => {
+    if (!pickingRef.current) return;
+    const target = e.target as Node;
+    cancelAnimationFrame(hoverRaf.current);
+    hoverRaf.current = requestAnimationFrame(() => {
+      const el = paper.current;
+      if (!el) return;
+      const card = cardAt(el, target);
+      const now = el.querySelector(".dv-rh-hover");
+      if (card && now === card.els[0]) return;
+      el.querySelectorAll(".dv-rh-hover").forEach((n) => n.classList.remove("dv-rh-hover"));
+      card?.els.forEach((n) => n.classList.add("dv-rh-hover"));
+    });
+  }, []);
+  const onPaperClick = useCallback((e: React.MouseEvent) => {
+    if (!pickingRef.current || !paper.current) return;
+    e.preventDefault();
+    const card = cardAt(paper.current, e.target as Node);
+    if (!card) { toast("That is not a card — click a card's tag or its text"); return; }
+    begin(card);
+  }, [begin, toast]);
+  // working: whatever is selected in the card goes green (or, if it is all green, back)
+  const onPaperUp = useCallback(() => {
+    const r = rhRef.current;
+    if (!r) return;
+    const sel = getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+    const before = snapshot(r.card);
+    if (paint(r.card, sel.getRangeAt(0))) {
+      sel.removeAllRanges();
+      setRh({ ...r, undo: [...r.undo, before], green: greenWords(r.card) });
+    }
+  }, []);
+  const sendRh = useCallback(async () => {
+    const r = rhRef.current;
+    const d = docRef.current;
+    if (!r || !d || r.sending) return;
+    if (!greenWords(r.card)) { toast("Highlight what you will read in green first"); return; }
+    setRh({ ...r, sending: true });
+    // read the card's look at its own size, not the zoom it is shown at
+    const box = paper.current?.parentElement as HTMLElement | null;
+    const zoomWas = box?.style.getPropertyValue("zoom") || "";
+    if (box) box.style.setProperty("zoom", "1");
+    const block = r.card.block || d.name;
+    let html = "";
+    try { html = cardHtml(r.card, block); } finally { if (box) box.style.setProperty("zoom", zoomWas); }
+    try {
+      const { parseHtml } = (await import("@/lib/evidence/engine")) as any;
+      const blk = parseHtml(html, {}).blocks.find((b: any) => (b.args || []).length);
+      if (!blk) throw new Error("the card came out empty");
+      const ok = await sendBlockToEvidence(owner, { ...blk, id: `rh:${d.id}:${block}`, pre: [], args: [blk.args[0]] }, 0, true);
+      if (!ok) throw new Error("open Evidence once first — the send list lives there");
+      const bus = openBus(owner, () => {});
+      bus.post({ kind: "send-changed", title: blk.title, from: "the Doc viewer" });
+      bus.close();
+      finishRh();
+      toast(`Sent to your send doc — ${r.card.title.length > 48 ? r.card.title.slice(0, 47) + "…" : r.card.title}`);
+    } catch (e: any) {
+      setRh((x) => (x ? { ...x, sending: false } : x));
+      toast("It did not send: " + String(e?.message || e));
+    }
+  }, [owner, toast, finishRh]);
+
+  /* ------------------------------------------------------------ the same doc, after a hop
+     Into or out of the split screen, or popped out into a window of its own,
+     the Doc viewer opens on the doc it was showing. */
+  useEffect(() => {
+    try { sessionStorage.setItem("viewer.last", doc ? doc.id : ""); } catch { /* private browsing */ }
+  }, [doc]);
+  useEffect(() => {
+    if (room || sd || !justHopped()) return;
+    let id = "";
+    try { id = sessionStorage.getItem("viewer.last") || ""; } catch { /* private browsing */ }
+    if (id) getDoc(owner, id).then((d) => { if (d && !docRef.current) { setDoc(d); setTab("outline"); } });
+    // once, on the way in
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ------------------------------------------------------------ keys */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -245,6 +385,9 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
       }
       if (e.key === "F3") { e.preventDefault(); showHit(hitAt + (e.shiftKey ? -1 : 1)); return; }
       if (typing) return;
+      if (rhRef.current && (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undoRh(); return; }
+      if (e.key === "Escape" && pickingRef.current) { e.preventDefault(); setPicking(false); return; }
+      if (e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey && !e.altKey && doc && doc.kind !== "pdf") { e.preventDefault(); startRehl(); return; }
       if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); toggleFull(); return; }
       if ((e.key === "j" || e.key === "k") && heads.length) {
         const i = Math.max(0, heads.findIndex((h) => h.id === cur));
@@ -255,7 +398,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [doc, heads, cur, hitAt, showHit, go, toggleFull]);
+  }, [doc, heads, cur, hitAt, showHit, go, toggleFull, undoRh, startRehl]);
 
   /* ------------------------------------------------------------ opening things */
   const openFile = useCallback(async (f: File) => {
@@ -402,6 +545,8 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
         {doc && doc.kind !== "pdf" && (
           <>
             <button type="button" className={"dv-btn" + (hlOnly ? " on" : "")} onClick={() => setHlOnly((h) => !h)} title="Highlighted only — fade everything that is not highlighted, what gets read"><Ico n="highlight" /><span className="lbl">Highlighted only</span></button>
+            <button type="button" className={"dv-btn" + (picking || rh ? " on" : "")} onClick={startRehl} aria-pressed={picking || !!rh}
+              title="Rehighlight a card (R) — its highlighting goes grey, yours goes on in green, and it goes to your send doc"><Ico n="rehl" /><span className="lbl">Rehighlight</span></button>
             <div className="dv-zoom">
               <button type="button" className="dv-btn" onClick={() => setZoom((z) => Math.max(0.7, +(z - 0.1).toFixed(2)))} aria-label="Smaller">A−</button>
               <button type="button" className="dv-btn" onClick={() => setZoom((z) => Math.min(1.8, +(z + 0.1).toFixed(2)))} aria-label="Larger">A+</button>
@@ -409,7 +554,8 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
           </>
         )}
         <FullBtn className="dv-btn dv-full" full={full} toggle={toggleFull} keyHint="F" />
-        <a className="dv-btn splitlink" href="/tools/split?a=viewer" onClick={markHop} title="Split screen — the Doc viewer beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
+        <PopBtn className="dv-btn" tool="viewer" onBlocked={() => toast("The browser blocked the new window — allow pop-ups for this site")} />
+        <a className="dv-btn splitlink icoonly" aria-label="Split screen" href="/tools/split?a=viewer" onClick={markHop} title="Split screen — the Doc viewer beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <ThemePicker />
       </header>
 
@@ -546,10 +692,27 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
               </div>
             </div>
           )}
+          {picking && (
+            <div className="dv-rhbar pick" role="status">
+              <span className="dv-rh-what"><span className="mono">Rehighlight</span><b>Click the card — its tag or any of its text</b></span>
+              <button type="button" className="dv-btn2" onClick={() => setPicking(false)}>Cancel</button>
+            </div>
+          )}
+          {rh && (
+            <div className="dv-rhbar" role="toolbar" aria-label="Rehighlighting">
+              <span className="dv-rh-what"><span className="mono">Rehighlighting</span><b title={rh.card.title}>{rh.card.title}</b></span>
+              <span className="dv-rh-how">Select words to highlight them <i className="g">green</i> · select green to take it off</span>
+              <span className="dv-rh-n mono">{rh.green} word{rh.green === 1 ? "" : "s"}</span>
+              <button type="button" className="dv-btn2" onClick={undoRh} disabled={!rh.undo.length} title="Undo (Ctrl+Z)">Undo</button>
+              <button type="button" className="dv-btn2" onClick={clearRh} disabled={!rh.green}>Clear green</button>
+              <button type="button" className="dv-btn2" onClick={() => finishRh(rh.orig)} title="Put the card back as it was">Cancel</button>
+              <button type="button" className="dv-btn2 ink" onClick={sendRh} disabled={!rh.green || rh.sending}>{rh.sending ? "Sending…" : "Send to send doc"}</button>
+            </div>
+          )}
           {pdfUrl && <iframe className="dv-pdf" src={pdfUrl} title={doc?.name || "PDF"} />}
-          <div className={"dv-paper" + (hlOnly ? " hl-only" : "") + (busy ? " busy" : "") + (!doc || pdfUrl ? " gone" : "")}
+          <div className={"dv-paper" + (hlOnly ? " hl-only" : "") + (busy ? " busy" : "") + (!doc || pdfUrl ? " gone" : "") + (picking ? " rh-pick" : "") + (rh ? " rh-on" : "")}
             style={{ zoom } as React.CSSProperties}>
-            <div className="dv-doc" ref={paper} />
+            <div className="dv-doc" ref={paper} onClick={onPaperClick} onMouseUp={onPaperUp} onMouseMove={onPaperMove} />
           </div>
         </main>
       </div>
