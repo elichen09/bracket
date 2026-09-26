@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { markHop } from "@/lib/toolsHop";
 import "./finish.css";
 
 /**
@@ -16,7 +17,8 @@ import "./finish.css";
  * swap sides. Sides are swapped with CSS order, never by moving the frames,
  * because moving a frame reloads it — nobody wants their flow to blink out
  * mid-round to change sides. Choosing for one side the tool the other side
- * has swaps them, for the same reason.
+ * has swaps them, for the same reason. Each side's × closes it, and the
+ * other tool carries on across the whole window.
  */
 
 const TOOLS = {
@@ -134,6 +136,13 @@ export default function Split({ first: want }: { first?: string }) {
     keep(t, left, ratio);
   };
 
+  /** Close one side: the other tool gets the window, on its own page. */
+  const close = (slot: 0 | 1) => {
+    const rest = tools[1 - slot];
+    markHop();
+    window.location.href = TOOLS[rest].src.replace(/\?embed=1$/, "");
+  };
+
   const widthOf = (slot: number) => `calc(${(slot === left ? ratio : 1 - ratio) * 100}% - 5px)`;
   const orderOf = (slot: number) => (slot === left ? 0 : 2);
 
@@ -155,6 +164,8 @@ export default function Split({ first: want }: { first?: string }) {
                   </button>
                 );
               })}
+              <button type="button" className="sp-close" onClick={() => close(slot as 0 | 1)}
+                title={`Close this side — ${TOOLS[tools[1 - slot]].title} full screen`} aria-label={`Close the ${side} side`}>×</button>
             </div>
           );
         })}

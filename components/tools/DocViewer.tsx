@@ -12,6 +12,7 @@ import { polish } from "@/lib/evidence/polish";
 import "./docviewer.css";
 import "./finish.css";
 import ThemePicker from "./ThemePicker";
+import { markHop } from "@/lib/toolsHop";
 
 /**
  * Doc viewer — reading someone else's document properly.
@@ -395,7 +396,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
             </div>
           </>
         )}
-        <a className="dv-btn splitlink" href="/tools/split?a=viewer" title="Split screen — the Doc viewer beside another tool">Split ◫</a>
+        <a className="dv-btn splitlink" href="/tools/split?a=viewer" onClick={markHop} title="Split screen — the Doc viewer beside another tool">Split ◫</a>
         <ThemePicker />
       </header>
 

@@ -32,6 +32,7 @@ import { polish } from "@/lib/evidence/polish";
 import "./docflow.css";
 import "./finish.css";
 import ThemePicker from "./ThemePicker";
+import { justHopped, markHop } from "@/lib/toolsHop";
 
 /**
  * Doc flow — flowing the way a Google Doc gets flowed, with the tool doing
@@ -236,7 +237,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
       setCurrent(first.id);
       setName(first.name);
       archiveAll(owner);
-      if (!open && !join) {
+      if (!open && !join && !justHopped()) {
         const json = loadDoc(owner, first.id);
         const cur = { id: first.id, name: first.name, stats: summarizeDoc(first.id, first.name, json, 0, 0).stats, blank: !docHasWriting(json) };
         if (await worthAsking(owner, "doc", cur) && !dead) setAsking(cur);
@@ -1147,7 +1148,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
         <button type="button" className="dbtn" onClick={copyForDocs} title="Numbered, red and highlighted, as a Doc">Copy for Docs</button>
         <button type="button" className="dbtn" onClick={saveDocx}>.docx</button>
         <a className="dbtn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
-        <a className="dbtn splitlink" href="/tools/split?a=docflow" title="Split screen — Doc flow beside another tool">Split ◫</a>
+        <a className="dbtn splitlink" href="/tools/split?a=docflow" onClick={markHop} title="Split screen — Doc flow beside another tool">Split ◫</a>
         <ThemePicker />
       </header>
 

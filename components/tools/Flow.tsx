@@ -10,6 +10,7 @@ import FlowPicker, { worthAsking, type PickerCurrent } from "./FlowPicker";
 import Presence from "./Presence";
 import "./flow.css";
 import "./finish.css";
+import { justHopped, markHop } from "@/lib/toolsHop";
 
 /**
  * Flow, mounted.
@@ -44,6 +45,8 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
         ask: (a: any) => {
           api.current = a;
           const cur = a.current();
+          // only going into or out of the split screen: the same flow, no question
+          if (justHopped()) return;
           worthAsking(owner, "grid", cur).then((yes) => { if (yes && !dead) setAsking(cur); });
         },
       });
@@ -89,7 +92,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
             list is the one Flow sends into. */}
         <a className="btn nosplit" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this"><Ico n="cards" /><span className="lbl">Evidence ↗</span></a>
         <Link className="btn" href="/tools/flows" title="Past flows — every round you have flowed, this one kept there as you go"><Ico n="history" /><span className="lbl">Past flows</span></Link>
-        <a className="btn splitlink" href="/tools/split?a=flow" title="Split screen — Flow beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
+        <a className="btn splitlink" href="/tools/split?a=flow" onClick={markHop} title="Split screen — Flow beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span className="lbl" id="share-state">Not shared</span>
         </button>
