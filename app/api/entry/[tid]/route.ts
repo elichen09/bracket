@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { circuitOfTournament, CIRCUITS } from "@/lib/circuit";
 import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@/lib/auth";
-import { loadField } from "@/lib/field";
+import { loadField, resolveEntry, fieldHeadToHead } from "@/lib/field";
 import {
-  loadRatings, ratingIndex, loadRosters, buildTeamIndex, resolveRating, headToHead, canonCode,
+  loadRatings, ratingIndex, loadRosters, buildTeamIndex, canonCode,
   pastSeasonPriors, type RatingRow,
 } from "@/lib/ratings";
 import { careersDeep } from "@/lib/careerArchive";
@@ -54,7 +54,7 @@ export async function GET(req: Request, { params }: { params: { tid: string } })
     const teamIdx = buildTeamIndex(teamRows, rosters);
     const debIdx = ratingIndex(debRows);
     const ids = (entry.Students || []).map((s) => s.id).filter(Boolean);
-    const resolved = resolveRating(entry.code, ids, teamIdx, debIdx, priors);
+    const resolved = resolveEntry(entry, ids, teamIdx, debIdx, priors);
 
     // Each listed debater's own record, assembled from the tournaments this site
     // has read in rather than scraped from their Tabroom page. Tabroom names only
@@ -77,7 +77,7 @@ export async function GET(req: Request, { params }: { params: { tid: string } })
       };
     });
 
-    const h2h = await headToHead(db, [entry.code], circuit);
+    const h2h = await fieldHeadToHead(db, raw, circuit, [entry]);
     const own = resolved.row;
 
     return NextResponse.json({

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CIRCUITS, type Circuit } from "./circuit";
-import { loadRatings, ratingIndex, resolveRating, headToHead, loadRosters, buildTeamIndex, pastSeasonPriors, type RatingRow } from "./ratings";
+import { loadRatings, ratingIndex, resolveRating, headToHead, loadRosters, buildTeamIndex, pastSeasonPriors, canonCode, codeFromEntryName, type RatingRow } from "./ratings";
 import { teamFrom, type SimTeam } from "./simulate";
 
 /**
@@ -11,7 +11,44 @@ import { teamFrom, type SimTeam } from "./simulate";
  * Tabroom lists only one debater per entry before a tournament starts, so the
  * partner is known by surname from the entry name ("Tran & Lee") and gains a
  * student id only once rounds are posted.
+ *
+ * Some tournaments code an entry by its debaters' full names ("University
+ * Sahas Chhabra & Gavin Chan"); the ratings know it as "University CC", so an
+ * entry is looked up by that (codeFromEntryName) and shown as Tabroom has it.
  */
+
+/** The code an entry is known by in the ratings. */
+export const lookupCode = (e: RawEntry) => codeFromEntryName(e.code, e.name, e.Students || []);
+
+/**
+ * An entry's rating: under the code the ratings know it by — or, if that
+ * finds no record of this pairing, under the code as Tabroom wrote it, which
+ * is how rounds read in before the codes were put right are still filed.
+ */
+export function resolveEntry(e: RawEntry, ids: number[], ...rest: Parameters<typeof resolveRating> extends [unknown, unknown, ...infer R] ? R : never) {
+  const known = lookupCode(e);
+  const first = resolveRating(known, ids, ...rest);
+  if (first.source === "team" || known === e.code.replace(/\s+/g, " ").trim()) return first;
+  const asWritten = resolveRating(e.code, ids, ...rest);
+  return asWritten.source === "team" ? asWritten : first;
+}
+
+/**
+ * Past meetings, asked for under the codes the ratings know and handed back
+ * under the codes this field shows — both sides of every meeting.
+ */
+export async function fieldHeadToHead(db: SupabaseClient, raw: RawEntry[], circuit: Circuit, only: RawEntry[] = raw) {
+  const toShown = new Map<string, string>();
+  for (const e of raw) toShown.set(canonCode(lookupCode(e)), canonCode(e.code));
+  const got = await headToHead(db, only.map(lookupCode), circuit);
+  const out: typeof got = {};
+  for (const [mine, opps] of Object.entries(got)) {
+    const row: (typeof got)[string] = {};
+    for (const [opp, wl] of Object.entries(opps)) row[toShown.get(opp) ?? opp] = wl;
+    out[toShown.get(mine) ?? mine] = row;
+  }
+  return out;
+}
 
 const API = "https://api.tabroom.com/v1";
 
@@ -36,7 +73,7 @@ export interface FieldTeam {
   history: RatingRow["history"];
 }
 
-interface RawEntry { id: number; code: string; name: string; School?: { name: string }; Students?: { id: number; firstName?: string; lastName?: string }[] }
+export interface RawEntry { id: number; code: string; name: string; School?: { name: string }; Students?: { id: number; firstName?: string; lastName?: string }[] }
 
 /** The published entry list for one event. Available well before the tournament runs. */
 export async function loadField(tournId: number, abbr: string): Promise<RawEntry[]> {
@@ -70,7 +107,7 @@ export async function fieldWithRatings(db: SupabaseClient, tournId: number, abbr
 
   const entries: FieldTeam[] = raw.map((e, i) => {
     const ids = (e.Students || []).map((s) => s.id).filter(Boolean);
-    const resolved = resolveRating(e.code, ids, teamIdx, debIdx, priors);
+    const resolved = resolveEntry(e, ids, teamIdx, debIdx, priors);
     const own = resolved.row;   // whatever the resolver matched, swapped codes included
     return {
       entryId: e.id,
@@ -102,9 +139,9 @@ export async function fieldWithRatings(db: SupabaseClient, tournId: number, abbr
 
   const teams = raw.map((e, i) => {
     const ids = (e.Students || []).map((s) => s.id).filter(Boolean);
-    return teamFrom(e.code, e.School?.name || null, i + 1, resolveRating(e.code, ids, teamIdx, debIdx, priors));
+    return teamFrom(e.code, e.School?.name || null, i + 1, resolveEntry(e, ids, teamIdx, debIdx, priors));
   });
 
-  const h2h = await headToHead(db, raw.map((e) => e.code), circuit);
+  const h2h = await fieldHeadToHead(db, raw, circuit);
   return { entries, teams, h2h };
 }

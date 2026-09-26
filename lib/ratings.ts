@@ -189,6 +189,37 @@ export function conventionalCode(code: string, students: { first?: string; last?
 }
 
 /**
+ * The same, for an entry in a published field — where Tabroom names only one
+ * of the debaters in full, and the pair only by surname ("Chhabra & Chan").
+ * That is enough: the school is whatever comes before the first debater's
+ * first name (known exactly for the one listed, taken as one word otherwise),
+ * and the initials are the surnames' — in the order the code writes them, a
+ * surname the code was cut off before coming last. So "University Sahas
+ * Chhabra & Gavin Chan" looks itself up as "University CC". A code that does
+ * not spell out the debaters comes back as it is.
+ */
+export function codeFromEntryName(code: string, name: string, known: { firstName?: string; lastName?: string }[] = []): string {
+  const c = (code || "").replace(/\s+/g, " ").trim();
+  if (!/&|\sand\s/i.test(c)) return c;
+  const lasts = (name || "").split(/\s*&\s*/).map((l) => l.trim()).filter(Boolean);
+  if (!lasts.length || lasts.length > 3) return c;
+  const at = lasts.map((l) => { const m = new RegExp(`\\b${escRe(l)}\\b`, "i").exec(c); return m ? m.index : -1; });
+  const seen = at.filter((i) => i >= 0);
+  if (!seen.length) return c;
+  const first = Math.min(...seen);
+  const who = lasts[at.indexOf(first)];
+  const before = c.slice(0, first).trimEnd();
+  const k = known.find((s) => (s.lastName || "").trim().toLowerCase() === who.toLowerCase() && s.firstName?.trim());
+  const given = k?.firstName!.trim() || "";
+  const prefix = (given && before.toLowerCase().endsWith(given.toLowerCase())
+    ? before.slice(0, before.length - given.length)
+    : before.replace(/\s*\S+$/, "")).replace(/[\s&,+/-]+$/, "").trim();
+  if (!prefix) return c;
+  const order = lasts.map((l, i) => ({ l, at: at[i] < 0 ? Infinity : at[i] })).sort((a, b) => a.at - b.at);
+  return `${prefix} ${order.map((o) => o.l[0].toUpperCase()).join("")}`;
+}
+
+/**
  * Read one event at one tournament into game rows. One request for the field,
  * then one per entry — a few hundred for a big Public Forum pool, which is why
  * this is an indexing job and not something a page does.
