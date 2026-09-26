@@ -224,6 +224,21 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
     return () => clearTimeout(t);
   }, [q, runSearch]);
 
+  /* ------------------------------------------------------------ full screen
+     The doc alone on the screen — above all from a side of the split screen,
+     where it had half the window. The browser's own full screen, so Esc
+     leaves it as it leaves any other; the button says which way it goes. */
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    const on = () => setFull(!!root.current && document.fullscreenElement === root.current);
+    document.addEventListener("fullscreenchange", on);
+    return () => document.removeEventListener("fullscreenchange", on);
+  }, []);
+  const toggleFull = useCallback(() => {
+    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+    root.current?.requestFullscreen?.().catch(() => toast("This browser would not go full screen here"));
+  }, [toast]);
+
   /* ------------------------------------------------------------ keys */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -234,6 +249,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
       }
       if (e.key === "F3") { e.preventDefault(); showHit(hitAt + (e.shiftKey ? -1 : 1)); return; }
       if (typing) return;
+      if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); toggleFull(); return; }
       if ((e.key === "j" || e.key === "k") && heads.length) {
         const i = Math.max(0, heads.findIndex((h) => h.id === cur));
         const next = heads.slice(e.key === "j" ? i + 1 : 0, e.key === "j" ? undefined : i).filter((h) => h.level <= 3);
@@ -243,7 +259,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [doc, heads, cur, hitAt, showHit, go]);
+  }, [doc, heads, cur, hitAt, showHit, go, toggleFull]);
 
   /* ------------------------------------------------------------ opening things */
   const openFile = useCallback(async (f: File) => {
@@ -396,6 +412,8 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
             </div>
           </>
         )}
+        <button type="button" className={"dv-btn dv-full" + (full ? " on" : "")} onClick={toggleFull} aria-pressed={full}
+          title={full ? "Leave full screen (Esc or F)" : "Full screen — just the doc (F; Esc to leave)"}>{full ? "Exit full screen" : "Full screen"}</button>
         <a className="dv-btn splitlink" href="/tools/split?a=viewer" onClick={markHop} title="Split screen — the Doc viewer beside another tool">Split ◫</a>
         <ThemePicker />
       </header>

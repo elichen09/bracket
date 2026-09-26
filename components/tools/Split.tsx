@@ -181,7 +181,7 @@ export default function Split({ first: want }: { first?: string }) {
               {/* the clipboard, by permission: a frame has none unless it is given it, and
                   without it Evidence could not copy a card — nor, then, send it */}
               <iframe ref={(el) => { frames.current[slot] = el; }} data-tool={k} src={TOOLS[k].src} title={TOOLS[k].title}
-                allow="clipboard-read; clipboard-write"
+                allow="clipboard-read; clipboard-write; fullscreen"
                 onLoad={() => setLoaded((m) => ({ ...m, [id]: true }))} />
               <div className="sp-wait" aria-hidden="true"><span>{TOOLS[k].title}</span></div>
             </div>
