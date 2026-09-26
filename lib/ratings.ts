@@ -134,7 +134,7 @@ export async function pool<T, R>(items: T[], limit: number, work: (item: T) => P
 interface FieldEntry { id: number; code: string; name: string; School?: { name: string }; Students?: { id: number }[] }
 interface RecordsDoc {
   id: number; code: string; name: string;
-  Students?: Record<string, unknown>;
+  Students?: Record<string, { first?: string; last?: string } | unknown>;
   Event?: { id: number; name: string; abbr: string };
   Rounds?: Record<string, {
     id: number; type: string; label?: string; name?: number; sideLabel?: string; bye?: number | boolean;
@@ -142,6 +142,50 @@ interface RecordsDoc {
     Judges?: Record<string, { paradigm?: number }>;
     Opponent?: { id: number; code: string };
   }>;
+}
+
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * The code a team goes by, when a tournament wrote its debaters' names out
+ * instead. Tabroom codes a team "University CC" — its school, then the first
+ * letter of each debater's last name — and that is the name it carries from
+ * tournament to tournament. Some tournaments (the Mid America Cup among them)
+ * code it "University Sahas Chhabra & Gavin Chan" instead, which is a new team
+ * as far as the rankings can tell. When every debater's full name is in the
+ * code, it is put back the usual way: what comes before the names, then their
+ * initials in the order they were written. Any other code is left as it is.
+ */
+export function conventionalCode(code: string, students: { first?: string; last?: string }[]): string {
+  const c = (code || "").replace(/\s+/g, " ").trim();
+  const people = students.filter((s) => s.first?.trim() && s.last?.trim());
+  if (!c || !people.length) return c;
+  const found = people.map((s) => {
+    // a middle name or initial may sit between the two
+    const m = new RegExp(`\\b${escRe(s.first!.trim())}\\s+(?:\\S+\\s+)?${escRe(s.last!.trim())}\\b`, "i").exec(c);
+    return { s, at: m ? m.index : -1 };
+  });
+  const named = (list: typeof people) => {
+    const at = found.find((f) => f.s === list[0])!.at;
+    const prefix = c.slice(0, at).replace(/[\s&,+/-]+$/, "").trim();
+    const initials = list.map((s) => s.last!.trim()[0].toUpperCase()).join("");
+    return prefix ? `${prefix} ${initials}` : initials;
+  };
+  if (found.every((f) => f.at >= 0)) return named(found.slice().sort((a, b) => a.at - b.at).map((f) => f.s));
+  // Tabroom cuts a code at 63 characters, sometimes mid-name ("… Kavin
+  // Dassanaike-Perera & Adhhrith"): the first name found, and all that follows
+  // it the start of the rest of the names written out, is the same team.
+  const first = found.filter((f) => f.at >= 0).sort((a, b) => a.at - b.at)[0];
+  if (!first || people.length > 3) return c;
+  const rest = c.slice(first.at).toLowerCase();
+  const others = people.filter((s) => s !== first.s);
+  const orders = others.length === 2 ? [others, [others[1], others[0]]] : [others];
+  for (const o of orders) {
+    const list = [first.s, ...o];
+    const written = list.map((s) => `${s.first!.trim()} ${s.last!.trim()}`).join(" & ").toLowerCase();
+    if (written.startsWith(rest)) return named(list);
+  }
+  return c;
 }
 
 /**
@@ -184,6 +228,13 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
   const rows: GameRow[] = [];
   // Every ballot of a rated event, with its judge, for judge scoring habits.
   const judgeBallots: JudgeBallot[] = [];
+  // each entry by the code it goes by — its debaters' names put back as initials
+  const codeOf = new Map<number, string>();
+  docs.forEach((doc, i) => {
+    if (!doc) return;
+    const people = Object.values(doc.Students || {}).filter((s): s is { first?: string; last?: string } => !!s && typeof s === "object");
+    codeOf.set(entries[i].id, conventionalCode(entries[i].code, people));
+  });
   docs.forEach((doc, i) => {
     if (!doc || !doc.Rounds) return;
     const entry = entries[i];
@@ -209,7 +260,7 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
         tourn_name: meta?.name || `Tournament ${tournId}`, tourn_start: meta?.start || null,
         round_name: typeof r.name === "number" ? r.name : null, round_label: r.label || "",
         elim: isElim,
-        code: entry.code, opp_code: r.Opponent.code, school: entry.School?.name || null,
+        code: codeOf.get(entry.id) || entry.code, opp_code: codeOf.get(r.Opponent.id) || r.Opponent.code, school: entry.School?.name || null,
         side: r.sideLabel || null,
         score: won > lost ? 1 : lost > won ? 0 : 0.5,
         ballots_for: won, ballots_against: lost,
@@ -493,8 +544,18 @@ export async function recompute(db: SupabaseClient, season = currentSeason(), ci
     if (error) throw new Error(error.message);
   }
   // A name folded into its team's real one ("Emory" into "Emory GY") must not
-  // linger in the table as a team of its own.
+  // linger in the table as a team of its own — and nor must any team this
+  // count no longer has: a tournament read again under better codes leaves
+  // its old names behind ("University Sahas Chhabra & Gavin Chan").
   const gone = [...renamed].filter((k) => !teams.has(k));
+  if (teams.size) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from("ratings").select("key").eq("kind", CIRCUITS[circuit].teamKind).order("key").range(from, from + 999);
+      if (error) throw new Error(error.message);
+      for (const r of (data || []) as { key: string }[]) if (!teams.has(r.key) && !gone.includes(r.key)) gone.push(r.key);
+      if (!data || data.length < 1000) break;
+    }
+  }
   for (let i = 0; i < gone.length; i += 200) {
     const { error } = await db.from("ratings").delete().eq("kind", CIRCUITS[circuit].teamKind).in("key", gone.slice(i, i + 200));
     if (error) throw new Error(error.message);
