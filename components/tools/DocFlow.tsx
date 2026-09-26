@@ -32,6 +32,9 @@ import { polish } from "@/lib/evidence/polish";
 import "./docflow.css";
 import "./finish.css";
 import ThemePicker from "./ThemePicker";
+import Ico from "./Ico";
+import { useFitBar } from "./fitBar";
+import FullBtn, { useFullscreen } from "./FullBtn";
 import { justHopped, markHop } from "@/lib/toolsHop";
 
 /**
@@ -133,6 +136,10 @@ const roundName = () => `Round — ${new Date().toLocaleDateString([], { month: 
 
 export default function DocFlow({ owner, me, join, open }: { owner?: string; me?: string; join?: string; open?: string }) {
   const root = useRef<HTMLDivElement>(null);
+  // the banner: words while they fit, icons when they do not (fitBar.ts)
+  const bar = useRef<HTMLElement>(null);
+  useFitBar(bar);
+  const fs = useFullscreen(root);
   const mount = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const ycur = useRef<{ ydoc: Y.Doc; awareness: Awareness } | null>(null);
@@ -1086,7 +1093,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
 
   return (
     <div className={"dfl" + (side ? "" : " noside")} ref={root}>
-      <header className="dtop">
+      <header className="dtop" ref={bar}>
         <Link className="back mono" href="/tools" title="Back to the tools">←</Link>
         <div className="brand mono">Doc flow</div>
         <div className="dclock mono" role="group" aria-label="Speech clock">
@@ -1110,7 +1117,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
                   <span className="dfaces">{mates.slice(0, 3).map((m) => <b key={m.client} style={{ background: m.color }} title={m.name}>{m.name.slice(0, 1).toUpperCase()}</b>)}</span>
                 ) : <small>{roomStatus === "joining" ? "connecting" : "waiting"}</small>}
               </>
-            ) : <>Share</>}
+            ) : <><Ico n="share" /><span className="lbl">Share</span></>}
           </button>
           <Presence show={!!shareOpen}>{shareOpen && (
             <div className="dsharepop" role="dialog" aria-label="Flow with your partner">
@@ -1144,11 +1151,12 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
             </div>
           )}</Presence>
         </div>
-        <button type="button" className="dbtn ink" onClick={() => openPanel()}>Commands {K("commands") && <kbd>{K("commands")}</kbd>}</button>
-        <button type="button" className="dbtn" onClick={copyForDocs} title="Numbered, red and highlighted, as a Doc">Copy for Docs</button>
-        <button type="button" className="dbtn" onClick={saveDocx}>.docx</button>
-        <a className="dbtn" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this">Evidence ↗</a>
-        <a className="dbtn splitlink" href="/tools/split?a=docflow" onClick={markHop} title="Split screen — Doc flow beside another tool">Split ◫</a>
+        <button type="button" className="dbtn ink" onClick={() => openPanel()} title={"Commands" + (K("commands") ? " (" + K("commands") + ")" : "")}><Ico n="command" /><span className="lbl">Commands</span> {K("commands") && <kbd>{K("commands")}</kbd>}</button>
+        <button type="button" className="dbtn" onClick={copyForDocs} title="Copy for Docs — numbered, red and highlighted, as a Doc"><Ico n="copy" /><span className="lbl">Copy for Docs</span></button>
+        <button type="button" className="dbtn" onClick={saveDocx} title="Save as .docx"><Ico n="export" /><span className="lbl">.docx</span></button>
+        <a className="dbtn nosplit" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this"><Ico n="cards" /><span className="lbl">Evidence ↗</span></a>
+        <FullBtn className="dbtn" full={fs.full} toggle={fs.toggle} />
+        <a className="dbtn splitlink" href="/tools/split?a=docflow" onClick={markHop} title="Split screen — Doc flow beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <ThemePicker />
       </header>
 

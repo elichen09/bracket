@@ -21,6 +21,11 @@ const PATHS: Record<string, string> = {
   drawer: "M3 4h18v16H3zM15 4v16",
   search: "M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13zM15.5 15.5L21 21",
   list: "M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1",
+  full: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
+  unfull: "M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5",
+  share: "M18 3a3 3 0 1 0 0 6a3 3 0 0 0 0-6zM6 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6zM18 15a3 3 0 1 0 0 6a3 3 0 0 0 0-6zM8.7 10.5l6.6-3.8M8.7 13.5l6.6 3.8",
+  copy: "M9 9h11v11H9zM5 15H4V4h11v1",
+  highlight: "M4 20h16M6 16l2-5 7-7 4 4-7 7-5 2zM13 6l4 4",
 };
 
 export default function Ico({ n }: { n: keyof typeof PATHS | string }) {

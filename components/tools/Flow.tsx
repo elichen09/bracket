@@ -6,6 +6,7 @@ import { polish } from "@/lib/evidence/polish";
 import ThemePicker from "./ThemePicker";
 import Ico from "./Ico";
 import { useFitBar } from "./fitBar";
+import FullBtn, { useFullscreen } from "./FullBtn";
 import FlowPicker, { worthAsking, type PickerCurrent } from "./FlowPicker";
 import Presence from "./Presence";
 import "./flow.css";
@@ -27,6 +28,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
   const ref = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLElement>(null);
   useFitBar(bar);
+  const fs = useFullscreen(ref);
   // Which round? — asked on the way in, unless a link already said
   const [asking, setAsking] = useState<PickerCurrent | null>(null);
   const api = useRef<any>(null);
@@ -92,6 +94,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
             list is the one Flow sends into. */}
         <a className="btn nosplit" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this"><Ico n="cards" /><span className="lbl">Evidence ↗</span></a>
         <Link className="btn" href="/tools/flows" title="Past flows — every round you have flowed, this one kept there as you go"><Ico n="history" /><span className="lbl">Past flows</span></Link>
+        <FullBtn className="btn" full={fs.full} toggle={fs.toggle} />
         <a className="btn splitlink" href="/tools/split?a=flow" onClick={markHop} title="Split screen — Flow beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span className="lbl" id="share-state">Not shared</span>

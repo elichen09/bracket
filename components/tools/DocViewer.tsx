@@ -12,6 +12,9 @@ import { polish } from "@/lib/evidence/polish";
 import "./docviewer.css";
 import "./finish.css";
 import ThemePicker from "./ThemePicker";
+import Ico from "./Ico";
+import { useFitBar } from "./fitBar";
+import FullBtn, { useFullscreen } from "./FullBtn";
 import { markHop } from "@/lib/toolsHop";
 
 /**
@@ -225,19 +228,12 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
   }, [q, runSearch]);
 
   /* ------------------------------------------------------------ full screen
-     The doc alone on the screen — above all from a side of the split screen,
-     where it had half the window. The browser's own full screen, so Esc
-     leaves it as it leaves any other; the button says which way it goes. */
-  const [full, setFull] = useState(false);
-  useEffect(() => {
-    const on = () => setFull(!!root.current && document.fullscreenElement === root.current);
-    document.addEventListener("fullscreenchange", on);
-    return () => document.removeEventListener("fullscreenchange", on);
-  }, []);
-  const toggleFull = useCallback(() => {
-    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
-    root.current?.requestFullscreen?.().catch(() => toast("This browser would not go full screen here"));
-  }, [toast]);
+     The doc alone on the screen (FullBtn.tsx) — F as well as the button. */
+  const refused = useCallback(() => toast("This browser would not go full screen here"), [toast]);
+  const { full, toggle: toggleFull } = useFullscreen(root, refused);
+  // the banner: words while they fit, icons when they do not (fitBar.ts)
+  const bar = useRef<HTMLElement>(null);
+  useFitBar(bar);
 
   /* ------------------------------------------------------------ keys */
   useEffect(() => {
@@ -379,7 +375,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
       onDrop={onDrop}>
-      <header className="dv-top">
+      <header className="dv-top" ref={bar}>
         <Link className="dv-back mono" href="/tools" title="Back to the tools">←</Link>
         <div className="dv-brand mono">Doc viewer</div>
         {doc && (
@@ -405,16 +401,15 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
         )}
         {doc && doc.kind !== "pdf" && (
           <>
-            <button type="button" className={"dv-btn" + (hlOnly ? " on" : "")} onClick={() => setHlOnly((h) => !h)} title="Fade everything that is not highlighted — what gets read">Highlighted only</button>
+            <button type="button" className={"dv-btn" + (hlOnly ? " on" : "")} onClick={() => setHlOnly((h) => !h)} title="Highlighted only — fade everything that is not highlighted, what gets read"><Ico n="highlight" /><span className="lbl">Highlighted only</span></button>
             <div className="dv-zoom">
               <button type="button" className="dv-btn" onClick={() => setZoom((z) => Math.max(0.7, +(z - 0.1).toFixed(2)))} aria-label="Smaller">A−</button>
               <button type="button" className="dv-btn" onClick={() => setZoom((z) => Math.min(1.8, +(z + 0.1).toFixed(2)))} aria-label="Larger">A+</button>
             </div>
           </>
         )}
-        <button type="button" className={"dv-btn dv-full" + (full ? " on" : "")} onClick={toggleFull} aria-pressed={full}
-          title={full ? "Leave full screen (Esc or F)" : "Full screen — just the doc (F; Esc to leave)"}>{full ? "Exit full screen" : "Full screen"}</button>
-        <a className="dv-btn splitlink" href="/tools/split?a=viewer" onClick={markHop} title="Split screen — the Doc viewer beside another tool">Split ◫</a>
+        <FullBtn className="dv-btn dv-full" full={full} toggle={toggleFull} keyHint="F" />
+        <a className="dv-btn splitlink" href="/tools/split?a=viewer" onClick={markHop} title="Split screen — the Doc viewer beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <ThemePicker />
       </header>
 

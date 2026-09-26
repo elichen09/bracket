@@ -493,7 +493,7 @@ html.embedded .splitlink, html.embedded .nosplit { display: none !important; }
 .toolpage .fitm, .toolpage .fitm * { flex-shrink: 0 !important; }
 .toolpage .compact .ico { display: block; }
 .toolpage .compact .lbl, .toolpage .compact kbd, .toolpage .compact .stat, .toolpage .compact .crumb { display: none !important; }
-.toolpage .compact .btn, .toolpage .compact .th-btn {
+.toolpage .compact .btn, .toolpage .compact .th-btn, .toolpage .compact .dbtn, .toolpage .compact .dv-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   padding-left: 9px; padding-right: 9px; min-width: 34px;
 }
@@ -505,6 +505,13 @@ html.embedded .splitlink, html.embedded .nosplit { display: none !important; }
 .toolpage .evi > .bar .panesw .btn.on:hover { background: var(--bn-main); color: var(--bn-main-ink); opacity: .9; }
 
 /* a toolbar that does not fit even as icons scrolls sideways (fitBar.ts) */
-.toolpage .evi > .bar, .toolpage .flw > .topbar { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
-.toolpage .evi > .bar::-webkit-scrollbar, .toolpage .flw > .topbar::-webkit-scrollbar { display: none; }
-.toolpage .evi > .bar.compact > *, .toolpage .flw > .topbar.compact > * { flex-shrink: 0; }
+.toolpage .evi > .bar, .toolpage .flw > .topbar, .toolpage .dfl > .dtop, .toolpage .dvw > .dv-top { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
+.toolpage .evi > .bar::-webkit-scrollbar, .toolpage .flw > .topbar::-webkit-scrollbar, .toolpage .dfl > .dtop::-webkit-scrollbar, .toolpage .dvw > .dv-top::-webkit-scrollbar { display: none; }
+.toolpage .evi > .bar.compact > *, .toolpage .flw > .topbar.compact > *, .toolpage .dfl > .dtop.compact > *, .toolpage .dvw > .dv-top.compact > * { flex-shrink: 0; }
+/* Doc flow and the Doc viewer, as icons: the doc's name gives way too */
+.toolpage .dvw > .dv-top.compact .dv-now { display: none; }
+.toolpage .dvw > .dv-top.compact .dv-search input { width: 120px; }
+
+/* a tool in full screen (FullBtn.tsx) keeps its own ground, not the browser's black */
+.toolpage .evi:fullscreen, .toolpage .flw:fullscreen, .toolpage .dfl:fullscreen { background-color: var(--t-ground); }
+.toolpage .dvw:fullscreen { background-color: var(--ground); }
