@@ -96,7 +96,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
         <a className="btn nosplit" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this"><Ico n="cards" /><span className="lbl">Evidence ↗</span></a>
         <Link className="btn" href="/tools/flows" title="Past flows — every round you have flowed, this one kept there as you go"><Ico n="history" /><span className="lbl">Past flows</span></Link>
         <FullBtn className="btn" full={fs.full} toggle={fs.toggle} />
-        <PopBtn className="btn" tool="flow" />
+        <PopBtn className="btn" view="flow" />
         <a className="btn splitlink icoonly" aria-label="Split screen" href="/tools/split?a=flow" onClick={markHop} title="Split screen — Flow beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <button className="btn" id="share-btn" aria-pressed="false" title="Flow with your partner">
           <span className="dot" id="share-dot" /><span className="lbl" id="share-state">Not shared</span>

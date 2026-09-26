@@ -143,17 +143,6 @@ export default function Split({ first: want }: { first?: string }) {
     window.location.href = TOOLS[rest].src.replace(/\?embed=1$/, "");
   };
 
-  // a tool popped out of one side (PopBtn.tsx) is in its own window now: that side closes
-  useEffect(() => {
-    const on = (e: MessageEvent) => {
-      if (e.origin !== location.origin || !e.data || e.data.kind !== "tools:popped") return;
-      const slot = tools.indexOf(e.data.tool);
-      if (slot >= 0) close(slot as 0 | 1);
-    };
-    window.addEventListener("message", on);
-    return () => window.removeEventListener("message", on);
-  });
-
   const widthOf = (slot: number) => `calc(${(slot === left ? ratio : 1 - ratio) * 100}% - 5px)`;
   const orderOf = (slot: number) => (slot === left ? 0 : 2);
 

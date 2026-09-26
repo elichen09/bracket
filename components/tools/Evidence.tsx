@@ -211,7 +211,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
             list Flow writes into is this one. */}
         <a className="btn nosplit" href="/tools/flow" target="break-flow" title="Open Flow in its own tab"><Ico n="grid" /><span className="lbl">Flow ↗</span></a>
         <FullBtn className="btn" full={fs.full} toggle={fs.toggle} />
-        <PopBtn className="btn" tool="evidence" />
+        <PopBtn className="btn" view="send" />
         <a className="btn splitlink icoonly" aria-label="Split screen" href="/tools/split?a=evidence" onClick={markHop} title="Split screen — Evidence beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         {/* Share the send doc into a flow room, for a partner flowing on another computer. */}
         <button className="btn roombtn" data-act="room" title="Share the send doc with your partner's flow">

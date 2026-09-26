@@ -12,6 +12,10 @@
  *   sent          Evidence sent a card; Flow offers to put its tags in the flow.
  *   senddoc       Evidence's send doc, as an outline of blocks and tags, so a
  *                 Flow tab can show it and flow it.
+ *   viewer-doc    The doc the Doc viewer is showing (its id in the viewer's
+ *                 store), for a pop-out following it; viewer-ask asks again.
+ *   evidence-doc  Evidence's send or read doc as HTML, for a pop-out showing
+ *                 it; evidence-ask says one is open and which it wants.
  */
 
 import { scoped } from "./owner";
@@ -21,7 +25,11 @@ export type BusMessage =
   | { kind: "sent"; title: string; trigger: string; tags: string[] }
   | { kind: "senddoc"; by: string; at: number; blocks: DocBlock[] }
   /** Evidence bins switched in or out of the round, from any of the tools. */
-  | { kind: "bins-changed" };
+  | { kind: "bins-changed" }
+  | { kind: "viewer-doc"; id: string; at: number; name: string }
+  | { kind: "viewer-ask" }
+  | { kind: "evidence-doc"; want: "send" | "read"; html: string; at: number }
+  | { kind: "evidence-ask"; want: "send" | "read" };
 
 /** One block of a send doc, as Flow needs it: its header and its tags. */
 export interface DocBlock { head: string; section: string; tags: { tag: string; cite: string }[] }

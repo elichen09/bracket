@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Presence from "./Presence";
-import { sanitize, readDoc, readTime, markHits, clearHits, type Head } from "@/lib/viewer/doc";
+import { readTime, markHits, clearHits, type Head } from "@/lib/viewer/doc";
+import { drawDoc } from "@/lib/viewer/draw";
 import { listDocs, getDoc, keepDoc, dropDoc, newDocId, type ViewDoc, type ViewMeta, type DocKind } from "@/lib/viewer/store";
 import { readRoom, type ViewerRoom, type RoomDoc } from "@/lib/viewer/room";
 import { tidyCode } from "@/lib/flow/share";
@@ -18,7 +19,7 @@ import FullBtn, { useFullscreen } from "./FullBtn";
 import PopBtn from "./PopBtn";
 import { cardAt, greyOut, snapshot, restore, paint, clearGreen, greenWords, cardHtml, type Card } from "@/lib/viewer/rehighlight";
 import { sendBlockToEvidence } from "@/lib/flow/cards";
-import { openBus } from "@/lib/toolsBus";
+import { openBus, type Bus } from "@/lib/toolsBus";
 import { justHopped, markHop } from "@/lib/toolsHop";
 
 /**
@@ -42,7 +43,6 @@ const kindOf = (name: string, type = ""): DocKind => {
   if (n.endsWith(".html") || n.endsWith(".htm") || type.includes("html")) return "html";
   return "text";
 };
-const textToHtml = (t: string) => t.replace(/\r/g, "").split(/\n{2,}/).map((p) => "<p>" + p.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!)).replace(/\n/g, "<br>") + "</p>").join("");
 const when = (t: number) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const SOURCE = { room: "Partner", speechdrop: "SpeechDrop", file: "File", paste: "Pasted" } as const;
@@ -138,18 +138,8 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
           setHeads([]);
           return;
         }
-        if (doc.kind === "docx" && doc.blob) {
-          const { renderAsync } = await import("docx-preview");
-          if (dead) return;
-          await renderAsync(doc.blob, el, el, {
-            inWrapper: false, ignoreWidth: true, ignoreHeight: true, breakPages: false, ignoreLastRenderedPageBreak: true,
-            renderHeaders: false, renderFooters: false, renderFootnotes: true, renderEndnotes: true, className: "docx", useBase64URL: true,
-          });
-        } else {
-          el.innerHTML = sanitize(doc.kind === "text" ? textToHtml(doc.html || "") : doc.html || "");
-        }
-        if (dead) return;
-        const hs = readDoc(el);
+        const hs = await drawDoc(el, doc, () => dead);
+        if (!hs) return;
         setHeads(hs);
         if (keepPlace && pane.current) {
           const again = hs.find((h) => h.text === keepPlace.text);
@@ -363,8 +353,17 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
   /* ------------------------------------------------------------ the same doc, after a hop
      Into or out of the split screen, or popped out into a window of its own,
      the Doc viewer opens on the doc it was showing. */
+  // and a pop-out of the doc (Peek.tsx) follows it here, over the tools' bus
+  const busRef = useRef<Bus | null>(null);
+  useEffect(() => {
+    const say = (b: Bus) => { const d = docRef.current; if (d) b.post({ kind: "viewer-doc", id: d.id, at: d.at, name: d.name }); };
+    const b: Bus = openBus(owner, (m) => { if (m.kind === "viewer-ask") say(b); });
+    busRef.current = b;
+    return () => { b.close(); busRef.current = null; };
+  }, [owner]);
   useEffect(() => {
     try { sessionStorage.setItem("viewer.last", doc ? doc.id : ""); } catch { /* private browsing */ }
+    if (doc) busRef.current?.post({ kind: "viewer-doc", id: doc.id, at: doc.at, name: doc.name });
   }, [doc]);
   useEffect(() => {
     if (room || sd || !justHopped()) return;
@@ -554,7 +553,7 @@ export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?
           </>
         )}
         <FullBtn className="dv-btn dv-full" full={full} toggle={toggleFull} keyHint="F" />
-        <PopBtn className="dv-btn" tool="viewer" onBlocked={() => toast("The browser blocked the new window — allow pop-ups for this site")} />
+        <PopBtn className="dv-btn" view="doc" params={(): Record<string, string> => (doc ? { doc: doc.id } : {})} onBlocked={() => toast("The browser blocked the new window — allow pop-ups for this site")} />
         <a className="dv-btn splitlink icoonly" aria-label="Split screen" href="/tools/split?a=viewer" onClick={markHop} title="Split screen — the Doc viewer beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>
         <ThemePicker />
       </header>

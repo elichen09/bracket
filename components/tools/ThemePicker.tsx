@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Presence from "./Presence";
-import { SHAPE_KEY, THEME_KEY } from "@/lib/toolTheme";
+import { COZY_FONT, SHAPE_KEY, THEME_KEY } from "@/lib/toolTheme";
 
 /**
  * The tools' colour scheme — one button in every tool's banner.
@@ -13,8 +13,10 @@ import { SHAPE_KEY, THEME_KEY } from "@/lib/toolTheme";
  * tools layout sets it before the page paints, so there is no flash of the
  * default.
  *
- * Under the colours, the shape: Sharp (square edges, the default) or Cozy
- * (rounded corners, softer panels) — on <html data-tool-shape>, the same way.
+ * Under the colours, the feel: Sharp (square edges, hairlines, mono labels —
+ * the default) or Cozy (warmer and softer colour, a rounded face in sentence
+ * case, paper grain and lamp-light, slower easing) — on <html data-tool-shape>,
+ * the same way. finish.css has what Cozy changes.
  */
 
 const THEMES = [
@@ -32,8 +34,14 @@ export function applyTheme(id: string) {
 }
 
 export function applyShape(id: string) {
-  if (id === "cozy") document.documentElement.setAttribute("data-tool-shape", "cozy");
-  else document.documentElement.removeAttribute("data-tool-shape");
+  if (id === "cozy") {
+    document.documentElement.setAttribute("data-tool-shape", "cozy");
+    if (!document.getElementById("cozy-font")) {
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.id = "cozy-font"; l.href = COZY_FONT;
+      document.head.appendChild(l);
+    }
+  } else document.documentElement.removeAttribute("data-tool-shape");
 }
 
 export default function ThemePicker() {
@@ -112,9 +120,9 @@ export default function ThemePicker() {
               <span className="th-name">{t.name}<small>{t.note}</small></span>
             </button>
           ))}
-          <div className="th-h th-h2">Shape · every tool</div>
+          <div className="th-h th-h2">Feel · every tool</div>
           <div className="th-shapes">
-            {([["sharp", "Sharp", "Square edges"], ["cozy", "Cozy", "Rounded and soft"]] as const).map(([id, name, note]) => (
+            {([["sharp", "Sharp", "Crisp, square, mono"], ["cozy", "Cozy", "Warm, soft, rounded"]] as const).map(([id, name, note]) => (
               <button type="button" key={id} className={"th-shape" + (shape === id ? " on" : "")} onClick={() => pickShape(id)} aria-pressed={shape === id}>
                 <i className={"th-shp " + id} aria-hidden="true" />
                 <span className="th-name">{name}<small>{note}</small></span>
