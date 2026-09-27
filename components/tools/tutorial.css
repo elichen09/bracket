@@ -126,3 +126,229 @@
 :root[data-tool-shape="cozy"] .toolpage .tut kbd { border-radius: 5px; }
 :root[data-tool-shape="cozy"] .toolpage .tut .tu-hero .mono, :root[data-tool-shape="cozy"] .toolpage .tut .tu-sec h3,
 :root[data-tool-shape="cozy"] .toolpage .tut .tu-navh, :root[data-tool-shape="cozy"] .toolpage .tut .tu-lab { text-transform: none; letter-spacing: .02em; font-size: 12px; }
+
+/* ================================================================ Try it (TutorialDemos.tsx) */
+.toolpage .tut .tu-nav .tu-prog { padding: 0 10px 14px; display: grid; gap: 6px; }
+.toolpage .tut .tu-progbar { height: 4px; background: var(--line-soft); overflow: hidden; }
+.toolpage .tut .tu-progbar i { display: block; height: 100%; background: var(--t-acc); transition: width .5s cubic-bezier(.22, 1, .36, 1); }
+.toolpage .tut .tu-prog .mono { font-size: 9.5px; letter-spacing: .1em; color: var(--dim); }
+.toolpage .tut .tu-tick { margin-left: auto; font-style: normal; font-size: 12px; color: var(--t-acc); opacity: 0; transform: scale(.4); transition: opacity .25s, transform .35s cubic-bezier(.22, 1.4, .36, 1); }
+.toolpage .tut .tu-tick.on { opacity: 1; transform: none; }
+
+.toolpage .tut .tu-demo { margin: 22px 0 0 54px; background: var(--t-paper); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(60, 45, 25, .06), 0 18px 36px -26px rgba(60, 45, 25, .4); }
+.toolpage .tut .tu-demo.wide { margin-left: 0; }
+.toolpage .tut .tu-dh { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); background: var(--t-surface-2); }
+.toolpage .tut .tu-try { font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-deep-ink); background: var(--t-deep); padding: 4px 7px; }
+.toolpage .tut .tu-goal { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; }
+.toolpage .tut .tu-check { width: 18px; height: 18px; flex: none; display: grid; place-items: center; font-style: normal; font-size: 11px; border: 1.5px solid var(--line); color: #fff; transition: background .25s, border-color .25s, transform .35s cubic-bezier(.22, 1.4, .36, 1); }
+.toolpage .tut .tu-demo.done .tu-check { background: var(--t-acc); border-color: var(--t-acc); transform: scale(1.12); }
+.toolpage .tut .tu-reset { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; background: none; border: 0; color: var(--dim); cursor: pointer; }
+.toolpage .tut .tu-reset:hover { color: var(--ink); }
+.toolpage .tut .tu-dbody { padding: 16px; }
+.toolpage .tut .tu-hint { margin: 10px 0 0; font-size: 12.5px; color: var(--dim); line-height: 1.7; }
+.toolpage .tut .tu-hint kbd { font-size: 10px; padding: 2px 5px 3px; }
+.toolpage .tut .tu-empty { color: var(--dim); font-size: 13px; margin: 6px 0; }
+.toolpage .tut .tu-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.toolpage .tut button.tu-btn { cursor: pointer; font: inherit; font-family: var(--mono); font-size: 10px; }
+.toolpage .tut button.tu-btn:disabled { opacity: .45; cursor: default; }
+.toolpage .tut .tu-chip {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+  padding: 6px 10px; border: 1px solid var(--line); background: var(--t-surface); color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.toolpage .tut .tu-chip:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); }
+.toolpage .tut .tu-chip.on { background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep); }
+.toolpage .tut .tu-chip kbd { font-size: 9px; padding: 1px 4px 2px; }
+
+/* 00 the map, played */
+.toolpage .tut .tu-map.interactive { margin: 0; padding: 0; border: 0; background: none; }
+.toolpage .tut .tu-map.interactive .tu-lane { padding: 6px 8px; transition: background .3s; }
+.toolpage .tut .tu-map.interactive .tu-lane.on { background: var(--t-surface-2); }
+.toolpage .tut .tu-step { display: inline-flex; align-items: center; gap: 6px; }
+.toolpage .tut button.tu-node { cursor: pointer; font: inherit; font-size: 13px; border: 1px solid transparent; opacity: .45; transition: opacity .35s, transform .35s cubic-bezier(.22, 1.4, .36, 1), box-shadow .35s; }
+.toolpage .tut button.tu-node.soft { border-color: var(--line-soft); }
+.toolpage .tut button.tu-node.lit { opacity: 1; }
+.toolpage .tut button.tu-node.now { transform: translateY(-2px) scale(1.04); box-shadow: 0 0 0 3px rgba(var(--t-acc-rgb), .35); }
+.toolpage .tut .tu-say { min-height: 44px; margin: 12px 0; padding: 10px 14px; font-size: 14.5px; line-height: 1.5; background: var(--t-surface); border-left: 3px solid var(--t-acc); }
+
+/* 01 Evidence */
+.toolpage .tut .tu-ev { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; }
+.toolpage .tut .tu-ev-q { display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--t-acc); padding: 4px 2px 8px; }
+.toolpage .tut .tu-ev-q span { font-family: var(--display); font-size: 24px; color: var(--t-acc); }
+.toolpage .tut .tu-ev-q input { flex: 1; min-width: 0; font: inherit; font-size: 18px; border: 0; outline: 0; background: none; color: var(--ink); }
+.toolpage .tut .tu-ev-res { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+.toolpage .tut .tu-ev-res > li { border-left: 3px solid transparent; transition: background .15s, border-color .15s; }
+.toolpage .tut .tu-ev-res > li.on { background: var(--t-surface-2); border-left-color: var(--t-acc); }
+.toolpage .tut .tu-ev-b { width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 10px; background: none; border: 0; font: inherit; color: var(--ink); cursor: pointer; text-align: left; }
+.toolpage .tut .tu-ev-b b { font-size: 14px; }
+.toolpage .tut .tu-ev-b small { font-family: var(--mono); font-size: 9.5px; color: var(--dim); letter-spacing: .06em; }
+.toolpage .tut .tu-ev-res ol { margin: 0 0 6px; padding: 0 0 0 26px; }
+.toolpage .tut .tu-ev-res ol li button { background: none; border: 0; font: inherit; font-size: 13px; color: var(--muted); padding: 3px 6px; cursor: pointer; text-align: left; }
+.toolpage .tut .tu-ev-res ol li.on button { color: var(--ink); background: var(--t-surface); box-shadow: inset 2px 0 0 var(--t-acc); }
+.toolpage .tut .tu-ev-res .none { padding: 8px 10px; color: var(--dim); font-size: 13px; }
+.toolpage .tut .tu-ev-fmt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.toolpage .tut .tu-ev-fmt .mono { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin-right: 2px; }
+.toolpage .tut .tu-paper { min-height: 220px; background: #fff; color: #1a1a1a; padding: 18px 20px; box-shadow: 0 1px 3px rgba(60, 64, 67, .18); font-family: Calibri, Carlito, Arial, sans-serif; }
+.toolpage .tut .tu-paper .tu-empty { font-family: var(--ui); }
+.toolpage .tut .tu-blk { animation: tuLand .5s cubic-bezier(.22, 1.2, .36, 1) both; margin-bottom: 12px; }
+.toolpage .tut .tu-blk h5 { margin: 0 0 4px; font-size: 15px; text-align: center; text-decoration: underline; }
+.toolpage .tut .tu-blk h6 { margin: 0 0 2px; font-size: 13px; }
+@keyframes tuLand { from { opacity: 0; transform: translateY(-10px) scale(.98); } }
+
+/* 02 Flow */
+.toolpage .tut .tu-fl { display: grid; grid-template-columns: 1fr 210px; gap: 16px; }
+.toolpage .tut .tu-clock { display: inline-flex; align-items: center; gap: 2px; margin-bottom: 10px; background: var(--t-deep); color: var(--t-deep-ink); padding: 3px; }
+.toolpage .tut .tu-clock button { background: none; border: 0; color: inherit; font: inherit; padding: 4px 8px; cursor: pointer; }
+.toolpage .tut .tu-clock b { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; min-width: 140px; text-align: center; }
+.toolpage .tut .tu-clock .tm { font-family: var(--mono); font-size: 18px; padding: 0 10px; font-variant-numeric: tabular-nums; }
+.toolpage .tut .tu-clock .tm.low { color: var(--t-acc-hi); }
+.toolpage .tut .tu-clock .play { background: var(--t-deep-ink); color: var(--t-deep); width: 28px; }
+.toolpage .tut .tu-clock .play.on { background: var(--t-acc); color: #fff; }
+.toolpage .tut .tu-grid { display: grid; grid-template-columns: repeat(3, 1fr); outline: none; border: 1px solid var(--line); background: var(--t-surface); }
+.toolpage .tut .tu-grid:focus-visible { box-shadow: 0 0 0 3px rgba(var(--t-acc-rgb), .3); }
+.toolpage .tut .tu-gh { display: flex; align-items: baseline; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--ink); border-top: 3px solid transparent; background: var(--t-con-head); }
+.toolpage .tut .tu-gh.pro { background: var(--t-pro-head); }
+.toolpage .tut .tu-gh b { font-size: 15px; }
+.toolpage .tut .tu-gh span { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; color: #fff; padding: 1px 5px; background: var(--t-con); }
+.toolpage .tut .tu-gh.pro span { background: var(--t-pro); }
+.toolpage .tut .tu-gh.live { border-top-color: var(--t-acc); box-shadow: inset 0 -3px 0 var(--t-acc); }
+.toolpage .tut .tu-gh em { margin-left: auto; font-style: normal; font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--t-acc); }
+.toolpage .tut .tu-gc { min-height: 44px; padding: 7px 10px; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); background: var(--t-con-bg); cursor: text; position: relative; }
+.toolpage .tut .tu-gc.pro { background: var(--t-pro-bg); }
+.toolpage .tut .tu-gc.sel { box-shadow: inset 0 0 0 2px var(--t-deep); z-index: 1; }
+.toolpage .tut .tu-gc.pop { animation: tuPop .45s cubic-bezier(.22, 1.4, .36, 1) both; }
+@keyframes tuPop { from { transform: scale(.9); opacity: 0; } }
+.toolpage .tut .tu-gc textarea { width: 100%; border: 0; outline: 0; resize: none; font: inherit; background: transparent; color: var(--ink); padding: 0; }
+.toolpage .tut .tu-tg { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; padding: 1px 4px; margin: 0 1px; border: 1px solid currentColor; color: var(--muted); }
+.toolpage .tut .tu-tg.turn { background: var(--t-acc); border-color: var(--t-acc); color: #fff; }
+.toolpage .tut .tu-tg.dropped { color: var(--t-acc); }
+.toolpage .tut .tu-fl-side { display: grid; gap: 10px; align-content: start; }
+.toolpage .tut .tu-fl-side > .mono { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.toolpage .tut .tu-sdb { background: var(--t-surface); border: 1px solid var(--line-soft); padding: 10px 12px; font-size: 13px; }
+.toolpage .tut .tu-sdb ol { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+
+/* 03 Doc flow */
+.toolpage .tut .tu-df { background: #fff; color: #1a1a1a; padding: 16px 20px; box-shadow: 0 1px 3px rgba(60, 64, 67, .18); }
+.toolpage .tut .tu-df-box { border: 3px solid #222; text-align: center; font-weight: 700; font-size: 18px; padding: 6px; margin-bottom: 10px; letter-spacing: .04em; }
+.toolpage .tut .tu-df-l { display: flex; align-items: baseline; gap: 8px; padding: 3px 10px; transition: padding-left .25s cubic-bezier(.22, 1, .36, 1), background .2s; }
+.toolpage .tut .tu-df-l.them { background: rgba(207, 42, 34, .06); }
+.toolpage .tut .tu-df-l.them input, .toolpage .tut .tu-df-l.them .tu-df-n { color: #C4302A; }
+.toolpage .tut .tu-df-l.us input, .toolpage .tut .tu-df-l.us .tu-df-n { color: #1a1a1a; }
+.toolpage .tut .tu-df-n { font-size: 14px; min-width: 18px; }
+.toolpage .tut .tu-df-l input { flex: 1; border: 0; outline: 0; font: inherit; font-size: 15px; background: transparent; padding: 2px 0; }
+.toolpage .tut .tu-df-l input::placeholder { font-style: italic; opacity: .5; }
+.toolpage .tut .tu-df .tu-hint { color: #666; }
+
+/* 04 Doc viewer: rehighlight */
+.toolpage .tut .tu-vw-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.toolpage .tut .tu-vw-n { font-size: 10px; color: var(--dim); letter-spacing: .06em; }
+.toolpage .tut .tu-vw-card { background: #fff; color: #1a1a1a; padding: 16px 20px; box-shadow: 0 1px 3px rgba(60, 64, 67, .18); font-family: Calibri, Carlito, Arial, sans-serif; user-select: none; transition: box-shadow .3s; }
+.toolpage .tut .tu-vw-card.rh { box-shadow: 0 0 0 2px rgba(0, 190, 0, .45), 0 10px 30px -18px rgba(0, 0, 0, .4); cursor: text; }
+.toolpage .tut .tu-vw-card.sent { animation: tuSend .6s cubic-bezier(.22, 1, .36, 1); }
+@keyframes tuSend { 40% { transform: translateY(-6px) scale(.985); } }
+.toolpage .tut .tu-vw-card h5 { margin: 0 0 4px; font-size: 15px; }
+.toolpage .tut .tu-vw-card .cite { margin: 0 0 6px; font-size: 12.5px; }
+.toolpage .tut .tu-vw-card .txt { margin: 0; font-size: 14px; line-height: 1.6; }
+.toolpage .tut .tu-vw-card .txt span { transition: background-color .35s, color .35s; }
+.toolpage .tut .tu-vw-card .txt .y { background: #ffff00; text-decoration: underline; }
+.toolpage .tut .tu-vw-card .txt .gr { background: #c0c0c0; text-decoration: underline; }
+.toolpage .tut .tu-vw-card .txt .g { background: #00ff00; text-decoration: underline; font-weight: 700; }
+.toolpage .tut .tu-vw-card.hlonly .txt span:not(.y):not(.gr):not(.g) { color: rgba(20, 20, 20, .16); }
+.toolpage .tut .tu-landed { margin-top: 12px; display: grid; gap: 2px; padding: 10px 14px; background: var(--t-surface); border-left: 3px solid #00c800; animation: tuLand .5s cubic-bezier(.22, 1.2, .36, 1) both; }
+.toolpage .tut .tu-landed .mono { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.toolpage .tut .tu-landed small { color: var(--muted); }
+
+/* 05 Split screen */
+.toolpage .tut .tu-sp { position: relative; border: 1px solid var(--line); background: var(--t-ground); user-select: none; touch-action: none; }
+.toolpage .tut .tu-sp-strip { display: flex; background: var(--bn); gap: 10px; }
+.toolpage .tut .tu-sp-pick { display: flex; flex-wrap: wrap; gap: 2px; padding: 5px 6px; min-width: 0; overflow: hidden; }
+.toolpage .tut .tu-sp-pick button { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; background: none; border: 1px solid transparent; color: rgba(var(--bn-rgb), .6); padding: 4px 7px; cursor: pointer; }
+.toolpage .tut .tu-sp-pick button.on { background: var(--bn-main); color: var(--bn-main-ink); }
+.toolpage .tut .tu-sp-pick button.there { color: rgba(var(--bn-rgb), .35); }
+.toolpage .tut .tu-sp-pick button.x { margin-left: auto; font-size: 13px; }
+.toolpage .tut .tu-sp-row { display: flex; height: 190px; }
+.toolpage .tut .tu-sp-pane { min-width: 0; padding: 10px; display: grid; grid-template-rows: auto 1fr; gap: 8px; background: var(--t-surface); }
+.toolpage .tut .tu-sp-pane > .mono { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.toolpage .tut .tu-sp-bar { flex: 0 0 10px; cursor: col-resize; background: var(--t-ground); position: relative; display: grid; place-items: center; }
+.toolpage .tut .tu-sp-bar::before { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: var(--line); transition: background .15s; }
+.toolpage .tut .tu-sp-bar:hover::before, .toolpage .tut .tu-sp-bar.drag::before { background: var(--t-acc); }
+.toolpage .tut .tu-sp-bar button { position: relative; width: 22px; height: 22px; font-size: 11px; background: var(--t-paper); border: 1px solid var(--line); cursor: pointer; }
+.toolpage .tut .tu-sp-back { position: absolute; right: 10px; bottom: 10px; }
+/* the tools, sketched */
+.toolpage .tut .sk { display: grid; gap: 5px; align-content: start; }
+.toolpage .tut .sk i { display: block; height: 7px; background: var(--line-soft); }
+.toolpage .tut .sk-grid { grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.toolpage .tut .sk-grid i { height: 22px; background: var(--t-pro-bg); border: 1px solid var(--line-soft); }
+.toolpage .tut .sk-grid i:nth-child(3n+2) { background: var(--t-con-bg); }
+.toolpage .tut .sk-ev .q { height: 12px; border-bottom: 2px solid var(--t-acc); background: none; }
+.toolpage .tut .sk .w { width: 70%; }
+.toolpage .tut .sk-doc { background: #fff; padding: 8px; }
+.toolpage .tut .sk-doc .h { width: 50%; margin: 0 auto 2px; background: #999; }
+.toolpage .tut .sk-doc .hl { background: #ffff00; width: 60%; }
+.toolpage .tut .sk-df .box { height: 14px; border: 2px solid #333; background: none; }
+.toolpage .tut .sk-df .r { background: rgba(207, 42, 34, .35); }
+.toolpage .tut .sk-df .u { margin-left: 18px; }
+
+/* 06 Pop-outs */
+.toolpage .tut .tu-desk { position: relative; height: 290px; overflow: hidden; background: linear-gradient(160deg, #3b4a57, #28323b); user-select: none; touch-action: none; }
+.toolpage .tut .tu-mainwin { position: absolute; left: 18px; top: 18px; right: 18px; bottom: 18px; background: var(--t-ground); box-shadow: 0 16px 40px -18px rgba(0, 0, 0, .6); display: flex; flex-direction: column; }
+.toolpage .tut .tu-wbar { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; background: var(--bn); color: var(--bn-ink); font-size: 11px; }
+.toolpage .tut .tu-wbar > i { width: 8px; height: 8px; border-radius: 50%; background: rgba(var(--bn-rgb), .35); }
+.toolpage .tut .tu-wbar span { flex: 1; margin-left: 6px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; }
+.toolpage .tut .tu-popbtn { width: 24px; height: 22px; display: grid; place-items: center; background: none; border: 1px solid rgba(var(--bn-rgb), .4); color: var(--bn-ink); cursor: pointer; animation: tuNudge 2.4s ease-in-out infinite; }
+.toolpage .tut .tu-popbtn .ico { display: block; width: 13px; height: 13px; }
+@keyframes tuNudge { 0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(var(--t-acc-rgb), 0); } 80% { box-shadow: 0 0 0 5px rgba(var(--t-acc-rgb), .45); } }
+.toolpage .tut .tu-mainpanes { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }
+.toolpage .tut .tu-mainpanes > div { background: var(--t-surface); padding: 8px; }
+.toolpage .tut .tu-popwin { position: absolute; width: 36%; min-width: 210px; background: var(--t-paper); box-shadow: 0 24px 50px -16px rgba(0, 0, 0, .65); animation: tuPopOut .45s cubic-bezier(.22, 1.2, .36, 1) both; z-index: 2; }
+@keyframes tuPopOut { from { opacity: 0; transform: translate(40%, -30%) scale(.3); } }
+.toolpage .tut .tu-wbar.grab { cursor: grab; }
+.toolpage .tut .tu-wbar.grab:active { cursor: grabbing; }
+.toolpage .tut .tu-wbar .live { display: inline-flex; align-items: center; gap: 4px; font-style: normal; font-family: var(--mono); font-size: 9px; color: #9fe3a6; }
+.toolpage .tut .tu-wbar .live i { width: 6px; height: 6px; border-radius: 50%; background: #54d162; animation: tuBlink 1.2s steps(2) infinite; }
+@keyframes tuBlink { 50% { opacity: .2; } }
+.toolpage .tut .tu-wbar button { background: none; border: 0; color: var(--bn-ink); font-size: 14px; cursor: pointer; }
+.toolpage .tut .tu-popdoc { padding: 10px 12px; background: #fff; color: #1a1a1a; font-family: Calibri, Carlito, Arial, sans-serif; font-size: 12.5px; max-height: 150px; overflow: auto; }
+.toolpage .tut .tu-popdoc p { margin: 0 0 4px; }
+.toolpage .tut .tu-popdoc p.new { animation: tuLand .6s ease both; }
+.toolpage .tut .tu-deskhint { position: absolute; right: 26px; top: 52px; margin: 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.toolpage .tut .tu-deskhint .ico { display: inline-block; width: 12px; height: 12px; }
+
+/* 07 Past flows */
+.toolpage .tut .tu-pf input { width: 100%; font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid var(--line); background: var(--t-surface); color: var(--ink); outline: none; }
+.toolpage .tut .tu-pf input:focus { border-color: var(--ink); }
+.toolpage .tut .tu-pf-list { margin-top: 10px; display: grid; gap: 2px; }
+.toolpage .tut .tu-pf-t { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 8px 0 4px; }
+.toolpage .tut .tu-pf-r { width: 100%; display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--t-surface); border: 1px solid var(--line-soft); font: inherit; font-size: 13.5px; color: var(--ink); cursor: pointer; text-align: left; animation: tuLand .35s ease both; }
+.toolpage .tut .tu-pf-r.on { border-color: var(--ink); }
+.toolpage .tut .tu-pf-r span { color: var(--muted); }
+.toolpage .tut .tu-pf-read { padding: 8px 12px; font-size: 13px; color: var(--muted); background: var(--t-surface-2); border: 1px solid var(--line-soft); border-top: 0; }
+.toolpage .tut .tu-pf mark { background: rgba(var(--t-acc-rgb), .25); color: inherit; }
+
+/* 08 every tool */
+.toolpage .tut .tu-ev2 { display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px; }
+.toolpage .tut .tu-kt { min-height: 150px; padding: 14px; background: var(--t-surface); border: 1.5px dashed var(--line); outline: none; cursor: pointer; transition: border-color .2s, background .2s; }
+.toolpage .tut .tu-kt:focus { border-style: solid; border-color: var(--t-acc); background: var(--t-paper); cursor: default; }
+.toolpage .tut .tu-kt-ask { font-size: 13.5px; color: var(--muted); line-height: 1.9; }
+.toolpage .tut .tu-kt-k { margin-bottom: 10px; animation: tuPop .3s cubic-bezier(.22, 1.4, .36, 1) both; }
+.toolpage .tut .tu-kt-k kbd { font-size: 15px; padding: 6px 10px 7px; }
+.toolpage .tut .tu-kt ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
+.toolpage .tut .tu-kt li b { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--t-acc); margin-right: 6px; }
+.toolpage .tut .tu-fit-h { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.toolpage .tut .tu-fit-h .mono { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.toolpage .tut .tu-fit-h input { flex: 1; accent-color: var(--t-acc); }
+.toolpage .tut .tu-minibar {
+  --ink: var(--bn-ink); --line: rgba(var(--bn-rgb), .3); max-width: 100%;
+  display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 10px; overflow: hidden; color: var(--bn-ink);
+  background-color: var(--bn); background-image: var(--bn-grain), linear-gradient(180deg, var(--bn-top), var(--bn-bot));
+}
+.toolpage .tut .tu-minibar .brand { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+.toolpage .tut .tu-minibar .btn { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; padding: 6px 9px; background: none; color: var(--bn-ink); border: 1px solid rgba(var(--bn-rgb), .32); cursor: default; flex-shrink: 0; }
+.toolpage .tut .tu-minibar .btn .ico { width: 13px; height: 13px; }
+
+@media (max-width: 860px) {
+  .toolpage .tut .tu-demo { margin-left: 0; }
+  .toolpage .tut .tu-ev, .toolpage .tut .tu-fl, .toolpage .tut .tu-ev2 { grid-template-columns: 1fr; }
+}
+:root[data-tool-shape="cozy"] .toolpage .tut :is(.tu-demo, .tu-paper, .tu-df, .tu-vw-card, .tu-sp, .tu-desk, .tu-mainwin, .tu-popwin, .tu-kt, .tu-grid, .tu-say, .tu-landed, .tu-sdb) { border-radius: 14px !important; overflow: hidden; }
+:root[data-tool-shape="cozy"] .toolpage .tut :is(.tu-chip, .tu-try, .tu-check, .tu-clock) { border-radius: 8px !important; }

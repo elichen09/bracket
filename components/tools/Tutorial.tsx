@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ThemePicker from "./ThemePicker";
 import { useFitBar } from "./fitBar";
+import { Keys, MapDemo, EvidenceDemo, FlowDemo, DocFlowDemo, ViewerDemo, SplitDemo, PopDemo, PastDemo, EveryDemo } from "./TutorialDemos";
 import "./finish.css";
 import "./tutorial.css";
 
@@ -12,26 +13,11 @@ import "./tutorial.css";
  * it step by step, its keys, and what is worth knowing — with a way into each.
  *
  * Written from the tools as they are (their key lists, their buttons), in the
- * words this computer uses for its keys: Ctrl and Alt, not symbols.
+ * words this computer uses for its keys: Ctrl and Alt, not symbols. Each
+ * section has a "Try it" panel (TutorialDemos.tsx): the tool in miniature,
+ * working, with one thing to do — done, it is ticked in the contents, and
+ * the ticks are kept in this browser.
  */
-
-/** "Ctrl+Shift+Z" as keys; "↑ ↓" as two; "PageDown / Space" as alternatives. */
-function Keys({ k }: { k: string }) {
-  return (
-    <span className="tu-keys">
-      {k.split(" / ").map((alt, i) => (
-        <span key={i} className="tu-alt">
-          {i > 0 && <i>or</i>}
-          {alt.split(" ").map((chord, j) => (
-            <span key={j} className="tu-chord">
-              {chord.split("+").map((x, n) => <kbd key={n}>{x}</kbd>)}
-            </span>
-          ))}
-        </span>
-      ))}
-    </span>
-  );
-}
 
 interface Section {
   id: string;
@@ -56,29 +42,6 @@ const SECTIONS: Section[] = [
         <p>Each tool does one job, and they talk to each other. A card you send from <b>Evidence</b> shows up ready to flow in <b>Flow</b>. A doc
           open in the <b>Doc viewer</b> can be rehighlighted and sent back to your send doc. One room code joins you and your partner in
           Flow, Evidence&apos;s send doc and the Doc viewer at once.</p>
-        <div className="tu-map" aria-label="How a round moves through the tools">
-          <div className="tu-lane">
-            <span className="tu-lab mono">Your cards</span>
-            <span className="tu-node">Evidence</span><span className="tu-arrow">→</span>
-            <span className="tu-node soft">Send list &amp; send doc</span><span className="tu-arrow">→</span>
-            <span className="tu-node">Flow · Send doc tab</span><span className="tu-arrow">→</span>
-            <span className="tu-node soft">Flow all</span>
-          </div>
-          <div className="tu-lane">
-            <span className="tu-lab mono">Their docs</span>
-            <span className="tu-node soft">SpeechDrop / a .docx</span><span className="tu-arrow">→</span>
-            <span className="tu-node">Doc viewer</span><span className="tu-arrow">→</span>
-            <span className="tu-node soft">Rehighlight</span><span className="tu-arrow">→</span>
-            <span className="tu-node">Evidence</span>
-          </div>
-          <div className="tu-lane">
-            <span className="tu-lab mono">With your partner</span>
-            <span className="tu-node soft">One room code</span><span className="tu-arrow">→</span>
-            <span className="tu-node">Flow</span><span className="tu-plus">+</span>
-            <span className="tu-node">Send doc</span><span className="tu-plus">+</span>
-            <span className="tu-node">Doc viewer</span>
-          </div>
-        </div>
       </>
     ),
     steps: [
@@ -269,7 +232,36 @@ const SECTIONS: Section[] = [
   },
 ];
 
+const DONE_KEY = "tutorial.done";
+
 export default function Tutorial() {
+  // what has been tried, kept here so the ticks are still there next time
+  const [tried, setTried] = useState<Set<string>>(new Set());
+  useEffect(() => { try { setTried(new Set(JSON.parse(localStorage.getItem(DONE_KEY) || "[]"))); } catch { /* first visit */ } }, []);
+  const mark = useCallback((id: string) => setTried((t) => {
+    if (t.has(id)) return t;
+    const n = new Set(t); n.add(id);
+    try { localStorage.setItem(DONE_KEY, JSON.stringify([...n])); } catch { /* private browsing */ }
+    return n;
+  }), []);
+  const doneFns = useMemo(() => Object.fromEntries(SECTIONS.map((x) => [x.id, () => mark(x.id)])), [mark]);
+  const allKeys = useMemo(() => SECTIONS.flatMap((x) => (x.keys || []).map(([k, what]) => ({ tool: x.name, k, what }))), []);
+  const demoFor = (id: string) => {
+    const props = { onDone: doneFns[id], done: tried.has(id) };
+    switch (id) {
+      case "start": return <MapDemo {...props} />;
+      case "evidence": return <EvidenceDemo {...props} />;
+      case "flow": return <FlowDemo {...props} />;
+      case "docflow": return <DocFlowDemo {...props} />;
+      case "viewer": return <ViewerDemo {...props} />;
+      case "split": return <SplitDemo {...props} />;
+      case "popout": return <PopDemo {...props} />;
+      case "flows": return <PastDemo {...props} />;
+      case "every": return <EveryDemo {...props} allKeys={allKeys} />;
+      default: return null;
+    }
+  };
+
   const bar = useRef<HTMLElement>(null);
   useFitBar(bar);
   const body = useRef<HTMLDivElement>(null);
@@ -314,9 +306,14 @@ export default function Tutorial() {
       <div className="tu-body">
         <nav className="tu-nav" aria-label="Tools">
           <div className="tu-navh mono">The tools</div>
+          <div className="tu-prog" aria-label={`${tried.size} of ${SECTIONS.length} tried`}>
+            <div className="tu-progbar"><i style={{ width: `${(tried.size / SECTIONS.length) * 100}%` }} /></div>
+            <span className="mono">{tried.size} of {SECTIONS.length} tried</span>
+          </div>
           {SECTIONS.map((s, i) => (
             <button key={s.id} type="button" className={"tu-navi" + (cur === s.id ? " on" : "")} onClick={() => go(s.id)} aria-current={cur === s.id}>
               <span className="n mono">{String(i).padStart(2, "0")}</span>{s.name}
+              <i className={"tu-tick" + (tried.has(s.id) ? " on" : "")} aria-label={tried.has(s.id) ? "tried" : undefined}>{tried.has(s.id) ? "✓" : ""}</i>
             </button>
           ))}
         </nav>
@@ -325,7 +322,7 @@ export default function Tutorial() {
             <div className="tu-hero">
               <p className="mono">The Break · Tools</p>
               <h1>How every tool works</h1>
-              <p className="tu-lead">What each tool is for, a first go at it step by step, its keys, and the things worth knowing. Open any of them from its section.</p>
+              <p className="tu-lead">What each tool is for, a first go at it step by step, its keys, and the things worth knowing. Every section has a <b>Try it</b> panel: a small working copy of the tool to have a go in. Nothing you do there touches your real flows or cards.</p>
             </div>
             {SECTIONS.map((s, i) => (
               <section key={s.id} id={"tu-" + s.id} className="tu-sec">
@@ -342,6 +339,7 @@ export default function Tutorial() {
                   </div>
                 )}
                 <div className="tu-idea">{s.idea}</div>
+                {demoFor(s.id)}
                 {s.steps && (
                   <>
                     <h3 className="mono">{s.id === "start" ? "A round with the tools" : s.id === "every" ? "The buttons" : "A first go"}</h3>
