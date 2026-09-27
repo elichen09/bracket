@@ -82,6 +82,8 @@ export async function loadField(tournId: number, abbr: string): Promise<RawEntry
     signal: AbortSignal.timeout(20_000),
     cache: "no-store",
   });
+  // A Tabroom that is down (its maintenance page, a 5xx) is not a missing field — say which it is.
+  if (res.status >= 500) throw new Error(`Tabroom is down right now (error ${res.status}) — try again once it is back`);
   if (!res.ok) throw new Error(`Tabroom has no published field for ${abbr} at tournament ${tournId}`);
   const j = (await res.json()) as { Entries?: RawEntry[] };
   // Placeholder entries ("TBA") are registrations without debaters yet, not teams,
