@@ -1,0 +1,128 @@
+/* ------------------------------------------------------------ the tutorial (Tutorial.tsx)
+   A reading page in the tools' own finish: the banner, the scheme's paper,
+   a contents list down the side that follows where you are. */
+.toolpage .tut {
+  --ink: var(--t-ink); --muted: var(--t-muted); --dim: var(--t-dim); --line: var(--t-line); --line-soft: var(--t-line-soft);
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  background-color: var(--t-ground); background-image: var(--grain); color: var(--ink);
+  font-family: var(--ui);
+}
+.toolpage .tut *, .toolpage .tut *::before, .toolpage .tut *::after { box-sizing: border-box; }
+
+/* the banner, as every tool has it */
+.toolpage .tut > .tu-top {
+  --ink: var(--bn-ink); --line: rgba(var(--bn-rgb), .26); --muted: rgba(var(--bn-rgb), .78); --dim: rgba(var(--bn-rgb), .55);
+  flex: none; display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 16px;
+  color: var(--ink); background-color: var(--bn);
+  background-image: var(--bn-grain), radial-gradient(120% 180% at 0% 0%, var(--bn-glow) 0%, transparent 60%), linear-gradient(180deg, var(--bn-top), var(--bn-bot));
+  border-bottom: 1px solid var(--bn-edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 10px 22px -18px rgba(0, 0, 0, .7);
+  position: relative; z-index: 5;
+}
+.toolpage .tut .tu-top .back { color: var(--dim); text-decoration: none; font-size: 13px; transition: color .15s, transform .15s; }
+.toolpage .tut .tu-top .back:hover { color: var(--ink); transform: translateX(-2px); }
+.toolpage .tut .tu-top .brand { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+.toolpage .tut .tu-gap { flex: 1; }
+
+.toolpage .tut .tu-body { flex: 1; min-height: 0; display: flex; }
+
+/* contents */
+.toolpage .tut .tu-nav {
+  flex: 0 0 230px; overflow-y: auto; padding: 22px 12px 30px; border-right: 1px solid var(--line-soft);
+  background-color: var(--t-panel); background-image: var(--grain);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.toolpage .tut .tu-navh { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); padding: 0 10px 10px; }
+.toolpage .tut .tu-navi {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left; padding: 8px 10px;
+  font: inherit; font-size: 14px; color: var(--muted); background: none; border: 0; border-left: 2px solid transparent; cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.toolpage .tut .tu-navi .n { font-size: 10px; color: var(--dim); letter-spacing: .08em; }
+.toolpage .tut .tu-navi:hover { color: var(--ink); background: rgba(0, 0, 0, .03); }
+.toolpage .tut .tu-navi.on { color: var(--ink); font-weight: 600; border-left-color: var(--t-acc); background: var(--t-surface-2); }
+
+/* the reading column */
+.toolpage .tut .tu-main { flex: 1; min-width: 0; overflow-y: auto; scroll-behavior: smooth; }
+.toolpage .tut .tu-col { max-width: 780px; margin: 0 auto; padding: 44px 32px 90px; }
+.toolpage .tut .tu-hero { padding-bottom: 26px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.toolpage .tut .tu-hero .mono { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--t-acc); margin: 0 0 12px; }
+.toolpage .tut .tu-hero h1 { font-family: var(--display); font-size: clamp(30px, 4vw, 44px); line-height: 1.05; letter-spacing: -.02em; margin: 0 0 12px; }
+.toolpage .tut .tu-lead { font-size: 16.5px; line-height: 1.55; color: var(--muted); margin: 0; max-width: 60ch; }
+
+.toolpage .tut .tu-sec { padding: 40px 0 34px; border-bottom: 1px solid var(--line-soft); scroll-margin-top: 18px; }
+.toolpage .tut .tu-sech { display: flex; gap: 16px; align-items: flex-start; }
+.toolpage .tut .tu-n { flex: none; margin-top: 7px; font-size: 11px; letter-spacing: .1em; color: var(--t-acc); border: 1px solid currentColor; padding: 3px 6px; }
+.toolpage .tut .tu-sech h2 { font-family: var(--display); font-size: 28px; letter-spacing: -.015em; margin: 0 0 4px; }
+.toolpage .tut .tu-line { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.5; }
+.toolpage .tut .tu-open { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0 54px; }
+.toolpage .tut .tu-btn {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; text-decoration: none;
+  padding: 9px 13px; border: 1px solid var(--line); color: var(--ink); background: var(--t-surface);
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.toolpage .tut .tu-btn:hover { border-color: var(--ink); }
+.toolpage .tut .tu-btn.ink { background: var(--t-deep); color: var(--t-deep-ink); border-color: var(--t-deep); }
+.toolpage .tut .tu-btn span { display: inline-block; transition: transform .15s; }
+.toolpage .tut .tu-btn:hover span { transform: translateX(3px); }
+
+.toolpage .tut .tu-idea { margin: 20px 0 0 54px; font-size: 15.5px; line-height: 1.62; }
+.toolpage .tut .tu-idea p { margin: 0 0 12px; }
+.toolpage .tut .tu-sec h3 { margin: 26px 0 10px 54px; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); font-weight: 500; }
+
+.toolpage .tut .tu-steps { margin: 0 0 0 54px; padding: 0; list-style: none; counter-reset: st; display: grid; gap: 10px; }
+.toolpage .tut .tu-steps li {
+  counter-increment: st; position: relative; padding: 12px 14px 12px 46px; font-size: 15px; line-height: 1.58;
+  background: var(--t-surface); border: 1px solid var(--line-soft);
+}
+.toolpage .tut .tu-steps li::before {
+  content: counter(st); position: absolute; left: 12px; top: 12px; width: 22px; height: 22px; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; color: var(--t-deep-ink); background: var(--t-deep);
+}
+
+.toolpage .tut .tu-keylist { margin: 0 0 0 54px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }
+.toolpage .tut .tu-krow { display: grid; grid-template-columns: minmax(118px, auto) 1fr; gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed var(--line-soft); }
+.toolpage .tut .tu-krow dt { margin: 0; }
+.toolpage .tut .tu-krow dd { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.4; }
+.toolpage .tut .tu-keys { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.toolpage .tut .tu-alt { display: inline-flex; align-items: center; gap: 4px; }
+.toolpage .tut .tu-alt i { font-style: normal; font-size: 11px; color: var(--dim); margin: 0 2px; }
+.toolpage .tut .tu-chord { display: inline-flex; gap: 2px; }
+.toolpage .tut kbd {
+  display: inline-block; min-width: 20px; text-align: center; font-family: var(--mono); font-size: 11px; line-height: 1;
+  padding: 4px 6px 5px; color: var(--ink); background: var(--t-paper); border: 1px solid var(--line); box-shadow: 0 1px 0 var(--line);
+}
+.toolpage .tut .tu-idea kbd, .toolpage .tut .tu-steps kbd, .toolpage .tut .tu-tips kbd { font-size: 10.5px; padding: 3px 5px 4px; vertical-align: 1px; }
+
+.toolpage .tut .tu-tips { margin: 0 0 0 54px; padding: 0; list-style: none; display: grid; gap: 8px; }
+.toolpage .tut .tu-tips li { position: relative; padding-left: 18px; font-size: 14.5px; line-height: 1.55; color: var(--muted); }
+.toolpage .tut .tu-tips li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 6px; height: 6px; background: var(--t-acc); transform: rotate(45deg); }
+.toolpage .tut .tu-tips b, .toolpage .tut .tu-steps b, .toolpage .tut .tu-idea b { color: var(--ink); font-weight: 650; }
+
+/* how the tools fit together */
+.toolpage .tut .tu-map { display: grid; gap: 10px; margin: 18px 0 4px; padding: 16px; background: var(--t-surface); border: 1px solid var(--line-soft); }
+.toolpage .tut .tu-lane { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.toolpage .tut .tu-lab { flex: 0 0 128px; font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.toolpage .tut .tu-node { font-size: 13px; font-weight: 600; padding: 5px 10px; background: var(--t-deep); color: var(--t-deep-ink); }
+.toolpage .tut .tu-node.soft { font-weight: 500; background: var(--t-surface-2); color: var(--ink); border: 1px solid var(--line-soft); }
+.toolpage .tut .tu-arrow, .toolpage .tut .tu-plus { color: var(--t-acc); font-size: 14px; }
+
+.toolpage .tut .tu-end { margin: 34px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--dim); }
+.toolpage .tut .tu-end a { color: var(--ink); }
+
+/* narrow: the contents step aside, the column takes the width */
+@media (max-width: 860px) {
+  .toolpage .tut .tu-nav { display: none; }
+  .toolpage .tut .tu-col { padding: 28px 16px 70px; }
+  .toolpage .tut :is(.tu-open, .tu-idea, .tu-steps, .tu-keylist, .tu-tips) { margin-left: 0; }
+  .toolpage .tut .tu-sec h3 { margin-left: 0; }
+  .toolpage .tut .tu-keylist { grid-template-columns: 1fr; }
+  .toolpage .tut .tu-lab { flex-basis: 100%; }
+}
+
+/* Cozy: rounded, like the rest */
+:root[data-tool-shape="cozy"] .toolpage .tut :is(.tu-steps li, .tu-map, .tu-btn, .tu-node, .tu-navi) { border-radius: 11px !important; }
+:root[data-tool-shape="cozy"] .toolpage .tut .tu-steps li::before, :root[data-tool-shape="cozy"] .toolpage .tut .tu-n { border-radius: 7px; }
+:root[data-tool-shape="cozy"] .toolpage .tut kbd { border-radius: 5px; }
+:root[data-tool-shape="cozy"] .toolpage .tut .tu-hero .mono, :root[data-tool-shape="cozy"] .toolpage .tut .tu-sec h3,
+:root[data-tool-shape="cozy"] .toolpage .tut .tu-navh, :root[data-tool-shape="cozy"] .toolpage .tut .tu-lab { text-transform: none; letter-spacing: .02em; font-size: 12px; }

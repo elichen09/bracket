@@ -20,6 +20,15 @@ export interface Tool {
 
 export const TOOLS: Tool[] = [
   {
+    slug: "tutorial",
+    name: "Tutorial",
+    blurb: "Start here — every tool explained: what it is for, a first go at it, its keys, and how they fit together.",
+    about:
+      "How the tools fit together through a round, then each one in turn — what it does, a first go at it step by step, " +
+      "every key it answers to, and what is worth knowing — with a way straight into each.",
+    storage: "Nothing to keep — it only explains.",
+  },
+  {
     slug: "evidence",
     name: "Evidence",
     blurb: "Search a cut file by trigger, send cards, and cut the speech doc from what you highlighted.",
