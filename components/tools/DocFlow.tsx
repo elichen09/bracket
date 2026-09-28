@@ -212,6 +212,23 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
   const [roomStatus, setRoomStatus] = useState<RoomStatus | null>(null);
   const [mates, setMates] = useState<Mate[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
+  // The share panel is pinned to the window under its button, not hung from
+  // the banner: a banner that scrolls sideways (fitBar.ts) clips whatever
+  // hangs out of it. It closes if the window or the banner moves the button.
+  const shareBtn = useRef<HTMLButtonElement>(null);
+  const [shareAt, setShareAt] = useState<{ top: number; right: number } | null>(null);
+  useEffect(() => {
+    if (!shareOpen) { setShareAt(null); return; }
+    const b = shareBtn.current?.getBoundingClientRect();
+    if (b) setShareAt({ top: Math.round(b.bottom + 10), right: Math.max(8, Math.round(window.innerWidth - b.right)) });
+    const shut = () => setShareOpen(false);
+    const barEl = shareBtn.current?.closest(".dtop");
+    const from = barEl ? barEl.scrollLeft : 0;
+    const scrolled = () => { if (barEl && Math.abs(barEl.scrollLeft - from) > 2) shut(); };
+    window.addEventListener("resize", shut);
+    barEl?.addEventListener("scroll", scrolled);
+    return () => { window.removeEventListener("resize", shut); barEl?.removeEventListener("scroll", scrolled); };
+  }, [shareOpen]);
   const [joinCode, setJoinCode] = useState("");
   // Which flow? — asked on the way in, unless a link already said
   const [asking, setAsking] = useState<PickerCurrent | null>(null);
@@ -1109,7 +1126,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
         </div>
         <div className="dgap" />
         <div className="dsharewrap">
-          <button type="button" className={"dbtn droom" + (inRoom ? " live " + roomStatus : "")} onClick={() => setShareOpen((s) => !s)}>
+          <button type="button" ref={shareBtn} className={"dbtn droom" + (inRoom ? " live " + roomStatus : "")} onClick={() => setShareOpen((s) => !s)}>
             {inRoom ? (
               <>
                 <i className="pulse" />
@@ -1120,8 +1137,8 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
               </>
             ) : <><Ico n="share" /><span className="lbl">Share</span></>}
           </button>
-          <Presence show={!!shareOpen}>{shareOpen && (
-            <div className="dsharepop" role="dialog" aria-label="Flow with your partner">
+          <Presence show={!!shareOpen && !!shareAt}>{shareOpen && shareAt && (
+            <div className="dsharepop" role="dialog" aria-label="Flow with your partner" style={{ position: "fixed", top: shareAt.top, right: shareAt.right }}>
               {inRoom ? (
                 <>
                   <div className="dsp-h mono">Room</div>
