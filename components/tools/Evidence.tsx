@@ -41,7 +41,7 @@ const DOCW_KEY = "evidence.docw";
 const MIN_SIDE = 300, MAX_SIDE = 820, DEFAULT_SIDE = 420;
 const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
 
-export default function Evidence({ owner, me, room }: { owner?: string; me?: string; room?: string }) {
+export default function Evidence({ owner, me, room, searchOnly }: { owner?: string; me?: string; room?: string; searchOnly?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const engine = useRef<any>(null);
   const bar = useRef<HTMLElement>(null);
@@ -55,29 +55,38 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   // The search as a pop-up: with its pane put away (to give the send doc the
   // room), / or the Search button floats the same search over the doc, and
   // Esc or a click outside puts it away again — the query kept for next time.
-  const [pop, setPop] = useState(false);
+  const [pop, setPopHere] = useState(false);
+  /** Inside Split screen the search pop-up is the split page's, free over both halves; elsewhere, this one. */
+  const inSplit = () => { try { return window.parent !== window && document.documentElement.classList.contains("embedded"); } catch { return false; } };
+  const setPop = useCallback((v: boolean | ((p: boolean) => boolean)) => {
+    if (!searchOnly && inSplit()) {
+      const want = typeof v === "function" ? v(false) : v;
+      if (want) window.parent.postMessage({ kind: "evidence-search", open: true }, location.origin);
+      return;
+    }
+    setPopHere(v);
+  }, [searchOnly]);
   // where the pop-up has been dragged to: an offset from its place in the middle, kept
   const [popAt, setPopAt] = useState({ x: 0, y: 0 });
   useEffect(() => {
     try { const v = JSON.parse(localStorage.getItem(POPAT_KEY) || "null"); if (v && typeof v.x === "number" && typeof v.y === "number") setPopAt(v); } catch { /* first time */ }
   }, []);
   /**
-   * Drag the pop-up by its bar. It stays wholly inside the tool (never lost
-   * off an edge), the spot is remembered, and a double-click on the bar puts
-   * it back in the middle.
+   * Drag the pop-up by its bar, anywhere in the window — over the banner and
+   * the site's menu too — but never off it, so the bar can always be reached.
+   * The spot is remembered; a double-click on the bar puts it back in the middle.
    */
   const dragPop = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("button") || e.button !== 0) return;
     const pane = e.currentTarget.parentElement as HTMLElement | null;
-    const box = ref.current;
-    if (!pane || !box) return;
+    if (!pane) return;
     e.preventDefault();
     const bar = e.currentTarget;
     bar.setPointerCapture(e.pointerId);
     const start = { x: e.clientX, y: e.clientY, at: popAt };
-    const r0 = pane.getBoundingClientRect(), b = box.getBoundingClientRect();
-    // how far it may go each way from where it started, and still be whole
-    const lim = { l: b.left - r0.left, r: b.right - r0.right, t: b.top + 56 - r0.top, bt: b.bottom - r0.bottom };
+    const r0 = pane.getBoundingClientRect();
+    // how far it may go each way from where it started: whole, inside the window
+    const lim = { l: -r0.left, r: window.innerWidth - r0.right, t: -r0.top, bt: window.innerHeight - r0.bottom };
     let last = popAt;
     const move = (ev: PointerEvent) => {
       const dx = Math.min(lim.r, Math.max(lim.l, ev.clientX - start.x));
@@ -97,15 +106,19 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   };
   const popRef = useRef(pop);
   popRef.current = pop;
-  useEffect(() => { if (show.search) setPop(false); }, [show.search]);
+  useEffect(() => { if (show.search) setPopHere(false); }, [show.search]);
+  // search-only (the split's floating search): the search pane, and nothing else
+  useEffect(() => { if (searchOnly) setShow({ search: true, list: false, doc: false }); }, [searchOnly]);
   useEffect(() => {
     if (!pop) return;
     const q = document.getElementById("q") as HTMLInputElement | null;
     setTimeout(() => {
       q?.focus(); q?.select();
       // a spot kept from a wider window that would leave it hanging off an edge here: back to the middle
-      const pane = ref.current?.querySelector(".pane.left")?.getBoundingClientRect(), b = ref.current?.getBoundingClientRect();
-      if (pane && b && (pane.left < b.left - 1 || pane.right > b.right + 1 || pane.bottom > b.bottom + 1 || pane.top < b.top)) setPopAt({ x: 0, y: 0 });
+      const pane = ref.current?.querySelector(".pane.left")?.getBoundingClientRect();
+      // (measured while it opens, a few pixels up and small: so only a real overhang counts)
+      const off = 16;
+      if (pane && (pane.left < -off || pane.right > window.innerWidth + off || pane.bottom > window.innerHeight + off || pane.top < -off)) setPopAt({ x: 0, y: 0 });
     }, 0);
   }, [pop]);
   const doc = show.doc;
@@ -137,7 +150,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       if (dead) return;
       engine.current = m;
       // Whose library: the engine opens this account's database, not a shared one.
-      off = m.boot(el, { owner, me, room });
+      off = m.boot(el, { owner, me, room, searchOnly });
     });
     return () => { dead = true; unpolish(); if (off) off(); };
   }, [owner, me, room]);
@@ -241,6 +254,11 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       if (e.key === "/" && !typing && !showRef.current.search && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault(); e.stopPropagation(); setPop(true); return;
       }
+      if (e.key === "Escape" && searchOnly) {
+        const q = document.getElementById("q") as HTMLInputElement | null;
+        if (!q || !q.value || t !== q) { e.preventDefault(); e.stopPropagation(); window.parent.postMessage({ kind: "evidence-search", open: false }, location.origin); }
+        return;
+      }
       if (e.key === "Escape" && popRef.current) {
         const q = document.getElementById("q") as HTMLInputElement | null;
         // a search with words in it is cleared first (Evidence does that); an empty one closes
@@ -267,7 +285,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   }, [toggle]);
 
   return (
-    <div className={"evi" + (dragging ? " resizing" : "") + (doc ? " withdoc" : "") + (show.search ? "" : " nosearch") + (show.list ? "" : " nolist") + (pop && !show.search ? " popsearch" : "")} ref={ref}
+    <div className={"evi" + (dragging ? " resizing" : "") + (doc ? " withdoc" : "") + (show.search ? "" : " nosearch") + (show.list ? "" : " nolist") + (pop && !show.search ? " popsearch" : "") + (searchOnly ? " searchonly" : "")} ref={ref}
       style={{
         ["--evi-side" as any]: `${Math.round(side)}px`,
         ["--evi-doc" as any]: `${Math.round(docW)}px`,

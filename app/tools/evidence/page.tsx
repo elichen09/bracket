@@ -18,11 +18,13 @@ export const dynamic = "force-dynamic";
  * code opens without the admin key. That link is how a partner is sent here
  * to build the send doc for the flow, and a partner is not an administrator.
  */
-export default async function EvidenceTool({ searchParams }: { searchParams?: { room?: string | string[]; embed?: string | string[] } }) {
+export default async function EvidenceTool({ searchParams }: { searchParams?: { room?: string | string[]; embed?: string | string[]; only?: string | string[] } }) {
   const raw = searchParams?.room;
   const room = (Array.isArray(raw) ? raw[0] : raw) || undefined;
   // inside the split view: the split page has the nav, and this is half of it
   const embed = !!searchParams?.embed;
+  // the floating search over the split screen: Evidence's search and nothing else
+  const searchOnly = (Array.isArray(searchParams?.only) ? searchParams?.only[0] : searchParams?.only) === "search";
   if (!isAdmin() && !room) {
     return (
       <>
@@ -38,7 +40,7 @@ export default async function EvidenceTool({ searchParams }: { searchParams?: { 
     <>
       {embed ? <Embedded /> : <Nav />}
       <main>
-        <div className="toolpage"><Evidence owner={user?.id} me={user ? displayName(user) : undefined} room={room} /></div>
+        <div className="toolpage"><Evidence owner={user?.id} me={user ? displayName(user) : undefined} room={searchOnly ? undefined : room} searchOnly={searchOnly} /></div>
       </main>
     </>
   );

@@ -83,7 +83,7 @@ const SECTIONS: Section[] = [
       <><b>+ Analytic</b> adds a tagline you write yourself under the last card.</>,
       <>The <b>Read</b> tab shows the doc as you&apos;ll read it: only what&apos;s highlighted.</>,
       <>Hide panes with {K("Alt+1")}–{K("Alt+3")} to split screen with just the send doc, or just the search.</>,
-      <>With the search pane hidden, {K("/")} (or the Search button) brings the search up <b>as a pop-up over the send doc</b>. It works just the same: {K("Enter")} sends, and your search is still there next time. {K("Esc")} clears it, and a second {K("Esc")} (or a click outside) puts it away. Drag it by its bar to move it anywhere (it stays there), and double-click the bar to centre it. <b>Keep it open</b> turns it back into a pane.</>,
+      <>With the search pane hidden, {K("/")} (or the Search button) brings the search up <b>as a pop-up over the send doc</b>. It works just the same: {K("Enter")} sends, and your search is still there next time. {K("Esc")} clears it, and a second {K("Esc")} (or a click outside) puts it away. Drag it by its bar anywhere on the screen, and it stays there. In Split screen it floats over both halves, over Flow too. Double-click the bar to centre it. <b>Keep it open</b> turns it back into a pane.</>,
     ],
   },
   {

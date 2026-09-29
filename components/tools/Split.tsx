@@ -25,6 +25,11 @@ import "./finish.css";
  * strip tucks away above the top edge until the pointer comes up to it, and
  * each tool draws its chrome small (html.roundmode, set in each frame) — the
  * room goes to the flow, the cards and the doc. Esc leaves it.
+ *
+ * Evidence's search pop-up, asked for from the Evidence side (/ or its Search
+ * button with the pane put away), floats here instead — over both halves,
+ * anywhere on the screen. It is Evidence in search-only mode, in a frame of
+ * its own: kept once opened, so the search is still there next time.
  */
 
 const TOOLS = {
@@ -50,6 +55,81 @@ export default function Split({ first: want }: { first?: string }) {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const frames = useRef<(HTMLIFrameElement | null)[]>([null, null]);
   const whole = useRef<HTMLDivElement>(null);
+
+  // the floating search: open or not, where it has been dragged to, and its frame
+  const SEARCH_AT = "tools.split.searchAt";
+  const [search, setSearch] = useState<{ open: boolean; made: boolean }>({ open: false, made: false });
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  const [moving, setMoving] = useState(false);
+  const searchFrame = useRef<HTMLIFrameElement>(null);
+  const floatBox = useRef<HTMLDivElement>(null);
+  // the cursor into its search box — tried again for a moment while the frame is still starting up
+  const focusSearch = useCallback(() => {
+    let tries = 0;
+    const go = () => {
+      const f = searchFrame.current;
+      try {
+        f?.contentWindow?.focus();
+        const q = f?.contentDocument?.getElementById("q") as HTMLInputElement | null;
+        q?.focus(); q?.select();
+        if (q && f?.contentDocument?.activeElement === q) return;
+      } catch { /* not there yet */ }
+      if (++tries < 50) setTimeout(go, 120);
+    };
+    go();
+  }, []);
+  // A spot, kept within the window: never somewhere the bar cannot be reached.
+  const place = useCallback((x: number, y: number) => {
+    const w = floatBox.current?.offsetWidth || 620, h = floatBox.current?.offsetHeight || 600;
+    return { x: Math.round(Math.min(window.innerWidth - w, Math.max(0, x))), y: Math.round(Math.min(window.innerHeight - 40, Math.max(0, y))) };
+  }, []);
+  useEffect(() => {
+    const on = (e: MessageEvent) => {
+      if (e.origin !== location.origin || !e.data || e.data.kind !== "evidence-search") return;
+      if (e.data.open) {
+        setSearch({ open: true, made: true });
+        setAt((a) => {
+          if (a) return a;
+          try { const v = JSON.parse(localStorage.getItem(SEARCH_AT) || "null"); if (v && typeof v.x === "number") return v; } catch { /* first time */ }
+          return { x: Math.round(window.innerWidth / 2 - 310), y: 70 };
+        });
+        setTimeout(focusSearch, 30);
+      } else setSearch((s) => ({ ...s, open: false }));
+    };
+    window.addEventListener("message", on);
+    return () => window.removeEventListener("message", on);
+  }, [focusSearch]);
+  // kept inside the window if the window shrinks (or it was kept from a bigger one)
+  useEffect(() => {
+    if (!search.open || !at) return;
+    const fit = () => setAt((a) => (a ? place(a.x, a.y) : a));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [search.open, place]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!search.open) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setSearch((s) => ({ ...s, open: false })); };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [search.open]);
+  const dragSearch = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button") || e.button !== 0 || !at) return;
+    e.preventDefault();
+    const bar = e.currentTarget;
+    bar.setPointerCapture(e.pointerId);
+    setMoving(true);
+    const from = { x: e.clientX, y: e.clientY, at };
+    let last = at;
+    const move = (ev: PointerEvent) => { last = place(from.at.x + ev.clientX - from.x, from.at.y + ev.clientY - from.y); setAt(last); };
+    const up = () => {
+      bar.removeEventListener("pointermove", move); bar.removeEventListener("pointerup", up);
+      setMoving(false);
+      try { localStorage.setItem(SEARCH_AT, JSON.stringify(last)); } catch { /* private browsing */ }
+    };
+    bar.addEventListener("pointermove", move);
+    bar.addEventListener("pointerup", up);
+  };
 
   // Round mode is full screen: it starts with it and ends with it (Esc included)
   const [round, setRound] = useState(false);
@@ -225,8 +305,24 @@ export default function Split({ first: want }: { first?: string }) {
           <i className="sp-grip" />
           <button type="button" className="sp-swap" onClick={flip} title="Swap sides" aria-label="Swap sides">⇄</button>
         </div>
-        {drag && <div className="sp-cover" />}
+        {(drag || moving) && <div className="sp-cover" />}
       </div>
+
+      {/* Evidence's search, floating over both halves — made the first time it is asked for, then kept */}
+      {search.made && at && (
+        <div className={"sp-float" + (search.open ? " open" : "") + (moving ? " moving" : "")} ref={floatBox}
+          style={{ left: at.x, top: at.y }} role="dialog" aria-label="Search evidence" aria-hidden={!search.open}>
+          <div className="sp-floatbar mono" onPointerDown={dragSearch}
+            onDoubleClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; const c = place(window.innerWidth / 2 - 310, 70); setAt(c); try { localStorage.setItem(SEARCH_AT, JSON.stringify(c)); } catch { /* private */ } }}
+            title="Drag to move it anywhere · double-click to put it back">
+            <span>Search evidence</span>
+            <span className="k"><kbd>/</kbd> on the Evidence side opens · <kbd>Esc</kbd> closes</span>
+            <button type="button" onClick={() => setSearch((s) => ({ ...s, open: false }))} aria-label="Close the search">×</button>
+          </div>
+          <iframe ref={searchFrame} src="/tools/evidence?embed=1&only=search" title="Search evidence" allow="clipboard-read; clipboard-write"
+            onLoad={() => { if (search.open) setTimeout(focusSearch, 60); }} />
+        </div>
+      )}
     </div>
   );
 }

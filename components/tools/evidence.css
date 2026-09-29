@@ -1006,9 +1006,9 @@
 }
 @keyframes eviVeil { from { opacity: 0; } }
 .evi.nosearch.popsearch .pane.left {
-  display: flex; position: absolute; z-index: 45; top: 70px; left: 50%;
+  display: flex; position: fixed; z-index: 45; top: 132px; left: 50%;
   transform: translate(calc(-50% + var(--pop-dx, 0px)), var(--pop-dy, 0px));
-  width: min(660px, calc(100% - 28px)); height: min(700px, calc(100% - 92px));
+  width: min(660px, calc(100vw - 28px)); height: min(700px, calc(100vh - 150px));
   border: 1px solid var(--line); box-shadow: 0 30px 80px -26px rgba(0, 0, 0, .55);
   animation: eviPopIn .24s var(--spring) both;
 }
@@ -1027,3 +1027,9 @@
 .evi.popsearch .popbar button { font: inherit; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; background: none; border: 1px solid var(--line); color: var(--muted); padding: 4px 8px; cursor: pointer; }
 .evi.popsearch .popbar button:hover { color: var(--ink); border-color: var(--ink); }
 .evi.popsearch .popbar button.x { border: 0; font-size: 15px; padding: 0 4px; }
+
+/* the floating search over the split screen (Split.tsx): Evidence's search pane, alone */
+.evi.searchonly > .bar { display: none; }
+.evi.searchonly .pane.right, .evi.searchonly .docpane, .evi.searchonly .grab { display: none !important; }
+.evi.searchonly .pane.left { display: flex !important; flex: 1; }
+.evi.searchonly #veil { display: none !important; }
