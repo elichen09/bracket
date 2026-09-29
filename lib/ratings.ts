@@ -220,21 +220,133 @@ export function codeFromEntryName(code: string, name: string, known: { firstName
 }
 
 /**
- * Read one event at one tournament into game rows. One request for the field,
- * then one per entry — a few hundred for a big Public Forum pool, which is why
- * this is an indexing job and not something a page does.
+ * Tabroom's logged-in website, shared by every tournament one update reads:
+ * its round results pages are where the rounds are now, and Tabroom turns
+ * away a login repeated a few times in a row. Loaded only here, on the
+ * server, so nothing that merely rates or ranks carries it.
+ */
+let shared: { session: import("./tabroom").TabroomSession } | null = null;
+async function tabroomSite() {
+  if (!shared) {
+    const { TabroomSession } = await import("./tabroom");
+    const u = process.env.TABROOM_USERNAME, pw = process.env.TABROOM_PASSWORD;
+    if (!u || !pw) throw new Error("TABROOM_USERNAME / TABROOM_PASSWORD are not set — the rounds are read from Tabroom's website");
+    shared = { session: new TabroomSession(u, pw) };
+  }
+  return shared.session;
+}
+
+interface SitePairing { aff: number; neg: number; affLabel: string; negLabel: string; winner: "aff" | "neg" | null; affBallots: number; negBallots: number; affPoints: number | null; negPoints: number | null }
+
+/**
+ * One round's results page, row by row: both entries (their ids, from the
+ * links to their records), who won, the ballots each way, and each team's
+ * speaker points averaged. A row without both entries (a bye) or without a
+ * decision is left out.
+ */
+async function readRoundPage(html: string): Promise<SitePairing[]> {
+  const cheerio = await import("cheerio");
+  const $ = cheerio.load(html);
+  const table = $("table").first();
+  if (!table.length) return [];
+  const heads = table.find("thead th, tr").first().find("th").map((_, th) => $(th).text().replace(/\s+/g, " ").trim()).get();
+  const at = (re: RegExp) => heads.findIndex((h) => re.test(h));
+  const affLabel = heads[0] || "Aff", negLabel = heads[1] || "Neg";
+  const iWin = at(/^win/i), iVotes = at(/^votes?$/i);
+  const pts = heads.map((h, i) => (/points/i.test(h) ? i : -1)).filter((i) => i >= 0);
+  const sideOf = (t: string): "aff" | "neg" | null => {
+    const w = t.toLowerCase();
+    const a = new RegExp(`\\b(${escRe(affLabel.toLowerCase())}|aff|pro|gov)\\b`).test(w);
+    const n = new RegExp(`\\b(${escRe(negLabel.toLowerCase())}|neg|con|opp)\\b`).test(w);
+    return a && !n ? "aff" : n && !a ? "neg" : null;
+  };
+  const avg = (t: string) => {
+    const xs = (t.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter((x) => x >= 15 && x <= 30.5);
+    return xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 100) / 100 : null;
+  };
+  const out: SitePairing[] = [];
+  table.find("tbody tr").each((_, tr) => {
+    const td = $(tr).find("td").toArray();
+    if (td.length < 3) return;
+    const idIn = (el: unknown) => { const h = $(el as never).find("a[href*='entry_id=']").attr("href") || ""; const m = /entry_id=(\d+)/.exec(h); return m ? Number(m[1]) : 0; };
+    const aff = idIn(td[0]), neg = idIn(td[1]);
+    if (!aff || !neg) return;
+    const winText = iWin >= 0 && td[iWin] ? $(td[iWin]).text().replace(/\s+/g, " ").trim() : "";
+    let winner = sideOf(winText);
+    // the ballots: "2-1 AFF" says it; otherwise each judge's vote, one ballot each
+    let affBallots = 0, negBallots = 0;
+    const votes = iVotes >= 0 && td[iVotes] ? $(td[iVotes]).find("div").map((_, d) => $(d).text().trim()).get().filter(Boolean) : [];
+    votes.forEach((v) => { const s = sideOf(v); if (s === "aff") affBallots++; else if (s === "neg") negBallots++; });
+    const split = /(\d+)\s*-\s*(\d+)/.exec(winText);
+    if (!votes.length && split && winner) {
+      const hi = Math.max(+split[1], +split[2]), lo = Math.min(+split[1], +split[2]);
+      if (winner === "aff") { affBallots = hi; negBallots = lo; } else { negBallots = hi; affBallots = lo; }
+    }
+    if (!winner && affBallots !== negBallots) winner = affBallots > negBallots ? "aff" : "neg";
+    if (!winner) return;                                       // no decision posted
+    if (!affBallots && !negBallots) { if (winner === "aff") affBallots = 1; else negBallots = 1; }
+    out.push({
+      aff, neg, affLabel, negLabel, winner, affBallots, negBallots,
+      affPoints: pts[0] !== undefined && td[pts[0]] ? avg($(td[pts[0]]).text()) : null,
+      negPoints: pts[1] !== undefined && td[pts[1]] ? avg($(td[pts[1]]).text()) : null,
+    });
+  });
+  return out;
+}
+
+/**
+ * The partner Tabroom did not name. Since the API lost its records, a
+ * tournament that publishes no speaker awards names one debater per entry, and
+ * a partnership known by one debater cannot be matched to itself anywhere else
+ * ("Dougherty Valley BT" at one tournament, "TB" at the next). Such an entry
+ * takes the pair its debater debated in at the nearest tournament in time that
+ * named both — the same partnership, as near as can be known. In memory only,
+ * for this count; what is stored is what Tabroom said.
+ */
+function completePartners(rows: GameRow[]): void {
+  const pairsOf = new Map<number, { pair: number[]; at: number }[]>();
+  for (const r of rows) {
+    const ids = [...new Set(r.student_ids || [])];
+    if (ids.length !== 2) continue;
+    const at = r.tourn_start ? Date.parse(r.tourn_start) : 0;
+    for (const id of ids) {
+      const list = pairsOf.get(id) || [];
+      if (!list.some((x) => x.at === at && x.pair.join() === ids.join())) list.push({ pair: ids, at });
+      pairsOf.set(id, list);
+    }
+  }
+  for (const r of rows) {
+    const ids = [...new Set(r.student_ids || [])];
+    if (ids.length !== 1) continue;
+    const at = r.tourn_start ? Date.parse(r.tourn_start) : 0;
+    const near = (pairsOf.get(ids[0]) || []).slice().sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
+    if (near) r.student_ids = near.pair.slice();
+  }
+}
+
+/**
+ * Read one event at one tournament into game rows.
+ *
+ * Tabroom's API no longer publishes a team's round records (the endpoint went
+ * in late September 2026), so the rounds are read where Tabroom still shows
+ * them: its round results pages, one per round, with the site's login. The
+ * API still gives the rest — the tournament, the field, the list of rounds,
+ * and, through the speaker awards, both debaters of every entry (the field
+ * names only one).
  */
 export async function collectGames(tournId: number, eventAbbr: string): Promise<{ rows: GameRow[]; entries: number; name: string; start: string | null; judgeBallots: JudgeBallot[] }> {
   const meta = await getJson<{ name: string; start: string }>(`/rest/tourns/${tournId}`);
-  const field = await getJson<{ Entries?: FieldEntry[]; name?: string }>(`/rest/tourns/${tournId}/events/${encodeURIComponent(eventAbbr)}/field`);
+  const field = await getJson<{ Entries?: FieldEntry[]; name?: string; id?: number }>(`/rest/tourns/${tournId}/events/${encodeURIComponent(eventAbbr)}/field`);
   let entries = field?.Entries || [];
+  const index = await getJson<Record<string, { id: number; abbr: string; name: string; ResultSets?: { id: number; tag: string }[] }>>(`/rest/tourns/${tournId}/results`);
+  const event = Object.values(index || {}).find((e) => e.abbr === eventAbbr || (field?.id && e.id === field.id));
+  const eventId = field?.id ?? event?.id ?? null;
+  const eventName = field?.name || event?.name || eventAbbr;
 
   // Some tournaments publish results but not a field — the national championships
   // among them. Their published result sets name every entry, so the roster can be
   // rebuilt from one of those instead.
   if (!entries.length) {
-    const index = await getJson<Record<string, { abbr: string; name: string; ResultSets?: { id: number; tag: string }[] }>>(`/rest/tourns/${tournId}/results`);
-    const event = Object.values(index || {}).find((e) => e.abbr === eventAbbr);
     const sets = (event?.ResultSets || []).slice().sort((a, b) => {
       const rank = (t: string) => (t === "bracket" ? 0 : t === "seed" ? 1 : t === "final" ? 2 : 3);
       return rank(a.tag) - rank(b.tag);
@@ -251,56 +363,68 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
     }
     entries = [...seen.values()];
   }
-
   if (!entries.length) throw new Error(`no entries published for ${eventAbbr} at tournament ${tournId}`);
+  const byId = new Map(entries.map((e) => [e.id, e]));
 
-  const docs = await pool(entries, 6, (e) => getJson<RecordsDoc>(`/rest/tourns/${tournId}/entries/${e.id}/records`));
-
-  const rows: GameRow[] = [];
-  // Every ballot of a rated event, with its judge, for judge scoring habits.
-  const judgeBallots: JudgeBallot[] = [];
+  // both debaters of each entry: the speaker awards name every one, with their entry
+  const people = new Map<number, { id: number; first?: string; last?: string }[]>();
+  const speakerSets = (event?.ResultSets || []).filter((r) => r.tag === "speaker");
+  for (const set of speakerSets) {
+    const doc = await getJson<{ results?: { Entry?: { id: number }; Student?: { id: number; first?: string; last?: string } }[] }[]>(`/rest/tourns/${tournId}/results/${set.id}`);
+    for (const row of (Array.isArray(doc) ? doc[0]?.results : undefined) || []) {
+      const eid = row.Entry?.id, st = row.Student;
+      if (!eid || !st?.id) continue;
+      const list = people.get(eid) || [];
+      if (!list.some((x) => x.id === st.id)) list.push({ id: st.id, first: st.first, last: st.last });
+      people.set(eid, list);
+    }
+  }
+  entries.forEach((e) => {
+    if (people.has(e.id)) return;
+    const fromField = (e.Students || []).map((s) => ({ id: s.id })).filter((s) => s.id);
+    if (fromField.length) people.set(e.id, fromField);
+  });
   // each entry by the code it goes by — its debaters' names put back as initials
   const codeOf = new Map<number, string>();
-  docs.forEach((doc, i) => {
-    if (!doc) return;
-    const people = Object.values(doc.Students || {}).filter((s): s is { first?: string; last?: string } => !!s && typeof s === "object");
-    codeOf.set(entries[i].id, conventionalCode(entries[i].code, people));
-  });
-  docs.forEach((doc, i) => {
-    if (!doc || !doc.Rounds) return;
-    const entry = entries[i];
-    // Judge habits are kept for every rated circuit, not just Public Forum.
-    const eventName = doc.Event?.name || field?.name || eventAbbr;
-    const circuit = circuitOf(meta?.name || "", eventName);
-    if (circuit && counts(circuit, eventName)) judgeBallots.push(...ballotsFromRecords(doc));
-    const students = Object.keys(doc.Students || {}).map(Number).filter(Boolean);
-    for (const r of Object.values(doc.Rounds)) {
-      const isPrelim = PRELIM_TYPES.has(r.type), isElim = ELIM_TYPES.has(r.type);
-      if (!isPrelim && !isElim) continue;
-      // Byes are not games, and neither is a round whose opponent Tabroom has not
-      // filled in — a forfeit against a withdrawn entry reads that way.
-      if (!r.Opponent?.id || r.bye) continue;
-      const ballots = Object.values(r.Results || {});
-      const won = ballots.filter((b) => b.winloss === "W").length;
-      const lost = ballots.filter((b) => b.winloss === "L").length;
-      if (!won && !lost) continue;                              // no decision posted
-      const pointBallot = ballots.find((b) => typeof b.point === "number");
-      rows.push({
-        tourn_id: tournId, round_id: r.id, entry_id: entry.id, opp_entry_id: r.Opponent.id,
-        event_id: doc.Event?.id ?? null, event_name: doc.Event?.name || field?.name || eventAbbr,
-        tourn_name: meta?.name || `Tournament ${tournId}`, tourn_start: meta?.start || null,
-        round_name: typeof r.name === "number" ? r.name : null, round_label: r.label || "",
-        elim: isElim,
-        code: codeOf.get(entry.id) || entry.code, opp_code: codeOf.get(r.Opponent.id) || r.Opponent.code, school: entry.School?.name || null,
-        side: r.sideLabel || null,
-        score: won > lost ? 1 : lost > won ? 0 : 0.5,
-        ballots_for: won, ballots_against: lost,
-        points: typeof pointBallot?.point === "number" ? pointBallot.point : null,
-        student_ids: students,
-      });
+  entries.forEach((e) => codeOf.set(e.id, conventionalCode(e.code, people.get(e.id) || [])));
+
+  // the event's rounds, and each one's results page
+  const rounds = ((await getJson<{ id: number; type: string; name: number | string; label?: string; eventId: number; published?: number }[]>(`/rest/tourns/${tournId}/rounds`)) || [])
+    .filter((r) => (!eventId || r.eventId === eventId) && (PRELIM_TYPES.has(r.type) || ELIM_TYPES.has(r.type)));
+  const site = rounds.length ? await tabroomSite() : null;
+  const pages = site ? await pool(rounds, 4, async (r) => {
+    try { return await readRoundPage(await site.page(`/index/tourn/results/round_results.mhtml?tourn_id=${tournId}&round_id=${r.id}`)); }
+    catch { return [] as SitePairing[]; }
+  }) : [];
+
+  const rows: GameRow[] = [];
+  rounds.forEach((r, ri) => {
+    const isElim = ELIM_TYPES.has(r.type);
+    for (const g of pages[ri] || []) {
+      for (const side of ["aff", "neg"] as const) {
+        const me = side === "aff" ? g.aff : g.neg, them = side === "aff" ? g.neg : g.aff;
+        const entry = byId.get(me), opp = byId.get(them);
+        if (!entry || !opp) continue;
+        const won = side === "aff" ? g.affBallots : g.negBallots, lost = side === "aff" ? g.negBallots : g.affBallots;
+        rows.push({
+          tourn_id: tournId, round_id: r.id, entry_id: me, opp_entry_id: them,
+          event_id: eventId, event_name: eventName,
+          tourn_name: meta?.name || `Tournament ${tournId}`, tourn_start: meta?.start || null,
+          round_name: typeof r.name === "number" ? r.name : Number(r.name) || null, round_label: r.label || "",
+          elim: isElim,
+          code: codeOf.get(me) || entry.code, opp_code: codeOf.get(them) || opp.code, school: entry.School?.name || null,
+          side: side === "aff" ? g.affLabel : g.negLabel,
+          score: g.winner === side ? 1 : 0,
+          ballots_for: won, ballots_against: lost,
+          points: side === "aff" ? g.affPoints : g.negPoints,
+          student_ids: (people.get(me) || []).map((x) => x.id),
+        });
+      }
     }
   });
-  return { rows, entries: entries.length, name: meta?.name || "", start: meta?.start || null, judgeBallots };
+  // Judges' scoring habits came from the records' judge ids, which the results
+  // pages do not give: none are gathered here, and the ones kept stay as they are.
+  return { rows, entries: entries.length, name: meta?.name || "", start: meta?.start || null, judgeBallots: [] };
 }
 
 /** Read one event and store its rounds. Safe to re-run: rows are upserted by round and entry. */
@@ -315,12 +439,26 @@ export async function ingestTournament(db: SupabaseClient, tournId: number, even
     return c !== null && counts(c, r.event_name);
   });
   if (!rows.length) return { rows: 0, entries: out.entries, name: out.name, skipped: out.rows.length > 0 };
+  // A round read again that names fewer debaters than the stored one did (a
+  // tournament with no speaker awards, since the API lost its records) keeps
+  // the ones already stored: an entry's debaters do not change.
+  const had = new Map<string, number[]>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from("rating_games").select("round_id,entry_id,student_ids").eq("tourn_id", tournId).range(from, from + 999);
+    if (error) break;
+    for (const g of (data || []) as { round_id: number; entry_id: number; student_ids: number[] | null }[]) had.set(g.round_id + ":" + g.entry_id, g.student_ids || []);
+    if (!data || data.length < 1000) break;
+  }
+  for (const r of rows) {
+    const before = had.get(r.round_id + ":" + r.entry_id);
+    if (before && before.length > (r.student_ids || []).length) r.student_ids = before;
+  }
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await db.from("rating_games").upsert(rows.slice(i, i + 500), { onConflict: "tourn_id,round_id,entry_id" });
     if (error) throw new Error(error.message);
   }
   const circuit = circuitOf(out.name, rows[0]?.event_name ?? eventAbbr);
-  if (circuit) await saveJudgeHabits(db, tournId, eventAbbr, out.start, judgeTallies(out.judgeBallots), circuit);
+  if (circuit && out.judgeBallots.length) await saveJudgeHabits(db, tournId, eventAbbr, out.start, judgeTallies(out.judgeBallots), circuit);
   return { rows: rows.length, entries: out.entries, name: out.name, skipped: false };
 }
 
@@ -385,6 +523,7 @@ export function currentSeason(now = new Date()): number {
  */
 function sameTeamSameName(rows: GameRow[], circuit: Circuit): Set<string> {
   const size = circuit === "ld" ? 1 : 2;
+  if (size === 2) completePartners(rows);
   const pairOf = (r: GameRow) => {
     const ids = [...new Set(r.student_ids || [])];
     return ids.length === size ? ids.sort((a, b) => a - b).join("+") : null;

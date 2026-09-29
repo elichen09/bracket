@@ -34,6 +34,8 @@ async function handle(req: Request) {
     return NextResponse.json({ error: "TABROOM_USERNAME / TABROOM_PASSWORD are not set" }, { status: 500 });
   }
 
+  // ?all=1 reads every tournament's rounds again, finished ones too
+  const force = new URL(req.url).searchParams.get("all") === "1";
   const db = supabaseAdmin();
   const { data: rows, error } = await db.from("tournaments").select("*")
     .neq("status", "complete").order("sort_order");
@@ -95,6 +97,15 @@ async function handle(req: Request) {
         if (abbr) await db.from("tournaments").update({ tabroom_event_abbr: abbr, tabroom_event_id: ev?.id ?? null }).eq("id", row.id);
       }
       if (!abbr) { summary.push(`ratings ${row.name}: no Tabroom event on file`); continue; }
+      // Rounds are read off Tabroom's results pages now, a page a round, and this
+      // has a minute to run: a tournament over and done with, its rounds already
+      // stored, is not read again. (A full re-read is /rankings/update's job.)
+      const { data: kept } = await db.from("rating_games").select("tourn_start").eq("tourn_id", row.tabroom_tourn_id).limit(1);
+      const began = kept?.[0]?.tourn_start ? Date.parse(kept[0].tourn_start) : NaN;
+      if (!force && kept?.length && Number.isFinite(began) && Date.now() - began > 5 * 86_400_000) {
+        summary.push(`ratings ${row.name}: finished, rounds already kept`);
+        continue;
+      }
       try {
         const r = await ingestTournament(db, row.tabroom_tourn_id, abbr);
         ingested += r.rows;
@@ -103,7 +114,7 @@ async function handle(req: Request) {
         summary.push(`ratings ${row.name}: ${e?.message || e}`);
       }
     }
-    if (ingested) {
+    if (ingested || force) {
       // Each circuit is its own standing, so each is rebuilt on its own rounds.
       for (const circuit of CIRCUIT_IDS) {
         const r = await recompute(db, undefined, circuit);
