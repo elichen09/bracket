@@ -1006,17 +1006,21 @@
 }
 @keyframes eviVeil { from { opacity: 0; } }
 .evi.nosearch.popsearch .pane.left {
-  display: flex; position: absolute; z-index: 45; top: 70px; left: 50%; transform: translateX(-50%);
+  display: flex; position: absolute; z-index: 45; top: 70px; left: 50%;
+  transform: translate(calc(-50% + var(--pop-dx, 0px)), var(--pop-dy, 0px));
   width: min(660px, calc(100% - 28px)); height: min(700px, calc(100% - 92px));
   border: 1px solid var(--line); box-shadow: 0 30px 80px -26px rgba(0, 0, 0, .55);
   animation: eviPopIn .24s var(--spring) both;
 }
-@keyframes eviPopIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(.985); } }
+@keyframes eviPopIn { from { opacity: 0; transform: translate(calc(-50% + var(--pop-dx, 0px)), calc(var(--pop-dy, 0px) - 8px)) scale(.985); } }
 .evi.popsearch .popbar {
   display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 8px 10px 8px var(--evi-gut);
   font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
   border-bottom: 1px solid var(--line-soft); background: var(--surface);
+  cursor: grab; user-select: none; touch-action: none;
 }
+.evi.popsearch .popbar.moving { cursor: grabbing; }
+.evi.popsearch .popbar button { cursor: pointer; }
 .evi.popsearch .popbar > span:first-child { color: var(--ink); }
 .evi.popsearch .popbar .pbk { flex: 1; text-transform: none; letter-spacing: .02em; }
 .evi.popsearch .popbar kbd { font-size: 9.5px; }

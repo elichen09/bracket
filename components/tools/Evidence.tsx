@@ -36,6 +36,7 @@ const DOC_KEY = "evidence.doc";
 /** Which of the three show — kept apart for the split view, which wants its own. */
 const PANES_KEY = "evidence.panes";
 const HINTS_KEY = "evidence.hints";
+const POPAT_KEY = "evidence.popAt";
 const DOCW_KEY = "evidence.docw";
 const MIN_SIDE = 300, MAX_SIDE = 820, DEFAULT_SIDE = 420;
 const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
@@ -55,13 +56,57 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   // room), / or the Search button floats the same search over the doc, and
   // Esc or a click outside puts it away again — the query kept for next time.
   const [pop, setPop] = useState(false);
+  // where the pop-up has been dragged to: an offset from its place in the middle, kept
+  const [popAt, setPopAt] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    try { const v = JSON.parse(localStorage.getItem(POPAT_KEY) || "null"); if (v && typeof v.x === "number" && typeof v.y === "number") setPopAt(v); } catch { /* first time */ }
+  }, []);
+  /**
+   * Drag the pop-up by its bar. It stays wholly inside the tool (never lost
+   * off an edge), the spot is remembered, and a double-click on the bar puts
+   * it back in the middle.
+   */
+  const dragPop = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button") || e.button !== 0) return;
+    const pane = e.currentTarget.parentElement as HTMLElement | null;
+    const box = ref.current;
+    if (!pane || !box) return;
+    e.preventDefault();
+    const bar = e.currentTarget;
+    bar.setPointerCapture(e.pointerId);
+    const start = { x: e.clientX, y: e.clientY, at: popAt };
+    const r0 = pane.getBoundingClientRect(), b = box.getBoundingClientRect();
+    // how far it may go each way from where it started, and still be whole
+    const lim = { l: b.left - r0.left, r: b.right - r0.right, t: b.top + 56 - r0.top, bt: b.bottom - r0.bottom };
+    let last = popAt;
+    const move = (ev: PointerEvent) => {
+      const dx = Math.min(lim.r, Math.max(lim.l, ev.clientX - start.x));
+      const dy = Math.min(lim.bt, Math.max(lim.t, ev.clientY - start.y));
+      last = { x: Math.round(start.at.x + dx), y: Math.round(start.at.y + dy) };
+      setPopAt(last);
+    };
+    const up = () => {
+      bar.removeEventListener("pointermove", move);
+      bar.removeEventListener("pointerup", up);
+      bar.classList.remove("moving");
+      remember(POPAT_KEY, JSON.stringify(last));
+    };
+    bar.classList.add("moving");
+    bar.addEventListener("pointermove", move);
+    bar.addEventListener("pointerup", up);
+  };
   const popRef = useRef(pop);
   popRef.current = pop;
   useEffect(() => { if (show.search) setPop(false); }, [show.search]);
   useEffect(() => {
     if (!pop) return;
     const q = document.getElementById("q") as HTMLInputElement | null;
-    setTimeout(() => { q?.focus(); q?.select(); }, 0);
+    setTimeout(() => {
+      q?.focus(); q?.select();
+      // a spot kept from a wider window that would leave it hanging off an edge here: back to the middle
+      const pane = ref.current?.querySelector(".pane.left")?.getBoundingClientRect(), b = ref.current?.getBoundingClientRect();
+      if (pane && b && (pane.left < b.left - 1 || pane.right > b.right + 1 || pane.bottom > b.bottom + 1 || pane.top < b.top)) setPopAt({ x: 0, y: 0 });
+    }, 0);
   }, [pop]);
   const doc = show.doc;
   const [dragging, setDragging] = useState(false);
@@ -226,6 +271,8 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       style={{
         ["--evi-side" as any]: `${Math.round(side)}px`,
         ["--evi-doc" as any]: `${Math.round(docW)}px`,
+        ["--pop-dx" as any]: `${popAt.x}px`,
+        ["--pop-dy" as any]: `${popAt.y}px`,
         // The page is drawn at its real 816px and zoomed to fit whatever the
         // panel has been dragged to, so the line breaks are the real ones.
         ["--evi-docscale" as any]: Math.max(0.3, Math.min(1.1, (docReal - 34) / 816)).toFixed(3),
@@ -270,7 +317,9 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         {pop && !show.search && <div className="popveil" onMouseDown={() => setPop(false)} aria-hidden="true" />}
         <section className="pane left">
           {/* only in the pop-up: what it is, and a way to keep it as a pane */}
-          <div className="popbar mono">
+          <div className="popbar mono" onPointerDown={dragPop}
+            onDoubleClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; setPopAt({ x: 0, y: 0 }); remember(POPAT_KEY, JSON.stringify({ x: 0, y: 0 })); }}
+            title="Drag to move it · double-click to put it back in the middle">
             <span>Search</span>
             <span className="pbk"><kbd>/</kbd> opens · <kbd>Esc</kbd> closes</span>
             <button type="button" onClick={() => toggle("search")} title="Keep the search open as a pane (Alt+1)">Keep it open</button>
