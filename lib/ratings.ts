@@ -131,7 +131,7 @@ export async function pool<T, R>(items: T[], limit: number, work: (item: T) => P
   return out;
 }
 
-interface FieldEntry { id: number; code: string; name: string; School?: { name: string }; Students?: { id: number }[] }
+interface FieldEntry { id: number; code: string; name: string; School?: { name: string }; Students?: { id: number; firstName?: string; lastName?: string }[] }
 interface RecordsDoc {
   id: number; code: string; name: string;
   Students?: Record<string, { first?: string; last?: string } | unknown>;
@@ -295,23 +295,32 @@ async function readRoundPage(html: string): Promise<SitePairing[]> {
 }
 
 /**
- * The partner Tabroom did not name. Since the API lost its records, a
- * tournament that publishes no speaker awards names one debater per entry, and
- * a partnership known by one debater cannot be matched to itself anywhere else
- * ("Dougherty Valley BT" at one tournament, "TB" at the next). Such an entry
- * takes the pair its debater debated in at the nearest tournament in time that
- * named both — the same partnership, as near as can be known. In memory only,
- * for this count; what is stored is what Tabroom said.
+ * The partner Tabroom did not name. Since the API lost its records, the field
+ * names one debater per entry, and a partnership known by one debater cannot
+ * be matched to itself where both were named. Such an entry takes a pair its
+ * debater debated in — but only the same partnership: that season (a debater
+ * who changes partners is a new team), and a pair that went by this same
+ * code, its initials either way round, or the school alone (a round robin's
+ * "Emory" for Emory GY). Lincoln-Sudbury CA never borrows last season's CR.
+ * In memory only, for this count; what is stored is what Tabroom said.
  */
+const SEASON_MS = 200 * 86_400_000;
+function sameCode(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (initialsKey(a) === initialsKey(b)) return true;
+  const school = (c: string) => c.replace(/\s+[A-Z]{1,4}$/, "").trim().toLowerCase();
+  const bare = (c: string) => !/\s[A-Z]{1,4}$/.test(c.trim());
+  return (bare(a) || bare(b)) && school(a) === school(b);
+}
 function completePartners(rows: GameRow[]): void {
-  const pairsOf = new Map<number, { pair: number[]; at: number }[]>();
+  const pairsOf = new Map<number, { pair: number[]; at: number; code: string }[]>();
   for (const r of rows) {
     const ids = [...new Set(r.student_ids || [])];
     if (ids.length !== 2) continue;
     const at = r.tourn_start ? Date.parse(r.tourn_start) : 0;
     for (const id of ids) {
       const list = pairsOf.get(id) || [];
-      if (!list.some((x) => x.at === at && x.pair.join() === ids.join())) list.push({ pair: ids, at });
+      if (!list.some((x) => x.at === at && x.pair.join() === ids.join() && x.code === r.code)) list.push({ pair: ids, at, code: r.code });
       pairsOf.set(id, list);
     }
   }
@@ -319,7 +328,9 @@ function completePartners(rows: GameRow[]): void {
     const ids = [...new Set(r.student_ids || [])];
     if (ids.length !== 1) continue;
     const at = r.tourn_start ? Date.parse(r.tourn_start) : 0;
-    const near = (pairsOf.get(ids[0]) || []).slice().sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
+    const near = (pairsOf.get(ids[0]) || [])
+      .filter((x) => Math.abs(x.at - at) <= SEASON_MS && sameCode(x.code, r.code))
+      .sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
     if (near) r.student_ids = near.pair.slice();
   }
 }
@@ -330,9 +341,8 @@ function completePartners(rows: GameRow[]): void {
  * Tabroom's API no longer publishes a team's round records (the endpoint went
  * in late September 2026), so the rounds are read where Tabroom still shows
  * them: its round results pages, one per round, with the site's login. The
- * API still gives the rest — the tournament, the field, the list of rounds,
- * and, through the speaker awards, both debaters of every entry (the field
- * names only one).
+ * API still gives the rest — the tournament, the field (which names one
+ * debater of each entry, usually) and the list of rounds.
  */
 export async function collectGames(tournId: number, eventAbbr: string): Promise<{ rows: GameRow[]; entries: number; name: string; start: string | null; judgeBallots: JudgeBallot[] }> {
   const meta = await getJson<{ name: string; start: string }>(`/rest/tourns/${tournId}`);
@@ -366,27 +376,13 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
   if (!entries.length) throw new Error(`no entries published for ${eventAbbr} at tournament ${tournId}`);
   const byId = new Map(entries.map((e) => [e.id, e]));
 
-  // both debaters of each entry: the speaker awards name every one, with their entry
-  const people = new Map<number, { id: number; first?: string; last?: string }[]>();
-  const speakerSets = (event?.ResultSets || []).filter((r) => r.tag === "speaker");
-  for (const set of speakerSets) {
-    const doc = await getJson<{ results?: { Entry?: { id: number }; Student?: { id: number; first?: string; last?: string } }[] }[]>(`/rest/tourns/${tournId}/results/${set.id}`);
-    for (const row of (Array.isArray(doc) ? doc[0]?.results : undefined) || []) {
-      const eid = row.Entry?.id, st = row.Student;
-      if (!eid || !st?.id) continue;
-      const list = people.get(eid) || [];
-      if (!list.some((x) => x.id === st.id)) list.push({ id: st.id, first: st.first, last: st.last });
-      people.set(eid, list);
-    }
-  }
-  entries.forEach((e) => {
-    if (people.has(e.id)) return;
-    const fromField = (e.Students || []).map((s) => ({ id: s.id })).filter((s) => s.id);
-    if (fromField.length) people.set(e.id, fromField);
-  });
-  // each entry by the code it goes by — its debaters' names put back as initials
+  // Each entry's debaters, as the field names them (since the API lost its
+  // records, usually just one); the code it goes by is put back from the
+  // entry's name ("Chhabra & Chan") where Tabroom wrote the names out.
+  const people = new Map<number, number[]>();
+  entries.forEach((e) => people.set(e.id, (e.Students || []).map((x) => x.id).filter(Boolean)));
   const codeOf = new Map<number, string>();
-  entries.forEach((e) => codeOf.set(e.id, conventionalCode(e.code, people.get(e.id) || [])));
+  entries.forEach((e) => codeOf.set(e.id, codeFromEntryName(e.code, e.name, e.Students || [])));
 
   // the event's rounds, and each one's results page
   const rounds = ((await getJson<{ id: number; type: string; name: number | string; label?: string; eventId: number; published?: number }[]>(`/rest/tourns/${tournId}/rounds`)) || [])
@@ -417,7 +413,7 @@ export async function collectGames(tournId: number, eventAbbr: string): Promise<
           score: g.winner === side ? 1 : 0,
           ballots_for: won, ballots_against: lost,
           points: side === "aff" ? g.affPoints : g.negPoints,
-          student_ids: (people.get(me) || []).map((x) => x.id),
+          student_ids: people.get(me) || [],
         });
       }
     }
@@ -526,7 +522,11 @@ function sameTeamSameName(rows: GameRow[], circuit: Circuit): Set<string> {
   if (size === 2) completePartners(rows);
   const pairOf = (r: GameRow) => {
     const ids = [...new Set(r.student_ids || [])];
-    return ids.length === size ? ids.sort((a, b) => a - b).join("+") : null;
+    if (ids.length === size) return ids.sort((a, b) => a - b).join("+");
+    // a two-person team known by one debater: that debater under a code with the
+    // same initials is the same team ("Dougherty Valley BT" and "TB")
+    if (size === 2 && ids.length === 1 && /\s[A-Z]{1,4}$/.test((r.code || "").trim())) return `${ids[0]}|${initialsKey(r.code)}`;
+    return null;
   };
   const initialled = (code: string) => /\s[A-Z]{1,4}$/.test(code.trim());
   // how often each pair has gone by each code
@@ -559,11 +559,35 @@ function sameTeamSameName(rows: GameRow[], circuit: Circuit): Set<string> {
   return renamed;              // the names that turned out to be someone else's
 }
 
-export async function recompute(db: SupabaseClient, season = currentSeason(), circuit: Circuit = "pf"): Promise<{ teams: number; debaters: number; periods: number; games: number; skippedSeasons: number }> {
-  await loadCircuitOverrides(db);   // tournaments said to be college (or not)
+/**
+ * Every stored round, in rating order. Loaded once and handed to recompute()
+ * for each circuit in turn, it spares three of four reads of the whole table
+ * — most of an update's minute.
+ */
+export async function loadAllGames(db: SupabaseClient): Promise<GameRow[]> {
   const all: GameRow[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("rating_games").select("*")
+      .order("tourn_start", { ascending: true })
+      .order("tourn_id", { ascending: true })
+      .order("round_id", { ascending: true })
+      .order("entry_id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    all.push(...((data || []) as GameRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return all;
+}
+
+export async function recompute(db: SupabaseClient, season = currentSeason(), circuit: Circuit = "pf", games?: GameRow[]): Promise<{ teams: number; debaters: number; periods: number; games: number; skippedSeasons: number }> {
+  await loadCircuitOverrides(db);   // tournaments said to be college (or not)
+  const all: GameRow[] = [];
+  // rounds already loaded: copies, since the count renames and fills them in
+  if (games) all.push(...games.map((g) => ({ ...g, student_ids: [...(g.student_ids || [])] })));
+  const PAGE = 1000;
+  for (let from = 0; !games; from += PAGE) {
     // Order by the primary key as well as the date: every round of a tournament
     // shares one start time, and paging a sort with ties repeats some rows and
     // drops others, which would count games twice.

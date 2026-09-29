@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { TabroomSession, syncTournament, statusFor } from "@/lib/tabroom";
 import type { Tournament } from "@/lib/types";
 import { eventForBracket, bracketResultId } from "@/lib/tabroomApi";
-import { ingestTournament, recompute } from "@/lib/ratings";
+import { ingestTournament, recompute, loadAllGames } from "@/lib/ratings";
 import { CIRCUITS, CIRCUIT_IDS } from "@/lib/circuit";
 
 export const runtime = "nodejs";
@@ -36,6 +36,7 @@ async function handle(req: Request) {
 
   // ?all=1 reads every tournament's rounds again, finished ones too
   const force = new URL(req.url).searchParams.get("all") === "1";
+  const t0 = Date.now();
   const db = supabaseAdmin();
   const { data: rows, error } = await db.from("tournaments").select("*")
     .neq("status", "complete").order("sort_order");
@@ -87,8 +88,15 @@ async function handle(req: Request) {
   try {
     const { data: all } = await db.from("tournaments").select("id,name,tabroom_tourn_id,tabroom_result_id,tabroom_event_abbr");
     let ingested = 0;
-    for (const row of all || []) {
+    // Reading a tournament is a page a round, and this has a minute in all: the
+    // reading stops at 30 seconds, leaving time to rebuild the rankings, and what
+    // it did not reach it reads next hour — in a new order each time, so no
+    // tournament is always the one left out.
+    const readUntil = Date.now() + 30_000;
+    const order = (all || []).slice().sort(() => Math.random() - 0.5);
+    for (const row of order) {
       if (!row.tabroom_tourn_id) continue;
+      if (!force && Date.now() > readUntil) { summary.push(`ratings ${row.name}: left for the next update`); continue; }
       let abbr: string | null = row.tabroom_event_abbr ?? null;
       if (!abbr && row.tabroom_result_id) {
         // older tournaments are identified by their bracket; learn the event once and remember it
@@ -109,16 +117,17 @@ async function handle(req: Request) {
       try {
         const r = await ingestTournament(db, row.tabroom_tourn_id, abbr);
         ingested += r.rows;
-        summary.push(`ratings ${row.name}: ${r.rows} rounds from ${r.entries} entries`);
+        summary.push(`ratings ${row.name}: ${r.rows} rounds from ${r.entries} entries (${Math.round((Date.now() - t0) / 1000)}s in)`);
       } catch (e: any) {
         summary.push(`ratings ${row.name}: ${e?.message || e}`);
       }
     }
     if (ingested || force) {
       // Each circuit is its own standing, so each is rebuilt on its own rounds.
+      const games = await loadAllGames(db);
       for (const circuit of CIRCUIT_IDS) {
-        const r = await recompute(db, undefined, circuit);
-        summary.push(`ratings ${CIRCUITS[circuit].short}: ${r.teams} partnerships and ${r.debaters} debaters over ${r.periods} tournaments`);
+        const r = await recompute(db, undefined, circuit, games);
+        summary.push(`ratings ${CIRCUITS[circuit].short}: ${r.teams} partnerships and ${r.debaters} debaters over ${r.periods} tournaments (${Math.round((Date.now() - t0) / 1000)}s in)`);
       }
     }
   } catch (e: any) {
