@@ -100,7 +100,8 @@ const SECTIONS: Section[] = [
       <>Click <b>Not shared</b> to start a room and read the code to your partner. You&apos;re both writing the same flow, and it stays shared through a page change.</>,
     ],
     keys: [
-      ["Enter", "Write in the cell, or the next line down"],
+      ["Enter", "Write in the cell, or the next line down (a new row, if that one is written in)"],
+      ["Ctrl+Enter", "A new row under this one, to answer in between"],
       ["Tab", "Answer: the next column across"],
       ["Shift+Enter", "A new line inside the cell"],
       ["Shift+↑ ↓ ← →", "Select a range"],

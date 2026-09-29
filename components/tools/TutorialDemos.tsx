@@ -224,22 +224,27 @@ export function FlowDemo({ onDone, done }: { onDone: () => void; done: boolean }
     f.setSelectionRange(f.value.length, f.value.length);
   }, [editing]);
 
-  const commit = useCallback((to?: { r: number; c: number }) => {
+  /** Put the cell away; then, maybe, somewhere else — a new row made there first, and writing in it. */
+  const commit = useCallback((to?: { r: number; c: number }, how: { insert?: boolean; write?: boolean } = {}) => {
     if (edit !== null && edit.trim() && sel.c > 0) onDone();
     setRows((rs) => {
       const copy = rs.map((r) => r.slice());
       if (edit !== null) copy[sel.r][sel.c] = edit;
-      if (to && to.r >= copy.length) copy.push(["", "", ""]);
+      if (to && how.insert) copy.splice(to.r, 0, ["", "", ""]);
+      else if (to && to.r >= copy.length) copy.push(["", "", ""]);
       return copy;
     });
-    setEdit(null);
+    setEdit(how.write ? "" : null);
     if (to) setSel({ r: to.r, c: Math.min(2, Math.max(0, to.c)) });
+    if (how.write) return;
     setTimeout(() => box.current?.focus(), 0);
   }, [edit, sel, onDone]);
 
   const onKey = (e: React.KeyboardEvent) => {
     if (edit !== null) {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit({ r: sel.r + 1, c: sel.c }); }
+      // Enter: the cell below — or, if it is written in, a new row between; Ctrl+Enter: always a new row
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit({ r: sel.r + 1, c: sel.c }, { insert: true, write: true }); }
+      else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); const below = rows[sel.r + 1]; commit({ r: sel.r + 1, c: sel.c }, { insert: !!(below && below[sel.c].trim()), write: true }); }
       else if (e.key === "Tab") { e.preventDefault(); commit({ r: sel.r, c: sel.c + 1 }); }
       else if (e.key === "Escape") { e.preventDefault(); commit(); }
       return;
@@ -292,7 +297,7 @@ export function FlowDemo({ onDone, done }: { onDone: () => void; done: boolean }
               );
             }))}
           </div>
-          <p className="tu-hint">Click a cell and type · <Keys k="Enter" /> next line · <Keys k="Tab" /> answer across · try typing <i>ext</i> or <i>turn</i></p>
+          <p className="tu-hint">Click a cell and type · <Keys k="Enter" /> next line (a new row if that one is written in) · <Keys k="Ctrl+Enter" /> a new row under this one · <Keys k="Tab" /> answer across · try <i>ext</i> or <i>turn</i></p>
         </div>
         <aside className="tu-fl-side">
           <div className="mono">Drawer › Send doc</div>
