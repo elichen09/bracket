@@ -495,7 +495,7 @@ export function PopDemo({ onDone, done }: { onDone: () => void; done: boolean })
   const dragFrom = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   useEffect(() => { if (!open) return; const t = setInterval(() => setShown((n) => (n < THEIR_1AC.length ? n + 1 : n)), 2200); return () => clearInterval(t); }, [open]);
   return (
-    <Demo goal="Pop their doc out, then drag it where you want it" done={done} onReset={() => { setOpen(false); setShown(2); setPos({ x: 58, y: 18 }); }}>
+    <Demo goal="Pop their doc out (it stays on top), then drag it where you want it" done={done} onReset={() => { setOpen(false); setShown(2); setPos({ x: 58, y: 18 }); }}>
       <div className="tu-desk" ref={desk}
         onPointerMove={(e) => {
           const d = dragFrom.current, b = desk.current?.getBoundingClientRect();

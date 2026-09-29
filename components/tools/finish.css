@@ -444,7 +444,43 @@ html[data-tool-theme="graphite"] .toolpage {
   flex: none; display: flex; color: var(--bn-ink); border-bottom: 1px solid var(--bn-edge);
   background-color: var(--bn); background-image: var(--bn-grain), linear-gradient(180deg, var(--bn-top), var(--bn-bot));
 }
-.toolpage .sp-gap { flex: 0 0 10px; }
+.toolpage .sp-gap { flex: 0 0 10px; position: relative; }
+/* Round mode's switch, over the line between the sides */
+.toolpage .sp-round {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+  width: 26px; height: 26px; display: grid; place-items: center; padding: 0; cursor: pointer;
+  color: var(--bn-ink); background: var(--bn); border: 1px solid rgba(var(--bn-rgb), .35);
+  transition: background .15s, border-color .15s;
+}
+.toolpage .sp-round:hover { border-color: var(--bn-ink); background: rgba(var(--bn-rgb), .12); }
+.toolpage .sp-round.on { background: var(--bn-main); color: var(--bn-main-ink); border-color: var(--bn-main); }
+.toolpage .sp-round .ico { display: block; width: 14px; height: 14px; }
+
+/* Round mode: full screen, the strip tucked above the top edge until the
+   pointer comes up to it, a hairline there to say it is waiting */
+.toolpage .splitv.round { background: var(--bn); }
+.toolpage .splitv.round .sp-strip {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+  transform: translateY(-100%); transition: transform .22s cubic-bezier(.22, 1, .36, 1) .12s;
+  box-shadow: 0 12px 28px -14px rgba(0, 0, 0, .6);
+}
+.toolpage .splitv.round .sp-reveal {
+  position: absolute; top: 0; left: 0; right: 0; height: 7px; z-index: 31;
+  background: linear-gradient(180deg, rgba(var(--bn-rgb), .22), transparent);
+}
+.toolpage .splitv.round .sp-reveal:hover ~ .sp-strip, .toolpage .splitv.round .sp-strip:hover { transform: none; transition-delay: 0s; }
+.toolpage .splitv.round .sp-row { height: 100%; }
+
+/* ---------- each tool in round mode (html.roundmode, set by Split screen) ----------
+   The banner a row shorter, the send doc's toolbar one scrolling line, the
+   key hints put away: the room goes to what is being read and written. */
+html.roundmode .toolpage :is(.evi > .bar, .flw > .topbar, .dfl > .dtop, .dvw > .dv-top) { height: 42px !important; gap: 8px; }
+html.roundmode .toolpage :is(.evi > .bar, .flw > .topbar, .dfl > .dtop, .dvw > .dv-top) :is(.btn, .dbtn, .dv-btn, .th-btn) { padding-top: 5px; padding-bottom: 5px; }
+html.roundmode .toolpage .evi .docpane.editable .docbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 4px 12px; }
+html.roundmode .toolpage .evi .docpane.editable .docbar::-webkit-scrollbar { display: none; }
+html.roundmode .toolpage .evi .docpane.editable .docbar > * { flex-shrink: 0; }
+html.roundmode .toolpage .evi .docnote { padding-top: 3px !important; padding-bottom: 3px !important; }
+html.roundmode .toolpage .evi .foothint, html.roundmode .toolpage .flw .bottom .keys, html.roundmode .toolpage .dfl .dkeys { display: none !important; }
 .toolpage .sp-pick { flex-grow: 0; flex-shrink: 0; min-width: 0; display: flex; gap: 2px; padding: 5px 8px; overflow-x: auto; scrollbar-width: none; }
 .toolpage .sp-pick::-webkit-scrollbar { display: none; }
 .toolpage .sp-tool {
@@ -660,3 +696,5 @@ html.embedded .splitlink, html.embedded .nosplit { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   :root[data-tool-shape="cozy"] .toolpage :is(button, a, input, select, textarea, .btn, .dbtn, .dv-btn, .dv-btn2, .th-btn, .c, .dv-orow) { transition-duration: .01s !important; }
 }
+html.roundmode .toolpage .evi.popsearch .popveil { top: 42px; }
+html.roundmode .toolpage .evi.nosearch.popsearch .pane.left { top: 54px; height: min(760px, calc(100% - 66px)); }

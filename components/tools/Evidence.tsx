@@ -51,6 +51,18 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   // Search, the send list, the document: each can be put away, any two or
   // one of them left — the send doc alone beside Flow, say. One always stays.
   const [show, setShow] = useState({ search: true, list: true, doc: true });
+  // The search as a pop-up: with its pane put away (to give the send doc the
+  // room), / or the Search button floats the same search over the doc, and
+  // Esc or a click outside puts it away again — the query kept for next time.
+  const [pop, setPop] = useState(false);
+  const popRef = useRef(pop);
+  popRef.current = pop;
+  useEffect(() => { if (show.search) setPop(false); }, [show.search]);
+  useEffect(() => {
+    if (!pop) return;
+    const q = document.getElementById("q") as HTMLInputElement | null;
+    setTimeout(() => { q?.focus(); q?.select(); }, 0);
+  }, [pop]);
   const doc = show.doc;
   const [dragging, setDragging] = useState(false);
   const [hintsShut, setHintsShut] = useState(false);
@@ -176,6 +188,26 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       return n;
     });
   }, []);
+  // / with the search put away: the pop-up. Esc on an empty search: away again.
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+      if (e.key === "/" && !typing && !showRef.current.search && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault(); e.stopPropagation(); setPop(true); return;
+      }
+      if (e.key === "Escape" && popRef.current) {
+        const q = document.getElementById("q") as HTMLInputElement | null;
+        // a search with words in it is cleared first (Evidence does that); an empty one closes
+        if (!q || !q.value || t !== q) { e.preventDefault(); e.stopPropagation(); setPop(false); }
+      }
+    };
+    window.addEventListener("keydown", on, true);
+    return () => window.removeEventListener("keydown", on, true);
+  }, []);
+  const showRef = useRef(show);
+  showRef.current = show;
+
   // Alt+1, Alt+2, Alt+3: search, the send list, the document
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -190,7 +222,7 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
   }, [toggle]);
 
   return (
-    <div className={"evi" + (dragging ? " resizing" : "") + (doc ? " withdoc" : "") + (show.search ? "" : " nosearch") + (show.list ? "" : " nolist")} ref={ref}
+    <div className={"evi" + (dragging ? " resizing" : "") + (doc ? " withdoc" : "") + (show.search ? "" : " nosearch") + (show.list ? "" : " nolist") + (pop && !show.search ? " popsearch" : "")} ref={ref}
       style={{
         ["--evi-side" as any]: `${Math.round(side)}px`,
         ["--evi-doc" as any]: `${Math.round(docW)}px`,
@@ -220,7 +252,9 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
         <ThemePicker />
         {/* what is on screen: any of the three, any two, or one alone */}
         <div className="panesw" role="group" aria-label="Show">
-          <button type="button" className={"btn pv" + (show.search ? " on" : "")} aria-pressed={show.search} onClick={() => toggle("search")} title="Search — Alt+1">
+          <button type="button" className={"btn pv" + (show.search || pop ? " on" : "")} aria-pressed={show.search || pop}
+            onClick={() => (show.search ? toggle("search") : setPop((p) => !p))}
+            title={show.search ? "Search — Alt+1 puts the pane away; then / or this button brings it up over the doc" : "Search, over the doc — / · Alt+1 keeps it open as a pane"}>
             <Ico n="search" /><span className="lbl">Search</span>
           </button>
           <button type="button" className={"btn pv" + (show.list ? " on" : "")} aria-pressed={show.list} onClick={() => toggle("list")} title="The send list — Alt+2">
@@ -233,7 +267,15 @@ export default function Evidence({ owner, me, room }: { owner?: string; me?: str
       </header>
 
       <div className="panes">
+        {pop && !show.search && <div className="popveil" onMouseDown={() => setPop(false)} aria-hidden="true" />}
         <section className="pane left">
+          {/* only in the pop-up: what it is, and a way to keep it as a pane */}
+          <div className="popbar mono">
+            <span>Search</span>
+            <span className="pbk"><kbd>/</kbd> opens · <kbd>Esc</kbd> closes</span>
+            <button type="button" onClick={() => toggle("search")} title="Keep the search open as a pane (Alt+1)">Keep it open</button>
+            <button type="button" className="x" onClick={() => setPop(false)} aria-label="Close the search">×</button>
+          </div>
           {/* where the search looks: your library, or this season's caselist wikis */}
           <div className="srcsw mono" id="srcsw" role="group" aria-label="Search in">
             <button type="button" data-src="lib" className="on" aria-pressed="true">Library</button>

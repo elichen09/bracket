@@ -994,3 +994,32 @@
   .evi .binbar > * { flex: none; }
   .evi .indexhead .c3 .link { white-space: nowrap; }
 }
+
+/* ---------- the search as a pop-up (Evidence.tsx, pop) ----------
+   With the search pane put away, the same search floats over the send doc:
+   the room stays the doc's until a card is wanted. */
+.evi .popbar { display: none; }
+.evi.popsearch { position: relative; }
+.evi.popsearch .popveil {
+  position: absolute; left: 0; right: 0; bottom: 0; top: 56px; z-index: 44;
+  background: rgba(24, 20, 14, .22); backdrop-filter: blur(1.5px); animation: eviVeil .18s ease both;
+}
+@keyframes eviVeil { from { opacity: 0; } }
+.evi.nosearch.popsearch .pane.left {
+  display: flex; position: absolute; z-index: 45; top: 70px; left: 50%; transform: translateX(-50%);
+  width: min(660px, calc(100% - 28px)); height: min(700px, calc(100% - 92px));
+  border: 1px solid var(--line); box-shadow: 0 30px 80px -26px rgba(0, 0, 0, .55);
+  animation: eviPopIn .24s var(--spring) both;
+}
+@keyframes eviPopIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(.985); } }
+.evi.popsearch .popbar {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 8px 10px 8px var(--evi-gut);
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
+  border-bottom: 1px solid var(--line-soft); background: var(--surface);
+}
+.evi.popsearch .popbar > span:first-child { color: var(--ink); }
+.evi.popsearch .popbar .pbk { flex: 1; text-transform: none; letter-spacing: .02em; }
+.evi.popsearch .popbar kbd { font-size: 9.5px; }
+.evi.popsearch .popbar button { font: inherit; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; background: none; border: 1px solid var(--line); color: var(--muted); padding: 4px 8px; cursor: pointer; }
+.evi.popsearch .popbar button:hover { color: var(--ink); border-color: var(--ink); }
+.evi.popsearch .popbar button.x { border: 0; font-size: 15px; padding: 0 4px; }

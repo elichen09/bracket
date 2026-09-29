@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { markHop } from "@/lib/toolsHop";
+import Ico from "./Ico";
 import "./finish.css";
 
 /**
@@ -19,6 +20,11 @@ import "./finish.css";
  * mid-round to change sides. Choosing for one side the tool the other side
  * has swaps them, for the same reason. Each side's × closes it, and the
  * other tool carries on across the whole window.
+ *
+ * Round mode (the button over the line): the split goes full screen, the
+ * strip tucks away above the top edge until the pointer comes up to it, and
+ * each tool draws its chrome small (html.roundmode, set in each frame) — the
+ * room goes to the flow, the cards and the doc. Esc leaves it.
  */
 
 const TOOLS = {
@@ -43,6 +49,24 @@ export default function Split({ first: want }: { first?: string }) {
   const [drag, setDrag] = useState(false);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const frames = useRef<(HTMLIFrameElement | null)[]>([null, null]);
+  const whole = useRef<HTMLDivElement>(null);
+
+  // Round mode is full screen: it starts with it and ends with it (Esc included)
+  const [round, setRound] = useState(false);
+  useEffect(() => {
+    const on = () => setRound(!!whole.current && document.fullscreenElement === whole.current);
+    document.addEventListener("fullscreenchange", on);
+    return () => document.removeEventListener("fullscreenchange", on);
+  }, []);
+  const toggleRound = () => {
+    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+    whole.current?.requestFullscreen?.().catch(() => {});
+  };
+  // each tool is told, so it can draw its chrome small — again whenever a frame loads
+  const tellFrames = useCallback((on: boolean) => {
+    frames.current.forEach((f) => { try { f?.contentDocument?.documentElement.classList.toggle("roundmode", on); } catch { /* not loaded */ } });
+  }, []);
+  useEffect(() => { tellFrames(round); }, [round, loaded, tellFrames]);
 
   const keep = (t: [ToolKey, ToolKey], l: 0 | 1, r: number) => {
     try { localStorage.setItem(KEY, JSON.stringify({ tools: t, left: l, ratio: r })); } catch { /* private browsing */ }
@@ -147,7 +171,9 @@ export default function Split({ first: want }: { first?: string }) {
   const orderOf = (slot: number) => (slot === left ? 0 : 2);
 
   return (
-    <div className={"splitv" + (drag ? " dragging" : "")}>
+    <div className={"splitv" + (drag ? " dragging" : "") + (round ? " round" : "")} ref={whole}>
+      {/* in round mode the strip waits above the top edge; the pointer at the edge brings it down */}
+      {round && <div className="sp-reveal" aria-hidden="true" />}
       {/* what is on each side, lined up over it */}
       <div className="sp-strip">
         {[0, 1].map((slot) => {
@@ -169,7 +195,12 @@ export default function Split({ first: want }: { first?: string }) {
             </div>
           );
         })}
-        <div className="sp-gap" style={{ order: 1 }} />
+        <div className="sp-gap" style={{ order: 1 }}>
+          <button type="button" className={"sp-round" + (round ? " on" : "")} onClick={toggleRound} aria-pressed={round}
+            title={round ? "Leave round mode (Esc)" : "Round mode — full screen, the chrome out of the way (Esc leaves)"} aria-label="Round mode">
+            <Ico n={round ? "unfull" : "full"} />
+          </button>
+        </div>
       </div>
 
       <div className="sp-row" ref={box}>
@@ -182,7 +213,7 @@ export default function Split({ first: want }: { first?: string }) {
                   without it Evidence could not copy a card — nor, then, send it */}
               <iframe ref={(el) => { frames.current[slot] = el; }} data-tool={k} src={TOOLS[k].src} title={TOOLS[k].title}
                 allow="clipboard-read; clipboard-write; fullscreen"
-                onLoad={() => setLoaded((m) => ({ ...m, [id]: true }))} />
+                onLoad={() => { setLoaded((m) => ({ ...m, [id]: true })); tellFrames(round); }} />
               <div className="sp-wait" aria-hidden="true"><span>{TOOLS[k].title}</span></div>
             </div>
           );

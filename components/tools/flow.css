@@ -1124,3 +1124,9 @@ body.flw-dragging, body.flw-dragging * { cursor: grabbing !important; user-selec
 .flw .palbins .psrc button + button { margin-left: -1px; }
 .flw .palbins .psrc button:hover { color: var(--ink); }
 .flw .palbins .psrc button[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); position: relative; }
+
+/* a column nobody has got to yet, folded to a sliver in a narrow flow (widths() in the engine) */
+.flw .h.fold { padding: 10px 0; justify-content: center; align-items: flex-start; overflow: hidden; cursor: pointer; }
+.flw .h.fold b { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; letter-spacing: .06em; color: var(--dim); }
+.flw .h.fold .sd, .flw .h.fold .ct, .flw .h.fold .lv { display: none; }
+.flw .h.fold:hover b { color: var(--ink); text-decoration: none; }

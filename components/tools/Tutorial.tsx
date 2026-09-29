@@ -83,6 +83,7 @@ const SECTIONS: Section[] = [
       <><b>+ Analytic</b> adds a tagline you write yourself under the last card.</>,
       <>The <b>Read</b> tab shows the doc as you&apos;ll read it: only what&apos;s highlighted.</>,
       <>Hide panes with {K("Alt+1")}–{K("Alt+3")} to split screen with just the send doc, or just the search.</>,
+      <>With the search pane hidden, {K("/")} (or the Search button) brings the search up <b>as a pop-up over the send doc</b>. It works just the same: {K("Enter")} sends, and your search is still there next time. {K("Esc")} clears it, and a second {K("Esc")} (or a click outside) puts it away. <b>Keep it open</b> turns it back into a pane.</>,
     ],
   },
   {
@@ -121,6 +122,7 @@ const SECTIONS: Section[] = [
     tips: [
       <>In the command panel, {K("/")} searches your evidence and {K("Tab")} switches to the caselist. Picking a card flows its tag and sends the card to your send doc.</>,
       <>Drag a row by its grip, or select several cells and drag them up or down together.</>,
+      <>When Flow is narrow (half of Split screen), columns nobody has reached yet fold into thin slivers, so the columns in use get the room. A column opens again when you click into it, Tab into it, or its speech starts.</>,
       <>Every key can be changed: open <b>Keyboard shortcuts</b> in the command panel.</>,
     ],
   },
@@ -186,19 +188,20 @@ const SECTIONS: Section[] = [
       <>Pick what goes on each side from the strip at the top: Evidence, Flow, Doc viewer or Doc flow. Picking what the other side has swaps them.</>,
       <>Drag the line between them to resize. Arrow keys nudge it, and double-clicking makes it half and half. <b>⇄</b> swaps the sides.</>,
       <><b>×</b> on a side closes it, and the other tool takes the whole window.</>,
+      <><b>Round mode</b> (the button over the line, in the strip) goes full screen and clears the clutter away. The site menu disappears, the strip tucks above the top edge until your pointer comes up to it, and each tool's banner gets shorter, with its key hints put away. {K("Esc")} leaves it.</>,
     ],
     tips: [
       <>The <b>Split</b> button in any tool opens Split screen with that tool on the left, still on the same flow and still in its room.</>,
-      <>Evidence with only its send doc showing ({K("Alt+3")}) beside Flow is a good setup for a speech.</>,
+      <>A good setup for a round: Flow and Evidence in <b>Round mode</b>, with Evidence showing only its send doc and the search as a pop-up ({K("/")}).</>,
     ],
   },
   {
     id: "popout",
     name: "Pop-outs",
     line: "One thing from a tool, in a small window of its own, to keep an eye on.",
-    idea: <p><b>Pop out</b> (the arrow-out-of-a-box icon in each banner) opens a small window with one thing in it. It stays live, and it can&apos;t be typed into, so it never conflicts with the tool itself.</p>,
+    idea: <p><b>Pop out</b> (the arrow-out-of-a-box icon in each banner) opens a small window with one thing in it. It <b>stays on top</b>, floating above both halves of Split screen and above other apps, so clicking elsewhere never hides it (in Chrome and Edge; other browsers get an ordinary window). It stays live, and it can&apos;t be typed into, so it never conflicts with the tool itself.</p>,
     steps: [
-      <>From the <b>Doc viewer</b>: just the doc. It follows whatever the Doc viewer shows, or can be pinned to one of your recent docs. You can have several, for example the other team&apos;s two docs side by side.</>,
+      <>From the <b>Doc viewer</b>: just the doc. It follows whatever the Doc viewer shows, or can be pinned to one of your recent docs. Only one pop-out floats at a time, so a second one (the other team&apos;s other doc, say) opens as an ordinary window beside it.</>,
       <>From <b>Evidence</b>: the send doc, or the read doc, as it&apos;s written.</>,
       <>From <b>Flow</b>: the grid, one sheet at a time. <b>Written only</b> hides columns nobody has spoken in yet.</>,
       <>From <b>Doc flow</b>: the flow as a document.</>,
