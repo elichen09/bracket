@@ -1057,3 +1057,29 @@
 .evi .docpane .soflash { animation: eviSoFlash 1.1s ease-out; }
 @keyframes eviSoFlash { 0%, 30% { background: rgba(var(--t-acc-rgb, 196, 85, 58), .22); } }
 :root[data-tool-shape="cozy"] .toolpage .evi .sol { border-radius: 8px; }
+
+/* ---------- the send doc with its outline down the left (Evidence.tsx) ----------
+   The send list is no pane of its own any more: its outline is the doc's. */
+.evi .docpane { flex-direction: row; }
+.evi .docpane > .docmain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.evi .docpane > .docside {
+  position: relative; width: 236px; flex: none; display: flex; flex-direction: column; min-height: 0;
+  border-right: 1px solid var(--line-soft); background: var(--surface);
+}
+.evi.nolist .docpane > .docside { display: flex; }
+.evi .docside #sidebody { flex: 1; min-height: 0; overflow-y: auto; }
+.evi .docside .tabs button { font-size: 9.5px; }
+.evi .docside .sideacts { flex-wrap: wrap; gap: 6px; padding: 10px; }
+.evi .docside .sideacts .btn { padding: 6px 9px; font-size: 9.5px; }
+.evi .docside .dsfold {
+  position: absolute; z-index: 3; top: 6px; right: -13px; width: 24px; height: 24px; padding: 0;
+  display: grid; place-items: center; font-size: 13px; line-height: 1; cursor: pointer;
+  color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 50%;
+}
+.evi .docside .dsfold:hover { color: var(--ink); border-color: var(--ink); }
+.evi .docside .dsfold span { display: none; }
+/* folded: a slim strip that says what it is and opens again */
+.evi .docside.shut { width: 26px; }
+.evi .docside.shut > :not(.dsfold) { display: none !important; }
+.evi .docside.shut .dsfold { position: static; width: 26px; height: 100%; border: 0; border-radius: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; padding-top: 12px; }
+.evi .docside.shut .dsfold span { display: block; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; }

@@ -39,7 +39,7 @@ const HINTS_KEY = "evidence.hints";
 const POPAT_KEY = "evidence.popAt";
 const DOCW_KEY = "evidence.docw";
 const MIN_SIDE = 300, MAX_SIDE = 820, DEFAULT_SIDE = 420;
-const MIN_DOC = 320, MAX_DOC = 900, DEFAULT_DOC = 460;
+const MIN_DOC = 420, MAX_DOC = 1200, DEFAULT_DOC = 700;      // the send doc pane, its outline column included
 
 export default function Evidence({ owner, me, room, searchOnly }: { owner?: string; me?: string; room?: string; searchOnly?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -166,7 +166,8 @@ export default function Evidence({ owner, me, room, searchOnly }: { owner?: stri
       if (localStorage.getItem(HINTS_KEY) === "1") setHintsShut(true);
       if (window.self !== window.top) panesKey.current = PANES_KEY + ".split";
       const kept = JSON.parse(localStorage.getItem(panesKey.current) || "null");
-      if (kept && (kept.search || kept.list || kept.doc)) setShow({ search: !!kept.search, list: !!kept.list, doc: !!kept.doc });
+      // (list: the send doc's outline column, which used to be the send list's own pane)
+      if (kept && (kept.search || kept.doc)) setShow({ search: !!kept.search, list: kept.list !== false, doc: !!kept.doc });
       else {
         const open = localStorage.getItem(DOC_KEY);
         if (open !== null) setShow((s) => ({ ...s, doc: open === "1" }));
@@ -239,7 +240,7 @@ export default function Evidence({ owner, me, room, searchOnly }: { owner?: stri
   const toggle = useCallback((k: "search" | "list" | "doc") => {
     setShow((s) => {
       const n = { ...s, [k]: !s[k] };
-      if (!n.search && !n.list && !n.doc) return s;            // one always stays
+      if (!n.search && !n.doc) return s;                       // one always stays
       remember(panesKey.current, JSON.stringify(n));
       if (k === "doc" && n.doc) setTimeout(() => engine.current?.renderDoc?.(), 0);
       if (k === "search" && n.search) setTimeout(() => (document.getElementById("q") as HTMLInputElement | null)?.focus(), 0);
@@ -271,7 +272,7 @@ export default function Evidence({ owner, me, room, searchOnly }: { owner?: stri
   const showRef = useRef(show);
   showRef.current = show;
 
-  // Alt+1, Alt+2, Alt+3: search, the send list, the document
+  // Alt+1, Alt+2, Alt+3: the search, the send doc's outline, the send doc
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
@@ -315,15 +316,12 @@ export default function Evidence({ owner, me, room, searchOnly }: { owner?: stri
           <span className="dot" id="roomdot" /><span className="lbl" id="roomstate">Room</span>
         </button>
         <ThemePicker />
-        {/* what is on screen: any of the three, any two, or one alone */}
+        {/* what is on screen: the search, the send doc (with its outline), or both */}
         <div className="panesw" role="group" aria-label="Show">
           <button type="button" className={"btn pv" + (show.search || pop ? " on" : "")} aria-pressed={show.search || pop}
             onClick={() => (show.search ? toggle("search") : setPop((p) => !p))}
             title={show.search ? "Search — Alt+1 puts the pane away; then / or this button brings it up over the doc" : "Search, over the doc — / · Alt+1 keeps it open as a pane"}>
             <Ico n="search" /><span className="lbl">Search</span>
-          </button>
-          <button type="button" className={"btn pv" + (show.list ? " on" : "")} aria-pressed={show.list} onClick={() => toggle("list")} title="The send list — Alt+2">
-            <Ico n="list" /><span className="lbl">Send list</span>
           </button>
           <button type="button" className={"btn pv" + (doc ? " on" : "")} aria-pressed={doc} onClick={() => toggle("doc")} title="The document as it will paste — Alt+3">
             <Ico n="doc" /><span className="lbl" id="doclabel">Send doc</span>
@@ -379,26 +377,27 @@ export default function Evidence({ owner, me, room, searchOnly }: { owner?: stri
           </div>
         </section>
 
-        {show.search && show.list && (
-          <div className="grab" role="separator" aria-orientation="vertical" aria-label="Resize the send list"
-            tabIndex={0} onPointerDown={grab("side")} onKeyDown={nudge("side")}><i /></div>
-        )}
-
-        <aside className="pane right">
-          <div className="tabs mono">
-            <button data-tab="send" className="on">Send <span className="count" id="sendCount" /></button>
-            <button data-tab="read">Read</button>
-          </div>
-          <div className="sideacts" id="sideacts" />
-          <div id="sidebody" />
-        </aside>
-
-        {doc && (show.search || show.list) && (
-          <div className="grab" role="separator" aria-orientation="vertical" aria-label="Resize the document"
+        {doc && show.search && (
+          <div className="grab" role="separator" aria-orientation="vertical" aria-label="Resize the send doc"
             tabIndex={0} onPointerDown={grab("doc")} onKeyDown={nudge("doc")}><i /></div>
         )}
-        <aside className="pane docpane" aria-hidden={!doc} ref={docPane}>
-          <DocEditor host={ref} width={docReal} owner={owner} />
+        {/* The send doc, and down its left side its outline — what was the send
+            list, now just the doc's own headings: the doc is the record, so
+            what comes out of it comes out of the list behind it too. */}
+        <aside className="pane docpane" aria-hidden={!doc}>
+          <div className={"pane right docside" + (show.list ? "" : " shut")}>
+            <button type="button" className="dsfold mono" onClick={() => toggle("list")} aria-pressed={show.list}
+              title={show.list ? "Fold the outline away (Alt+2)" : "The outline (Alt+2)"}>{show.list ? "‹" : "›"}<span>Outline</span></button>
+            <div className="tabs mono">
+              <button data-tab="send" className="on">Send doc <span className="count" id="sendCount" /></button>
+              <button data-tab="read">Read doc</button>
+            </div>
+            <div className="sideacts" id="sideacts" />
+            <div id="sidebody" />
+          </div>
+          <div className="docmain" ref={docPane as React.RefObject<HTMLDivElement>}>
+            <DocEditor host={ref} width={docReal} owner={owner} />
+          </div>
         </aside>
       </div>
 
