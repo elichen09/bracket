@@ -1033,3 +1033,27 @@
 .evi.searchonly .pane.right, .evi.searchonly .docpane, .evi.searchonly .grab { display: none !important; }
 .evi.searchonly .pane.left { display: flex !important; flex: 1; }
 .evi.searchonly #veil { display: none !important; }
+
+/* ---------- the send doc's outline (the Send tab), as the Doc viewer draws one ---------- */
+.evi .soutline { padding: 8px 6px 40px; }
+.evi .sototal { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 4px 10px 10px; }
+.evi .sol {
+  width: 100%; display: flex; align-items: baseline; gap: 8px; text-align: left; font: inherit; color: var(--ink);
+  background: none; border: 0; border-left: 2px solid transparent; cursor: pointer; padding: 5px 8px 5px 10px;
+  transition: background .12s, border-color .12s;
+}
+.evi .sol:hover { background: rgba(127, 127, 127, .1); }
+.evi .sol .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evi .sol .rt { font-size: 9.5px; color: var(--dim); flex-shrink: 0; letter-spacing: .04em; }
+.evi .sol { padding-left: calc(10px + var(--d, 0) * 14px); }
+.evi .sol.h1 { margin-top: 6px; }
+.evi .sol.h1 .t { font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.evi .sol.h2 .t { font-weight: 700; font-size: 13px; }
+.evi .sol.h3 { margin-top: 5px; }
+.evi .sol.h3 .t { font-weight: 650; font-size: 13.5px; }
+.evi .sol.h4 .t { font-size: 12.5px; color: var(--muted); }
+.evi .sol.on { background: var(--t-deep, var(--ink)); color: var(--t-deep-ink, var(--ground)); border-left-color: var(--t-acc, #C4553A); }
+.evi .sol.on .t, .evi .sol.on .rt { color: inherit; }
+.evi .docpane .soflash { animation: eviSoFlash 1.1s ease-out; }
+@keyframes eviSoFlash { 0%, 30% { background: rgba(var(--t-acc-rgb, 196, 85, 58), .22); } }
+:root[data-tool-shape="cozy"] .toolpage .evi .sol { border-radius: 8px; }

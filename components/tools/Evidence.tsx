@@ -369,7 +369,7 @@ export default function Evidence({ owner, me, room, searchOnly }: { owner?: stri
                 <span><kbd>Enter</kbd> copy + send</span>
                 <span><kbd>esc</kbd> clear</span>
                 <span className="libonly"><kbd>del</kbd> remove from library</span>
-                <span className="drift">drag a sent block to reorder it · type in the document to edit it</span>
+                <span className="drift">the Send tab is the send doc's outline: click a heading to go to it · type in the document to edit it</span>
               </>
             )}
             <button type="button" className="hintx" onClick={() => setHintsShut((s) => { remember(HINTS_KEY, s ? "0" : "1"); return !s; })}
