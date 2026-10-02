@@ -22,7 +22,8 @@
  * Index format (gzipped JSON):
  *   { v: 1, wiki, built, zip: { name, url }, schools: { slug: display },
  *     docs: [[path, offset, csize, method, nameLen]],
- *     cards: [[docIndex, tag, cite, rounds]] }
+ *     cards: [[docIndex, tag, cite, rounds, blockIndex, readWords]],
+ *     blocks: [block heading] }                       (v2: blockIndex/readWords/blocks)
  * A card disclosed round after round by one team is one entry; `rounds`
  * counts how many documents it appeared in.
  */
@@ -69,24 +70,64 @@ function styleLevels(stylesXml) {
   return level;
 }
 
-/** A document's tags, each with the first paragraph under it — the cite. */
+/**
+ * The words of a paragraph's runs that are highlighted (or, failing any,
+ * underlined) — what is read. Word splits words across runs, so runs next to
+ * each other are joined as they stand, with a space only where unread text
+ * came between.
+ */
+const marked = (p, how) => {
+  let out = "", gap = false;
+  for (const r of p.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []) {
+    const on = how === "hl"
+      ? /<w:highlight w:val="(?!none)[^"]+"/.test(r) || /<w:shd\b[^>]*w:fill="(?!auto|FFFFFF|ffffff)[0-9A-Fa-f]{6}"/.test(r)
+      : /<w:u w:val="(?!none)[^"]+"/.test(r) || /<w:u\/>/.test(r);
+    if (!on) { gap = true; continue; }
+    const t = unxml((r.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map((x) => x.replace(/<[^>]+>/g, "")).join(""));
+    out += (gap && out ? " " : "") + t;
+    gap = false;
+  }
+  return out.replace(/\s+/g, " ");
+};
+
+/**
+ * A document's tags, each with the first paragraph under it — the cite — the
+ * block heading it sits under, and the words its highlighting reads (its
+ * underlining, if nothing is highlighted): what a card is about, for the tags
+ * that do not say.
+ */
 export async function readTags(docx) {
   const z = await JSZip.loadAsync(docx);
   const doc = await z.file("word/document.xml")?.async("string");
   if (!doc) return [];
   const level = styleLevels((await z.file("word/styles.xml")?.async("string")) || "");
   const out = [];
-  let open = null;
+  let open = null, block = "";
   for (const p of doc.match(/<w:p\b[\s\S]*?<\/w:p>/g) || []) {
     const sid = (p.match(/<w:pStyle w:val="([^"]+)"/) || [])[1];
     const ol = (p.match(/<w:outlineLvl w:val="(\d)"/) || [])[1];
     const lvl = sid ? level(sid) : (ol !== undefined ? +ol + 1 : 0);
     const t = textOf(p);
-    if (lvl === 4 && t) { open = { tag: t.slice(0, 500), cite: "" }; out.push(open); continue; }
-    if (lvl) { open = null; continue; }
-    if (open && !open.cite && t) open.cite = t.slice(0, 220);
+    if (lvl === 4 && t) { open = { tag: t.slice(0, 500), cite: "", block, hl: "", ul: "" }; out.push(open); continue; }
+    if (lvl) { open = null; if (lvl <= 3 && t) block = lvl === 3 ? t.slice(0, 140) : ""; continue; }
+    if (!open || !t) continue;
+    if (!open.cite) { open.cite = t.slice(0, 220); continue; }
+    if (open.hl.length < 600) open.hl += " " + marked(p, "hl");
+    if (!open.hl.trim() && open.ul.length < 600) open.ul += " " + marked(p, "ul");
   }
   return out;
+}
+
+/** The read words, cut to what a search needs: the distinct ones that say something, at most 28. */
+const STOP = new Set("a an and are as at be been but by can could do does for from had has have how if in into is it its may more most no not of on or our so such than that the their them then there these they this those to was were what when which who will with would you your".split(" "));
+function readWords(text) {
+  const seen = new Set(), out = [];
+  for (const w of (String(text || "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [])) {
+    if (w.length < 3 || STOP.has(w) || seen.has(w)) continue;
+    seen.add(w); out.push(w);
+    if (out.length >= 28) break;
+  }
+  return out.join(" ");
 }
 
 /* ------------------------------------------------------------ one wiki */
@@ -97,6 +138,8 @@ export async function buildIndex({ wiki, zipFile, zipName, zipUrl, schools = {} 
   const read = async (start, len) => { const b = Buffer.alloc(len); fs.readSync(fd, b, 0, len, start); return b; };
   const list = (await entries(size, read)).filter((e) => /\.docx$/i.test(e.name) && e.name.split("/").length >= 4);
   const docs = [], cards = [];
+  const blocks = [], blockAt = new Map();      // the block headings, each kept once
+  const blockOf = (b) => { if (!b) return -1; let i = blockAt.get(b); if (i === undefined) { i = blocks.length; blocks.push(b); blockAt.set(b, i); } return i; };
   const seen = new Map();          // team|tag|cite -> card
   let failed = 0;
   const t0 = Date.now();
@@ -112,7 +155,7 @@ export async function buildIndex({ wiki, zipFile, zipName, zipUrl, schools = {} 
         const key = team + "|" + t.tag.toLowerCase().replace(/\W+/g, "") + "|" + t.cite.toLowerCase().replace(/\W+/g, "").slice(0, 60);
         const had = seen.get(key);
         if (had) { had[3]++; continue; }
-        const c = [di, t.tag, t.cite, 1];
+        const c = [di, t.tag, t.cite, 1, blockOf(t.block), readWords(t.hl.trim() ? t.hl : t.ul)];
         seen.set(key, c);
         cards.push(c);
       }
@@ -121,7 +164,7 @@ export async function buildIndex({ wiki, zipFile, zipName, zipUrl, schools = {} 
   }
   fs.closeSync(fd);
   console.log(`  ${wiki}: ${docs.length} docs with tags, ${cards.length} cards, ${failed} unreadable, ${Math.round((Date.now() - t0) / 1000)}s`);
-  return { v: 1, wiki, built: new Date().toISOString(), zip: { name: zipName, url: zipUrl }, schools, docs, cards };
+  return { v: 2, wiki, built: new Date().toISOString(), zip: { name: zipName, url: zipUrl }, schools, docs, cards, blocks };
 }
 
 const gz = (obj) => zlib.gzipSync(Buffer.from(JSON.stringify(obj)), { level: 9 });
