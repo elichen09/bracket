@@ -52,7 +52,8 @@ export async function POST(req: Request) {
       };
       out.push({
         slug, name: String(w.display_name || slug), zip: all, schools,
-        current: meta?.zip?.name || null,
+        // an index built before cards kept their block and read words (v2) is rebuilt, archive or no
+        current: (meta as { v?: number } | null)?.v && (meta as { v?: number }).v! >= 2 ? meta?.zip?.name || null : null,
         upload: await up(`${slug}.json.gz`),
         uploadMeta: await up(`${slug}.meta.json`),
       });

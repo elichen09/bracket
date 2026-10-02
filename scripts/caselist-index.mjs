@@ -212,7 +212,7 @@ if (arg("zip")) {
     const up = await fetch(w.upload, { method: "PUT", headers: { "content-type": "application/gzip", "x-upsert": "true" }, body });
     if (!up.ok) throw new Error(w.slug + " upload " + up.status + " " + (await up.text()));
     // the note beside it, written after the index so it never points at one that is not there
-    const meta = { wiki: w.slug, built: idx.built, zip: idx.zip, docs: idx.docs.length, cards: idx.cards.length, bytes: body.length };
+    const meta = { v: idx.v, wiki: w.slug, built: idx.built, zip: idx.zip, docs: idx.docs.length, cards: idx.cards.length, bytes: body.length };
     const um = await fetch(w.uploadMeta, { method: "PUT", headers: { "content-type": "application/json", "x-upsert": "true" }, body: JSON.stringify(meta) });
     if (!um.ok) throw new Error(w.slug + " meta upload " + um.status + " " + (await um.text()));
     console.log(`  ${w.slug}: uploaded ${(body.length / 1e6).toFixed(1)} MB`);
