@@ -1,0 +1,65 @@
+/* ---------- Jump (Ctrl+Shift+K): any tool, by typing ----------
+   One box over whatever tool is open, in that tool's colours. Quiet and
+   quick: it is there at once, and a row is a tool's name and a line. */
+
+.tj-veil {
+  position: fixed; inset: 0; z-index: 2147483000;
+  display: flex; justify-content: center; align-items: flex-start; padding: 14vh 16px 16px;
+  background: rgba(20, 18, 14, .22);
+  animation: tjFade .12s ease-out both;
+}
+@keyframes tjFade { from { opacity: 0; } }
+.tj {
+  width: min(560px, 100%); max-height: 70vh; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--t-surface, #FBF8F2); color: var(--t-ink, #1D1B17);
+  border: 1px solid var(--t-ink, #1D1B17);
+  box-shadow: 0 36px 80px -28px rgba(0, 0, 0, .5), 0 0 0 6px rgba(14, 14, 13, .05);
+  font-family: var(--ui, system-ui, sans-serif); text-align: left;
+  animation: tjIn .16s cubic-bezier(.2, .9, .3, 1.1) both;
+}
+@keyframes tjIn { from { opacity: 0; transform: translateY(8px) scale(.99); } }
+.tj-in { display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--t-line, #C8BDAB); }
+.tj-glyph {
+  width: 26px; height: 26px; flex: none; display: grid; place-items: center;
+  background: var(--t-deep, #1F2C24); color: var(--t-deep-ink, #F3EDE1); font-size: 14px; line-height: 1;
+}
+.tj-in input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: inherit;
+  padding: 16px 0; font: 500 17px/1.2 var(--ui, system-ui, sans-serif); box-shadow: none;
+}
+.tj-in input::placeholder { color: var(--t-dim, #857E71); }
+.tj kbd {
+  font-family: var(--mono, ui-monospace, monospace); font-size: 10px; line-height: 1; padding: 3px 5px;
+  border: 1px solid var(--t-line, #C8BDAB); border-bottom-width: 2px; background: var(--t-surface-2, #F4EEE3); color: var(--t-muted, #5A554B);
+}
+.tj ul { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1; min-height: 0; }
+.tj li {
+  display: flex; align-items: center; gap: 12px; padding: 9px 10px; cursor: pointer; border-radius: 0;
+}
+.tj li.on { background: var(--t-deep, #1F2C24); color: var(--t-deep-ink, #F3EDE1); }
+.tj-ico { width: 18px; height: 18px; flex: none; display: grid; place-items: center; color: var(--t-acc, #C4553A); }
+.tj li.on .tj-ico { color: inherit; }
+.tj-ico svg, .toolpage .tj-ico .ico { display: block; width: 16px; height: 16px; }
+.tj-lb { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.tj-lb b { flex: none; font-size: 14.5px; font-weight: 600; }
+.tj-lb small { min-width: 0; font-size: 12px; color: var(--t-muted, #5A554B); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tj li.on .tj-lb small { color: inherit; opacity: .7; }
+.tj-tag {
+  flex: none; font-family: var(--mono, ui-monospace, monospace); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--t-dim, #857E71);
+}
+.tj li.on .tj-tag { color: inherit; opacity: .7; }
+.tj li.on kbd { background: transparent; color: inherit; border-color: currentColor; opacity: .7; }
+.tj-none { cursor: default !important; color: var(--t-dim, #857E71); font-size: 13px; padding: 14px 10px !important; }
+.tj-foot {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 16px; border-top: 1px solid var(--t-line-soft, #E0D6C5);
+  background: var(--t-surface-2, #F4EEE3); font-size: 11.5px; color: var(--t-muted, #5A554B);
+}
+.tj-foot span { display: inline-flex; align-items: center; gap: 4px; }
+.tj-foot .tj-k { margin-left: auto; }
+@media (max-width: 520px) { .tj-foot .tj-k { display: none; } }
+
+:root[data-tool-shape="cozy"] .tj { border-radius: 14px; border-color: var(--t-line, #C8BDAB); }
+:root[data-tool-shape="cozy"] .tj li { border-radius: 9px; }
+:root[data-tool-shape="cozy"] .tj-glyph { border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { .tj-veil, .tj { animation: none; } }

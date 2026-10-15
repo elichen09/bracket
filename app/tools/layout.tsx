@@ -1,5 +1,6 @@
 import LightOnly from "@/components/tools/LightOnly";
 import ToolFx from "@/components/tools/ToolFx";
+import ToolJump from "@/components/tools/ToolJump";
 import { THEME_BOOT } from "@/lib/toolTheme";
 
 /**
@@ -12,6 +13,7 @@ export default function ToolsLayout({ children }: { children: React.ReactNode })
       <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       <LightOnly />
       <ToolFx />
+      <ToolJump />
       {children}
     </>
   );

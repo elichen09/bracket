@@ -54,6 +54,7 @@ const SECTIONS: Section[] = [
     tips: [
       <>Everything is kept in this browser, separately for each account. Nothing is uploaded unless you share a room, and a room passes changes straight between the two browsers.</>,
       <>Every tool has the same buttons in its banner: <b>Colours</b> (scheme and feel), <b>Full screen</b>, <b>Pop out</b> and <b>Split</b>. They&apos;re explained at the end.</>,
+      <>{K("Ctrl+Shift+K")} in any tool opens <b>Jump</b>. Type a couple of letters of another tool and press {K("Enter")} to go there, still on the same flow.</>,
     ],
   },
   {
@@ -67,7 +68,7 @@ const SECTIONS: Section[] = [
       <>Press {K("/")} and type a trigger (&ldquo;econ&rdquo;, &ldquo;AT: heg&rdquo;). Move with {K("↑ ↓")}. {K("→")} opens a block&apos;s arguments so you can send just one.</>,
       <>Press {K("Enter")} to send. The card is copied, goes into the <b>Send doc</b>, and its block and tag show in the outline down the doc's left side. Cards from the same block merge into one block. Delete a card from the doc and it's gone for good; sending more never brings it back.</>,
       <>Click <b>Format</b> in the send doc&apos;s bar. It asks for your code, the speech and the tournament once, then titles the doc, can delete analytics (and put them back), makes highlighting one colour (grey stays grey), numbers responses (or doesn&apos;t), and adds the speech to each heading.</>,
-      <>To search the open caselist, switch <b>Library</b> to <b>Caselist</b>. It searches this year&apos;s tags, with the strongest teams&apos; cards first.</>,
+      <>To search the open caselist, switch <b>Library</b> to <b>Caselist</b>. It searches this year&apos;s cards by their tags, the blocks they sit in and their highlighted words, with the strongest teams&apos; cards first.</>,
       <>Click <b>Room</b> to share the send doc with your partner. It&apos;s the same code as your flow room.</>,
     ],
     keys: [
@@ -226,13 +227,21 @@ const SECTIONS: Section[] = [
   {
     id: "every",
     name: "In every tool",
-    line: "The same four buttons in every banner, and what they do.",
-    idea: <p>The Colours button and the three icons at the right of each banner work the same way in every tool.</p>,
+    line: "Jump between tools by typing, and the four buttons in every banner.",
+    idea: <p>One key gets you from any tool to any other, and the Colours button and the three icons at the right of each banner work the same way everywhere.</p>,
     steps: [
+      <><b>Jump</b>: press {K("Ctrl+Shift+K")} in any tool, type a few letters (&ldquo;ev&rdquo;, &ldquo;flow&rdquo;, &ldquo;dv&rdquo;) and press {K("Enter")}. With nothing typed, {K("Enter")} goes back to the tool you were just in, and a number picks its row. You stay on the same flow.</>,
+      <>In Split screen, Jump changes the side you pressed it in, so the other side keeps going. Rows further down put a tool on the other side, swap the sides, start round mode, or leave the split. From a tool on its own, &ldquo;Flow + Evidence&rdquo; opens those two side by side.</>,
       <><b>Colours</b> offers five schemes (Forest, Paper, Navy, Oxblood, Graphite) and a <b>Feel</b>. <b>Sharp</b> is square and crisp. <b>Cozy</b> is warm and rounded, with a softer typeface and lamp-light. The choice applies to every tool in this browser.</>,
       <><b>Full screen</b> gives the tool the whole screen, even from a side of Split screen. {K("Esc")} brings it back.</>,
       <><b>Pop out</b> is covered above.</>,
       <><b>Split</b> opens Split screen with this tool on the left.</>,
+    ],
+    keys: [
+      ["Ctrl+Shift+K", "Jump to another tool"],
+      ["Enter", "Go (with nothing typed: back to the last tool)"],
+      ["1–9", "Go straight to that row"],
+      ["Esc", "Close Jump"],
     ],
     tips: [<>When a banner gets too narrow for its words, its buttons turn into icons, and hovering one shows its name. If it&apos;s narrower still, scroll the banner sideways.</>],
   },

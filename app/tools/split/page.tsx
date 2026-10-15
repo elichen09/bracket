@@ -7,9 +7,10 @@ import "../tools.css";
 export const metadata = { title: "Split screen · The Break" };
 export const dynamic = "force-dynamic";
 
-/** Any two tools side by side, each whole, in one window. `?a=flow` puts that one on the left. */
-export default function SplitTool({ searchParams }: { searchParams?: { a?: string | string[] } }) {
+/** Any two tools side by side, each whole, in one window. `?a=flow` puts that one on the left, `&b=evidence` that one on the right. */
+export default function SplitTool({ searchParams }: { searchParams?: { a?: string | string[]; b?: string | string[] } }) {
   const a = (Array.isArray(searchParams?.a) ? searchParams?.a[0] : searchParams?.a) || undefined;
+  const b = (Array.isArray(searchParams?.b) ? searchParams?.b[0] : searchParams?.b) || undefined;
   if (!isAdmin()) {
     return (
       <>
@@ -22,7 +23,7 @@ export default function SplitTool({ searchParams }: { searchParams?: { a?: strin
     <>
       <Nav />
       <main>
-        <div className="toolpage"><Split first={a} /></div>
+        <div className="toolpage"><Split first={a} second={b} /></div>
       </main>
     </>
   );

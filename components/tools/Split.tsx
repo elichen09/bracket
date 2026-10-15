@@ -45,7 +45,7 @@ const isTool = (k: unknown): k is ToolKey => typeof k === "string" && k in TOOLS
 const KEY = "tools.split";
 const MIN = 360;          // narrower than this and no tool is usable
 
-export default function Split({ first: want }: { first?: string }) {
+export default function Split({ first: want, second: want2 }: { first?: string; second?: string }) {
   const box = useRef<HTMLDivElement>(null);
   // two frames, each showing one tool; `left` says which frame is on the left
   const [tools, setTools] = useState<[ToolKey, ToolKey]>(["evidence", "flow"]);
@@ -162,14 +162,19 @@ export default function Split({ first: want }: { first?: string }) {
       else if (s && typeof s.swap === "boolean") l = s.swap ? 1 : 0;       // the split's first version
       if (s && typeof s.ratio === "number") r = s.ratio;
     } catch { /* first time */ }
-    if (isTool(want)) {
+    if (isTool(want) && isTool(want2) && want !== want2) {
+      // both named (Jump's "Flow + Evidence"): those two, in that order
+      const at = t.indexOf(want), at2 = t.indexOf(want2);
+      if (at >= 0 && at2 >= 0) { if (at !== l) { l = at as 0 | 1; r = 1 - r; } }
+      else { t = [want, want2]; l = 0; }
+    } else if (isTool(want)) {
       const at = t.indexOf(want);
       if (at >= 0) { if (at !== l) { l = at as 0 | 1; r = 1 - r; } }
       else t[l] = want;
     }
     setTools(t); setLeft(l); setRatio(r);
     keep(t, l, r);
-  }, [want]);
+  }, [want, want2]);
 
   // A frame can finish loading before React is listening for it, and then
   // onLoad never comes: so look for yourself too, and never cover a tool for
@@ -247,11 +252,25 @@ export default function Split({ first: want }: { first?: string }) {
     window.location.href = TOOLS[rest].src.replace(/\?embed=1$/, "");
   };
 
+  // Jump (Ctrl+Shift+K) changes the split from its box: a tool on a side, the sides swapped, round mode
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      if (isTool(d.put) && (d.slot === 0 || d.slot === 1)) {
+        choose(d.slot === left ? "left" : "right", d.put);
+        setTimeout(() => { const f = frames.current[d.slot]; f?.focus(); f?.contentWindow?.focus(); }, 400);
+      } else if (d.swap) flip();
+      else if (d.round) toggleRound();
+    };
+    window.addEventListener("tools-split", on);
+    return () => window.removeEventListener("tools-split", on);
+  });
+
   const widthOf = (slot: number) => `calc(${(slot === left ? ratio : 1 - ratio) * 100}% - 5px)`;
   const orderOf = (slot: number) => (slot === left ? 0 : 2);
 
   return (
-    <div className={"splitv" + (drag ? " dragging" : "") + (round ? " round" : "")} ref={whole}>
+    <div className={"splitv" + (drag ? " dragging" : "") + (round ? " round" : "")} ref={whole} data-tools={tools.join(",")} data-left={left}>
       {/* in round mode the strip waits above the top edge; the pointer at the edge brings it down */}
       {round && <div className="sp-reveal" aria-hidden="true" />}
       {/* what is on each side, lined up over it */}
@@ -291,7 +310,7 @@ export default function Split({ first: want }: { first?: string }) {
             <div key={slot} className={"sp-pane" + (loaded[id] ? " ready" : "")} style={{ order: orderOf(slot), flexBasis: widthOf(slot) }}>
               {/* the clipboard, by permission: a frame has none unless it is given it, and
                   without it Evidence could not copy a card — nor, then, send it */}
-              <iframe ref={(el) => { frames.current[slot] = el; }} data-tool={k} src={TOOLS[k].src} title={TOOLS[k].title}
+              <iframe ref={(el) => { frames.current[slot] = el; }} data-tool={k} data-slot={slot} src={TOOLS[k].src} title={TOOLS[k].title}
                 allow="clipboard-read; clipboard-write; fullscreen"
                 onLoad={() => { setLoaded((m) => ({ ...m, [id]: true })); tellFrames(round); }} />
               <div className="sp-wait" aria-hidden="true"><span>{TOOLS[k].title}</span></div>
