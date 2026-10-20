@@ -6,29 +6,27 @@ export { comboOf, keyLabel } from "../docflow/keys";
 /**
  * The card cutter's keys, and the ones you have changed.
  *
- * The defaults are Verbatim's, because that is where a debater's hands
- * already are: F4–F7 the four heading levels, F8 cite, F9 underline, F10
- * emphasis, F11 highlight, F12 clear, F3 condense, F2 paste as plain text.
- * Every one can be moved (Keys, in the banner), and a laptop that needs Fn
- * for its F-keys is the usual reason to.
+ * The defaults are the ones Eli cuts with: Ctrl+Space cuts (underline, at
+ * 11pt), Ctrl+N shrinks, Alt+Z highlights green; the rest sit next to them
+ * on Ctrl and Alt. No F-keys. Every one can be moved (Keys, in the banner).
  */
 
 export interface Action { id: string; group: string; label: string; key: string | null; hint: string }
 
 export const ACTIONS: Action[] = [
-  { id: "pocket", group: "Headings", label: "Pocket", key: "F4", hint: "The biggest heading, in a box — a whole file's subject" },
-  { id: "hat", group: "Headings", label: "Hat", key: "F5", hint: "A group of blocks" },
-  { id: "block", group: "Headings", label: "Block", key: "F6", hint: "A block — “AT: Econ”" },
-  { id: "tag", group: "Headings", label: "Tag", key: "F7", hint: "A card's tag" },
-  { id: "cite", group: "Cutting", label: "Cite", key: "F8", hint: "Author and date, 13pt bold" },
-  { id: "underline", group: "Cutting", label: "Underline", key: "F9", hint: "Underline, back to full size" },
-  { id: "emphasis", group: "Cutting", label: "Emphasis", key: "F10", hint: "Bold and underlined" },
-  { id: "highlight", group: "Cutting", label: "Highlight", key: "F11", hint: "In the highlighter's colour" },
-  { id: "clear", group: "Cutting", label: "Clear", key: "F12", hint: "Back to plain text" },
-  { id: "shrink", group: "Cutting", label: "Shrink", key: "alt+F3", hint: "What is not underlined goes small (again: back)" },
-  { id: "condense", group: "Cutting", label: "Condense", key: "F3", hint: "The card's paragraphs into one" },
-  { id: "paste", group: "Cutting", label: "Paste as text", key: "F2", hint: "Without the source's formatting" },
-  { id: "hl-next", group: "Cutting", label: "Next highlighter colour", key: "alt+F11", hint: "Yellow, green, blue, pink, grey" },
+  { id: "underline", group: "Cutting", label: "Cut", key: "mod+Space", hint: "Underline, at 11pt" },
+  { id: "shrink", group: "Cutting", label: "Shrink", key: "mod+N", hint: "What is neither underlined nor bold goes to 8pt (again: back)" },
+  { id: "highlight", group: "Cutting", label: "Highlight", key: "alt+Z", hint: "In the highlighter's colour — green to start with" },
+  { id: "emphasis", group: "Cutting", label: "Emphasis", key: "mod+shift+Space", hint: "Bold, underlined, and boxed" },
+  { id: "cite", group: "Cutting", label: "Cite", key: "alt+C", hint: "Author and date, 13pt bold" },
+  { id: "clear", group: "Cutting", label: "Clear", key: "mod+\\", hint: "Back to plain text" },
+  { id: "condense", group: "Cutting", label: "Condense", key: "alt+Q", hint: "The card's paragraphs into one" },
+  { id: "hl-next", group: "Cutting", label: "Next highlighter colour", key: "alt+shift+Z", hint: "Green, yellow, blue, pink, grey" },
+  { id: "paste", group: "Cutting", label: "Paste as text", key: null, hint: "Without the source's formatting (Ctrl+Shift+V does it too)" },
+  { id: "tag", group: "Headings", label: "Tag", key: "alt+4", hint: "A card's tag" },
+  { id: "block", group: "Headings", label: "Block", key: "alt+3", hint: "A block — “AT: Econ”" },
+  { id: "hat", group: "Headings", label: "Hat", key: "alt+2", hint: "A group of blocks" },
+  { id: "pocket", group: "Headings", label: "Pocket", key: "alt+1", hint: "The biggest heading, in a box — a whole file's subject" },
   { id: "new-card", group: "Files", label: "New card", key: "alt+N", hint: "A tag, a cite and room for the card, after this one" },
   { id: "save", group: "Files", label: "Save", key: "mod+S", hint: "It also saves by itself as you go" },
   { id: "find", group: "Files", label: "Search every file", key: "mod+shift+F", hint: "Tags, cites, blocks and what is read" },
@@ -37,14 +35,21 @@ export const ACTIONS: Action[] = [
 export const ACTION = new Map(ACTIONS.map((a) => [a.id, a]));
 
 /**
- * Why a key cannot be used, or null if it can. Doc flow's rule, except that
- * F5, F11 and F12 are allowed here: a page can keep them, and they are where
- * Verbatim puts hat, highlight and clear.
+ * Why a key cannot be used, or null if it can: Doc flow's rule, with two
+ * exceptions. F-keys are allowed (a page can keep them). And Ctrl+N, which
+ * Chrome keeps for a new window — except while the cutter is full screen,
+ * when it locks the key for itself (see `caveat`).
  */
-const MINE = new Set(["F5", "F11", "F12"]);
+const MINE = new Set(["mod+N", "F5", "F11", "F12"]);
 export function refuse(spec: string): string | null {
   if (MINE.has(spec)) return null;
   return docRefuse(spec);
+}
+
+/** What to know about a key that works, but not everywhere. */
+export function caveat(spec: string | null): string | null {
+  if (spec === "mod+N") return "Chrome keeps Ctrl+N for a new window, so it works while the cutter is full screen";
+  return null;
 }
 
 export type Overrides = Record<string, string | null>;

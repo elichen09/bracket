@@ -41,12 +41,12 @@ export const TOOLS: Tool[] = [
   {
     slug: "cutter",
     name: "Card cutter",
-    blurb: "Cut cards into files of your own by key — Verbatim's F-keys, any of them movable — searchable, and in Evidence too.",
+    blurb: "Cut cards into files of your own by key — Ctrl+Space cut, Ctrl+N shrink, Alt+Z highlight, any of them movable — searchable, and in Evidence too.",
     about:
-      "Files in a cut file's shape — pocket, hat, block, tag, cite and card — cut with one key per move: F4–F7 the headings, " +
-      "F8 cite, F9 underline, F10 emphasis, F11 highlight, F12 clear, F3 condense, Alt+F3 shrink. A double-click takes the " +
-      "word without the space after it. Every file is searchable by tag, cite, block and what is read, and is in Evidence's " +
-      "search as well, kept up to date as you cut.",
+      "Files in a cut file's shape — pocket, hat, block, tag, cite and card — cut with one key per move: Ctrl+Space cuts " +
+      "(underline at 11pt), Ctrl+N shrinks, Alt+Z highlights, Ctrl+Shift+Space is emphasis in a box, Alt+C the cite, Alt+1–4 " +
+      "the headings. A double-click takes the word without the space after it. Every file is searchable by tag, cite, block " +
+      "and what is read, and is in Evidence's search as well, kept up to date as you cut.",
     storage: "This browser, kept apart per account — IndexedDB. Evidence reads the files from there; nothing is uploaded.",
   },
   {

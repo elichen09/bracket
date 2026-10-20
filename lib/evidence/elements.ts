@@ -15,6 +15,7 @@ export interface Run {
   fg?: string | null;       // colour
   bg?: string | null;       // highlight
   lk?: string;              // link
+  bx?: boolean;             // a box round it (emphasis)
 }
 
 export interface Elem {

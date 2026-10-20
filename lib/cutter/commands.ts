@@ -10,8 +10,8 @@ import type { CardBrief } from "./store";
  * the card's text — everything after that until the next heading. The marks
  * are the ones every cut file uses, so a card cut here pastes into Google
  * Docs or Word as a card, and Evidence reads it like any other: cite is 13pt
- * bold, underline is underline, emphasis is bold and underlined, highlight is
- * a background colour, shrunk text is 8pt.
+ * bold, cut is underlined at 11pt, emphasis is bold, underlined and boxed,
+ * highlight is a background colour, shrunk text is 8pt.
  *
  * With nothing selected, a mark key works on the word the cursor is in, the
  * way Word does; shrink and condense work on the whole card.
@@ -24,8 +24,8 @@ export const SMALL = "8pt";
 const CITE_SIZE = "13pt";
 
 export const HIGHLIGHTS = [
-  { name: "Yellow", color: "#ffff00" },
   { name: "Green", color: "#00ff00" },
+  { name: "Yellow", color: "#ffff00" },
   { name: "Blue", color: "#00ffff" },
   { name: "Pink", color: "#ff00ff" },
   { name: "Grey", color: "#c0c0c0" },
@@ -65,13 +65,9 @@ function allHave(doc: PMNode, from: number, to: number, test: (marks: readonly M
 
 const isSmall = (m: Mark) => m.type === M.fontSize && parseFloat(m.attrs.size) < 11;
 
-/** Take shrunk sizes off text that is being made something that is read. */
+/** Text that is being made something that is read goes back to 11pt. */
 function unshrink(tr: Transaction, from: number, to: number) {
-  tr.doc.nodesBetween(from, to, (n, pos) => {
-    if (!n.isText) return;
-    const m = n.marks.find(isSmall);
-    if (m) tr.removeMark(Math.max(pos, from), Math.min(pos + n.nodeSize, to), m);
-  });
+  tr.removeMark(from, to, M.fontSize);
 }
 
 function toggleSet(marks: Mark[], has: (ms: readonly Mark[]) => boolean, opts: { unshrink?: boolean; drop?: MarkType[] } = {}): Cmd {
@@ -92,12 +88,14 @@ function toggleSet(marks: Mark[], has: (ms: readonly Mark[]) => boolean, opts: {
   };
 }
 
+/** Cut: underlined, at 11pt. */
 export const underline: Cmd = toggleSet([M.underline.create()], (ms) => ms.some((m) => m.type === M.underline), { unshrink: true });
 
+/** Emphasis: bold, underlined, and a box round it. Again, and the bold and box come off. */
 export const emphasis: Cmd = toggleSet(
-  [M.strong.create(), M.underline.create()],
-  (ms) => ms.some((m) => m.type === M.strong) && ms.some((m) => m.type === M.underline),
-  { unshrink: true, drop: [M.strong] },
+  [M.strong.create(), M.underline.create(), M.box.create()],
+  (ms) => ms.some((m) => m.type === M.strong) && ms.some((m) => m.type === M.underline) && ms.some((m) => m.type === M.box),
+  { unshrink: true, drop: [M.strong, M.box] },
 );
 
 export const cite: Cmd = toggleSet(
@@ -192,8 +190,8 @@ export function cardAround(state: EditorState, pos = state.selection.from): Card
 }
 
 /**
- * Shrink: the text that is not underlined goes to 8pt, so what is read
- * stands out. Again, and it comes back.
+ * Shrink: the text that is neither underlined nor bold goes to 8pt, so what
+ * is read stands out. Again, and it comes back.
  */
 export const shrink: Cmd = (state, dispatch) => {
   let from: number, to: number;
@@ -205,7 +203,7 @@ export const shrink: Cmd = (state, dispatch) => {
   }
   const plain: { a: number; b: number; n: PMNode }[] = [];
   state.doc.nodesBetween(from, to, (n, pos) => {
-    if (!n.isText || n.marks.some((m) => m.type === M.underline)) return;
+    if (!n.isText || n.marks.some((m) => m.type === M.underline || m.type === M.strong)) return;
     plain.push({ a: Math.max(pos, from), b: Math.min(pos + n.nodeSize, to), n });
   });
   if (!plain.length) return false;

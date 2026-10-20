@@ -30,7 +30,7 @@ type SideKey = "evidence" | "cutter" | "flow" | "docflow" | "viewer";
 
 const TOOLS: { slug: Slug; name: string; icon: string; sub: string; words: string }[] = [
   { slug: "evidence", name: "Evidence", icon: "cards", sub: "Search cards, send, cut the speech doc", words: "ev cards search send doc speech file cut" },
-  { slug: "cutter", name: "Card cutter", icon: "highlight", sub: "Cut cards by key, into files of your own", words: "cutter cut card cards cutting verbatim file files highlight" },
+  { slug: "cutter", name: "Card cutter", icon: "highlight", sub: "Cut cards by key, into files of your own", words: "cutter cut card cards cutting file files highlight shrink" },
   { slug: "flow", name: "Flow", icon: "grid", sub: "The grid, on the clock", words: "grid sheet flowing clock timer prep" },
   { slug: "docflow", name: "Doc flow", icon: "doc", sub: "A flow the way a Google Doc gets flowed", words: "docflow google doc flow" },
   { slug: "viewer", name: "Doc viewer", icon: "list", sub: "Your partner's send doc, SpeechDrop, any .docx", words: "viewer read reader speechdrop docx pdf partner outline rehighlight" },

@@ -361,3 +361,4 @@
 .toolpage .tut .tu-ct .txt .h { background: #00ff00; }
 .toolpage .tut .tu-ct .txt .h.sel { background: #7ad8ff; }
 .toolpage .tut .tu-ct .txt.small > span > span:not(.u) { font-size: 10.5px; }
+.toolpage .tut .tu-ct .txt .e { outline: 1px solid #000; outline-offset: 0; }

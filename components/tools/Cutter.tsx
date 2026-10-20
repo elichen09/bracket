@@ -11,7 +11,7 @@ import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { schema } from "@/lib/evidence/docSchema";
 import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type CutFile } from "@/lib/cutter/store";
 import * as C from "@/lib/cutter/commands";
-import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, loadKeys, saveKeys, type Overrides } from "@/lib/cutter/keys";
+import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize } from "@/lib/viewer/doc";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
@@ -29,11 +29,12 @@ import "./cutter.css";
 /**
  * Card cutter — cutting cards into files of your own, by key.
  *
- * Files are documents in Verbatim's shape: pocket, hat, block, tag, and under
- * each tag its cite and the card. Every formatting move a card needs is one
- * key, Verbatim's by default (lib/cutter/keys.ts), and any of them can be
- * moved. A double-click takes the word and not the space after it, so a
- * highlight stops where the word does.
+ * Files are documents in a cut file's shape: pocket, hat, block, tag, and
+ * under each tag its cite and the card. Every formatting move a card needs
+ * is one key — Ctrl+Space cut, Ctrl+N shrink, Alt+Z highlight and the rest
+ * (lib/cutter/keys.ts) — and any of them can be moved. A double-click takes
+ * the word and not the space after it, so a highlight stops where the word
+ * does.
  *
  * Files save as you go, in this browser, and every one of them is searchable
  * from the side — by tag, cite, block, and the words that are read. They are
@@ -63,8 +64,8 @@ const countWords = (doc: PMNode) => (doc.textContent.match(/[\p{L}\p{N}][\p{L}\p
 
 interface Head { level: number; text: string; pos: number }
 
-/** The keys along the top of the page, in Verbatim's order. */
-const STRIP = ["paste", "condense", "pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink"];
+/** The keys along the top of the page, the ones used most first. */
+const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "condense"];
 /** What only makes sense with the cursor in the document. */
 const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card"]);
 
@@ -96,7 +97,7 @@ export default function Cutter({ owner }: { owner?: string }) {
   const listeningRef = useRef(listening);
   listeningRef.current = listening;
   const [keyNote, setKeyNote] = useState("");
-  const [hl, setHl] = useState(C.HIGHLIGHTS[1].color);
+  const [hl, setHl] = useState(C.HIGHLIGHTS[0].color);
   const hlRef = useRef(hl);
   hlRef.current = hl;
   const [toastMsg, setToastMsg] = useState<{ t: string; n: number } | null>(null);
@@ -109,6 +110,14 @@ export default function Cutter({ owner }: { owner?: string }) {
   const refused = useCallback(() => toast("This browser would not go full screen here"), [toast]);
   const { full, toggle: toggleFull } = useFullscreen(root, refused);
   useFitBar(bar);
+  // Full screen, the page may have the keys Chrome otherwise keeps — Ctrl+N
+  // among them, which is shrink (the Keyboard Lock API; Chrome only)
+  useEffect(() => {
+    const kb = (navigator as any).keyboard;
+    if (!full || !kb?.lock) return;
+    kb.lock(["KeyN", "KeyT", "KeyW"]).catch(() => {});
+    return () => { try { kb.unlock(); } catch { /* gone */ } };
+  }, [full]);
 
   // ---- preferences ---------------------------------------------------------
   useEffect(() => {
@@ -367,7 +376,7 @@ export default function Cutter({ owner }: { owner?: string }) {
       if (no) { setKeyNote(no); return; }
       const { next, moved } = bind(keysRef.current, listening, spec);
       setKeys(next); saveKeys(owner, next); setListening(null);
-      setKeyNote(`${ACTION.get(listening)?.label}: ${keyLabel(spec)}` + (moved ? ` — ${ACTION.get(moved)?.label} had it, and has no key now` : ""));
+      setKeyNote(`${ACTION.get(listening)?.label}: ${keyLabel(spec)}` + (moved ? ` — ${ACTION.get(moved)?.label} had it, and has no key now` : "") + (caveat(spec) ? `. ${caveat(spec)}.` : ""));
     };
     window.addEventListener("keydown", take, true);
     return () => window.removeEventListener("keydown", take, true);
@@ -477,12 +486,13 @@ export default function Cutter({ owner }: { owner?: string }) {
         <input ref={fileIn} type="file" accept=".docx,.html,.htm,.txt" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void openFile(f); }} />
       </header>
 
-      {/* every cutting key, in Verbatim's order — pressable as well */}
+      {/* every cutting key, the most used first — pressable as well */}
       <div className="ct-strip" role="toolbar" aria-label="Cutting keys">
         {STRIP.map((id) => {
           const a = ACTION.get(id)!;
           return (
-            <button key={id} type="button" className={"ct-key ct-" + id} onMouseDown={(e) => e.preventDefault()} onClick={() => run(id)} title={a.hint}>
+            <button key={id} type="button" className={"ct-key ct-" + id} onMouseDown={(e) => e.preventDefault()} onClick={() => run(id)}
+              title={a.hint + (caveat(keyFor(keys, id)) ? ` — ${caveat(keyFor(keys, id))}` : "")}>
               {K(id) && <kbd>{K(id)}</kbd>}<span>{a.label}</span>
             </button>
           );
@@ -572,7 +582,7 @@ export default function Cutter({ owner }: { owner?: string }) {
           <div className="ct-keyshead">
             <b>Keys</b>
             <span>Click a key, then press the new one. Backspace leaves it with none; Esc keeps it.</span>
-            <button type="button" className="dv-btn2" onClick={() => { setKeys({}); saveKeys(owner, {}); setKeyNote("Every key is back to Verbatim's"); }}>Reset all</button>
+            <button type="button" className="dv-btn2" onClick={() => { setKeys({}); saveKeys(owner, {}); setKeyNote("Every key is back to the defaults"); }}>Reset all</button>
             <button type="button" className="dv-btn2 ink" onClick={() => { setKeysOpen(false); setListening(null); view.current?.focus(); }}>Done</button>
           </div>
           {keyNote && <p className="ct-keynote">{keyNote}</p>}
@@ -582,7 +592,7 @@ export default function Cutter({ owner }: { owner?: string }) {
                 <h3 className="mono">{g}</h3>
                 {ACTIONS.filter((a) => a.group === g).map((a) => (
                   <div key={a.id} className="ct-keyrow">
-                    <span className="ct-kl"><b>{a.label}</b>{a.hint && <small>{a.hint}</small>}</span>
+                    <span className="ct-kl"><b>{a.label}</b>{a.hint && <small>{a.hint}</small>}{caveat(keyFor(keys, a.id)) && <small className="ct-warn">{caveat(keyFor(keys, a.id))}</small>}</span>
                     <button type="button" className={"ct-kbtn" + (listening === a.id ? " wait" : "") + (a.id in keys ? " moved" : "")}
                       onClick={() => { setListening((l) => (l === a.id ? null : a.id)); setKeyNote(""); }}>
                       {listening === a.id ? "Press a key…" : K(a.id) || "none"}

@@ -459,7 +459,9 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
   useEffect(() => { if (under >= 3 && lit >= 2 && !done) onDone(); }, [under, lit, done, onDone]);
 
   const onKey = (e: React.KeyboardEvent) => {
-    const k = e.altKey && e.key === "F3" ? "shrink" : ({ F9: "u", F10: "e", F11: "h", F12: "clear" } as Record<string, "u" | "e" | "h" | "clear">)[e.key];
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = ctrl && e.shiftKey && e.code === "Space" ? "e" : ctrl && e.code === "Space" ? "u" : e.altKey && e.code === "KeyZ" ? "h"
+      : ctrl && e.code === "KeyN" ? "shrink" : ctrl && e.code === "Backslash" ? "clear" : null;
     if (!k) return;
     e.preventDefault();
     apply(k);
@@ -470,11 +472,11 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
       onReset={() => { setSel(new Set()); setMarks({}); setSmall(false); }}>
       <div className="tu-vw" ref={box} tabIndex={0} onKeyDown={onKey} style={{ outline: "none" }}>
         <div className="tu-vw-bar">
-          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("u")}><Keys k="F9" /> Underline</button>
-          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("e")}><Keys k="F10" /> Emphasis</button>
-          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("h")}><Keys k="F11" /> Highlight</button>
-          <button type="button" className={"tu-chip" + (small ? " on" : "")} onMouseDown={(e) => e.preventDefault()} onClick={() => apply("shrink")}><Keys k="Alt+F3" /> Shrink</button>
-          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("clear")}><Keys k="F12" /> Clear</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("u")}><Keys k="Ctrl+Space" /> Cut</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("e")}><Keys k="Ctrl+Shift+Space" /> Emphasis</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("h")}><Keys k="Alt+Z" /> Highlight</button>
+          <button type="button" className={"tu-chip" + (small ? " on" : "")} onMouseDown={(e) => e.preventDefault()} onClick={() => apply("shrink")}><Keys k="Ctrl+N" /> Shrink</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("clear")}><Keys k="Ctrl+\\" /> Clear</button>
         </div>
         <div className="tu-vw-card tu-ct">
           <h5>The unexamined life is not worth living</h5>
@@ -495,9 +497,9 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
         </div>
         <p className="tu-hint" aria-live="polite">
           {!sel.size ? "Drag across some words to select them (in the cutter a double-click takes one word, without the space after it)." :
-            under < 3 ? "Now underline them: F9, or the button. Underlined words are the ones you'll read from." :
-            lit < 2 ? "Highlight what you'll actually say: select a few underlined words and press F11." :
-            "That's a cut card. Shrink (Alt+F3) makes everything that isn't underlined small."}
+            under < 3 ? "Now cut them: Ctrl+Space, or the button. Underlined words are the ones you'll read from." :
+            lit < 2 ? "Highlight what you'll actually say: select a few underlined words and press Alt+Z." :
+            "That's a cut card. Shrink makes everything that is neither underlined nor bold small."}
         </p>
       </div>
     </Demo>

@@ -59,6 +59,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
       font: r.ff || "Calibri",
       color: hex(r.fg),
       shading: r.bg ? { type: ShadingType.CLEAR, color: "auto", fill: hex(r.bg) } : undefined,
+      border: r.bx ? { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 0 } : undefined,
     }));
   };
 

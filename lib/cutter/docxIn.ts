@@ -40,10 +40,11 @@ export async function docxToHtml(blob: Blob): Promise<string> {
         if (!text) continue;
         const p = t.parentElement || (el as HTMLElement);
         const cs = getComputedStyle(p);
-        let under = false, bg = "";
+        let under = false, bg = "", box = false;
         for (let a: HTMLElement | null = p; a && a !== el.parentElement; a = a.parentElement) {
           if ((getComputedStyle(a).textDecorationLine || "").includes("underline")) under = true;
           if (!bg) { const b = getComputedStyle(a).backgroundColor; if (isBg(b)) bg = b; }
+          if (a !== el && getComputedStyle(a).borderTopStyle === "solid") box = true;
         }
         if (level) { runs.push(esc(text)); continue; }               // a heading is its style
         const px = parseFloat(cs.fontSize);
@@ -53,6 +54,7 @@ export async function docxToHtml(blob: Blob): Promise<string> {
           under ? "text-decoration:underline" : "",
           px && Math.abs(px - BASE_PX) > 0.6 ? `font-size:${Math.round(px * 0.75)}pt` : "",
           bg ? `background-color:${bg}` : "",
+          box ? "border:1px solid #000" : "",
         ].filter(Boolean).join(";");
         runs.push(st ? `<span style="${st}">${esc(text)}</span>` : esc(text));
       }

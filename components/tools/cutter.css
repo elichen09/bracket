@@ -2,8 +2,8 @@
    Card cutter — built on the Doc viewer's frame (.dvw: banner, side, paper),
    so it wears every colour scheme, Cozy and round mode the way the others
    do. What is its own: the strip of cutting keys under the banner, the file
-   list, the Keys panel, and the page, which is Verbatim's — 11pt Calibri,
-   tag 13pt bold, block 16pt underlined, hat 22pt double, pocket 26pt boxed.
+   list, the Keys panel, and the page — 11pt Calibri, tag 13pt bold, block
+   16pt underlined, hat 22pt double, pocket 26pt boxed.
    ===================================================================== */
 
 /* ------------------------------------------------------------ the banner */
@@ -39,7 +39,7 @@
 .cutw .ct-key.ct-tag span { font-weight: 700; }
 .cutw .ct-key.ct-cite span { font-weight: 700; font-size: 13.5px; }
 .cutw .ct-key.ct-underline span { text-decoration: underline; }
-.cutw .ct-key.ct-emphasis span { font-weight: 700; text-decoration: underline; }
+.cutw .ct-key.ct-emphasis span { font-weight: 700; text-decoration: underline; border: 1px solid currentColor; padding: 0 2px; }
 .cutw .ct-key.ct-highlight span { background: var(--ct-hl, #00ff00); color: #111; padding: 0 2px; }
 .cutw .ct-key.ct-shrink span { font-size: 10.5px; }
 .cutw .ct-hls { display: inline-flex; gap: 3px; margin-left: 8px; padding-left: 10px; border-left: 1px solid var(--line-soft); flex-shrink: 0; }
@@ -102,6 +102,7 @@
 .cutw .ct-kl { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .cutw .ct-kl b { font-size: 13.5px; font-weight: 600; }
 .cutw .ct-kl small { font-size: 11.5px; color: var(--dim); }
+.cutw .ct-kl small.ct-warn { color: var(--t-acc, #C4553A); }
 .cutw .ct-kbtn {
   min-width: 96px; padding: 6px 10px; font-family: var(--mono); font-size: 11px; text-align: center;
   border: 1px solid var(--line) !important; border-bottom-width: 2px !important; background: var(--surface-2); color: var(--ink);

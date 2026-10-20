@@ -104,6 +104,25 @@ export const schema = new Schema({
       toDOM(mark): DOMOutputSpec { return ["span", { style: `background-color:${mark.attrs.color}` }, 0]; },
     },
 
+    /**
+     * A box round the words — emphasis, in a cut card. Only a span carries
+     * one: a style rule would also catch the pocket's own box, which is on
+     * the heading, and box every word of it.
+     */
+    box: {
+      parseDOM: [
+        { tag: "span[data-box]" },
+        {
+          tag: "span",
+          getAttrs: (n) => {
+            const st = (n as HTMLElement).style;
+            return /solid/.test(st.borderStyle || st.borderTopStyle || st.border || "") ? null : false;
+          },
+        },
+      ],
+      toDOM(): DOMOutputSpec { return ["span", { "data-box": "", style: "border:1px solid #000000;padding:0 1px" }, 0]; },
+    },
+
     fontSize: {
       attrs: { size: { default: "11pt" } },
       parseDOM: [{ style: "font-size", getAttrs: (v) => ({ size: String(v) }) }],
