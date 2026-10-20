@@ -110,14 +110,25 @@ export default function Cutter({ owner }: { owner?: string }) {
   const refused = useCallback(() => toast("This browser would not go full screen here"), [toast]);
   const { full, toggle: toggleFull } = useFullscreen(root, refused);
   useFitBar(bar);
-  // Full screen, the page may have the keys Chrome otherwise keeps — Ctrl+N
-  // among them, which is shrink (the Keyboard Lock API; Chrome only)
+  // Full screen, the page may have the keys Chrome otherwise keeps for itself
+  // or hands to an extension first — Ctrl+N for a new window, or a Docs
+  // hotkey extension's Ctrl+Space (the Keyboard Lock API; Chrome only). Every
+  // key the cutter uses is locked, so they come here first.
   useEffect(() => {
     const kb = (navigator as any).keyboard;
     if (!full || !kb?.lock) return;
-    kb.lock(["KeyN", "KeyT", "KeyW"]).catch(() => {});
+    const codes = new Set<string>();
+    for (const a of ACTIONS) {
+      const last = (keyFor(keys, a.id) || "").split("+").pop() || "";
+      if (/^[A-Z]$/.test(last)) codes.add("Key" + last);
+      else if (/^\d$/.test(last)) codes.add("Digit" + last);
+      else if (last === "Space") codes.add("Space");
+      else if (last === "\\") codes.add("Backslash");
+      else if (/^F\d+$/.test(last)) codes.add(last);
+    }
+    kb.lock([...codes]).catch(() => {});
     return () => { try { kb.unlock(); } catch { /* gone */ } };
-  }, [full]);
+  }, [full, keys]);
 
   // ---- preferences ---------------------------------------------------------
   useEffect(() => {
@@ -581,7 +592,7 @@ export default function Cutter({ owner }: { owner?: string }) {
         <div className="ct-keys" role="dialog" aria-label="Change the keys">
           <div className="ct-keyshead">
             <b>Keys</b>
-            <span>Click a key, then press the new one. Backspace leaves it with none; Esc keeps it.</span>
+            <span>Click a key, then press the new one. Backspace leaves it with none; Esc keeps it. A key that does nothing here may belong to an extension (chrome://extensions/shortcuts): Chrome gives it to the extension first, except while the cutter is full screen.</span>
             <button type="button" className="dv-btn2" onClick={() => { setKeys({}); saveKeys(owner, {}); setKeyNote("Every key is back to the defaults"); }}>Reset all</button>
             <button type="button" className="dv-btn2 ink" onClick={() => { setKeysOpen(false); setListening(null); view.current?.focus(); }}>Done</button>
           </div>
