@@ -6,15 +6,16 @@ export { comboOf, keyLabel } from "../docflow/keys";
 /**
  * The card cutter's keys, and the ones you have changed.
  *
- * The defaults are the ones Eli cuts with: Ctrl+Space cuts (underline, at
- * 11pt), Ctrl+N shrinks, Alt+Z highlights green; the rest sit next to them
- * on Ctrl and Alt. No F-keys. Every one can be moved (Keys, in the banner).
+ * The defaults are the ones Eli cuts with: Ctrl+Alt cuts (underline, at
+ * 11pt — the two keys alone, see watchChords), Ctrl+N shrinks, Alt+Z
+ * highlights green; the rest sit next to them on Ctrl and Alt. No F-keys.
+ * Every one can be moved (Keys, in the banner).
  */
 
 export interface Action { id: string; group: string; label: string; key: string | null; hint: string }
 
 export const ACTIONS: Action[] = [
-  { id: "underline", group: "Cutting", label: "Cut", key: "mod+Space", hint: "Underline, at 11pt" },
+  { id: "underline", group: "Cutting", label: "Cut", key: "mod+alt", hint: "Underline, at 11pt — Ctrl and Alt together, then let go" },
   { id: "shrink", group: "Cutting", label: "Shrink", key: "mod+N", hint: "What is neither underlined nor bold goes to 8pt (again: back)" },
   { id: "highlight", group: "Cutting", label: "Highlight", key: "alt+Z", hint: "In the highlighter's colour — green to start with" },
   { id: "emphasis", group: "Cutting", label: "Emphasis", key: "mod+shift+Space", hint: "Bold, underlined, and boxed" },
@@ -83,3 +84,43 @@ export function bind(o: Overrides, id: string, spec: string | null): { next: Ove
 }
 
 export const label = (o: Overrides, id: string) => keyLabel(keyFor(o, id));
+
+/**
+ * Shortcuts made of modifiers alone — Ctrl+Alt, pressed and let go with
+ * nothing else in between. A keydown can't say that (the press is only a
+ * modifier), so it is the release that counts: two or more modifiers went
+ * down, no other key and no click came while they were held, and the first
+ * of them has come up. The spec is the same shape as any other: 'mod+alt'.
+ */
+export function watchChords(onChord: (spec: string, e: KeyboardEvent) => void): () => void {
+  const held = new Set<string>(), peak = new Set<string>();
+  let spoiled = false;
+  const name = (k: string) => (k === "Control" || k === "Meta" ? "mod" : k === "Alt" || k === "AltGraph" ? "alt" : k === "Shift" ? "shift" : null);
+  const down = (e: KeyboardEvent) => {
+    const n = name(e.key);
+    if (!n) { if (held.size) spoiled = true; return; }
+    if (!held.size) { spoiled = false; peak.clear(); }
+    held.add(n); peak.add(n);
+  };
+  const up = (e: KeyboardEvent) => {
+    const n = name(e.key);
+    if (!n || !held.has(n)) return;
+    if (!spoiled && peak.size >= 2) {
+      spoiled = true;
+      onChord(["mod", "alt", "shift"].filter((m) => peak.has(m)).join("+"), e);
+    }
+    held.delete(n);
+  };
+  const spoil = () => { if (held.size) spoiled = true; };
+  const reset = () => { held.clear(); peak.clear(); spoiled = false; };
+  window.addEventListener("keydown", down, true);
+  window.addEventListener("keyup", up, true);
+  window.addEventListener("mousedown", spoil, true);
+  window.addEventListener("blur", reset);
+  return () => {
+    window.removeEventListener("keydown", down, true);
+    window.removeEventListener("keyup", up, true);
+    window.removeEventListener("mousedown", spoil, true);
+    window.removeEventListener("blur", reset);
+  };
+}

@@ -11,7 +11,7 @@ import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { schema } from "@/lib/evidence/docSchema";
 import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type CutFile } from "@/lib/cutter/store";
 import * as C from "@/lib/cutter/commands";
-import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, type Overrides } from "@/lib/cutter/keys";
+import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize } from "@/lib/viewer/doc";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
@@ -31,7 +31,7 @@ import "./cutter.css";
  *
  * Files are documents in a cut file's shape: pocket, hat, block, tag, and
  * under each tag its cite and the card. Every formatting move a card needs
- * is one key — Ctrl+Space cut, Ctrl+N shrink, Alt+Z highlight and the rest
+ * is one key — Ctrl+Alt cut, Ctrl+N shrink, Alt+Z highlight and the rest
  * (lib/cutter/keys.ts) — and any of them can be moved. A double-click takes
  * the word and not the space after it, so a highlight stops where the word
  * does.
@@ -366,7 +366,18 @@ export default function Cutter({ owner }: { owner?: string }) {
       run(id);
     };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    // and the ones made of modifiers alone (Ctrl+Alt), which fire as they are let go
+    const offChords = watchChords((spec, e) => {
+      if (listeningRef.current) return;
+      const id = actionFor(keysRef.current, spec);
+      if (!id) return;
+      const v = view.current;
+      const inDoc = !!v && (v.hasFocus() || (document.activeElement === document.body && !!curRef.current));
+      if (IN_DOC.has(id) && !inDoc) return;
+      e.preventDefault();
+      run(id);
+    });
+    return () => { window.removeEventListener("keydown", onKey, true); offChords(); };
   }, [run]);
 
   // ---- the Keys panel: press the new key ---------------------------------------
@@ -382,7 +393,9 @@ export default function Cutter({ owner }: { owner?: string }) {
         return;
       }
       const spec = comboOf(e);
-      if (!spec) return;
+      if (spec) give(spec);
+    };
+    const give = (spec: string) => {
       const no = refuse(spec);
       if (no) { setKeyNote(no); return; }
       const { next, moved } = bind(keysRef.current, listening, spec);
@@ -390,7 +403,9 @@ export default function Cutter({ owner }: { owner?: string }) {
       setKeyNote(`${ACTION.get(listening)?.label}: ${keyLabel(spec)}` + (moved ? ` — ${ACTION.get(moved)?.label} had it, and has no key now` : "") + (caveat(spec) ? `. ${caveat(spec)}.` : ""));
     };
     window.addEventListener("keydown", take, true);
-    return () => window.removeEventListener("keydown", take, true);
+    // modifiers alone — Ctrl+Alt — are taken as they are let go
+    const offChords = watchChords((spec, e) => { e.preventDefault(); give(spec); });
+    return () => { window.removeEventListener("keydown", take, true); offChords(); };
   }, [listening, owner]);
   useEffect(() => {
     if (!keysOpen || listening) return;
@@ -592,7 +607,7 @@ export default function Cutter({ owner }: { owner?: string }) {
         <div className="ct-keys" role="dialog" aria-label="Change the keys">
           <div className="ct-keyshead">
             <b>Keys</b>
-            <span>Click a key, then press the new one. Backspace leaves it with none; Esc keeps it. A key that does nothing here may belong to an extension (chrome://extensions/shortcuts): Chrome gives it to the extension first, except while the cutter is full screen.</span>
+            <span>Click a key, then press the new one (two modifiers alone work too, like Ctrl+Alt: press them together and let go). Backspace leaves it with none; Esc keeps it. A key that does nothing here may belong to an extension (chrome://extensions/shortcuts): Chrome gives it to the extension first, except while the cutter is full screen.</span>
             <button type="button" className="dv-btn2" onClick={() => { setKeys({}); saveKeys(owner, {}); setKeyNote("Every key is back to the defaults"); }}>Reset all</button>
             <button type="button" className="dv-btn2 ink" onClick={() => { setKeysOpen(false); setListening(null); view.current?.focus(); }}>Done</button>
           </div>

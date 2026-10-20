@@ -41,9 +41,9 @@ export const TOOLS: Tool[] = [
   {
     slug: "cutter",
     name: "Card cutter",
-    blurb: "Cut cards into files of your own by key — Ctrl+Space cut, Ctrl+N shrink, Alt+Z highlight, any of them movable — searchable, and in Evidence too.",
+    blurb: "Cut cards into files of your own by key — Ctrl+Alt cut, Ctrl+N shrink, Alt+Z highlight, any of them movable — searchable, and in Evidence too.",
     about:
-      "Files in a cut file's shape — pocket, hat, block, tag, cite and card — cut with one key per move: Ctrl+Space cuts " +
+      "Files in a cut file's shape — pocket, hat, block, tag, cite and card — cut with one key per move: Ctrl+Alt cuts " +
       "(underline at 11pt), Ctrl+N shrinks, Alt+Z highlights, Ctrl+Shift+Space is emphasis in a box, Alt+C the cite, Alt+1–4 " +
       "the headings. A double-click takes the word without the space after it. Every file is searchable by tag, cite, block " +
       "and what is read, and is in Evidence's search as well, kept up to date as you cut.",

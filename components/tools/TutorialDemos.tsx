@@ -433,6 +433,7 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
   const [small, setSmall] = useState(false);
   const anchor = useRef<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  const chord = useRef(false);
   useEffect(() => { const up = () => { anchor.current = null; }; window.addEventListener("mouseup", up); return () => window.removeEventListener("mouseup", up); }, []);
   const range = (a: number, b: number) => { const s = new Set<number>(); for (let i = Math.min(a, b); i <= Math.max(a, b); i++) s.add(i); return s; };
 
@@ -460,7 +461,10 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
 
   const onKey = (e: React.KeyboardEvent) => {
     const ctrl = e.ctrlKey || e.metaKey;
-    const k = ctrl && e.shiftKey && e.code === "Space" ? "e" : ctrl && e.code === "Space" ? "u" : e.altKey && e.code === "KeyZ" ? "h"
+    // Ctrl+Alt alone is cut: it counts when let go (onKeyUp), unless another key came first
+    if ((e.key === "Control" && e.altKey) || (e.key === "Alt" && ctrl)) { chord.current = true; return; }
+    if (e.key !== "Control" && e.key !== "Alt") chord.current = false;
+    const k = ctrl && e.shiftKey && e.code === "Space" ? "e" : e.altKey && e.code === "KeyZ" ? "h"
       : ctrl && e.code === "KeyN" ? "shrink" : ctrl && e.code === "Backslash" ? "clear" : null;
     if (!k) return;
     e.preventDefault();
@@ -470,9 +474,10 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
   return (
     <Demo goal="Cut the card: underline what matters, then highlight what you'll read" done={done}
       onReset={() => { setSel(new Set()); setMarks({}); setSmall(false); }}>
-      <div className="tu-vw" ref={box} tabIndex={0} onKeyDown={onKey} style={{ outline: "none" }}>
+      <div className="tu-vw" ref={box} tabIndex={0} onKeyDown={onKey} style={{ outline: "none" }}
+        onKeyUp={(e) => { if (chord.current && (e.key === "Control" || e.key === "Alt")) { chord.current = false; e.preventDefault(); apply("u"); } }}>
         <div className="tu-vw-bar">
-          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("u")}><Keys k="Ctrl+Space" /> Cut</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("u")}><Keys k="Ctrl+Alt" /> Cut</button>
           <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("e")}><Keys k="Ctrl+Shift+Space" /> Emphasis</button>
           <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("h")}><Keys k="Alt+Z" /> Highlight</button>
           <button type="button" className={"tu-chip" + (small ? " on" : "")} onMouseDown={(e) => e.preventDefault()} onClick={() => apply("shrink")}><Keys k="Ctrl+N" /> Shrink</button>
@@ -497,7 +502,7 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
         </div>
         <p className="tu-hint" aria-live="polite">
           {!sel.size ? "Drag across some words to select them (in the cutter a double-click takes one word, without the space after it)." :
-            under < 3 ? "Now cut them: Ctrl+Space, or the button. Underlined words are the ones you'll read from." :
+            under < 3 ? "Now cut them: Ctrl+Alt (press both, let go), or the button. Underlined words are the ones you'll read from." :
             lit < 2 ? "Highlight what you'll actually say: select a few underlined words and press Alt+Z." :
             "That's a cut card. Shrink makes everything that is neither underlined nor bold small."}
         </p>
