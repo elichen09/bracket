@@ -58,6 +58,14 @@
 .cutw .ct-x { width: 30px; color: var(--dim); font-size: 16px; opacity: 0; transition: opacity .12s, color .12s; }
 .cutw .ct-file:hover .ct-x, .cutw .ct-x:focus-visible { opacity: 1; }
 .cutw .ct-x:hover { color: #B3261E; }
+.cutw .ct-x.ct-ren { font-size: 14px; }
+.cutw .ct-x.ct-ren:hover { color: var(--ink); }
+.cutw .ct-file.renaming { border-color: var(--ink); }
+.cutw .ct-rename { flex: 1; min-width: 0; padding: 9px 10px; font: 600 13px/1.2 var(--ui); color: var(--ink); background: var(--t-paper, #fff); border: 0; outline: none; }
+/* the open file's name stays in a narrow banner too — it is where it is renamed */
+.toolpage .dvw.cutw > .dv-top.compact .dv-now.ct-now { display: grid; }
+.toolpage .dvw.cutw > .dv-top.compact .ct-name { width: min(200px, 24vw); }
+.toolpage .dvw.cutw > .dv-top.compact .ct-now .dv-src { display: none; }
 .cutw .ct-hit { display: grid; gap: 3px; text-align: left; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line-soft); transition: border-color .12s, transform .15s var(--spring); }
 .cutw .ct-hit:hover { border-color: var(--ink); transform: translateX(2px); }
 .cutw .ct-hit b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

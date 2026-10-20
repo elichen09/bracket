@@ -291,9 +291,27 @@ export default function Cutter({ owner }: { owner?: string }) {
     const next = { ...f, name: clean, updated: Date.now() };
     curRef.current = next;
     setCur(next);
+    setName(clean);
     setFiles((l) => l.map((x) => (x.id === f.id ? { ...x, name: clean } : x)));
     await save();
   }, [save]);
+
+  // renaming from the list: the open file the same way as from the banner, any other in place
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const renamingRef = useRef(renaming);
+  renamingRef.current = renaming;
+  const renameFile = useCallback(async (id: string, n: string) => {
+    setRenaming(null);
+    const clean = n.replace(/\s+/g, " ").trim();
+    if (!clean) return;
+    if (curRef.current?.id === id) { await rename(clean); return; }
+    const f = await getFile(owner, id);
+    if (!f || f.name === clean) return;
+    const next = { ...f, name: clean, updated: Date.now() };       // a new name is news to Evidence too
+    await putFile(owner, next);
+    setFiles((l) => l.map((x) => (x.id === id ? { ...x, name: clean, updated: next.updated } : x)));
+    bus.current?.post({ kind: "cutter-changed", id });
+  }, [owner, rename]);
 
   const remove = useCallback(async (id: string) => {
     const f = files.find((x) => x.id === id);
@@ -570,12 +588,31 @@ export default function Cutter({ owner }: { owner?: string }) {
                   </>
                 ) : (
                   files.map((f) => (
-                    <div key={f.id} className={"ct-file" + (cur?.id === f.id ? " on" : "")}>
-                      <button type="button" className="ct-open" onClick={() => void open(f.id, (v) => v.focus())}>
-                        <b>{f.name}</b>
-                        <small className="mono">{f.cards.length} card{f.cards.length === 1 ? "" : "s"} · {when(f.updated)}</small>
-                      </button>
-                      <button type="button" className="ct-x" onClick={() => void remove(f.id)} aria-label={`Delete ${f.name}`} title="Delete this file">×</button>
+                    <div key={f.id} className={"ct-file" + (cur?.id === f.id ? " on" : "") + (renaming === f.id ? " renaming" : "")}>
+                      {renaming === f.id ? (
+                        <input className="ct-rename" defaultValue={f.name} autoFocus spellCheck={false} aria-label={`New name for ${f.name}`}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onBlur={(e) => void renameFile(f.id, e.currentTarget.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+                            if (e.key === "Escape") { e.preventDefault(); setRenaming(null); }
+                          }} />
+                      ) : (
+                        <button type="button" className="ct-open"
+                          // the open file is not opened again — so its double-click is a rename, not a reload —
+                          // and a file opening never takes the cursor from a rename under way
+                          onClick={() => { if (cur?.id !== f.id) void open(f.id, (v) => { if (!renamingRef.current) v.focus(); }); }}
+                          onDoubleClick={(e) => { e.preventDefault(); setRenaming(f.id); }} title="Open · double-click to rename">
+                          <b>{f.name}</b>
+                          <small className="mono">{f.cards.length} card{f.cards.length === 1 ? "" : "s"} · {when(f.updated)}</small>
+                        </button>
+                      )}
+                      {renaming !== f.id && (
+                        <>
+                          <button type="button" className="ct-x ct-ren" onClick={() => setRenaming(f.id)} aria-label={`Rename ${f.name}`} title="Rename this file">✎</button>
+                          <button type="button" className="ct-x" onClick={() => void remove(f.id)} aria-label={`Delete ${f.name}`} title="Delete this file">×</button>
+                        </>
+                      )}
                     </div>
                   ))
                 )}

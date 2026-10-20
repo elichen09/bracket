@@ -166,7 +166,7 @@ const SECTIONS: Section[] = [
     open: [{ href: "/tools/cutter", label: "Open the Card cutter" }, { href: "/tools/split?a=cutter&b=evidence", label: "Cutter beside Evidence" }],
     idea: <p>A file is a cut file: pocket, hat, block, tag, and under each tag its cite and the card. Each move is one key, and any of them can be moved. Files save as you go, and each one is in Evidence&apos;s search too, updated whenever you save.</p>,
     steps: [
-      <>Make a file with <b>New file</b>, or <b>Open .docx</b> to bring in one you have (cite, underline, emphasis and highlighting come with it). Rename it by clicking its name in the banner.</>,
+      <>Make a file with <b>New file</b>, or <b>Open .docx</b> to bring in one you have (cite, underline, emphasis and highlighting come with it). Rename a file with its <b>✎</b> in the list (or double-click its name), or click the open file&apos;s name in the banner. Evidence takes the new name too.</>,
       <>Paste the article. {K("Ctrl+Shift+V")} pastes without the source&apos;s formatting, and {K("Alt+Q")} (condense) joins the lines a PDF breaks it into.</>,
       <>Type the tag and press {K("Alt+4")}. Select the author and date and press {K("Alt+C")} for the cite.</>,
       <>Select what matters and press {K("Ctrl+Alt")} (together, then let go) to cut it (underlined, at 11pt), {K("Ctrl+Shift+Space")} for emphasis (bold, underlined, boxed), {K("Alt+Z")} to highlight. With nothing selected, a key works on the word the cursor is in. A double-click takes the word without the space after it, so a highlight stops where the word does.</>,
