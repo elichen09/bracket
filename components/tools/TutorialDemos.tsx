@@ -422,6 +422,88 @@ export function ViewerDemo({ onDone, done }: { onDone: () => void; done: boolean
   );
 }
 
+/* ================================================================ Card cutter */
+
+const CUT_WORDS = "Heidegger would obviously concur with Socrates’ statement that the unexamined life is not worth living. Unfortunately, this statement often passes into the plethora of unpracticed platitudes that perform the task of thinking for the One.".split(" ");
+type CutMark = { u?: boolean; e?: boolean; h?: boolean };
+
+export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean }) {
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [marks, setMarks] = useState<Record<number, CutMark>>({});
+  const [small, setSmall] = useState(false);
+  const anchor = useRef<number | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => { const up = () => { anchor.current = null; }; window.addEventListener("mouseup", up); return () => window.removeEventListener("mouseup", up); }, []);
+  const range = (a: number, b: number) => { const s = new Set<number>(); for (let i = Math.min(a, b); i <= Math.max(a, b); i++) s.add(i); return s; };
+
+  const apply = useCallback((what: "u" | "e" | "h" | "clear" | "shrink") => {
+    if (what === "shrink") { setSmall((s) => !s); box.current?.focus(); return; }
+    if (!sel.size) return;
+    setMarks((m) => {
+      const n = { ...m };
+      const all = what !== "clear" && [...sel].every((i) => (what === "e" ? n[i]?.e : n[i]?.[what]));
+      for (const i of sel) {
+        const c: CutMark = { ...n[i] };
+        if (what === "clear") { delete n[i]; continue; }
+        if (what === "e") { c.e = !all; if (!all) c.u = true; }
+        else c[what] = !all;
+        n[i] = c;
+      }
+      return n;
+    });
+    box.current?.focus();
+  }, [sel]);
+
+  const under = Object.values(marks).filter((m) => m.u || m.e).length;
+  const lit = Object.values(marks).filter((m) => m.h).length;
+  useEffect(() => { if (under >= 3 && lit >= 2 && !done) onDone(); }, [under, lit, done, onDone]);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    const k = e.altKey && e.key === "F3" ? "shrink" : ({ F9: "u", F10: "e", F11: "h", F12: "clear" } as Record<string, "u" | "e" | "h" | "clear">)[e.key];
+    if (!k) return;
+    e.preventDefault();
+    apply(k);
+  };
+
+  return (
+    <Demo goal="Cut the card: underline what matters, then highlight what you'll read" done={done}
+      onReset={() => { setSel(new Set()); setMarks({}); setSmall(false); }}>
+      <div className="tu-vw" ref={box} tabIndex={0} onKeyDown={onKey} style={{ outline: "none" }}>
+        <div className="tu-vw-bar">
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("u")}><Keys k="F9" /> Underline</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("e")}><Keys k="F10" /> Emphasis</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("h")}><Keys k="F11" /> Highlight</button>
+          <button type="button" className={"tu-chip" + (small ? " on" : "")} onMouseDown={(e) => e.preventDefault()} onClick={() => apply("shrink")}><Keys k="Alt+F3" /> Shrink</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("clear")}><Keys k="F12" /> Clear</button>
+        </div>
+        <div className="tu-vw-card tu-ct">
+          <h5>The unexamined life is not worth living</h5>
+          <p className="cite"><b style={{ fontSize: "14px" }}>Steele 14</b> Master of Arts in Political Science, Carleton University</p>
+          <p className={"txt" + (small ? " small" : "")}>
+            {CUT_WORDS.map((w, i) => {
+              const m = marks[i] || {};
+              const cls = [sel.has(i) ? "sel" : "", m.u || m.e ? "u" : "", m.e ? "e" : "", m.h ? "h" : ""].filter(Boolean).join(" ");
+              return (
+                <span key={i}>
+                  <span className={cls}
+                    onMouseDown={(e) => { e.preventDefault(); box.current?.focus(); anchor.current = i; setSel(new Set([i])); }}
+                    onMouseEnter={(e) => { if (e.buttons === 1 && anchor.current !== null) setSel(range(anchor.current, i)); }}>{w}</span>{" "}
+                </span>
+              );
+            })}
+          </p>
+        </div>
+        <p className="tu-hint" aria-live="polite">
+          {!sel.size ? "Drag across some words to select them (in the cutter a double-click takes one word, without the space after it)." :
+            under < 3 ? "Now underline them: F9, or the button. Underlined words are the ones you'll read from." :
+            lit < 2 ? "Highlight what you'll actually say: select a few underlined words and press F11." :
+            "That's a cut card. Shrink (Alt+F3) makes everything that isn't underlined small."}
+        </p>
+      </div>
+    </Demo>
+  );
+}
+
 /* ================================================================ 05 Split screen */
 
 const SPLIT_TOOLS = ["Evidence", "Flow", "Doc viewer", "Doc flow"];

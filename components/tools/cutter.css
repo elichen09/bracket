@@ -1,0 +1,116 @@
+/* =====================================================================
+   Card cutter — built on the Doc viewer's frame (.dvw: banner, side, paper),
+   so it wears every colour scheme, Cozy and round mode the way the others
+   do. What is its own: the strip of cutting keys under the banner, the file
+   list, the Keys panel, and the page, which is Verbatim's — 11pt Calibri,
+   tag 13pt bold, block 16pt underlined, hat 22pt double, pocket 26pt boxed.
+   ===================================================================== */
+
+/* ------------------------------------------------------------ the banner */
+.cutw .ct-now { display: grid; gap: 1px; }
+.cutw .ct-name {
+  font: 600 14px/1.2 var(--ui); color: inherit; background: transparent; border: 1px solid transparent;
+  padding: 2px 6px; margin-left: -6px; width: min(340px, 30vw); outline: none; text-overflow: ellipsis;
+}
+.cutw .ct-name:hover { border-color: rgba(var(--bn-rgb, 0, 0, 0), .25); }
+.cutw .ct-name:focus { border-color: rgba(var(--bn-rgb, 0, 0, 0), .6); background: var(--bn-well, rgba(0, 0, 0, .06)); }
+
+/* ------------------------------------------------------------ the cutting keys */
+.cutw .ct-strip {
+  display: flex; align-items: center; gap: 4px; padding: 6px 12px; flex-shrink: 0;
+  border-bottom: 1px solid var(--line); background: var(--t-surface, var(--surface));
+  overflow-x: auto; scrollbar-width: none;
+}
+.cutw .ct-strip::-webkit-scrollbar { display: none; }
+.cutw .ct-key {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 5px 9px 5px 6px; border: 1px solid var(--line-soft); background: var(--t-paper, #fff);
+  font-size: 12.5px; color: var(--ink); white-space: nowrap; transition: border-color .12s, background .12s;
+}
+.cutw .ct-key:hover { border-color: var(--ink); }
+.cutw .ct-key kbd {
+  font-family: var(--mono); font-size: 9.5px; line-height: 1; padding: 3px 4px; min-width: 22px; text-align: center;
+  background: var(--t-surface-2, var(--surface-2)); border: 1px solid var(--line); border-bottom-width: 2px; color: var(--muted);
+}
+/* each key shows what it does to the text */
+.cutw .ct-key.ct-pocket span { font-weight: 800; outline: 1.5px solid currentColor; outline-offset: 1px; padding: 0 2px; }
+.cutw .ct-key.ct-hat span { font-weight: 700; text-decoration: underline double; }
+.cutw .ct-key.ct-block span { font-weight: 700; text-decoration: underline; }
+.cutw .ct-key.ct-tag span { font-weight: 700; }
+.cutw .ct-key.ct-cite span { font-weight: 700; font-size: 13.5px; }
+.cutw .ct-key.ct-underline span { text-decoration: underline; }
+.cutw .ct-key.ct-emphasis span { font-weight: 700; text-decoration: underline; }
+.cutw .ct-key.ct-highlight span { background: var(--ct-hl, #00ff00); color: #111; padding: 0 2px; }
+.cutw .ct-key.ct-shrink span { font-size: 10.5px; }
+.cutw .ct-hls { display: inline-flex; gap: 3px; margin-left: 8px; padding-left: 10px; border-left: 1px solid var(--line-soft); flex-shrink: 0; }
+.cutw .ct-hl { width: 18px; height: 18px; border: 1px solid rgba(0, 0, 0, .25) !important; transition: transform .12s; }
+.cutw .ct-hl:hover { transform: translateY(-1px); }
+.cutw .ct-hl.on { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ------------------------------------------------------------ files */
+.cutw .ct-files { display: grid; align-content: start; gap: 3px; padding-top: 2px; }
+.cutw .ct-file { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--line-soft); transition: border-color .12s; }
+.cutw .ct-file:hover, .cutw .ct-file.on { border-color: var(--ink); }
+.cutw .ct-file.on { box-shadow: inset 3px 0 0 var(--t-acc, #C4553A); }
+.cutw button.ct-file, .cutw .ct-open { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; padding: 8px 10px; }
+.cutw .ct-file b, .cutw .ct-hit b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cutw .ct-file small, .cutw .ct-hit small { font-size: 8.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cutw .ct-x { width: 30px; color: var(--dim); font-size: 16px; opacity: 0; transition: opacity .12s, color .12s; }
+.cutw .ct-file:hover .ct-x, .cutw .ct-x:focus-visible { opacity: 1; }
+.cutw .ct-x:hover { color: #B3261E; }
+.cutw .ct-hit { display: grid; gap: 3px; text-align: left; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line-soft); transition: border-color .12s, transform .15s var(--spring); }
+.cutw .ct-hit:hover { border-color: var(--ink); transform: translateX(2px); }
+.cutw .ct-hit b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cutw .ct-cite { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cutw .ct-note { margin: 0; padding: 10px 14px 14px; font-size: 11.5px; line-height: 1.5; color: var(--dim); border-top: 1px solid var(--line-soft); }
+
+/* ------------------------------------------------------------ the page */
+.cutw .ct-paper { max-width: 880px; }
+.cutw .ct-sheet {
+  min-height: 60vh; outline: none; color: #222; caret-color: #111;
+  font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; font-size: 11pt; line-height: 1.3;
+  white-space: pre-wrap; word-wrap: break-word; letter-spacing: 0; text-transform: none;
+}
+.cutw .ct-sheet p { margin: 0 0 6pt; }
+.cutw .ct-sheet h1, .cutw .ct-sheet h2, .cutw .ct-sheet h3, .cutw .ct-sheet h4 {
+  font-family: inherit; font-weight: 700; color: inherit; line-height: 1.2; margin: 12pt 0 4pt; scroll-margin-top: 24px;
+}
+.cutw .ct-sheet h1 { font-size: 26pt; text-align: center; border: 4px solid #333; padding: 8pt 12pt; }
+.cutw .ct-sheet h2 { font-size: 22pt; text-align: center; text-decoration: underline double; }
+.cutw .ct-sheet h3 { font-size: 16pt; text-align: center; text-decoration: underline; }
+.cutw .ct-sheet h4 { font-size: 13pt; }
+.cutw .ct-sheet > :first-child { margin-top: 0; }
+.cutw .ct-sheet h4:empty::before, .cutw .ct-sheet h4:has(> br:only-child)::before { content: "Tag"; color: #b5b5b5; font-weight: 400; pointer-events: none; }
+.cutw .ct-sheet a { color: #1155cc; text-decoration: underline; }
+.cutw .ct-sheet hr.brk { border: 0; border-top: 1px dashed #9aa0a6; margin: 14pt 0; }
+.cutw .ct-sheet ::selection { background: rgba(66, 133, 244, .32); }
+.cutw .ct-flash { animation: dvFlash 1.1s ease-out; }
+
+/* ------------------------------------------------------------ the Keys panel */
+.cutw .ct-keys {
+  position: absolute; top: 64px; right: 16px; z-index: 60; width: min(560px, calc(100% - 32px)); max-height: calc(100% - 84px);
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--ink);
+  box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .55); animation: dvIn .2s var(--spring) both;
+}
+.cutw .ct-keyshead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.cutw .ct-keyshead b { font-size: 16px; }
+.cutw .ct-keyshead span { flex: 1 1 220px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.cutw .ct-keynote { margin: 0; padding: 8px 14px; font-size: 12.5px; background: var(--surface-2); border-bottom: 1px solid var(--line-soft); }
+.cutw .ct-keylist { overflow-y: auto; padding: 4px 14px 14px; }
+.cutw .ct-keylist h3 { margin: 12px 0 4px; font-size: 9.5px; font-weight: 400; color: var(--dim); }
+.cutw .ct-keyrow { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--line-soft); }
+.cutw .ct-kl { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.cutw .ct-kl b { font-size: 13.5px; font-weight: 600; }
+.cutw .ct-kl small { font-size: 11.5px; color: var(--dim); }
+.cutw .ct-kbtn {
+  min-width: 96px; padding: 6px 10px; font-family: var(--mono); font-size: 11px; text-align: center;
+  border: 1px solid var(--line) !important; border-bottom-width: 2px !important; background: var(--surface-2); color: var(--ink);
+}
+.cutw .ct-kbtn:hover { border-color: var(--ink) !important; }
+.cutw .ct-kbtn.moved { color: var(--t-acc, #C4553A); }
+.cutw .ct-kbtn.wait { background: var(--ink); color: var(--ground); border-color: var(--ink) !important; animation: ctWait 1s ease-in-out infinite; }
+@keyframes ctWait { 50% { opacity: .7; } }
+
+@media (max-width: 1000px) {
+  .cutw .ct-name { width: min(220px, 26vw); }
+}

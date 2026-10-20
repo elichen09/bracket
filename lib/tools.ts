@@ -39,6 +39,17 @@ export const TOOLS: Tool[] = [
     storage: "This browser, kept apart per account — IndexedDB. Nothing is uploaded and nothing reaches the server.",
   },
   {
+    slug: "cutter",
+    name: "Card cutter",
+    blurb: "Cut cards into files of your own by key — Verbatim's F-keys, any of them movable — searchable, and in Evidence too.",
+    about:
+      "Files in a cut file's shape — pocket, hat, block, tag, cite and card — cut with one key per move: F4–F7 the headings, " +
+      "F8 cite, F9 underline, F10 emphasis, F11 highlight, F12 clear, F3 condense, Alt+F3 shrink. A double-click takes the " +
+      "word without the space after it. Every file is searchable by tag, cite, block and what is read, and is in Evidence's " +
+      "search as well, kept up to date as you cut.",
+    storage: "This browser, kept apart per account — IndexedDB. Evidence reads the files from there; nothing is uploaded.",
+  },
+  {
     slug: "split",
     name: "Split screen",
     blurb: "Any two tools side by side — Evidence, Flow, the Doc viewer, Doc flow — in one window.",

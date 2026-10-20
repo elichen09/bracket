@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ThemePicker from "./ThemePicker";
 import { useFitBar } from "./fitBar";
-import { Keys, MapDemo, EvidenceDemo, FlowDemo, DocFlowDemo, ViewerDemo, SplitDemo, PopDemo, PastDemo, EveryDemo } from "./TutorialDemos";
+import { Keys, MapDemo, EvidenceDemo, CutterDemo, FlowDemo, DocFlowDemo, ViewerDemo, SplitDemo, PopDemo, PastDemo, EveryDemo } from "./TutorialDemos";
 import "./finish.css";
 import "./tutorial.css";
 
@@ -160,6 +160,39 @@ const SECTIONS: Section[] = [
     tips: [<>Paste a flow straight out of Google Docs and it keeps its structure. <b>Change keys</b> (bottom left) moves any shortcut.</>],
   },
   {
+    id: "cutter",
+    name: "Card cutter",
+    line: "Cut cards into files of your own, one key per move. Every file is searchable, and in Evidence too.",
+    open: [{ href: "/tools/cutter", label: "Open the Card cutter" }, { href: "/tools/split?a=cutter&b=evidence", label: "Cutter beside Evidence" }],
+    idea: <p>A file is a cut file: pocket, hat, block, tag, and under each tag its cite and the card. Each move is one key, Verbatim&apos;s by default, and any of them can be moved. Files save as you go, and each one is in Evidence&apos;s search too, updated whenever you save.</p>,
+    steps: [
+      <>Make a file with <b>New file</b>, or <b>Open .docx</b> to bring in one you have (cite, underline, emphasis and highlighting come with it). Rename it by clicking its name in the banner.</>,
+      <>Paste the article. {K("F2")} pastes without the source&apos;s formatting, and {K("F3")} (condense) joins the lines a PDF breaks it into.</>,
+      <>Type the tag and press {K("F7")}. Select the author and date and press {K("F8")} for the cite.</>,
+      <>Select what matters and press {K("F9")} to underline, {K("F10")} for emphasis, {K("F11")} to highlight. With nothing selected, a key works on the word the cursor is in. A double-click takes the word without the space after it, so a highlight stops where the word does.</>,
+      <>{K("Alt+F3")} shrinks everything that isn&apos;t underlined, and {K("Alt+N")} starts the next card. The coloured squares pick the highlighter, and {K("Alt+F11")} cycles through them.</>,
+      <>Search every file from the side by tag, cite, block or the words that are read. In Evidence the same cards come up, marked <b>cutter</b>.</>,
+    ],
+    keys: [
+      ["F4 / F5 / F6 / F7", "Pocket, hat, block, tag (the same key again: back to normal text)"],
+      ["F8", "Cite"],
+      ["F9", "Underline"],
+      ["F10", "Emphasis"],
+      ["F11", "Highlight"],
+      ["F12", "Clear formatting"],
+      ["Alt+F3", "Shrink what isn't underlined"],
+      ["F3", "Condense the card into one paragraph"],
+      ["F2", "Paste as plain text"],
+      ["Alt+N", "New card"],
+      ["Ctrl+S", "Save (it also saves by itself)"],
+      ["Ctrl+Shift+F", "Search every file"],
+    ],
+    tips: [
+      <><b>Keys</b> in the banner moves any of them. Click one, press the new key; on a laptop whose F-keys need Fn, that is the first thing to do.</>,
+      <>Deleting a file takes its cards out of Evidence too. <b>.docx</b> downloads the file for Word or Google Docs.</>,
+    ],
+  },
+  {
     id: "viewer",
     name: "Doc viewer",
     line: "Read your partner's send doc live, the other team's doc off SpeechDrop, or any .docx. Rehighlight their cards.",
@@ -266,6 +299,7 @@ export default function Tutorial() {
     switch (id) {
       case "start": return <MapDemo {...props} />;
       case "evidence": return <EvidenceDemo {...props} />;
+      case "cutter": return <CutterDemo {...props} />;
       case "flow": return <FlowDemo {...props} />;
       case "docflow": return <DocFlowDemo {...props} />;
       case "viewer": return <ViewerDemo {...props} />;

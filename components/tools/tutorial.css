@@ -352,3 +352,12 @@
 }
 :root[data-tool-shape="cozy"] .toolpage .tut :is(.tu-demo, .tu-paper, .tu-df, .tu-vw-card, .tu-sp, .tu-desk, .tu-mainwin, .tu-popwin, .tu-kt, .tu-grid, .tu-say, .tu-landed, .tu-sdb) { border-radius: 14px !important; overflow: hidden; }
 :root[data-tool-shape="cozy"] .toolpage .tut :is(.tu-chip, .tu-try, .tu-check, .tu-clock) { border-radius: 8px !important; }
+
+/* the Card cutter demo: words picked by dragging, cut with the F-keys */
+.toolpage .tut .tu-ct .txt > span > span { padding: 1px 0; transition: background-color .2s, font-size .2s; cursor: text; }
+.toolpage .tut .tu-ct .txt .sel { background: rgba(66, 133, 244, .3); }
+.toolpage .tut .tu-ct .txt .u { text-decoration: underline; }
+.toolpage .tut .tu-ct .txt .e { font-weight: 700; }
+.toolpage .tut .tu-ct .txt .h { background: #00ff00; }
+.toolpage .tut .tu-ct .txt .h.sel { background: #7ad8ff; }
+.toolpage .tut .tu-ct .txt.small > span > span:not(.u) { font-size: 10.5px; }

@@ -37,6 +37,7 @@ const TOOLS = {
   flow: { title: "Flow", src: "/tools/flow?embed=1" },
   viewer: { title: "Doc viewer", src: "/tools/viewer?embed=1" },
   docflow: { title: "Doc flow", src: "/tools/docflow?embed=1" },
+  cutter: { title: "Card cutter", src: "/tools/cutter?embed=1" },
 } as const;
 type ToolKey = keyof typeof TOOLS;
 const KEYS = Object.keys(TOOLS) as ToolKey[];

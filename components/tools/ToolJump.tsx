@@ -25,11 +25,12 @@ import "./jump.css";
  * mode are a row or two further down.
  */
 
-type Slug = "evidence" | "flow" | "docflow" | "viewer" | "flows" | "split" | "tutorial";
-type SideKey = "evidence" | "flow" | "docflow" | "viewer";
+type Slug = "evidence" | "cutter" | "flow" | "docflow" | "viewer" | "flows" | "split" | "tutorial";
+type SideKey = "evidence" | "cutter" | "flow" | "docflow" | "viewer";
 
 const TOOLS: { slug: Slug; name: string; icon: string; sub: string; words: string }[] = [
   { slug: "evidence", name: "Evidence", icon: "cards", sub: "Search cards, send, cut the speech doc", words: "ev cards search send doc speech file cut" },
+  { slug: "cutter", name: "Card cutter", icon: "highlight", sub: "Cut cards by key, into files of your own", words: "cutter cut card cards cutting verbatim file files highlight" },
   { slug: "flow", name: "Flow", icon: "grid", sub: "The grid, on the clock", words: "grid sheet flowing clock timer prep" },
   { slug: "docflow", name: "Doc flow", icon: "doc", sub: "A flow the way a Google Doc gets flowed", words: "docflow google doc flow" },
   { slug: "viewer", name: "Doc viewer", icon: "list", sub: "Your partner's send doc, SpeechDrop, any .docx", words: "viewer read reader speechdrop docx pdf partner outline rehighlight" },
@@ -37,7 +38,7 @@ const TOOLS: { slug: Slug; name: string; icon: string; sub: string; words: strin
   { slug: "split", name: "Split screen", icon: "split", sub: "Two tools side by side", words: "split side by side two both" },
   { slug: "tutorial", name: "Tutorial", icon: "command", sub: "Every tool explained", words: "tutorial help guide learn how" },
 ];
-const SIDE: SideKey[] = ["evidence", "flow", "docflow", "viewer"];
+const SIDE: SideKey[] = ["evidence", "cutter", "flow", "docflow", "viewer"];
 const nameOf = (s: string) => TOOLS.find((t) => t.slug === s)?.name || s;
 const iconOf = (s: string) => TOOLS.find((t) => t.slug === s)?.icon || "command";
 const isSide = (s: unknown): s is SideKey => typeof s === "string" && (SIDE as string[]).includes(s);

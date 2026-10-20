@@ -16,6 +16,8 @@
  *                 store), for a pop-out following it; viewer-ask asks again.
  *   evidence-doc  Evidence's send or read doc as HTML, for a pop-out showing
  *                 it; evidence-ask says one is open and which it wants.
+ *   cutter-changed  A Card cutter file was saved or deleted; Evidence reads
+ *                 the cutter's files again and brings its library up to date.
  */
 
 import { scoped } from "./owner";
@@ -29,7 +31,8 @@ export type BusMessage =
   | { kind: "viewer-doc"; id: string; at: number; name: string }
   | { kind: "viewer-ask" }
   | { kind: "evidence-doc"; want: "send" | "read"; html: string; at: number }
-  | { kind: "evidence-ask"; want: "send" | "read" };
+  | { kind: "evidence-ask"; want: "send" | "read" }
+  | { kind: "cutter-changed"; id?: string };
 
 /** One block of a send doc, as Flow needs it: its header and its tags. */
 export interface DocBlock { head: string; section: string; tags: { tag: string; cite: string }[] }
