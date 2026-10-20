@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { EditorState, TextSelection } from "prosemirror-state";
+import { EditorState, TextSelection, type Selection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { DOMParser as PMParser, DOMSerializer, type Node as PMNode } from "prosemirror-model";
-import { history, undo, redo } from "prosemirror-history";
+import { history, undo, redo, closeHistory, undoDepth } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { schema } from "@/lib/evidence/docSchema";
@@ -66,6 +66,9 @@ interface Head { level: number; text: string; pos: number }
 
 /** The keys along the top of the page, the ones used most first. */
 const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "condense"];
+/** How soon a second press of Cut has to come to make emphasis instead. */
+const DOUBLE_CUT = 500;
+
 /** What only makes sense with the cursor in the document. */
 const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card"]);
 
@@ -329,6 +332,9 @@ export default function Cutter({ owner }: { owner?: string }) {
   }, [files, owner, open, create, toast]);
 
   // ---- the commands ---------------------------------------------------------
+  // the last cut, for a second press of the same key straight after it
+  const lastCut = useRef<{ at: number; doc: PMNode; sel: Selection; depth: number } | null>(null);
+
   const run = useCallback((id: string) => {
     const v = view.current;
     if (!v) return;
@@ -339,7 +345,24 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "block": return exec(C.setLevel(3));
       case "tag": return exec(C.setLevel(4));
       case "cite": return exec(C.cite);
-      case "underline": return exec(C.underline);
+      case "underline": {
+        // Cut twice, quickly, on the same words is emphasis: the first cut is taken
+        // back (it is its own step in the history, so one undo does exactly that)
+        // and emphasis goes on in its place. Only when the first press really cut
+        // something, and nothing — the text, the selection, the history — has moved
+        // since; anything else is just another cut.
+        // a selection made a moment ago is read first, so the press acts on what is selected now
+        try { (v as any).domObserver?.flush?.(); } catch { /* read on its own soon enough */ }
+        const prev = lastCut.current;
+        lastCut.current = null;
+        if (prev && Date.now() - prev.at < DOUBLE_CUT && v.state.doc === prev.doc && v.state.selection.eq(prev.sel)
+          && undoDepth(v.state) === prev.depth && undo(v.state, v.dispatch)) return exec(C.emphasis);
+        let changed = false;
+        C.underline(v.state, (tr) => { changed = tr.docChanged; v.dispatch(closeHistory(tr)); });
+        lastCut.current = changed ? { at: Date.now(), doc: v.state.doc, sel: v.state.selection, depth: undoDepth(v.state) } : null;
+        v.focus();
+        return;
+      }
       case "emphasis": return exec(C.emphasis);
       case "highlight": return exec(C.highlight(hlRef.current));
       case "clear": return exec(C.clear);
