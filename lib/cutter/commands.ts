@@ -88,8 +88,36 @@ function toggleSet(marks: Mark[], has: (ms: readonly Mark[]) => boolean, opts: {
   };
 }
 
-/** Cut: underlined, at 11pt. */
+/** Underlined, at 11pt — on and off. */
 export const underline: Cmd = toggleSet([M.underline.create()], (ms) => ms.some((m) => m.type === M.underline), { unshrink: true });
+
+/**
+ * Cut: one key that steps the words along. Plain words are cut (underlined,
+ * at 11pt); words already cut get emphasis (bold, underlined, boxed); words
+ * already emphasised go back to plain. So pressing it twice is emphasis, at
+ * any pace, and a third press takes it all off. With some of the words one
+ * way and some another, it goes by the least done: any not cut, and all are
+ * cut; all cut but any not emphasised, and all are emphasised.
+ */
+export const cut: Cmd = (state, dispatch) => {
+  const r = targetOf(state);
+  if (!r) return false;
+  const has = (t: MarkType) => (ms: readonly Mark[]) => ms.some((m) => m.type === t);
+  const cutAll = allHave(state.doc, r.from, r.to, has(M.underline));
+  const emphAll = cutAll && allHave(state.doc, r.from, r.to, (ms) => has(M.strong)(ms) && has(M.box)(ms));
+  if (dispatch) {
+    const tr = state.tr;
+    if (emphAll) {
+      for (const t of [M.underline, M.strong, M.box]) tr.removeMark(r.from, r.to, t);
+    } else {
+      tr.addMark(r.from, r.to, M.underline.create());
+      if (cutAll) { tr.addMark(r.from, r.to, M.strong.create()); tr.addMark(r.from, r.to, M.box.create()); }
+      unshrink(tr, r.from, r.to);
+    }
+    dispatch(tr.scrollIntoView());
+  }
+  return true;
+};
 
 /** Emphasis: bold, underlined, and a box round it. Again, and the bold and box come off. */
 export const emphasis: Cmd = toggleSet(

@@ -434,15 +434,23 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
   const anchor = useRef<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const chord = useRef(false);
-  const lastChord = useRef(0);
   useEffect(() => { const up = () => { anchor.current = null; }; window.addEventListener("mouseup", up); return () => window.removeEventListener("mouseup", up); }, []);
   const range = (a: number, b: number) => { const s = new Set<number>(); for (let i = Math.min(a, b); i <= Math.max(a, b); i++) s.add(i); return s; };
 
-  const apply = useCallback((what: "u" | "e" | "h" | "clear" | "shrink") => {
+  const apply = useCallback((what: "u" | "e" | "h" | "clear" | "shrink" | "cut") => {
     if (what === "shrink") { setSmall((s) => !s); box.current?.focus(); return; }
     if (!sel.size) return;
     setMarks((m) => {
       const n = { ...m };
+      if (what === "cut") {
+        // plain → cut → emphasis → plain, like the cutter's Ctrl+Alt
+        const cutAll = [...sel].every((i) => n[i]?.u || n[i]?.e), emphAll = [...sel].every((i) => n[i]?.e);
+        for (const i of sel) {
+          if (emphAll) { const c = { ...n[i] }; delete c.u; delete c.e; n[i] = c; }
+          else n[i] = { ...n[i], u: true, ...(cutAll ? { e: true } : {}) };
+        }
+        return n;
+      }
       const all = what !== "clear" && [...sel].every((i) => (what === "e" ? n[i]?.e : n[i]?.[what]));
       for (const i of sel) {
         const c: CutMark = { ...n[i] };
@@ -479,13 +487,10 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
         onKeyUp={(e) => {
           if (!chord.current || (e.key !== "Control" && e.key !== "Alt")) return;
           chord.current = false; e.preventDefault();
-          // twice, quickly, is emphasis
-          const twice = Date.now() - lastChord.current < 500;
-          lastChord.current = twice ? 0 : Date.now();
-          apply(twice ? "e" : "u");
+          apply("cut");
         }}>
         <div className="tu-vw-bar">
-          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("u")}><Keys k="Ctrl+Alt" /> Cut</button>
+          <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("cut")}><Keys k="Ctrl+Alt" /> Cut</button>
           <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("e")}><Keys k="Ctrl+Shift+Space" /> Emphasis</button>
           <button type="button" className="tu-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => apply("h")}><Keys k="Alt+Z" /> Highlight</button>
           <button type="button" className={"tu-chip" + (small ? " on" : "")} onMouseDown={(e) => e.preventDefault()} onClick={() => apply("shrink")}><Keys k="Ctrl+N" /> Shrink</button>

@@ -15,10 +15,10 @@ export { comboOf, keyLabel } from "../docflow/keys";
 export interface Action { id: string; group: string; label: string; key: string | null; hint: string }
 
 export const ACTIONS: Action[] = [
-  { id: "underline", group: "Cutting", label: "Cut", key: "mod+alt", hint: "Underline, at 11pt — Ctrl and Alt together, then let go. Twice, quickly: emphasis" },
+  { id: "underline", group: "Cutting", label: "Cut", key: "mod+alt", hint: "Underline, at 11pt — Ctrl and Alt together, then let go. Again on cut words: emphasis; again: plain" },
   { id: "shrink", group: "Cutting", label: "Shrink", key: "mod+N", hint: "What is neither underlined nor bold goes to 8pt (again: back)" },
   { id: "highlight", group: "Cutting", label: "Highlight", key: "alt+Z", hint: "In the highlighter's colour — green to start with" },
-  { id: "emphasis", group: "Cutting", label: "Emphasis", key: "mod+shift+Space", hint: "Bold, underlined, and boxed — or Cut twice, quickly" },
+  { id: "emphasis", group: "Cutting", label: "Emphasis", key: "mod+shift+Space", hint: "Bold, underlined, and boxed — or Cut, twice" },
   { id: "cite", group: "Cutting", label: "Cite", key: "alt+C", hint: "Author and date, 13pt bold" },
   { id: "clear", group: "Cutting", label: "Clear", key: "mod+\\", hint: "Back to plain text" },
   { id: "condense", group: "Cutting", label: "Condense", key: "alt+Q", hint: "The card's paragraphs into one" },
