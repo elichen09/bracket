@@ -24,6 +24,7 @@ export const ACTIONS: Action[] = [
   { id: "condense", group: "Cutting", label: "Condense", key: "alt+Q", hint: "The card's paragraphs into one" },
   { id: "hl-next", group: "Cutting", label: "Next highlighter colour", key: "alt+shift+Z", hint: "Green, yellow, blue, pink, grey" },
   { id: "paste", group: "Cutting", label: "Paste as text", key: null, hint: "Without the source's formatting (Ctrl+Shift+V does it too)" },
+  { id: "verbatim", group: "View", label: "Verbatimise", key: "alt+V", hint: "Just the highlighting — the cards as you'll read them (again: back)" },
   { id: "tag", group: "Headings", label: "Tag", key: "alt+4", hint: "A card's tag" },
   { id: "block", group: "Headings", label: "Block", key: "alt+3", hint: "A block — “AT: Econ”" },
   { id: "hat", group: "Headings", label: "Hat", key: "alt+2", hint: "A group of blocks" },

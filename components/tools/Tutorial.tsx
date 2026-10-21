@@ -171,6 +171,7 @@ const SECTIONS: Section[] = [
       <>Type the tag and press {K("Alt+4")}. Select the author and date and press {K("Alt+C")} for the cite.</>,
       <>Select what matters and press {K("Ctrl+Alt")} (together, then let go) to cut it (underlined, at 11pt); press it again on cut words for emphasis (bold, underlined, boxed), and a third time to take it all off. {K("Ctrl+Shift+Space")} goes straight to emphasis, {K("Alt+Z")} to highlight. With nothing selected, a key works on the word the cursor is in. A double-click takes the word without the space after it, so a highlight stops where the word does.</>,
       <>{K("Ctrl+N")} shrinks everything that is neither underlined nor bold to 8pt. Chrome keeps Ctrl+N for a new window, so it works with the cutter full screen; anywhere else, give shrink another key. {K("Alt+N")} starts the next card. The coloured squares pick the highlighter, and {K("Alt+Shift+Z")} cycles through them.</>,
+      <><b>Verbatimise</b> ({K("Alt+V")}) shows just the highlighting: each card&apos;s tag and cite, then only the words you&apos;ll read, with how many there are and how long they take. Nothing in the file changes; {K("Alt+V")} again goes back to editing.</>,
       <>Search every file from the side by tag, cite, block or the words that are read. In Evidence the same cards come up, marked <b>cutter</b>.</>,
     ],
     keys: [
@@ -183,6 +184,7 @@ const SECTIONS: Section[] = [
       ["Alt+1 / Alt+2 / Alt+3 / Alt+4", "Pocket, hat, block, tag (the same key again: back to normal text)"],
       ["Ctrl+\\", "Clear formatting"],
       ["Alt+Q", "Condense the card into one paragraph"],
+      ["Alt+V", "Verbatimise: just the highlighting (again: back)"],
       ["Alt+N", "New card"],
       ["Ctrl+S", "Save (it also saves by itself)"],
       ["Ctrl+Shift+F", "Search every file"],

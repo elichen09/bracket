@@ -13,7 +13,8 @@ import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type Cu
 import * as C from "@/lib/cutter/commands";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
-import { sanitize } from "@/lib/viewer/doc";
+import { sanitize, readTime } from "@/lib/viewer/doc";
+import { verbatimPlugin, verbKey, readWords } from "@/lib/cutter/verbatim";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -102,6 +103,11 @@ export default function Cutter({ owner }: { owner?: string }) {
   hlRef.current = hl;
   const [toastMsg, setToastMsg] = useState<{ t: string; n: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  // verbatimised: just the highlighting on the page (lib/cutter/verbatim.ts)
+  const [verb, setVerb] = useState(false);
+  const verbRef = useRef(false);
+  verbRef.current = verb;
+  const [readN, setReadN] = useState(0);
   const saveT = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toast = useCallback((t: string) => setToastMsg((m) => ({ t, n: (m?.n || 0) + 1 })), []);
@@ -203,6 +209,7 @@ export default function Cutter({ owner }: { owner?: string }) {
           "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline),
         }),
         keymap(baseKeymap),
+        verbatimPlugin(verbRef.current),
       ],
     });
   }, []);
@@ -241,6 +248,7 @@ export default function Cutter({ owner }: { owner?: string }) {
     const v = view.current;
     if (!f || !v) return;
     v.updateState(stateFor(f));
+    setReadN(readWords(v.state.doc));
     curRef.current = f;
     setCur(f);
     setName(f.name);
@@ -252,6 +260,8 @@ export default function Cutter({ owner }: { owner?: string }) {
 
   const create = useCallback(async (fileName: string, html = "<h4></h4><p></p>") => {
     if (saveT.current) await save();
+    // a new file is for writing in, not reading
+    verbRef.current = false; setVerb(false);
     const doc = fromHtml(html);
     const f: CutFile = {
       id: newFileId(), name: fileName, doc: doc.toJSON(), html: toHtml(doc),
@@ -329,9 +339,24 @@ export default function Cutter({ owner }: { owner?: string }) {
   }, [files, owner, open, create, toast]);
 
   // ---- the commands ---------------------------------------------------------
+  /** Just the highlighting, or back to the whole cards. Nothing in the file changes. */
+  const toggleVerb = useCallback(() => {
+    const v = view.current;
+    if (!v) return;
+    const next = !verbRef.current;
+    verbRef.current = next;
+    setVerb(next);
+    if (next) setReadN(readWords(v.state.doc));
+    v.dispatch(v.state.tr.setMeta(verbKey, next));
+    if (!next) v.focus();
+  }, []);
+
   const run = useCallback((id: string) => {
     const v = view.current;
     if (!v) return;
+    if (id === "verbatim") { toggleVerb(); return; }
+    // a read view: nothing to cut in it
+    if (verbRef.current && IN_DOC.has(id)) { toast(`Verbatimised — ${keyLabel(keyFor(keysRef.current, "verbatim")) || "Verbatimise"} to edit again`); return; }
     const exec = (cmd: (s: EditorState, d?: EditorView["dispatch"]) => boolean) => { cmd(v.state, v.dispatch); v.focus(); };
     switch (id) {
       case "pocket": return exec(C.setLevel(1));
@@ -371,7 +396,7 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "find": setTab("files"); requestAnimationFrame(() => { qIn.current?.focus(); qIn.current?.select(); }); return;
       case "new-file": void create("Untitled file"); return;
     }
-  }, [save, create, toast]);
+  }, [save, create, toast, toggleVerb]);
 
   // every key, before the page does anything with it
   useEffect(() => {
@@ -525,6 +550,10 @@ export default function Cutter({ owner }: { owner?: string }) {
           </span>
         </div>
         <div className="dv-gap" />
+        <button type="button" className={"dv-btn" + (verb ? " on" : "")} onClick={toggleVerb} aria-pressed={verb}
+          title={`Verbatimise — just the highlighting, the cards as you'll read them${K("verbatim") ? ` (${K("verbatim")})` : ""}`}>
+          <Ico n="highlight" /><span className="lbl">Verbatimise</span>
+        </button>
         <button type="button" className="dv-btn" onClick={() => void create("Untitled file")} title={`New file${K("new-file") ? ` (${K("new-file")})` : ""}`}><Ico n="doc" /><span className="lbl">New file</span></button>
         <button type="button" className="dv-btn" onClick={() => fileIn.current?.click()} disabled={busy} title="Open a .docx (or a web page, or text) as a file of your own"><Ico n="import" /><span className="lbl">{busy ? "Opening…" : "Open .docx"}</span></button>
         <button type="button" className="dv-btn" onClick={() => void download()} title="Download this file as a .docx — Word and Google Docs open it"><Ico n="export" /><span className="lbl">.docx</span></button>
@@ -540,7 +569,7 @@ export default function Cutter({ owner }: { owner?: string }) {
         {STRIP.map((id) => {
           const a = ACTION.get(id)!;
           return (
-            <button key={id} type="button" className={"ct-key ct-" + id} onMouseDown={(e) => e.preventDefault()} onClick={() => run(id)}
+            <button key={id} type="button" className={"ct-key ct-" + id} onMouseDown={(e) => e.preventDefault()} onClick={() => run(id)} disabled={verb}
               title={a.hint + (caveat(keyFor(keys, id)) ? ` — ${caveat(keyFor(keys, id))}` : "")}>
               {K(id) && <kbd>{K(id)}</kbd>}<span>{a.label}</span>
             </button>
@@ -639,7 +668,14 @@ export default function Cutter({ owner }: { owner?: string }) {
         </aside>
 
         <main className="dv-pane" ref={pane}>
-          <div className="dv-paper ct-paper">
+          {verb && (
+            <div className="ct-vbar" role="status">
+              <b>Verbatimised</b>
+              <span>Just the highlighting: {readN} word{readN === 1 ? "" : "s"}{readN ? ` · about ${readTime(readN)} to read` : ""}</span>
+              <button type="button" className="dv-btn2 ink" onClick={toggleVerb}>Back to editing{K("verbatim") ? ` (${K("verbatim")})` : ""}</button>
+            </div>
+          )}
+          <div className={"dv-paper ct-paper" + (verb ? " verb" : "")}>
             <div ref={mount} />
           </div>
         </main>
