@@ -356,3 +356,65 @@ export function briefs(doc: PMNode): CardBrief[] {
   for (const c of out) c.read = c.read.replace(/\s+/g, " ").trim().slice(0, 2000);
   return out;
 }
+
+/* ------------------------------------------------------------------ moving cards and blocks */
+
+/** The top-level headings, with where each one's section — it and all under it — ends. */
+export function sections(doc: PMNode): { pos: number; level: number; end: number }[] {
+  const heads: { pos: number; level: number; end: number }[] = [];
+  doc.forEach((n, pos) => { if (n.type === schema.nodes.heading) heads.push({ pos, level: n.attrs.level, end: doc.content.size }); });
+  heads.forEach((h, i) => {
+    for (let j = i + 1; j < heads.length; j++) if (heads[j].level <= h.level) { h.end = heads[j].pos; break; }
+  });
+  return heads;
+}
+
+/**
+ * Move the section of the heading at `start` — a card with its tag, a block
+ * with its cards — to `target`, a position between top-level nodes. Nothing
+ * happens for a target inside the section itself. The moved heading ends up
+ * selected, so the outline follows it.
+ */
+export function moveSection(state: EditorState, start: number, target: number): Transaction | null {
+  const sec = sections(state.doc).find((s) => s.pos === start);
+  if (!sec || (target >= sec.pos && target <= sec.end)) return null;
+  const content = state.doc.slice(sec.pos, sec.end).content;
+  const tr = state.tr;
+  let at: number;
+  if (target > sec.end) { tr.insert(target, content); tr.delete(sec.pos, sec.end); at = target - (sec.end - sec.pos); }
+  else { tr.delete(sec.pos, sec.end); tr.insert(target, content); at = target; }
+  tr.setSelection(TextSelection.create(tr.doc, at + 1));
+  return tr.scrollIntoView();
+}
+
+/**
+ * Alt+↑ / Alt+↓: the card (or block, or hat) the cursor is in, one place up
+ * or down — past the one before or after it at its own level. At the edge of
+ * its block it goes into the next one: up, to the end of the block before;
+ * down, to the top of the block after.
+ */
+export const moveBy = (dir: -1 | 1): Cmd => (state, dispatch) => {
+  const secs = sections(state.doc);
+  const from = state.selection.from;
+  let me = null as (typeof secs)[number] | null;
+  for (const s of secs) if (s.pos <= from) me = s;
+  if (!me) return false;
+  let target: number | null = null;
+  if (dir < 0) {
+    const before = secs.filter((s) => s.pos < me!.pos && s.level <= me!.level).pop();
+    if (before) target = before.pos;
+  } else if (me.end < state.doc.content.size) {
+    const next = secs.find((s) => s.pos === me!.end)!;
+    if (next.level === me.level) target = next.end;
+    else {
+      // into the top of the next block: after its heading and anything under it before its first child
+      const after = secs.find((s) => s.pos > next.pos);
+      target = after ? after.pos : state.doc.content.size;
+    }
+  }
+  if (target === null) return false;
+  const tr = moveSection(state, me.pos, target);
+  if (!tr) return false;
+  if (dispatch) dispatch(tr);
+  return true;
+};

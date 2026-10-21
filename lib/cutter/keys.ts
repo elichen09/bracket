@@ -29,6 +29,8 @@ export const ACTIONS: Action[] = [
   { id: "block", group: "Headings", label: "Block", key: "alt+3", hint: "A block — “AT: Econ”" },
   { id: "hat", group: "Headings", label: "Hat", key: "alt+2", hint: "A group of blocks" },
   { id: "pocket", group: "Headings", label: "Pocket", key: "alt+1", hint: "The biggest heading, in a box — a whole file's subject" },
+  { id: "move-up", group: "Moving", label: "Move up", key: "alt+↑", hint: "The card (or block) the cursor is in, one place up" },
+  { id: "move-down", group: "Moving", label: "Move down", key: "alt+↓", hint: "The card (or block) the cursor is in, one place down" },
   { id: "new-card", group: "Files", label: "New card", key: "alt+N", hint: "A tag, a cite and room for the card, after this one" },
   { id: "save", group: "Files", label: "Save", key: "mod+S", hint: "It also saves by itself as you go" },
   { id: "find", group: "Files", label: "Search every file", key: "mod+shift+F", hint: "Tags, cites, blocks and what is read" },

@@ -107,6 +107,18 @@
 .cutw .ct-key:disabled { opacity: .4; cursor: default; }
 .cutw .ct-key:disabled:hover { border-color: var(--line-soft); }
 
+/* ------------------------------------------------------------ moving cards in the outline */
+.cutw .ct-olist .dv-orow { position: relative; cursor: grab; }
+.cutw .ct-olist.dragging .dv-orow { cursor: grabbing; }
+.cutw .ct-grip { width: 10px; flex-shrink: 0; font-size: 11px; color: var(--dim); opacity: 0; transition: opacity .12s; }
+.cutw .ct-olist .dv-orow:hover .ct-grip { opacity: .8; }
+.cutw .ct-olist .dv-orow.lifted { opacity: .4; }
+.cutw .ct-olist .dv-orow.drop-before::before, .cutw .ct-olist .dv-orow.drop-after::after {
+  content: ""; position: absolute; left: calc(6px + var(--d) * 14px); right: 4px; height: 3px; background: var(--t-acc, #C4553A); pointer-events: none;
+}
+.cutw .ct-olist .dv-orow.drop-before::before { top: -2px; }
+.cutw .ct-olist .dv-orow.drop-after::after { bottom: -2px; }
+
 /* ------------------------------------------------------------ the Keys panel */
 .cutw .ct-keys {
   position: absolute; top: 64px; right: 16px; z-index: 60; width: min(560px, calc(100% - 32px)); max-height: calc(100% - 84px);

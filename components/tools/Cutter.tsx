@@ -68,7 +68,9 @@ interface Head { level: number; text: string; pos: number }
 /** The keys along the top of the page, the ones used most first. */
 const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "condense"];
 /** What only makes sense with the cursor in the document. */
-const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card"]);
+const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down"]);
+/** What still works while verbatimised: reordering cards is fine in a read view. */
+const IN_READ = new Set(["move-up", "move-down"]);
 
 export default function Cutter({ owner }: { owner?: string }) {
   const root = useRef<HTMLDivElement>(null);
@@ -356,7 +358,7 @@ export default function Cutter({ owner }: { owner?: string }) {
     if (!v) return;
     if (id === "verbatim") { toggleVerb(); return; }
     // a read view: nothing to cut in it
-    if (verbRef.current && IN_DOC.has(id)) { toast(`Verbatimised — ${keyLabel(keyFor(keysRef.current, "verbatim")) || "Verbatimise"} to edit again`); return; }
+    if (verbRef.current && IN_DOC.has(id) && !IN_READ.has(id)) { toast(`Verbatimised — ${keyLabel(keyFor(keysRef.current, "verbatim")) || "Verbatimise"} to edit again`); return; }
     const exec = (cmd: (s: EditorState, d?: EditorView["dispatch"]) => boolean) => { cmd(v.state, v.dispatch); v.focus(); };
     switch (id) {
       case "pocket": return exec(C.setLevel(1));
@@ -376,6 +378,8 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "shrink": return exec(C.shrink);
       case "condense": return exec(C.condense);
       case "new-card": return exec(C.newCard);
+      case "move-up": return exec(C.moveBy(-1));
+      case "move-down": return exec(C.moveBy(1));
       case "hl-next": {
         const i = C.HIGHLIGHTS.findIndex((h) => h.color === hlRef.current);
         const n = C.HIGHLIGHTS[(i + 1) % C.HIGHLIGHTS.length];
@@ -494,6 +498,42 @@ export default function Cutter({ owner }: { owner?: string }) {
     if (pos < 0) return;
     goPos(v, pos);
   }, []);
+  // ---- dragging in the outline: a heading takes everything under it along -------------
+  const [drag, setDrag] = useState<number | null>(null);        // the row being dragged
+  const [dropAt, setDropAt] = useState<number | null>(null);    // the row it would go in front of (heads.length: the end)
+  /** Where a drop in front of row `i` lands in the document, or null where it can't go. */
+  const dropTarget = (from: number, i: number): number | null => {
+    const v = view.current;
+    if (!v) return null;
+    const secs = C.sections(v.state.doc);
+    const me = secs.find((s) => s.pos === heads[from]?.pos);
+    if (!me) return null;
+    const target = i < heads.length ? heads[i].pos : v.state.doc.content.size;
+    return target >= me.pos && target <= me.end ? null : target;
+  };
+  const onRowDrag = (e: React.DragEvent, i: number) => {
+    if (drag === null) return;
+    e.preventDefault();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const at = e.clientY > r.top + r.height / 2 ? i + 1 : i;
+    const ok = dropTarget(drag, at) !== null;
+    e.dataTransfer.dropEffect = ok ? "move" : "none";
+    setDropAt(ok ? at : null);
+  };
+  const dropRow = () => {
+    const v = view.current;
+    if (v && drag !== null && dropAt !== null) {
+      const target = dropTarget(drag, dropAt);
+      const tr = target === null ? null : C.moveSection(v.state, heads[drag].pos, target);
+      if (tr) {
+        v.dispatch(tr);
+        const pos = v.state.selection.$from.before(1);
+        requestAnimationFrame(() => goPos(v, pos));
+      }
+    }
+    setDrag(null); setDropAt(null);
+  };
+
   const goPos = (v: EditorView, pos: number) => {
     v.dispatch(v.state.tr.setSelection(TextSelection.create(v.state.doc, pos + 1)));
     v.focus();
@@ -655,14 +695,24 @@ export default function Cutter({ owner }: { owner?: string }) {
             </div>
           ) : (
             <div className="dv-outline">
-              <div className="dv-olist">
+              <div className={"dv-olist ct-olist" + (drag !== null ? " dragging" : "")}
+                onDragOver={(e) => { if (drag !== null && e.target === e.currentTarget) { e.preventDefault(); const ok = dropTarget(drag, heads.length) !== null; setDropAt(ok ? heads.length : null); } }}
+                onDrop={(e) => { e.preventDefault(); dropRow(); }}>
                 {heads.length ? heads.map((h, i) => (
-                  <button key={i} type="button" className={`dv-orow l${h.level}` + (i === at ? " on" : "")} style={{ ["--d" as string]: h.level - 1 }}
-                    onClick={() => view.current && goPos(view.current, h.pos)}>
+                  <button key={i} type="button" draggable
+                    className={`dv-orow l${h.level}` + (i === at ? " on" : "") + (drag === i ? " lifted" : "") + (dropAt === i ? " drop-before" : "") + (dropAt === heads.length && i === heads.length - 1 ? " drop-after" : "")}
+                    style={{ ["--d" as string]: h.level - 1 }}
+                    title="Click to go there · drag to move it, and everything under it"
+                    onClick={() => view.current && goPos(view.current, h.pos)}
+                    onDragStart={(e) => { setDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", h.text); }}
+                    onDragOver={(e) => onRowDrag(e, i)}
+                    onDragEnd={() => { setDrag(null); setDropAt(null); }}>
+                    <span className="ct-grip" aria-hidden="true">⠿</span>
                     <span className="t">{h.text}</span>
                   </button>
                 )) : <p className="dv-none">No headings yet. {K("tag")} makes a line a tag, {K("block")} a block.</p>}
               </div>
+              {heads.length > 1 && <p className="ct-note">Drag a heading to move it — a tag takes its card, a block its cards. {K("move-up")} / {K("move-down")} move the one the cursor is in.</p>}
             </div>
           )}
         </aside>
