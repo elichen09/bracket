@@ -52,6 +52,19 @@ function targetOf(state: EditorState): { from: number; to: number } | null {
   return wordAt(state, from);
 }
 
+/**
+ * The range without the spaces at its ends — a drag that took in the space
+ * before or after a word. Marks go on the words; spaces between two marked
+ * words stay inside the range. Nothing but space: the range as it was.
+ */
+function trimmed_(doc: PMNode, r: { from: number; to: number }): { from: number; to: number } {
+  let f = r.from, t = r.to;
+  const ch = (p: number) => doc.textBetween(p, p + 1, "\n", "\uFFFC");
+  while (f < t) { const c = ch(f); if (c === "" || /\s/.test(c)) f++; else break; }
+  while (t > f) { const c = ch(t - 1); if (c === "" || /\s/.test(c)) t--; else break; }
+  return f < t ? { from: f, to: t } : r;
+}
+
 /** Does every bit of text in the range carry every one of these marks? */
 function allHave(doc: PMNode, from: number, to: number, test: (marks: readonly Mark[]) => boolean): boolean {
   let any = false, all = true;
@@ -74,13 +87,15 @@ function toggleSet(marks: Mark[], has: (ms: readonly Mark[]) => boolean, opts: {
   return (state, dispatch) => {
     const r = targetOf(state);
     if (!r) return false;
+    // on: the words, not a space either side; off: everything selected
+    const w = trimmed_(state.doc, r);
     if (dispatch) {
       const tr = state.tr;
-      if (allHave(state.doc, r.from, r.to, has)) {
+      if (allHave(state.doc, w.from, w.to, has)) {
         for (const t of opts.drop || marks.map((m) => m.type)) tr.removeMark(r.from, r.to, t);
       } else {
-        for (const m of marks) tr.addMark(r.from, r.to, m);
-        if (opts.unshrink) unshrink(tr, r.from, r.to);
+        for (const m of marks) tr.addMark(w.from, w.to, m);
+        if (opts.unshrink) unshrink(tr, w.from, w.to);
       }
       dispatch(tr.scrollIntoView());
     }
@@ -102,17 +117,19 @@ export const underline: Cmd = toggleSet([M.underline.create()], (ms) => ms.some(
 export const cut: Cmd = (state, dispatch) => {
   const r = targetOf(state);
   if (!r) return false;
+  const w = trimmed_(state.doc, r);
   const has = (t: MarkType) => (ms: readonly Mark[]) => ms.some((m) => m.type === t);
-  const cutAll = allHave(state.doc, r.from, r.to, has(M.underline));
-  const emphAll = cutAll && allHave(state.doc, r.from, r.to, (ms) => has(M.strong)(ms) && has(M.box)(ms));
+  const cutAll = allHave(state.doc, w.from, w.to, has(M.underline));
+  const emphAll = cutAll && allHave(state.doc, w.from, w.to, (ms) => has(M.strong)(ms) && has(M.box)(ms));
   if (dispatch) {
     const tr = state.tr;
     if (emphAll) {
       for (const t of [M.underline, M.strong, M.box]) tr.removeMark(r.from, r.to, t);
     } else {
-      tr.addMark(r.from, r.to, M.underline.create());
-      if (cutAll) { tr.addMark(r.from, r.to, M.strong.create()); tr.addMark(r.from, r.to, M.box.create()); }
-      unshrink(tr, r.from, r.to);
+      // on the words only; a space at either end of the selection is left as it was
+      tr.addMark(w.from, w.to, M.underline.create());
+      if (cutAll) { tr.addMark(w.from, w.to, M.strong.create()); tr.addMark(w.from, w.to, M.box.create()); }
+      unshrink(tr, w.from, w.to);
     }
     dispatch(tr.scrollIntoView());
   }
@@ -418,3 +435,76 @@ export const moveBy = (dir: -1 | 1): Cmd => (state, dispatch) => {
   if (dispatch) dispatch(tr);
   return true;
 };
+
+
+/* ------------------------------------------------------------------ cleaning up */
+
+/** The marks that show on a space when they spill past a word. */
+const EDGE = [M.underline, M.highlight, M.box];
+
+/**
+ * Clean up: what a quick drag leaves behind. A highlight, underline or box
+ * that runs onto the space before or after its words comes off that space —
+ * spaces between two marked words keep it, so a highlighted phrase stays one
+ * stretch of colour. A space that loses its underline in a shrunk card goes
+ * small like the words beside it. Two or more spaces in a row become one.
+ * With nothing selected, the whole file; otherwise just the selection.
+ */
+export function cleanUp(state: EditorState): { tr: Transaction; spaces: number; doubles: number } {
+  const { from, to, empty } = state.selection;
+  const a = empty ? 0 : from, b = empty ? state.doc.content.size : to;
+  const tr = state.tr;
+  let spaces = 0;
+  const cuts: { at: number; len: number }[] = [];
+  state.doc.nodesBetween(a, b, (node, pos) => {
+    if (!node.isTextblock) return true;
+    const start = pos + 1;
+    // every character of the line with its marks (an inline node is one character)
+    const chars: { c: string; marks: readonly Mark[] }[] = [];
+    node.forEach((child) => {
+      if (child.isText) for (let i = 0; i < child.text!.length; i++) chars.push({ c: child.text![i], marks: child.marks });
+      else chars.push({ c: "\uFFFC", marks: child.marks });
+    });
+    const inside = (i: number) => start + i >= a && start + i < b;
+    const ws = (i: number) => /\s/.test(chars[i].c);
+    for (const type of EDGE) {
+      const on = (i: number) => chars[i].marks.some((m) => m.type === type);
+      for (let i = 0; i < chars.length;) {
+        if (!on(i)) { i++; continue; }
+        let j = i;
+        while (j < chars.length && on(j)) j++;
+        // the run [i, j): its edge spaces come off
+        const strip = (k: number, outside: number) => {
+          if (!inside(k)) return;
+          tr.removeMark(start + k, start + k + 1, type);
+          spaces++;
+          if (type === M.underline && outside >= 0 && outside < chars.length) {
+            const small = chars[outside].marks.find(isSmall);
+            if (small) tr.addMark(start + k, start + k + 1, small);
+          }
+        };
+        let x = i, y = j;
+        while (x < y && ws(x)) { strip(x, i - 1); x++; }
+        while (y > x && ws(y - 1)) { strip(y - 1, j); y--; }
+        i = j;
+      }
+    }
+    // two or more spaces in a row, in text that is not a heading
+    if (node.type === schema.nodes.paragraph) {
+      for (let i = 0; i < chars.length; i++) {
+        if (chars[i].c !== " " || chars[i + 1]?.c !== " ") continue;
+        let j = i + 1;
+        while (j < chars.length && chars[j].c === " ") j++;
+        if (inside(i + 1)) cuts.push({ at: start + i + 1, len: j - i - 1 });
+        i = j - 1;
+      }
+    }
+    return false;
+  });
+  // the extra spaces go last, from the end back, so nothing moves under what is still to do
+  for (const c of cuts.sort((x, y) => y.at - x.at)) {
+    const f = tr.mapping.map(c.at), t = tr.mapping.map(c.at + c.len);
+    if (t > f) tr.delete(f, t);
+  }
+  return { tr, spaces, doubles: cuts.length };
+}

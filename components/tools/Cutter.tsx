@@ -85,9 +85,9 @@ let paneSeq = 0;
 const newKey = () => "p" + (++paneSeq) + "_" + Date.now().toString(36);
 
 /** The keys along the top of the page, the ones used most first. */
-const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "condense", "new-extension"];
+const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "clean-up", "condense", "new-extension"];
 /** What only makes sense with the cursor in the document. */
-const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break"]);
+const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up"]);
 /** What still works in a read page: reordering cards is fine in a read view. */
 const IN_READ = new Set(["move-up", "move-down"]);
 
@@ -706,6 +706,15 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "new-extension": return exec(X.newExtension(curRef.current?.name || ""));
       case "analytic": return exec(X.analytic);
       case "page-break": return exec(X.pageBreak);
+      case "clean-up": {
+        const { tr, spaces, doubles } = C.cleanUp(v.state);
+        if (!tr.docChanged) { toast(v.state.selection.empty ? "Nothing to clean up in this file" : "Nothing to clean up in what's selected"); v.focus(); return; }
+        v.dispatch(tr);
+        v.focus();
+        const said = [spaces && `${spaces} space${spaces === 1 ? "" : "s"} unmarked`, doubles && `${doubles} double space${doubles === 1 ? "" : "s"} made single`].filter(Boolean).join(", ");
+        toast(`Cleaned up${v.state.selection.empty ? " the file" : ""}: ${said}`);
+        return;
+      }
       case "paste": {
         if (!navigator.clipboard?.readText) { toast("This browser will not read the clipboard — use Ctrl+Shift+V"); return; }
         navigator.clipboard.readText().then((t) => {

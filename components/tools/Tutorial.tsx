@@ -186,6 +186,7 @@ const SECTIONS: Section[] = [
       ["Alt+C", "Cite"],
       ["Alt+1 / Alt+2 / Alt+3 / Alt+4", "Pocket, hat, block, tag (the same key again: back to normal text)"],
       ["Ctrl+\\", "Clear formatting"],
+      ["Alt+W", "Clean up: marks off the spaces they spilled onto, double spaces to one"],
       ["Alt+Q", "Condense the card into one paragraph"],
       ["Alt+↑ / Alt+↓", "Move the card (or block) the cursor is in up or down"],
       ["Alt+X", "New extension: a new page, a heading ending in the speech, bold lines under it"],
