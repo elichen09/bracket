@@ -78,15 +78,19 @@ export function verbatimPlugin(startOn: boolean) {
 export const isVerbatim = (s: EditorState) => !!verbKey.getState(s)?.on;
 
 /**
- * How many words a speech reads from the file: in a card, what is highlighted;
- * outside one — an extension's analytics, under a block — every word. A
- * heading is not read.
+ * How many words a speech reads from the file: every tag and analytic (Heading
+ * 4 — they are said out loud); in a card, what is highlighted; outside one,
+ * every word. A pocket, hat or block heading is not read.
  */
 export function readWords(doc: PMNode): number {
   const count = (s: string) => (s.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
   let n = 0, inCard = false;
   doc.forEach((node) => {
-    if (node.type === schema.nodes.heading) { inCard = node.attrs.level === 4; return; }
+    if (node.type === schema.nodes.heading) {
+      inCard = node.attrs.level === 4;
+      if (inCard) n += count(node.textContent);
+      return;
+    }
     if (!inCard) { n += count(node.textContent); return; }
     node.descendants((t) => { if (t.isText && isHl(t)) n += count(t.text || ""); });
   });

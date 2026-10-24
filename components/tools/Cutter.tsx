@@ -620,8 +620,8 @@ export default function Cutter({ owner }: { owner?: string }) {
       if (!o) { toast("Make or open another file first — or try Write beside the cards"); return; }
       next = [base, { key: newKey(), fileId: o.id, read: false, follow: true }];
     } else {
-      // an extensions file starts with a block heading to name; the lines under it come out bold
-      const f = await newFile(`Extensions — ${loaded.current.get(a.fileId)?.name || "cards"}`, "<h3></h3><p></p>");
+      // an extensions file starts with a block heading to name, and an analytic (Heading 4) under it
+      const f = await newFile(`Extensions — ${loaded.current.get(a.fileId)?.name || "cards"}`, "<h3></h3><h4></h4>");
       next = [base, { key: newKey(), fileId: f.id, read: false, follow: true }];
     }
     await flush();
