@@ -46,7 +46,8 @@ export const TOOLS: Tool[] = [
       "Files in a cut file's shape — pocket, hat, block, tag, cite and card — cut with one key per move: Ctrl+Alt cuts " +
       "(underline at 11pt), Ctrl+N shrinks, Alt+Z highlights, Ctrl+Shift+Space is emphasis in a box, Alt+C the cite, Alt+1–4 " +
       "the headings. A double-click takes the word without the space after it. Every file is searchable by tag, cite, block " +
-      "and what is read, and is in Evidence's search as well, kept up to date as you cut.",
+      "and what is read, and is in Evidence's search as well, kept up to date as you cut. Up to three pages side by side when you want " +
+      "them: the read view following your card, two places in one file, or a file to write extensions in beside the cards.",
     storage: "This browser, kept apart per account — IndexedDB. Evidence reads the files from there; nothing is uploaded.",
   },
   {
