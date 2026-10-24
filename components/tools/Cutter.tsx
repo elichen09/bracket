@@ -11,6 +11,7 @@ import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { schema } from "@/lib/evidence/docSchema";
 import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type CutFile } from "@/lib/cutter/store";
 import * as C from "@/lib/cutter/commands";
+import * as X from "@/lib/cutter/extensions";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize, readTime } from "@/lib/viewer/doc";
@@ -84,9 +85,9 @@ let paneSeq = 0;
 const newKey = () => "p" + (++paneSeq) + "_" + Date.now().toString(36);
 
 /** The keys along the top of the page, the ones used most first. */
-const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "condense"];
+const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "condense", "new-extension"];
 /** What only makes sense with the cursor in the document. */
-const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down"]);
+const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break"]);
 /** What still works in a read page: reordering cards is fine in a read view. */
 const IN_READ = new Set(["move-up", "move-down"]);
 
@@ -207,6 +208,7 @@ export default function Cutter({ owner }: { owner?: string }) {
       keymap({
         "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo,
         "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline),
+        Enter: X.enterKeepingAnalytics,
       }),
       keymap(baseKeymap),
       verbatimPlugin(read),
@@ -618,7 +620,8 @@ export default function Cutter({ owner }: { owner?: string }) {
       if (!o) { toast("Make or open another file first — or try Write beside the cards"); return; }
       next = [base, { key: newKey(), fileId: o.id, read: false, follow: true }];
     } else {
-      const f = await newFile(`Extensions — ${loaded.current.get(a.fileId)?.name || "cards"}`);
+      // an extensions file starts with a block heading to name; the lines under it come out bold
+      const f = await newFile(`Extensions — ${loaded.current.get(a.fileId)?.name || "cards"}`, "<h3></h3><p></p>");
       next = [base, { key: newKey(), fileId: f.id, read: false, follow: true }];
     }
     await flush();
@@ -700,6 +703,9 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "new-card": return exec(C.newCard);
       case "move-up": return exec(C.moveBy(-1));
       case "move-down": return exec(C.moveBy(1));
+      case "new-extension": return exec(X.newExtension(curRef.current?.name || ""));
+      case "analytic": return exec(X.analytic);
+      case "page-break": return exec(X.pageBreak);
       case "paste": {
         if (!navigator.clipboard?.readText) { toast("This browser will not read the clipboard — use Ctrl+Shift+V"); return; }
         navigator.clipboard.readText().then((t) => {
