@@ -6,8 +6,8 @@ import { cardAround } from "./commands";
 
 /**
  * Cards for reference: a card put in an extension to point at, not to read.
- * Its tag stays, a line under the tag says <<FOR REFERENCE>>, and its
- * highlighting goes grey — the colour every debater reads as "not read in
+ * Its tag stays, a line under the tag says whose card it is —
+ * <<FOR REFERENCE---Lange 23>> — and its highlighting goes grey — the colour every debater reads as "not read in
  * this speech". Verbatimise and the read count leave grey out.
  */
 
@@ -37,7 +37,29 @@ export function isGrey(color: string): boolean {
 /** A highlight that is read: any colour but grey. */
 export const readHighlight = (n: PMNode) => n.marks.some((m) => m.type === M.highlight && !isGrey(m.attrs.color));
 
-const isMarker = (n: PMNode | null | undefined) => !!n && n.type === P && /^<<\s*for reference\s*>>$/i.test(n.textContent.trim());
+const isMarker = (n: PMNode | null | undefined) => !!n && n.type === P && /^<<\s*for reference\b.*>>$/i.test(n.textContent.trim());
+
+/**
+ * Whose card it is, from its cite: the bold part at its start (what Cite
+ * makes — "Steele 14"), or failing that its words up to the year.
+ */
+export function shortCite(cite: PMNode | null | undefined): string {
+  if (!cite || !cite.textContent.trim()) return "";
+  let bold = "", done = false;
+  cite.forEach((t) => {
+    if (done || !t.isText) return;
+    if (t.marks.some((m) => m.type === M.strong)) bold += t.text;
+    else if (bold.trim()) done = true;
+  });
+  const tidy = (s: string) => s.replace(/\s+/g, " ").replace(/[.,;:\s]+$/, "").trim();
+  // "Connor **Steele 14.**": the bold surname and year is what a debater says
+  if (bold.trim() && bold.trim().length <= 60) return tidy(bold);
+  const m = /^\s*(.{1,50}?\b(?:\d{4}|\d{2}))\b/.exec(cite.textContent);
+  return tidy(m ? m[1] : cite.textContent.split(/\s+/).slice(0, 2).join(" "));
+}
+
+/** The line under a reference's tag. */
+export const markerFor = (author: string) => (author ? `<<FOR REFERENCE---${author}>>` : MARKER);
 
 /** Every highlight in [from, to) as `color`. */
 function recolour(tr: Transaction, doc: PMNode, from: number, to: number, color: string) {
@@ -83,7 +105,7 @@ export const referenceCard = (color: string): Cmd => (state, dispatch) => {
     if (any) recolour(tr, state.doc, a, b, back ? color : GREY);
     if (empty && card?.tag) {
       if (back && hasMarker) tr.delete(markerAt, markerAt + state.doc.nodeAt(markerAt)!.nodeSize);
-      if (!back && !hasMarker) tr.insert(markerAt, P.create(null, schema.text(MARKER)));
+      if (!back && !hasMarker) tr.insert(markerAt, P.create(null, schema.text(markerFor(shortCite(card.cite?.node)))));
     }
     dispatch(closeHistory(tr.scrollIntoView()));
   }
@@ -101,15 +123,21 @@ export function referenceNodes(doc: PMNode, i: number): PMNode[] | null {
   let k = -1, at = -1;
   top.forEach((t, j) => { if (at < 0 && t.node.type === H && t.node.attrs.level === 4 && ++k === i) at = j; });
   if (at < 0) return null;
-  const out: PMNode[] = [top[at].node, P.create(null, schema.text(MARKER))];
-  let citeSkipped = false;
+  const out: PMNode[] = [top[at].node];
+  let citeSkipped = false, author = "";
   for (let j = at + 1; j < top.length && top[j].node.type !== H; j++) {
     const n = top[j].node;
-    // its cite — or, for a card that is a reference already, its marker — stays behind
-    if (!citeSkipped && n.type === P && n.textContent.trim()) { citeSkipped = true; continue; }
+    // its cite stays behind, all but whose it is; a reference already says whose in its marker
+    if (!citeSkipped && n.type === P && n.textContent.trim()) {
+      citeSkipped = true;
+      if (isMarker(n)) author = (/---(.+?)>>\s*$/.exec(n.textContent) || [])[1] || "";
+      else author = shortCite(n);
+      continue;
+    }
     if (n.type !== P) continue;
     out.push(greyed(n));
   }
+  out.splice(1, 0, P.create(null, schema.text(markerFor(author))));
   return out;
 }
 

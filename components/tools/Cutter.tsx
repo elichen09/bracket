@@ -1202,7 +1202,7 @@ export default function Cutter({ owner }: { owner?: string }) {
                 </li>
               ))}
               {refPick.q.trim().length >= 2 && !refHits.length && <li className="none">No card in your files says that</li>}
-              {refPick.q.trim().length < 2 && <li className="none">It goes in under the line you&apos;re on, with &lt;&lt;FOR REFERENCE&gt;&gt; and its highlighting grey</li>}
+              {refPick.q.trim().length < 2 && <li className="none">It goes in under the line you&apos;re on, with &lt;&lt;FOR REFERENCE---its author&gt;&gt; and its highlighting grey</li>}
             </ul>
           </div>
         </div>

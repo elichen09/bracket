@@ -28,7 +28,7 @@ export const ACTIONS: Action[] = [
   { id: "new-extension", group: "Extensions", label: "New extension", key: "alt+X", hint: "A new page, a block heading ending in the speech (---1AR), a Heading 4 line under it for the analytic" },
   { id: "analytic", group: "Extensions", label: "Analytic", key: "alt+shift+X", hint: "The line a Heading 4 — bold, 13pt — the way an extension is written (again: plain)" },
   { id: "page-break", group: "Extensions", label: "Page break", key: "mod+Enter", hint: "A new page here — it stays one in the .docx" },
-  { id: "reference", group: "Extensions", label: "Reference", key: "alt+G", hint: "The card here kept for reference: its highlighting grey, <<FOR REFERENCE>> under its tag (again: back)" },
+  { id: "reference", group: "Extensions", label: "Reference", key: "alt+G", hint: "The card here kept for reference: its highlighting grey, <<FOR REFERENCE---its author>> under its tag (again: back)" },
   { id: "insert-reference", group: "Extensions", label: "Reference a card", key: "alt+shift+G", hint: "Find a card in any file and put it here as a reference" },
   { id: "verbatim", group: "View", label: "Verbatimise", key: "alt+V", hint: "This page: just the highlighting — the cards as you'll read them (again: back)" },
   { id: "read-beside", group: "View", label: "Read view beside", key: "alt+R", hint: "This file verbatimised beside the page, following the card you're in (again: closes it)" },
