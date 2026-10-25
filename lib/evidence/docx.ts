@@ -57,7 +57,8 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
           : undefined,
       size: (r.fs || (style ? style.size : 11)) * PT,
       font: r.ff || "Calibri",
-      color: hex(r.fg),
+      // black unless the text has a colour of its own — never the heading style's blue
+      color: hex(r.fg) || "000000",
       shading: r.bg ? { type: ShadingType.CLEAR, color: "auto", fill: hex(r.bg) } : undefined,
       border: r.bx ? { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 0 } : undefined,
     }));
@@ -88,7 +89,33 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
     }));
   });
 
+  // Word's own Heading 1–4 are blue Calibri Light (Heading 4 italic too), and a
+  // paragraph marked as a heading takes whatever the file says those styles
+  // are. So the file says: black Calibri, bold, at the cut file's sizes — the
+  // headings still work as headings (Navigation pane, outline), they just look
+  // like a cut file's.
+  const headingStyle = (l: 1 | 2 | 3 | 4) => ({
+    run: {
+      font: "Calibri", color: "000000", bold: true, italics: false, size: LEVEL[l].size * PT,
+      underline: LEVEL[l].underline ? { type: LEVEL[l].underline === "double" ? UnderlineType.DOUBLE : UnderlineType.SINGLE, color: "000000" } : undefined,
+    },
+    paragraph: {
+      alignment: LEVEL[l].centre ? AlignmentType.CENTER : AlignmentType.LEFT,
+      spacing: { before: SPACE_BEFORE_HEAD, after: 60 },
+    },
+  });
+
   const doc = new Document({
+    // the defaults themselves, replaced — not a second set beside them, which Word may ignore
+    styles: {
+      default: {
+        document: { run: { font: "Calibri", size: 11 * PT, color: "000000" } },
+        heading1: headingStyle(1), heading2: headingStyle(2), heading3: headingStyle(3), heading4: headingStyle(4),
+        // not used here, but black too, for whoever goes on in Word
+        heading5: { run: { font: "Calibri", color: "000000", italics: false } },
+        heading6: { run: { font: "Calibri", color: "000000", italics: false } },
+      },
+    },
     sections: [{
       properties: { page: { margin: { top: TWIP, bottom: TWIP, left: TWIP, right: TWIP } } },
       children: children.length ? children : [new Paragraph({ children: [] })],
