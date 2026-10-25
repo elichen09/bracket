@@ -12,6 +12,7 @@ import { schema } from "@/lib/evidence/docSchema";
 import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type CutFile } from "@/lib/cutter/store";
 import * as C from "@/lib/cutter/commands";
 import * as X from "@/lib/cutter/extensions";
+import * as R from "@/lib/cutter/reference";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize, readTime } from "@/lib/viewer/doc";
@@ -85,9 +86,9 @@ let paneSeq = 0;
 const newKey = () => "p" + (++paneSeq) + "_" + Date.now().toString(36);
 
 /** The keys along the top of the page, the ones used most first. */
-const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "clean-up", "condense", "new-extension"];
+const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "clean-up", "condense", "new-extension", "reference"];
 /** What only makes sense with the cursor in the document. */
-const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up"]);
+const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference"]);
 /** What still works in a read page: reordering cards is fine in a read view. */
 const IN_READ = new Set(["move-up", "move-down"]);
 
@@ -155,6 +156,9 @@ export default function Cutter({ owner }: { owner?: string }) {
   hlRef.current = hl;
   const [toastMsg, setToastMsg] = useState<{ t: string; n: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  // finding a card to put in as a reference (Alt+Shift+G)
+  const [refPick, setRefPick] = useState<{ q: string; sel: number } | null>(null);
+  const refIn = useRef<HTMLInputElement>(null);
   const saveT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickT = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -706,6 +710,11 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "new-extension": return exec(X.newExtension(curRef.current?.name || ""));
       case "analytic": return exec(X.analytic);
       case "page-break": return exec(X.pageBreak);
+      case "reference": {
+        if (!R.referenceCard(hlRef.current)(v.state)) { toast("Put the cursor in a card (or select some of one) to keep it for reference"); return; }
+        return exec(R.referenceCard(hlRef.current));
+      }
+      case "insert-reference": setRefPick({ q: "", sel: 0 }); return;
       case "clean-up": {
         const { tr, spaces, doubles } = C.cleanUp(v.state);
         if (!tr.docChanged) { toast(v.state.selection.empty ? "Nothing to clean up in this file" : "Nothing to clean up in what's selected"); v.focus(); return; }
@@ -824,6 +833,33 @@ export default function Cutter({ owner }: { owner?: string }) {
     });
     return { named, cards };
   }, [q, files, index]);
+
+  // ---- a card from any file, put in as a reference -----------------------------------
+  const refHits = useMemo(() => {
+    if (!refPick) return [];
+    const w = refPick.q.trim();
+    if (w.length < 2) return [];
+    const { hits } = searchCards(index.s, w, (i: number) => String(index.cards[i][1] || ""));
+    return (hits as { i: number }[]).slice(0, 12).map((h) => {
+      const c = index.cards[h.i], at = index.where[h.i], f = files[at.file];
+      return { key: f.id + ":" + at.i, file: f, i: at.i, tag: String(c[1] || "(no tag)"), cite: String(c[2] || "") };
+    });
+  }, [refPick, index, files]);
+  useEffect(() => { if (refPick) requestAnimationFrame(() => refIn.current?.focus()); }, [refPick !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const putReference = useCallback(async (hit: { file: CutMeta; i: number }) => {
+    setRefPick(null);
+    const v = view.current;
+    if (!v) return;
+    let doc: PMNode | null = null;
+    const k = keyShowing(hit.file.id);
+    if (k) doc = views.current.get(k)!.state.doc;
+    else { const f = await getFile(owner, hit.file.id); if (f) doc = docOf(f); }
+    const nodes = doc ? R.referenceNodes(doc, hit.i) : null;
+    if (!nodes) { toast("That card has moved — search for it again"); v.focus(); return; }
+    R.insertReference(nodes)(v.state, v.dispatch);
+    v.focus();
+    toast(`For reference: ${nodes[0].textContent.slice(0, 60)}`);
+  }, [owner, toast]);
 
   /** Bring the n-th tag of the open file to the top, with the cursor in it. */
   const goTag = useCallback((v: EditorView, n: number) => {
@@ -1143,6 +1179,32 @@ export default function Cutter({ owner }: { owner?: string }) {
             );
           })}
           <p className="ct-layhint">Any page: its file and Edit / Read on its own line. Drag between pages to resize. {K("sidebar") && <><kbd>{K("sidebar")}</kbd> hides the side, </>}{K("next-pane") && <><kbd>{K("next-pane")}</kbd> moves to the next page.</>}</p>
+        </div>
+      )}
+
+      {refPick && (
+        <div className="ct-refveil" onPointerDown={(e) => { if (e.target === e.currentTarget) { setRefPick(null); view.current?.focus(); } }}>
+          <div className="ct-refpick" role="dialog" aria-label="Reference a card">
+            <input ref={refIn} value={refPick.q} placeholder="Find the card to reference — tag, cite, words…" spellCheck={false}
+              aria-label="Find the card to reference"
+              onChange={(e) => setRefPick({ q: e.target.value, sel: 0 })}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { e.preventDefault(); setRefPick(null); view.current?.focus(); }
+                if (e.key === "ArrowDown") { e.preventDefault(); setRefPick((r) => r && { ...r, sel: Math.min(refHits.length - 1, r.sel + 1) }); }
+                if (e.key === "ArrowUp") { e.preventDefault(); setRefPick((r) => r && { ...r, sel: Math.max(0, r.sel - 1) }); }
+                if (e.key === "Enter") { e.preventDefault(); const h = refHits[refPick.sel]; if (h) void putReference(h); }
+              }} />
+            <ul>
+              {refHits.map((h, n) => (
+                <li key={h.key} className={n === refPick.sel ? "on" : ""} onPointerMove={() => { if (n !== refPick.sel) setRefPick({ ...refPick, sel: n }); }} onClick={() => void putReference(h)}>
+                  <b>{h.tag}</b>
+                  <small className="mono">{h.cite ? h.cite.slice(0, 70) + " · " : ""}{h.file.name}</small>
+                </li>
+              ))}
+              {refPick.q.trim().length >= 2 && !refHits.length && <li className="none">No card in your files says that</li>}
+              {refPick.q.trim().length < 2 && <li className="none">It goes in under the line you&apos;re on, with &lt;&lt;FOR REFERENCE&gt;&gt; and its highlighting grey</li>}
+            </ul>
+          </div>
         </div>
       )}
 

@@ -117,6 +117,19 @@
 .cutw .ct-olist .dv-orow.drop-before::before { top: -2px; }
 .cutw .ct-olist .dv-orow.drop-after::after { bottom: -2px; }
 
+/* ------------------------------------------------------------ a card for reference */
+.cutw .ct-key.ct-reference span { background: #c0c0c0; color: #111; padding: 0 3px; }
+.cutw .ct-refveil { position: absolute; inset: 0; z-index: 65; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; background: rgba(20, 18, 14, .16); animation: dvIn .12s ease-out both; }
+.cutw .ct-refpick { width: min(560px, calc(100% - 32px)); background: var(--surface); border: 1px solid var(--ink); box-shadow: 0 30px 70px -28px rgba(0, 0, 0, .55); }
+.cutw .ct-refpick input { width: 100%; padding: 15px 16px; font: 500 16px/1.2 var(--ui); border-bottom: 1px solid var(--line) !important; outline: none; }
+.cutw .ct-refpick ul { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow: auto; }
+.cutw .ct-refpick li { display: grid; gap: 2px; padding: 8px 10px; cursor: pointer; }
+.cutw .ct-refpick li b { font-size: 14px; font-weight: 600; }
+.cutw .ct-refpick li small { font-size: 9px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cutw .ct-refpick li.on { background: var(--ink); color: var(--ground); }
+.cutw .ct-refpick li.on small { color: inherit; opacity: .7; }
+.cutw .ct-refpick li.none { cursor: default; color: var(--dim); font-size: 12.5px; }
+
 /* ------------------------------------------------------------ the Keys panel */
 .cutw .ct-keys {
   position: absolute; top: 64px; right: 16px; z-index: 60; width: min(560px, calc(100% - 32px)); max-height: calc(100% - 84px);

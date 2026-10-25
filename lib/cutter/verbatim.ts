@@ -2,6 +2,7 @@ import { Plugin, PluginKey, type EditorState } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { Node as PMNode } from "prosemirror-model";
 import { schema } from "../evidence/docSchema";
+import { readHighlight } from "./reference";
 
 /**
  * Verbatimise: the cards as they will be read — just the highlighting.
@@ -17,7 +18,8 @@ import { schema } from "../evidence/docSchema";
 
 export const verbKey = new PluginKey<{ on: boolean; deco: DecorationSet }>("verbatimise");
 
-const isHl = (n: PMNode) => n.marks.some((m) => m.type === schema.marks.highlight);
+/** Highlighted to be read — grey is a card kept for reference, not read. */
+const isHl = readHighlight;
 
 function gap() {
   const s = document.createElement("span");

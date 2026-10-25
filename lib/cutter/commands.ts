@@ -362,6 +362,7 @@ export function briefs(doc: PMNode): CardBrief[] {
       return;
     }
     if (!cur || !text) return;
+    if (citeNext && /^<<.*>>$/.test(text)) return;              // <<FOR REFERENCE>>, not a cite
     if (citeNext) { cur.cite = text.slice(0, 300); citeNext = false; return; }
     if (cur.read.length > 2000) return;
     let read = "";
