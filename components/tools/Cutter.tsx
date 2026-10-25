@@ -16,7 +16,7 @@ import * as R from "@/lib/cutter/reference";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize, readTime } from "@/lib/viewer/doc";
-import { verbatimPlugin, verbKey, readWords } from "@/lib/cutter/verbatim";
+import { verbatimPlugin, verbKey, readWords, countIn } from "@/lib/cutter/verbatim";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -140,6 +140,8 @@ export default function Cutter({ owner }: { owner?: string }) {
   const [name, setName] = useState("");
   const [state, setStateTag] = useState<"saved" | "saving" | "dirty">("saved");
   const [heads, setHeads] = useState<Head[]>([]);
+  // the words in what is selected, and how many of them are read
+  const [selCount, setSelCount] = useState<{ words: number; read: number } | null>(null);
   const [at, setAt] = useState(-1);                       // the heading the cursor is under
   const [tab, setTab] = useState<"files" | "outline">("files");
   const [q, setQ] = useState("");
@@ -223,6 +225,9 @@ export default function Cutter({ owner }: { owner?: string }) {
   const readHeads = useCallback(() => {
     const v = view.current;
     if (!v) return;
+    const { from: sf, to: st, empty } = v.state.selection;
+    const c = empty ? null : countIn(v.state.doc, sf, st);
+    setSelCount(c && c.words ? c : null);
     const out: Head[] = [];
     v.state.doc.forEach((n, pos) => { if (n.type === schema.nodes.heading) out.push({ level: n.attrs.level, text: n.textContent.trim() || "(empty)", pos }); });
     setHeads(out);
@@ -1152,6 +1157,11 @@ export default function Cutter({ owner }: { owner?: string }) {
                       <button type="button" className="ct-pbtn" onClick={() => addPane({ fileId: p.fileId, read: false, follow: true }, p.key)} title="Another page of this file beside this one" aria-label="Split this page">＋</button>
                     )}
                     {many && <button type="button" className="ct-pbtn" onClick={() => void closePane(p.key)} title="Close this page" aria-label="Close this page">×</button>}
+                  </div>
+                )}
+                {p.key === activeKey && selCount && (
+                  <div className="ct-selcount mono" role="status" aria-live="polite">
+                    {selCount.words} word{selCount.words === 1 ? "" : "s"} · {selCount.read} to read{selCount.read ? ` · ${readTime(selCount.read)}` : ""}
                   </div>
                 )}
                 <main className="dv-pane ct-scroll">

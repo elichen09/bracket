@@ -85,7 +85,7 @@ export const isVerbatim = (s: EditorState) => !!verbKey.getState(s)?.on;
  * every word. A pocket, hat or block heading is not read.
  */
 export function readWords(doc: PMNode): number {
-  const count = (s: string) => (s.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
+  const count = (s: string) => (s.replace(/-{2,}/g, " ").match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;   // "---" separates words
   let n = 0, inCard = false;
   doc.forEach((node) => {
     if (node.type === schema.nodes.heading) {
@@ -97,4 +97,30 @@ export function readWords(doc: PMNode): number {
     node.descendants((t) => { if (t.isText && isHl(t)) n += count(t.text || ""); });
   });
   return n;
+}
+
+/**
+ * The words in part of the file, and how many of them a speech reads — by
+ * the same rule as readWords: tags and analytics all, card text only where
+ * it is highlighted (not grey), pocket, hat and block headings not at all.
+ */
+export function countIn(doc: PMNode, from: number, to: number): { words: number; read: number } {
+  const count = (s: string) => (s.replace(/-{2,}/g, " ").match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;   // "---" separates words
+  let words = 0, read = 0, inCard = false;
+  doc.forEach((node, pos) => {
+    const heading = node.type === schema.nodes.heading;
+    if (heading) inCard = node.attrs.level === 4;
+    const end = pos + node.nodeSize;
+    if (!node.isTextblock || end <= from || pos >= to) return;
+    const a = Math.max(from, pos + 1), b = Math.min(to, end - 1);
+    if (b <= a) return;
+    const n = count(doc.textBetween(a, b, " "));
+    words += n;
+    if (heading) { if (node.attrs.level === 4) read += n; return; }
+    if (!inCard) { read += n; return; }
+    doc.nodesBetween(a, b, (t, p) => {
+      if (t.isText && isHl(t)) read += count((t.text || "").slice(Math.max(0, a - p), b - p));
+    });
+  });
+  return { words, read };
 }

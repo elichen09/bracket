@@ -176,6 +176,7 @@ const SECTIONS: Section[] = [
       <>More than one page when you want it: <b>Layout</b> in the banner, or {K("Alt+R")} for the read view beside you. It follows the card you&apos;re editing, and clicking a card in it takes you there. Two places in one file, another file beside, or a new file to write extensions next to the cards: up to three pages, each with its own file and Edit / Read on one thin line. A file open twice stays one document. Drag between pages to resize; {K("Alt+S")} hides the side for room.</>,
       <>Reorder in the <b>Outline</b> tab: drag a heading and everything under it moves with it in the file (a tag takes its card, a block its cards). {K("Alt+↑")} / {K("Alt+↓")} move the card the cursor is in one place up or down. Each move is one {K("Ctrl+Z")}.</>,
       <><b>Verbatimise</b> ({K("Alt+V")}) shows just the highlighting: each card&apos;s tag and cite, then only the words you&apos;ll read, with how many there are and how long they take. Nothing in the file changes; {K("Alt+V")} again goes back to editing.</>,
+      <>Select any part of a file to see its word count in the corner: all its words, how many you&apos;d read (highlighted card text, tags and analytics; grey left out) and how long that takes.</>,
       <>Search every file from the side by tag, cite, block or the words that are read. In Evidence the same cards come up, marked <b>cutter</b>.</>,
     ],
     keys: [

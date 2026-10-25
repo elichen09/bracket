@@ -117,6 +117,14 @@
 .cutw .ct-olist .dv-orow.drop-before::before { top: -2px; }
 .cutw .ct-olist .dv-orow.drop-after::after { bottom: -2px; }
 
+/* ------------------------------------------------------------ the words in a selection */
+.cutw .ct-selcount {
+  position: absolute; right: 22px; bottom: 16px; z-index: 6; pointer-events: none;
+  padding: 6px 10px; font-size: 10px; letter-spacing: .08em; background: var(--ink); color: var(--ground);
+  box-shadow: 0 10px 24px -14px rgba(0, 0, 0, .6); animation: dvIn .14s var(--spring) both;
+}
+:root[data-tool-shape="cozy"] .cutw .ct-selcount { border-radius: 8px; }
+
 /* ------------------------------------------------------------ a card for reference */
 .cutw .ct-key.ct-reference span { background: #c0c0c0; color: #111; padding: 0 3px; }
 .cutw .ct-refveil { position: absolute; inset: 0; z-index: 65; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; background: rgba(20, 18, 14, .16); animation: dvIn .12s ease-out both; }
