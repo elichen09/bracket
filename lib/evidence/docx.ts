@@ -37,7 +37,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
   stage("importing");
   const {
     Document, Packer, Paragraph, TextRun, PageBreak, HeadingLevel,
-    AlignmentType, BorderStyle, ShadingType, UnderlineType,
+    AlignmentType, BorderStyle, ShadingType, UnderlineType, PageOrientation,
   } = await import("docx");
   stage("imported");
 
@@ -117,7 +117,15 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
       },
     },
     sections: [{
-      properties: { page: { margin: { top: TWIP, bottom: TWIP, left: TWIP, right: TWIP } } },
+      // Word's standard page: US Letter, an inch all round, header and footer at half an
+      // inch. Left to itself the library writes A4, which sits oddly in Word and Docs set
+      // to Letter — a different width and length, so the margins look wrong.
+      properties: {
+        page: {
+          size: { width: 8.5 * TWIP, height: 11 * TWIP, orientation: PageOrientation.PORTRAIT },
+          margin: { top: TWIP, bottom: TWIP, left: TWIP, right: TWIP, header: TWIP / 2, footer: TWIP / 2, gutter: 0 },
+        },
+      },
       children: children.length ? children : [new Paragraph({ children: [] })],
     }],
   });
