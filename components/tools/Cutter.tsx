@@ -736,6 +736,7 @@ export default function Cutter({ owner }: { owner?: string }) {
           r.recoloured && "highlighting one colour",
           r.boxed && "emphasis boxed",
           r.plain && "pasted fonts and colours off",
+          r.sized && "sizes set (11pt read, 8pt shrunk)",
           r.spaces && `${r.spaces} stray space${r.spaces === 1 ? "" : "s"} unmarked`,
           r.doubles && `${r.doubles} double space${r.doubles === 1 ? "" : "s"} made single`,
           r.cites && `${r.cites} cite${r.cites === 1 ? "" : "s"} rewritten`,

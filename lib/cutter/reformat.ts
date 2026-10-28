@@ -15,6 +15,9 @@ import { rewriteCite } from "./cites";
  *    has in this tool;
  *  - card text in the file's own face and colour: fonts and text colours a
  *    paste brought with it come off;
+ *  - card text at the two sizes a card has: what is read (underlined or
+ *    highlighted) at 11pt, what was shrunk at 8pt — plain text at 11pt is a
+ *    card left unshrunk on purpose, and stays;
  *  - then Clean up: no mark on a stray space, no double spaces;
  *  - and cites of the bracketed kind rewritten into one shape — first name,
  *    short cite, qualifications, "title", date, publication, link, your
@@ -35,26 +38,36 @@ const sameColour = (a: string, b: string) => {
   return norm(a) === norm(b);
 };
 
-export interface Reformatted { tr: Transaction; recoloured: number; boxed: number; plain: number; spaces: number; doubles: number; cites: number }
+export interface Reformatted { tr: Transaction; recoloured: number; boxed: number; plain: number; sized: number; spaces: number; doubles: number; cites: number }
+
+const READ_PT = 11, SHRUNK_PT = 8;
+
+/** A size mark's points, whatever it was written in. */
+function points(size: string): number {
+  const m = /^([\d.]+)\s*(pt|px)?$/i.exec(String(size).trim());
+  if (!m) return READ_PT;
+  return (m[2] || "pt").toLowerCase() === "px" ? parseFloat(m[1]) * 0.75 : parseFloat(m[1]);
+}
 
 export function reformat(state: EditorState, color: string, signature = ""): Reformatted {
   const { from, to, empty } = state.selection;
   const a = empty ? 0 : from, b = empty ? state.doc.content.size : to;
   const tr = state.tr;
-  let recoloured = 0, boxed = 0, plain = 0;
-  // the cites — the first line under each tag — whose bold, underlined short cite is not emphasis
-  const citeAt = new Set<number>();
-  let afterTag = false;
+  let recoloured = 0, boxed = 0, plain = 0, sized = 0;
+  // under each tag: its cite (the first line — its bold, underlined short cite is not emphasis)
+  // and then the card's text, which is what gets the card's two sizes
+  const citeAt = new Set<number>(), bodyAt = new Set<number>();
+  let inCard = false, citeDone = false;
   state.doc.forEach((n, pos) => {
-    if (n.type === schema.nodes.heading) { afterTag = n.attrs.level === 4; return; }
-    if (!afterTag || n.type !== schema.nodes.paragraph || !n.textContent.trim()) return;
-    if (/^<<.*>>$/.test(n.textContent.trim())) return;
-    citeAt.add(pos);
-    afterTag = false;
+    if (n.type === schema.nodes.heading) { inCard = n.attrs.level === 4; citeDone = false; return; }
+    if (!inCard || n.type !== schema.nodes.paragraph) return;
+    if (/^<<.*>>$/.test(n.textContent.trim())) return;                     // a reference's marker
+    if (!citeDone) { if (n.textContent.trim()) { citeAt.add(pos); citeDone = true; } return; }
+    bodyAt.add(pos);
   });
-  let inCite = false;
+  let inCite = false, inBody = false;
   state.doc.nodesBetween(a, b, (node: PMNode, pos: number, parent: PMNode | null) => {
-    if (!node.isText) { if (node.isTextblock) inCite = citeAt.has(pos); return true; }
+    if (!node.isText) { if (node.isTextblock) { inCite = citeAt.has(pos); inBody = bodyAt.has(pos); } return true; }
     if (parent && parent.type === schema.nodes.heading) return false;     // headings keep their own look
     const f = Math.max(pos, a), t = Math.min(pos + node.nodeSize, b);
     if (t <= f) return false;
@@ -73,6 +86,16 @@ export function reformat(state: EditorState, color: string, signature = ""): Ref
       tr.removeMark(f, t, M.fontFamily);
       tr.removeMark(f, t, M.textColor);
       plain += t - f;
+    }
+    if (inBody) {
+      const size = has(M.fontSize);
+      const pt = size ? points(size.attrs.size) : READ_PT;
+      const read = !!has(M.underline) || !!hl;
+      // read: 11pt (the body's own size, so no size mark at all)
+      if (read && pt !== READ_PT) { tr.removeMark(f, t, M.fontSize); sized += t - f; }
+      // not read and shrunk at all: 8pt exactly; bigger than the body: back to it
+      else if (!read && pt < READ_PT && pt !== SHRUNK_PT) { tr.removeMark(f, t, M.fontSize); tr.addMark(f, t, M.fontSize.create({ size: SHRUNK_PT + "pt" })); sized += t - f; }
+      else if (!read && pt > READ_PT) { tr.removeMark(f, t, M.fontSize); sized += t - f; }
     }
     return false;
   });
@@ -101,7 +124,7 @@ export function reformat(state: EditorState, color: string, signature = ""): Ref
     rewritten++;
   }
   closeHistory(tr);
-  return { tr, recoloured, boxed, plain, spaces, doubles, cites: rewritten };
+  return { tr, recoloured, boxed, plain, sized, spaces, doubles, cites: rewritten };
 }
 
 /** As a command, for the key and the strip. */
