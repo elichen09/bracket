@@ -155,6 +155,10 @@ export default function Cutter({ owner }: { owner?: string }) {
   listeningRef.current = listening;
   const [keyNote, setKeyNote] = useState("");
   const [hl, setHl] = useState(C.HIGHLIGHTS[0].color);
+  // how this account signs the cites Reformat rewrites
+  const [sig, setSig] = useState("");
+  const sigRef = useRef(sig);
+  sigRef.current = sig;
   const hlRef = useRef(hl);
   hlRef.current = hl;
   const [toastMsg, setToastMsg] = useState<{ t: string; n: number } | null>(null);
@@ -195,6 +199,7 @@ export default function Cutter({ owner }: { owner?: string }) {
   useEffect(() => {
     setKeys(loadKeys(owner));
     try { const c = localStorage.getItem(scoped("cutter.hl", owner)); if (c) setHl(c); } catch { /* private */ }
+    try { setSig(localStorage.getItem(scoped("cutter.sig", owner)) ?? ""); } catch { /* private */ }
   }, [owner]);
   useEffect(() => { try { localStorage.setItem(scoped("cutter.hl", owner), hl); } catch { /* private */ } }, [hl, owner]);
 
@@ -723,7 +728,7 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "insert-reference": setRefPick({ q: "", sel: 0 }); return;
       case "reformat": {
         const whole = v.state.selection.empty;
-        const r = reformat(v.state, hlRef.current);
+        const r = reformat(v.state, hlRef.current, sigRef.current);
         if (!r.tr.docChanged) { toast(whole ? "Every card here is formatted already" : "What's selected is formatted already"); v.focus(); return; }
         v.dispatch(r.tr);
         v.focus();
@@ -733,6 +738,7 @@ export default function Cutter({ owner }: { owner?: string }) {
           r.plain && "pasted fonts and colours off",
           r.spaces && `${r.spaces} stray space${r.spaces === 1 ? "" : "s"} unmarked`,
           r.doubles && `${r.doubles} double space${r.doubles === 1 ? "" : "s"} made single`,
+          r.cites && `${r.cites} cite${r.cites === 1 ? "" : "s"} rewritten`,
         ].filter(Boolean).join(", ");
         toast(`Reformatted${whole ? " the file" : ""}: ${said}`);
         return;
@@ -1243,6 +1249,11 @@ export default function Cutter({ owner }: { owner?: string }) {
             <button type="button" className="dv-btn2" onClick={() => { setKeys({}); saveKeys(owner, {}); setKeyNote("Every key is back to the defaults"); }}>Reset all</button>
             <button type="button" className="dv-btn2 ink" onClick={() => { setKeysOpen(false); setListening(null); view.current?.focus(); }}>Done</button>
           </div>
+          <label className="ct-sigrow">
+            <span><b>Sign cites as</b><small>Reformat ends the cites it rewrites with this, in place of the original cutter&apos;s initials. Empty keeps theirs.</small></span>
+            <input value={sig} placeholder="e.g. elimafia 🕵" spellCheck={false}
+              onChange={(e) => { setSig(e.target.value); try { localStorage.setItem(scoped("cutter.sig", owner), e.target.value); } catch { /* private */ } }} />
+          </label>
           {keyNote && <p className="ct-keynote">{keyNote}</p>}
           <div className="ct-keylist">
             {groups.map((g) => (
