@@ -21,6 +21,29 @@ import { Schema, type DOMOutputSpec } from "prosemirror-model";
 
 const inline = "inline*";
 
+/**
+ * A background that is no highlight: none, see-through, or white — and the
+ * near-whites a paste from Docs or Word puts behind every run. The browser
+ * hands colours over as rgb(), so "#ffffff" arrives as "rgb(255, 255, 255)".
+ */
+export function isBlankBackground(color: string): boolean {
+  const s = String(color || "").trim().toLowerCase();
+  if (!s || /^(transparent|white|none|inherit|initial|unset)$/.test(s)) return true;
+  let r: number, g: number, b: number;
+  const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+)(%?))?/.exec(s);
+  if (rgb) {
+    if (rgb[4] !== undefined && parseFloat(rgb[4]) === 0) return true;
+    [r, g, b] = [rgb[1], rgb[2], rgb[3]].map(Number);
+  } else {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})([0-9a-f]{2})?$/.exec(s);
+    if (!m) return false;
+    if (m[2] === "00") return true;
+    const h = m[1].length === 3 ? m[1].split("").map((c) => c + c).join("") : m[1];
+    [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  }
+  return Math.min(r, g, b) >= 0xf2;
+}
+
 export const schema = new Schema({
   nodes: {
     doc: { content: "block+" },
@@ -97,7 +120,7 @@ export const schema = new Schema({
         style: "background-color",
         getAttrs: (v) => {
           const c = String(v);
-          if (!c || /transparent|^rgba\(0, 0, 0, 0\)$|^#f{3,6}$|^white$/i.test(c)) return false;
+          if (isBlankBackground(c)) return false;
           return { color: c };
         },
       }],

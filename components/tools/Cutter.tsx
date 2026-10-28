@@ -733,6 +733,7 @@ export default function Cutter({ owner }: { owner?: string }) {
         v.dispatch(r.tr);
         v.focus();
         const said = [
+          r.tags && `${r.tags} tag${r.tags === 1 ? "" : "s"} made tag${r.tags === 1 ? "" : "s"} again`,
           r.recoloured && "highlighting one colour",
           r.boxed && "emphasis boxed",
           r.plain && "pasted fonts and colours off",

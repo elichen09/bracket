@@ -1,14 +1,18 @@
 import { type EditorState, type Transaction } from "prosemirror-state";
 import { closeHistory } from "prosemirror-history";
 import type { Node as PMNode } from "prosemirror-model";
-import { schema } from "../evidence/docSchema";
+import { schema, isBlankBackground } from "../evidence/docSchema";
 import { cleanUp } from "./commands";
-import { isGrey } from "./reference";
+import { isGrey, shortCite } from "./reference";
 import { rewriteCite } from "./cites";
 
 /**
  * Reformat: cards cut anywhere, made to look like cards cut here.
  *
+ *  - tags that came in as plain bold lines (a paste from Google Docs, where
+ *    Word's tag style became bold text) made tags again: a line all but
+ *    entirely bold, with a cite under it;
+ *  - the white "highlight" a paste puts behind every run taken off;
  *  - one highlight colour — the highlighter's — for every highlight that is
  *    not grey (grey is a card kept for reference, and stays grey);
  *  - emphasis boxed: words bold and underlined get the box that emphasis
@@ -38,7 +42,7 @@ const sameColour = (a: string, b: string) => {
   return norm(a) === norm(b);
 };
 
-export interface Reformatted { tr: Transaction; recoloured: number; boxed: number; plain: number; sized: number; spaces: number; doubles: number; cites: number }
+export interface Reformatted { tr: Transaction; tags: number; recoloured: number; boxed: number; plain: number; sized: number; spaces: number; doubles: number; cites: number }
 
 const READ_PT = 11, SHRUNK_PT = 8;
 
@@ -49,16 +53,65 @@ function points(size: string): number {
   return (m[2] || "pt").toLowerCase() === "px" ? parseFloat(m[1]) * 0.75 : parseFloat(m[1]);
 }
 
+const letters = (s: string) => s.replace(/[\s.,;:!?'"“”‘’()[\]-]/g, "").length;
+
+/** A tag that came in as a paragraph: short, and bold all but throughout. */
+function tagLike(p: PMNode): boolean {
+  const text = p.textContent.trim();
+  if (!text || /^<<.*>>$/.test(text) || text.split(/\s+/).length > 60) return false;
+  let bold = 0, all = 0;
+  p.forEach((t) => {
+    if (!t.isText) return;
+    const n = letters(t.text!);
+    all += n;
+    if (t.marks.some((m) => m.type === M.strong)) bold += n;
+  });
+  return all > 0 && bold / all >= 0.9;
+}
+
+/** A cite: a bold name with a year near its start, a date or a link after, and mostly not bold. */
+function citeLike(p: PMNode): boolean {
+  const text = p.textContent;
+  if (!text.trim() || !/https?:\/\/|\b(19|20)\d{2}\b|\bDOA\b|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/i.test(text)) return false;
+  let bold = "", at = 0, boldAll = 0, all = 0;
+  p.forEach((t) => {
+    if (!t.isText) return;
+    const strong = t.marks.some((m) => m.type === M.strong);
+    if (strong && at < 160) bold += t.text + " ";
+    at += t.text!.length;
+    all += letters(t.text!);
+    if (strong) boldAll += letters(t.text!);
+  });
+  return /\b(?:['’]?\d{2}|\d{4})\b/.test(bold) && boldAll / Math.max(all, 1) < 0.5 && !!shortCite(p);
+}
+
 export function reformat(state: EditorState, color: string, signature = ""): Reformatted {
   const { from, to, empty } = state.selection;
   const a = empty ? 0 : from, b = empty ? state.doc.content.size : to;
   const tr = state.tr;
-  let recoloured = 0, boxed = 0, plain = 0, sized = 0;
+  let tags = 0, recoloured = 0, boxed = 0, plain = 0, sized = 0;
+  // tags that came in as bold lines: a tag is a heading here, so the card under it is a card.
+  // Nothing changes size, so every position below holds in the doc before and after.
+  {
+    const kids: { node: PMNode; pos: number }[] = [];
+    state.doc.forEach((node, pos) => { if (node.textContent.trim() || node.type !== schema.nodes.paragraph) kids.push({ node, pos }); });
+    kids.forEach(({ node, pos }, i) => {
+      const next = kids[i + 1]?.node;
+      if (node.type !== schema.nodes.paragraph || !next || next.type !== schema.nodes.paragraph) return;
+      if (pos + node.nodeSize <= a || pos >= b) return;
+      if (!tagLike(node) || !citeLike(next)) return;
+      tr.setNodeMarkup(pos, schema.nodes.heading, { level: 4 });
+      const f = pos + 1, t = pos + node.nodeSize - 1;
+      for (const m of [M.strong, M.fontSize, M.fontFamily, M.textColor, M.highlight, M.box]) tr.removeMark(f, t, m);
+      tags++;
+    });
+  }
+  const doc0 = tr.doc;
   // under each tag: its cite (the first line — its bold, underlined short cite is not emphasis)
   // and then the card's text, which is what gets the card's two sizes
   const citeAt = new Set<number>(), bodyAt = new Set<number>();
   let inCard = false, citeDone = false;
-  state.doc.forEach((n, pos) => {
+  doc0.forEach((n, pos) => {
     if (n.type === schema.nodes.heading) { inCard = n.attrs.level === 4; citeDone = false; return; }
     if (!inCard || n.type !== schema.nodes.paragraph) return;
     if (/^<<.*>>$/.test(n.textContent.trim())) return;                     // a reference's marker
@@ -66,13 +119,14 @@ export function reformat(state: EditorState, color: string, signature = ""): Ref
     bodyAt.add(pos);
   });
   let inCite = false, inBody = false;
-  state.doc.nodesBetween(a, b, (node: PMNode, pos: number, parent: PMNode | null) => {
+  doc0.nodesBetween(a, b, (node: PMNode, pos: number, parent: PMNode | null) => {
     if (!node.isText) { if (node.isTextblock) { inCite = citeAt.has(pos); inBody = bodyAt.has(pos); } return true; }
     if (parent && parent.type === schema.nodes.heading) return false;     // headings keep their own look
     const f = Math.max(pos, a), t = Math.min(pos + node.nodeSize, b);
     if (t <= f) return false;
     const has = (type: (typeof M)[keyof typeof M]) => node.marks.find((m) => m.type === type);
-    const hl = has(M.highlight);
+    let hl = has(M.highlight);
+    if (hl && isBlankBackground(hl.attrs.color)) { tr.removeMark(f, t, M.highlight); plain += t - f; hl = undefined; }
     if (hl && !isGrey(hl.attrs.color) && !sameColour(hl.attrs.color, color)) {
       tr.removeMark(f, t, M.highlight);
       tr.addMark(f, t, M.highlight.create({ color }));
@@ -124,7 +178,7 @@ export function reformat(state: EditorState, color: string, signature = ""): Ref
     rewritten++;
   }
   closeHistory(tr);
-  return { tr, recoloured, boxed, plain, sized, spaces, doubles, cites: rewritten };
+  return { tr, tags, recoloured, boxed, plain, sized, spaces, doubles, cites: rewritten };
 }
 
 /** As a command, for the key and the strip. */

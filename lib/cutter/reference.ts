@@ -1,7 +1,7 @@
 import { TextSelection, type EditorState, type Transaction } from "prosemirror-state";
 import { closeHistory } from "prosemirror-history";
 import { Fragment, type Node as PMNode } from "prosemirror-model";
-import { schema } from "../evidence/docSchema";
+import { schema, isBlankBackground } from "../evidence/docSchema";
 import { cardAround } from "./commands";
 
 /**
@@ -34,8 +34,8 @@ export function isGrey(color: string): boolean {
   return Math.max(r, g, b) - Math.min(r, g, b) <= 16 && r < 0xf0;
 }
 
-/** A highlight that is read: any colour but grey. */
-export const readHighlight = (n: PMNode) => n.marks.some((m) => m.type === M.highlight && !isGrey(m.attrs.color));
+/** A highlight that is read: any colour but grey (and not the white a paste leaves behind). */
+export const readHighlight = (n: PMNode) => n.marks.some((m) => m.type === M.highlight && !isGrey(m.attrs.color) && !isBlankBackground(m.attrs.color));
 
 const isMarker = (n: PMNode | null | undefined) => !!n && n.type === P && /^<<\s*for reference\b.*>>$/i.test(n.textContent.trim());
 

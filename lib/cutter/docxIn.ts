@@ -1,4 +1,5 @@
 import { levelOf } from "../viewer/doc";
+import { isBlankBackground } from "../evidence/docSchema";
 
 /**
  * A .docx, as HTML the card cutter can open.
@@ -14,10 +15,7 @@ import { levelOf } from "../viewer/doc";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const BASE_PX = 11 / 0.75;          // 11pt, in the pixels getComputedStyle answers in
 
-function isBg(c: string) {
-  const s = c.trim().toLowerCase();
-  return !!s && s !== "transparent" && !/^rgba\([^)]*,\s*0\s*\)$/.test(s) && !/^rgb\(255,\s*255,\s*255\)$/.test(s);
-}
+const isBg = (c: string) => !isBlankBackground(c);
 
 export async function docxToHtml(blob: Blob): Promise<string> {
   const holder = document.createElement("div");

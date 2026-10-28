@@ -22,7 +22,7 @@ export const ACTIONS: Action[] = [
   { id: "cite", group: "Cutting", label: "Cite", key: "alt+C", hint: "Author and date, 13pt bold" },
   { id: "clear", group: "Cutting", label: "Clear", key: "mod+\\", hint: "Back to plain text" },
   { id: "clean-up", group: "Cutting", label: "Clean up", key: "alt+W", hint: "Highlight, underline and boxes off the spaces they spilled onto; double spaces to one. The whole file, or just what's selected" },
-  { id: "reformat", group: "Cutting", label: "Reformat", key: "alt+shift+W", hint: "Cards cut anywhere made to look cut here: one highlight colour (grey kept), emphasis boxed, 11pt read and 8pt shrunk, pasted fonts and colours off, bracketed cites rewritten (signed as you set in Keys), then Clean up. The whole file, or what's selected" },
+  { id: "reformat", group: "Cutting", label: "Reformat", key: "alt+shift+W", hint: "Cards cut anywhere made to look cut here: tags pasted as bold lines made tags, one highlight colour (grey kept), emphasis boxed, 11pt read and 8pt shrunk, pasted fonts and colours off, bracketed cites rewritten (signed as you set in Keys), then Clean up. The whole file, or what's selected" },
   { id: "condense", group: "Cutting", label: "Condense", key: "alt+Q", hint: "The card's paragraphs into one" },
   { id: "hl-next", group: "Cutting", label: "Next highlighter colour", key: "alt+shift+Z", hint: "Green, yellow, blue, pink, grey" },
   { id: "paste", group: "Cutting", label: "Paste as text", key: null, hint: "Without the source's formatting (Ctrl+Shift+V does it too)" },
