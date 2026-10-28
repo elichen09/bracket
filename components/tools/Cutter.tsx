@@ -13,6 +13,7 @@ import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type Cu
 import * as C from "@/lib/cutter/commands";
 import * as X from "@/lib/cutter/extensions";
 import * as R from "@/lib/cutter/reference";
+import { reformat } from "@/lib/cutter/reformat";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize, readTime } from "@/lib/viewer/doc";
@@ -86,9 +87,9 @@ let paneSeq = 0;
 const newKey = () => "p" + (++paneSeq) + "_" + Date.now().toString(36);
 
 /** The keys along the top of the page, the ones used most first. */
-const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "clean-up", "condense", "new-extension", "reference"];
+const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "clean-up", "reformat", "condense", "new-extension", "reference"];
 /** What only makes sense with the cursor in the document. */
-const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference"]);
+const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference", "reformat"]);
 /** What still works in a read page: reordering cards is fine in a read view. */
 const IN_READ = new Set(["move-up", "move-down"]);
 
@@ -720,6 +721,22 @@ export default function Cutter({ owner }: { owner?: string }) {
         return exec(R.referenceCard(hlRef.current));
       }
       case "insert-reference": setRefPick({ q: "", sel: 0 }); return;
+      case "reformat": {
+        const whole = v.state.selection.empty;
+        const r = reformat(v.state, hlRef.current);
+        if (!r.tr.docChanged) { toast(whole ? "Every card here is formatted already" : "What's selected is formatted already"); v.focus(); return; }
+        v.dispatch(r.tr);
+        v.focus();
+        const said = [
+          r.recoloured && "highlighting one colour",
+          r.boxed && "emphasis boxed",
+          r.plain && "pasted fonts and colours off",
+          r.spaces && `${r.spaces} stray space${r.spaces === 1 ? "" : "s"} unmarked`,
+          r.doubles && `${r.doubles} double space${r.doubles === 1 ? "" : "s"} made single`,
+        ].filter(Boolean).join(", ");
+        toast(`Reformatted${whole ? " the file" : ""}: ${said}`);
+        return;
+      }
       case "clean-up": {
         const { tr, spaces, doubles } = C.cleanUp(v.state);
         if (!tr.docChanged) { toast(v.state.selection.empty ? "Nothing to clean up in this file" : "Nothing to clean up in what's selected"); v.focus(); return; }
