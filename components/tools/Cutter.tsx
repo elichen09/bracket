@@ -14,6 +14,7 @@ import * as C from "@/lib/cutter/commands";
 import * as X from "@/lib/cutter/extensions";
 import * as R from "@/lib/cutter/reference";
 import { reformat } from "@/lib/cutter/reformat";
+import { DEFAULT_CITE_FORMAT } from "@/lib/cutter/cites";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize, readTime } from "@/lib/viewer/doc";
@@ -156,9 +157,9 @@ export default function Cutter({ owner }: { owner?: string }) {
   const [keyNote, setKeyNote] = useState("");
   const [hl, setHl] = useState(C.HIGHLIGHTS[0].color);
   // how this account signs the cites Reformat rewrites
-  const [sig, setSig] = useState("");
-  const sigRef = useRef(sig);
-  sigRef.current = sig;
+  const [citeFormat, setCiteFormat] = useState(DEFAULT_CITE_FORMAT);
+  const citeRef = useRef(citeFormat);
+  citeRef.current = citeFormat;
   const hlRef = useRef(hl);
   hlRef.current = hl;
   const [toastMsg, setToastMsg] = useState<{ t: string; n: number } | null>(null);
@@ -199,7 +200,12 @@ export default function Cutter({ owner }: { owner?: string }) {
   useEffect(() => {
     setKeys(loadKeys(owner));
     try { const c = localStorage.getItem(scoped("cutter.hl", owner)); if (c) setHl(c); } catch { /* private */ }
-    try { setSig(localStorage.getItem(scoped("cutter.sig", owner)) ?? ""); } catch { /* private */ }
+    try {
+      // the format, or the signature the cutter kept before there was one
+      const old = localStorage.getItem(scoped("cutter.sig", owner))?.trim();
+      setCiteFormat(localStorage.getItem(scoped("cutter.citefmt", owner))
+        ?? (old ? DEFAULT_CITE_FORMAT.replace(/\S+\s+\S+$/, old) : DEFAULT_CITE_FORMAT));
+    } catch { /* private */ }
   }, [owner]);
   useEffect(() => { try { localStorage.setItem(scoped("cutter.hl", owner), hl); } catch { /* private */ } }, [hl, owner]);
 
@@ -728,7 +734,7 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "insert-reference": setRefPick({ q: "", sel: 0 }); return;
       case "reformat": {
         const whole = v.state.selection.empty;
-        const r = reformat(v.state, hlRef.current, sigRef.current);
+        const r = reformat(v.state, hlRef.current, citeRef.current);
         if (!r.tr.docChanged) { toast(whole ? "Every card here is formatted already" : "What's selected is formatted already"); v.focus(); return; }
         v.dispatch(r.tr);
         v.focus();
@@ -1251,10 +1257,10 @@ export default function Cutter({ owner }: { owner?: string }) {
             <button type="button" className="dv-btn2" onClick={() => { setKeys({}); saveKeys(owner, {}); setKeyNote("Every key is back to the defaults"); }}>Reset all</button>
             <button type="button" className="dv-btn2 ink" onClick={() => { setKeysOpen(false); setListening(null); view.current?.focus(); }}>Done</button>
           </div>
-          <label className="ct-sigrow">
-            <span><b>Sign cites as</b><small>Reformat ends the cites it rewrites with this, in place of the original cutter&apos;s initials. Empty keeps theirs.</small></span>
-            <input value={sig} placeholder="e.g. elimafia 🕵" spellCheck={false}
-              onChange={(e) => { setSig(e.target.value); try { localStorage.setItem(scoped("cutter.sig", owner), e.target.value); } catch { /* private */ } }} />
+          <label className="ct-sigrow wide">
+            <span><b>Cite format</b><small>How Reformat writes the cites it rewrites. %author% %y% is the short cite (bold); %title%, %date%, %url%, %quals%, %publication%, %accessed% are the rest. A part a cite doesn&apos;t have is left out.</small></span>
+            <input value={citeFormat} placeholder={DEFAULT_CITE_FORMAT} spellCheck={false}
+              onChange={(e) => { setCiteFormat(e.target.value); try { localStorage.setItem(scoped("cutter.citefmt", owner), e.target.value); } catch { /* private */ } }} />
           </label>
           {keyNote && <p className="ct-keynote">{keyNote}</p>}
           <div className="ct-keylist">

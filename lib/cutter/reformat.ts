@@ -4,7 +4,7 @@ import type { Node as PMNode } from "prosemirror-model";
 import { schema, isBlankBackground } from "../evidence/docSchema";
 import { cleanUp } from "./commands";
 import { isGrey, shortCite } from "./reference";
-import { rewriteCite } from "./cites";
+import { rewriteCite, DEFAULT_CITE_FORMAT } from "./cites";
 
 /**
  * Reformat: cards cut anywhere, made to look like cards cut here.
@@ -85,7 +85,7 @@ function citeLike(p: PMNode): boolean {
   return /\b(?:['’]?\d{2}|\d{4})\b/.test(bold) && boldAll / Math.max(all, 1) < 0.5 && !!shortCite(p);
 }
 
-export function reformat(state: EditorState, color: string, signature = ""): Reformatted {
+export function reformat(state: EditorState, color: string, citeFormat = DEFAULT_CITE_FORMAT): Reformatted {
   const { from, to, empty } = state.selection;
   const a = empty ? 0 : from, b = empty ? state.doc.content.size : to;
   const tr = state.tr;
@@ -172,7 +172,7 @@ export function reformat(state: EditorState, color: string, signature = ""): Ref
   });
   let rewritten = 0;
   for (const c of cites.reverse()) {
-    const fresh = rewriteCite(c.node, signature);
+    const fresh = rewriteCite(c.node, citeFormat);
     if (!fresh || fresh.eq(c.node)) continue;
     tr.replaceWith(c.pos, c.pos + c.node.nodeSize, fresh);
     rewritten++;
@@ -182,8 +182,8 @@ export function reformat(state: EditorState, color: string, signature = ""): Ref
 }
 
 /** As a command, for the key and the strip. */
-export const reformatCmd = (color: string, signature = "") => (state: EditorState, dispatch?: (tr: Transaction) => void) => {
-  const r = reformat(state, color, signature);
+export const reformatCmd = (color: string, citeFormat = DEFAULT_CITE_FORMAT) => (state: EditorState, dispatch?: (tr: Transaction) => void) => {
+  const r = reformat(state, color, citeFormat);
   if (!r.tr.docChanged) return false;
   if (dispatch) dispatch(r.tr);
   return true;

@@ -153,6 +153,9 @@
 .cutw .ct-sigrow b { font-size: 13.5px; font-weight: 600; }
 .cutw .ct-sigrow small { font-size: 11.5px; color: var(--dim); }
 .cutw .ct-sigrow input { width: 180px; padding: 6px 9px; border: 1px solid var(--line) !important; background: var(--surface-2); font: 13px var(--ui); outline: none; }
+.cutw .ct-sigrow.wide { flex-wrap: wrap; }
+.cutw .ct-sigrow.wide span { flex-basis: 100%; }
+.cutw .ct-sigrow.wide input { width: 100%; font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; }
 .cutw .ct-sigrow input:focus { border-color: var(--ink) !important; }
 .cutw .ct-keynote { margin: 0; padding: 8px 14px; font-size: 12.5px; background: var(--surface-2); border-bottom: 1px solid var(--line-soft); }
 .cutw .ct-keylist { overflow-y: auto; padding: 4px 14px 14px; }
