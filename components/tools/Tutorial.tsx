@@ -70,6 +70,8 @@ const SECTIONS: Section[] = [
       <>The cursor in the speech doc? The ribbon, the outline and the status line follow it there: cut, highlight, reformat and reorder the speech doc with the same keys.</>,
       <><b>Room</b> (top right) shares the speech doc with your partner. You both write it, and every card either of you sends lands in it.</>,
       <>The status line shows where you are (pocket › hat › block › tag), which card, and how many words you&apos;ll read and how long they take. {K("Alt+T")} opens the <b>speech timer</b>.</>,
+      <>Room to work: the chevron in a group&apos;s corner folds it into one button (its buttons open under it), and {K("Alt+M")} folds the whole ribbon to one line. Drag the side&apos;s edge (or its ⇔ button) to widen it for the search.</>,
+      <><b>Colours</b> (the swatch, top right) picks the palette: Graphite, Ember, Forest, Navy, Oxblood or Paper. The page stays white.</>,
     ],
     keys: [
       ["Alt+Enter", "Send the card (or block) you're in to the speech doc"],
@@ -78,6 +80,7 @@ const SECTIONS: Section[] = [
       ["/ or Alt+/", "Search the library and the caselist"],
       ["Alt+T", "Speech timer"],
       ["Alt+S", "Hide or show the side"],
+      ["Alt+M", "Fold the ribbon to one line (again: back)"],
     ],
     tips: [
       <>Everything from the Card cutter, Evidence and the Doc viewer is here; their old addresses open Round Magic.</>,

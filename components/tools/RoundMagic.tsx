@@ -127,6 +127,18 @@ const CLOCKS = [
   { label: "Prep · 10:00", s: 600 }, { label: "Prep · 8:00", s: 481 },
 ];
 
+/** The colour palettes: the chrome round the page, and the accent. The page itself stays white. */
+const PALETTES = [
+  { id: "graphite", name: "Graphite", sub: "Charcoal, violet", chrome: "#1b1b1b", side: "#1e1e1e", acc: "#8b7cf0" },
+  { id: "ember", name: "Ember", sub: "Charcoal, orange", chrome: "#1b1b1b", side: "#1e1e1e", acc: "#E97A3E" },
+  { id: "forest", name: "Forest", sub: "The suite's green, terracotta", chrome: "#1F2C24", side: "#22302A", acc: "#D9694B" },
+  { id: "navy", name: "Navy", sub: "Deep blue, sky", chrome: "#121A2A", side: "#151F32", acc: "#5B9BFF" },
+  { id: "oxblood", name: "Oxblood", sub: "Dark red, ember", chrome: "#221416", side: "#261719", acc: "#E0703A" },
+  { id: "paper", name: "Paper", sub: "Light, terracotta", chrome: "#EFEBE3", side: "#F6F3EC", acc: "#C4553A" },
+] as const;
+type PaletteId = (typeof PALETTES)[number]["id"];
+const SIDE_W = 290, SIDE_WIDE = 560;
+
 /* ------------------------------------------------------------------ the ribbon's pictures */
 const I = {
   folder: <svg width="16" height="16" viewBox="0 0 24 24" fill="#e8b84a" aria-hidden="true"><path d="M3 6a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>,
@@ -146,6 +158,9 @@ const I = {
   search: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>,
   x: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>,
   menu: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>,
+  fold: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>,
+  unfold: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>,
+  wide: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M3 12h18" /></svg>,
 };
 
 export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me?: string; room?: string; sd?: string }) {
@@ -194,7 +209,12 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   const [hideDim, setHideDim] = useState(false);
   const [depth, setDepth] = useState(4);
   const [olFilter, setOlFilter] = useState("");
-  const [menu, setMenu] = useState<null | { id: "hl" | "pages" | "more"; x: number; y: number }>(null);
+  const [menu, setMenu] = useState<null | { id: string; x: number; y: number }>(null);
+  // the ribbon: folded to one line, or with some of its groups folded into a button each
+  const [ribMin, setRibMin] = useState(false);
+  const [folded, setFolded] = useState<string[]>([]);
+  const [palette, setPalette] = useState<PaletteId>("graphite");
+  const [sideW, setSideW] = useState(SIDE_W);
 
   const [files, setFilesState] = useState<CutMeta[]>([]);
   const filesRef = useRef<CutMeta[]>([]);
@@ -285,13 +305,17 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
         if (typeof u.speechOutline === "boolean") setSpeechOutline(u.speechOutline);
         if (typeof u.depth === "number") setDepth(u.depth);
         if (typeof u.limit === "number") setTimer((t) => ({ ...t, limit: u.limit }));
+        if (typeof u.ribMin === "boolean") setRibMin(u.ribMin);
+        if (Array.isArray(u.folded)) setFolded(u.folded.filter((x: unknown) => typeof x === "string"));
+        if (PALETTES.some((p) => p.id === u.palette)) setPalette(u.palette);
+        if (typeof u.sideW === "number") setSideW(Math.min(760, Math.max(220, u.sideW)));
       }
     } catch { /* first time */ }
   }, [owner]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem(scoped("cutter.hl", owner), hl); } catch { /* private */ } }, [hl, owner]);
   useEffect(() => {
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit })); } catch { /* private */ }
-  }, [mode, tab, speechW, wpm, hideDim, speechOutline, depth, timer.limit, UI_KEY]);
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW })); } catch { /* private */ }
+  }, [mode, tab, speechW, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, UI_KEY]);
 
   const setTab = useCallback((t: Tab) => { setTabState(t); setSide(true); }, []);
 
@@ -989,6 +1013,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     if (id === "mode-split") { setMode(modeRef.current === "split" ? "edit" : "split"); return; }
     if (id === "mode-read") { setMode(modeRef.current === "read" ? "edit" : "read"); return; }
     if (id === "timer") { setTimer((t) => ({ ...t, open: !t.open })); return; }
+    if (id === "ribbon") { setMenu(null); setRibMin((r) => !r); return; }
     if (id === "send") { void sendCard(); return; }
     if (id === "hl-next") {
       const i = C.HIGHLIGHTS.findIndex((h) => h.color === hlRef.current);
@@ -1151,10 +1176,10 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     window.addEventListener("pointerdown", away, true);
     return () => { window.removeEventListener("keydown", esc, true); window.removeEventListener("pointerdown", away, true); };
   }, [menu]);
-  const openMenu = (id: "hl" | "pages" | "more", e: React.MouseEvent<HTMLElement>) => {
+  const openMenu = (id: string, e: React.MouseEvent<HTMLElement>) => {
     if (menu?.id === id) { setMenu(null); return; }
     const r = e.currentTarget.getBoundingClientRect();
-    const w = id === "pages" ? 330 : 240;
+    const w = id === "pages" || id === "palette" ? 330 : id.startsWith("g:") ? 360 : 240;
     setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: r.bottom + 6 });
   };
 
@@ -1267,6 +1292,17 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       const next = [...w0]; next[i] = a; next[i + 1] = pair - a;
       setWidths(next);
     };
+    const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  };
+  const dragSide = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const el = e.currentTarget, body = el.parentElement;
+    if (!body) return;
+    el.setPointerCapture(e.pointerId);
+    const left = body.getBoundingClientRect().left;
+    const move = (ev: PointerEvent) => setSideW(Math.round(Math.min(Math.min(760, window.innerWidth - 360), Math.max(220, ev.clientX - left))));
     const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
@@ -1384,9 +1420,57 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     );
   }, [keys]);
 
+  // the ribbon's groups: each folds into one button whose popover holds the same buttons
+  const ribbon: { id: string; name: string; sub: string; cols: string; body: React.ReactNode }[] = [
+    { id: "file", name: "File", sub: "open, new, download, keys", cols: "c2", body: <>
+      <button type="button" className="rm-b rm-i" data-tip="Open a .docx, web page or text as a file of yours" aria-label="Open a file" onClick={() => fileIn.current?.click()} disabled={busy}>{I.folder}</button>
+      <B id="new-file" cls="rm-i" label="New file">{I.newfile}</B>
+      <button type="button" className="rm-b rm-i" data-tip="Download this file as a .docx" aria-label="Download as .docx" onClick={() => { const fid = viewFile.current.get(activeRef.current); if (fid && !isTheirs(fid)) void download(fid); else toast("Their docs download from where they came from — or keep it as yours first"); }}>{I.down}</button>
+      <button type="button" className={"rm-b rm-i" + (keysOpen ? " on" : "")} data-tip="Keys, and the cite format" aria-label="Keys" onClick={() => { setMenu(null); setKeysOpen((o) => !o); setKeyNote(""); }}>{I.keys}</button>
+    </> },
+    { id: "styles", name: "Styles", sub: "pocket, hat, block, tag, analytic, cite", cols: "c3", body: <>
+      <B id="pocket"><span className="s-pocket">Pocket</span></B>
+      <B id="hat"><span className="s-hat">Hat</span></B>
+      <B id="block"><span className="s-block">Block</span></B>
+      <B id="tag"><span className="s-tag">Tag</span></B>
+      <B id="analytic"><span className="s-ana">Analytic</span></B>
+      <B id="cite"><span className="s-cite">Cite</span></B>
+    </> },
+    { id: "cut", name: "Cut", sub: "cut, emphasis, shrink, highlight, clear, condense", cols: "c3", body: <>
+      <B id="underline"><span className="s-u">Cut</span></B>
+      <B id="emphasis"><span className="s-emph">Emphasis</span></B>
+      <B id="shrink"><span className="s-big">A</span><span className="s-small">a</span></B>
+      <span className="rm-split2">
+        <B id="highlight"><span className="rm-sw" /><span>Highlight</span></B>
+        <button type="button" className="rm-b rm-menubtn rm-car" data-tip="Highlighter colour" aria-label="Highlighter colour" aria-expanded={menu?.id === "hl"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("hl", e)}>▾</button>
+      </span>
+      <B id="clear">Clear</B>
+      <B id="condense" cls="rm-i">{I.condense}</B>
+    </> },
+    { id: "card", name: "Card", sub: "new card, send, reference, clean up, reformat, extension", cols: "c3", body: <>
+      <B id="new-card" cls="rm-i">{I.plus}</B>
+      <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span>Send</span></B>
+      <B id="reference"><span className="s-ref">Reference</span></B>
+      <B id="clean-up">Clean up</B>
+      <B id="reformat"><span className="s-reformat">Reformat</span></B>
+      <B id="new-extension"><span className="s-tag">Extension</span></B>
+    </> },
+    { id: "move", name: "Move", sub: "move up and down, undo, redo", cols: "c2", body: <>
+      <B id="move-up" cls="rm-i">{I.up}</B>
+      <B id="undo" cls="rm-i" label="Undo · Ctrl+Z">{I.undo}</B>
+      <B id="move-down" cls="rm-i">{I.dn}</B>
+      <B id="redo" cls="rm-i" label="Redo · Ctrl+Y">{I.redo}</B>
+    </> },
+    { id: "view", name: "View", sub: "pages, and more", cols: "c1", body: <>
+      <button type="button" className={"rm-b rm-menubtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}<span>Pages</span><span className="rm-carr">▾</span></button>
+      <button type="button" className="rm-b rm-menubtn" data-tip="More — the library, pop-outs, this file" aria-expanded={menu?.id === "more"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("more", e)}>More<span className="rm-carr">▾</span></button>
+    </> },
+  ];
+  const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
+
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "")} ref={root} data-mode={mode}
-      style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%` }}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribMin ? " ribmin" : "")} ref={root} data-mode={mode} data-palette={palette}
+      style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
 
@@ -1396,49 +1480,24 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
           <Link className="rm-back" href="/tools" title="Back to the tools" aria-label="Back to the tools">←</Link>
           <span className="rm-logo" aria-label="Round Magic">ROUND<br />MAGIC</span>
         </div>
-        <div className="rm-g c2">
-          <button type="button" className="rm-b rm-i" data-tip="Open a .docx, web page or text as a file of yours" aria-label="Open a file" onClick={() => fileIn.current?.click()} disabled={busy}>{I.folder}</button>
-          <B id="new-file" cls="rm-i" label="New file">{I.newfile}</B>
-          <button type="button" className="rm-b rm-i" data-tip="Download this file as a .docx" aria-label="Download as .docx" onClick={() => { const fid = viewFile.current.get(activeRef.current); if (fid && !isTheirs(fid)) void download(fid); else toast("Their docs download from where they came from — or keep it as yours first"); }}>{I.down}</button>
-          <button type="button" className={"rm-b rm-i" + (keysOpen ? " on" : "")} data-tip="Keys, and the cite format" aria-label="Keys" onClick={() => { setKeysOpen((o) => !o); setKeyNote(""); }}>{I.keys}</button>
-        </div>
-        <div className="rm-g c3">
-          <B id="pocket"><span className="s-pocket">Pocket</span></B>
-          <B id="hat"><span className="s-hat">Hat</span></B>
-          <B id="block"><span className="s-block">Block</span></B>
-          <B id="tag"><span className="s-tag">Tag</span></B>
-          <B id="analytic"><span className="s-ana">Analytic</span></B>
-          <B id="cite"><span className="s-cite">Cite</span></B>
-        </div>
-        <div className="rm-g c3">
-          <B id="underline"><span className="s-u">Cut</span></B>
-          <B id="emphasis"><span className="s-emph">Emphasis</span></B>
-          <B id="shrink"><span className="s-big">A</span><span className="s-small">a</span></B>
-          <span className="rm-split2">
-            <B id="highlight"><span className="rm-sw" /><span>Highlight</span></B>
-            <button type="button" className="rm-b rm-menubtn rm-car" data-tip="Highlighter colour" aria-label="Highlighter colour" aria-expanded={menu?.id === "hl"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("hl", e)}>▾</button>
-          </span>
-          <B id="clear">Clear</B>
-          <B id="condense" cls="rm-i">{I.condense}</B>
-        </div>
-        <div className="rm-g c3">
-          <B id="new-card" cls="rm-i">{I.plus}</B>
-          <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span>Send</span></B>
-          <B id="reference"><span className="s-ref">Reference</span></B>
-          <B id="clean-up">Clean up</B>
-          <B id="reformat"><span className="s-reformat">Reformat</span></B>
-          <B id="new-extension"><span className="s-tag">Extension</span></B>
-        </div>
-        <div className="rm-g c2">
-          <B id="move-up" cls="rm-i">{I.up}</B>
-          <B id="undo" cls="rm-i" label="Undo · Ctrl+Z">{I.undo}</B>
-          <B id="move-down" cls="rm-i">{I.dn}</B>
-          <B id="redo" cls="rm-i" label="Redo · Ctrl+Y">{I.redo}</B>
-        </div>
-        <div className="rm-g c1">
-          <button type="button" className={"rm-b rm-menubtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}<span>Pages</span><span className="rm-carr">▾</span></button>
-          <button type="button" className="rm-b rm-menubtn" data-tip="More — the library's export and settings" aria-expanded={menu?.id === "more"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("more", e)}>More<span className="rm-carr">▾</span></button>
-        </div>
+        {ribbon.map((g) => {
+          const shut = ribMin || folded.includes(g.id);
+          if (shut) return (
+            <div key={g.id} className="rm-g rm-gshut">
+              <button type="button" className={"rm-b rm-menubtn rm-gbtn" + (menu?.id === "g:" + g.id ? " on" : "")} data-tip={`${g.name}: ${g.sub}`}
+                aria-expanded={menu?.id === "g:" + g.id} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("g:" + g.id, e)}>
+                {g.name.toUpperCase()}<span className="rm-carr">▾</span>
+              </button>
+            </div>
+          );
+          return (
+            <div key={g.id} className={"rm-g " + g.cols}>
+              {g.body}
+              <button type="button" className="rm-gfold" onMouseDown={(e) => e.preventDefault()} onClick={() => setFolded((f) => [...f.filter((x) => x !== g.id), g.id])}
+                aria-label={`Fold ${g.name}`} title={`Fold ${g.name} into one button`}>{I.fold}</button>
+            </div>
+          );
+        })}
 
         <div className="rm-spacer" />
         <div className="rm-titlebox">
@@ -1459,7 +1518,11 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
             <button type="button" className={"rm-b rm-i" + (timer.open ? " on" : "")} data-tip={tip("timer", "Speech timer")} aria-label="Speech timer" aria-pressed={timer.open} onClick={() => run("timer")}>{I.timer}</button>
+            <button type="button" className={"rm-b rm-i rm-menubtn" + (menu?.id === "palette" ? " on" : "")} data-tip="Colours" aria-label="Colours" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
+              <span className="rm-palsw" aria-hidden="true"><i /><i /></span>
+            </button>
             <button type="button" className={"rm-b rm-i" + (full ? " on" : "")} data-tip={full ? "Leave full screen" : "Full screen — every key is yours"} aria-label="Full screen" onClick={toggleFull}>{I.full}</button>
+            <button type="button" className="rm-b rm-i" data-tip={tip("ribbon", ribMin ? "Unfold the ribbon" : "Fold the ribbon to one line")} aria-label={ribMin ? "Unfold the ribbon" : "Fold the ribbon"} aria-pressed={ribMin} onClick={() => run("ribbon")}>{ribMin ? I.unfold : I.fold}</button>
           </div>
         </div>
         <input ref={fileIn} type="file" accept=".docx,.html,.htm,.txt,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void openFile(f); }} />
@@ -1475,6 +1538,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
             <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "search"} onClick={focusLibrary} title={tip("library")}>SEARCH</button>
             <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "round"} onClick={() => setTab("round")}>ROUND</button>
             <span className="rm-grow" />
+            <button type="button" className={"rm-sico" + (sideW > 420 ? " on" : "")} onClick={() => setSideW((w) => (w > 420 ? SIDE_W : SIDE_WIDE))} aria-label={sideW > 420 ? "Narrower" : "Wider"} title={sideW > 420 ? "Narrower — or drag the edge" : "Wider — or drag the edge"}>{I.wide}</button>
             <button type="button" className="rm-sico" onClick={() => setSide(false)} aria-label="Hide the side" title={tip("sidebar", "Hide the side")}>{I.x}</button>
           </div>
 
@@ -1649,6 +1713,8 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
           </div>
         </aside>
 
+        {side && <div className="rm-sgrab" role="separator" aria-orientation="vertical" aria-label="Resize the side" onPointerDown={dragSide}
+          onDoubleClick={() => setSideW((w) => (w > 420 ? SIDE_W : SIDE_WIDE))} title="Drag to widen the side · double-click: wide or narrow" />}
         {/* ------------------------------------------------------------ the work */}
         <div className="rm-main">
           {!side && <button type="button" className="rm-showside" onClick={() => setSide(true)} aria-label="Show the side" title={tip("sidebar", "Show the side")}>{I.menu}</button>}
@@ -1772,6 +1838,27 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       )}
 
       {/* ------------------------------------------------------------ menus */}
+      {openGroup && menu && (
+        <div className="rm-menu rm-gpop" style={{ left: menu.x, top: menu.y }} role="menu">
+          <h4><span>{openGroup.name.toUpperCase()}</span>
+            {!ribMin && <button type="button" className="rm-linkbtn" onClick={() => { setFolded((f) => f.filter((x) => x !== openGroup.id)); setMenu(null); }}>UNFOLD INTO THE RIBBON</button>}
+          </h4>
+          <div className={"rm-g " + openGroup.cols}>{openGroup.body}</div>
+        </div>
+      )}
+      {menu?.id === "palette" && (
+        <div className="rm-menu wide" style={{ left: menu.x, top: menu.y }} role="menu">
+          <h4>COLOURS</h4>
+          {PALETTES.map((p) => (
+            <button key={p.id} type="button" role="menuitemradio" aria-checked={palette === p.id} className="rm-mb lay" onClick={() => { setPalette(p.id); setMenu(null); }}>
+              <span className="rm-palpic" aria-hidden="true" style={{ background: p.chrome }}><i style={{ background: p.side }} /><i style={{ background: "#fff" }} /><b style={{ background: p.acc }} /></span>
+              <span className="rm-lt"><b>{p.name}</b><small>{p.sub}</small></span>
+              {palette === p.id && <span className="k">✓</span>}
+            </button>
+          ))}
+          <div className="rm-mnote">The page stays white, the way a cut file is read. Kept in this browser.</div>
+        </div>
+      )}
       {menu?.id === "hl" && (
         <div className="rm-menu" style={{ left: menu.x, top: menu.y }} role="menu">
           <h4>HIGHLIGHTER</h4>

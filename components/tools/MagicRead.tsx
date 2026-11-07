@@ -116,7 +116,9 @@ export default function MagicRead({ doc, source, setSource, hasSpeech, wpm, setW
             if (it.k === "plain") return <p key={i} className="rm-rplain">{it.text}</p>;
             return (
               <p key={i} className={"rm-rbody" + (it.any ? "" : " dim")}>
-                {it.runs.map((r, j) => <span key={j} className={r.read ? "hl" : "dim"}>{r.text}</span>)}
+                {it.runs.map((r, j) => (r.read ? <span key={j} className="hl">{r.text}</span>
+                  // hidden, it leaves a space behind, so the read words either side don't run together
+                  : <span key={j}><span className="dim">{r.text}</span><span className="gap"> </span></span>))}
               </p>
             );
           })}
