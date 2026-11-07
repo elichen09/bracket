@@ -1495,7 +1495,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribMin ? " ribmin" : "")} ref={root} data-mode={mode} data-palette={palette}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribMin ? " ribmin" : "") + (menu ? " menuopen" : "")} ref={root} data-mode={mode} data-palette={palette}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
