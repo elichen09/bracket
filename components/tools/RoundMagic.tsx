@@ -22,6 +22,7 @@ import { sanitize, readTime } from "@/lib/viewer/doc";
 import { textToHtml } from "@/lib/viewer/draw";
 import { listDocs, getDoc, keepDoc, dropDoc, newDocId, type ViewDoc, type ViewMeta, type DocKind } from "@/lib/viewer/store";
 import { verbatimPlugin, verbKey, readWords, countIn } from "@/lib/cutter/verbatim";
+import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter/spell";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -230,6 +231,10 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   const [folded, setFolded] = useState<string[]>([]);
   const [palette, setPalette] = useState<PaletteId>("graphite");
   const [sideW, setSideW] = useState(SIDE_W);
+  // spelling: what the browser's checker looks at (lib/cutter/spell.ts)
+  const [spell, setSpell] = useState<SpellMode>("writing");
+  const spellRef = useRef(spell);
+  spellRef.current = spell;
 
   const [files, setFilesState] = useState<CutMeta[]>([]);
   const filesRef = useRef<CutMeta[]>([]);
@@ -301,6 +306,8 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
 
   // ---- preferences ---------------------------------------------------------
   const UI_KEY = scoped("magic.ui", owner);
+  // nothing is saved until what was kept has been read — or the defaults would be written over it first
+  const [uiReady, setUiReady] = useState(false);
   useEffect(() => {
     setKeys(loadKeys(owner));
     try { const c = localStorage.getItem(scoped("cutter.hl", owner)); if (c) setHl(c); } catch { /* private */ }
@@ -324,13 +331,16 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
         if (Array.isArray(u.folded)) setFolded(u.folded.filter((x: unknown) => typeof x === "string"));
         if (PALETTES.some((p) => p.id === u.palette)) setPalette(u.palette);
         if (typeof u.sideW === "number") setSideW(Math.min(760, Math.max(220, u.sideW)));
+        if (SPELL_MODES.some((m) => m.id === u.spell)) setSpell(u.spell);
       }
     } catch { /* first time */ }
+    setUiReady(true);
   }, [owner]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem(scoped("cutter.hl", owner), hl); } catch { /* private */ } }, [hl, owner]);
   useEffect(() => {
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW })); } catch { /* private */ }
-  }, [mode, tab, speechW, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, UI_KEY]);
+    if (!uiReady) return;
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell })); } catch { /* private */ }
+  }, [mode, tab, speechW, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, UI_KEY, uiReady]);
 
   const setTab = useCallback((t: Tab) => { setTabState(t); setSide(true); }, []);
 
@@ -356,6 +366,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       }),
       keymap(baseKeymap),
       verbatimPlugin(read),
+      spellPlugin(spellRef.current),
     ],
   }), []);
 
@@ -586,7 +597,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
         if (views.current.has(key)) return;
         const v = new EditorView({ mount: el }, {
           state: EditorState.create({ schema }),
-          attributes: { class: "ct-sheet", spellcheck: "false" },
+          attributes: { class: "ct-sheet" },
           dispatchTransaction: (tr) => fns.current.onTr(key, tr),
           handleClick: (_view, pos) => { if (isRead(key)) { fns.current.jumpFromRead(key, pos); return true; } return false; },
           handleDOMEvents: {
@@ -1035,6 +1046,13 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     if (id === "mode-read") { setMode(modeRef.current === "read" ? "edit" : "read"); return; }
     if (id === "timer") { setTimer((t) => ({ ...t, open: !t.open })); return; }
     if (id === "ribbon") { setMenu(null); setRibMin((r) => !r); return; }
+    if (id === "spelling") {
+      const i = SPELL_MODES.findIndex((m) => m.id === spellRef.current);
+      const n = SPELL_MODES[(i + 1) % SPELL_MODES.length];
+      setSpell(n.id);
+      toast(`Spelling: ${n.name.toLowerCase()}`);
+      return;
+    }
     if (id === "send") { void sendCard(); return; }
     if (id === "hl-next") {
       const i = C.HIGHLIGHTS.findIndex((h) => h.color === hlRef.current);
@@ -1389,9 +1407,15 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     return () => ro.disconnect();
   }, [speechOutline]);
   // the cursor going into the speech doc: the ribbon, the outline and the status line follow it there
+  // spelling, changed: every page told, and the speech doc (all of it is checked, or none — it isn't ours to decorate)
+  useEffect(() => {
+    for (const v of views.current.values()) v.dispatch(v.state.tr.setMeta(spellKey, spell));
+    speechView.current?.dom.setAttribute("spellcheck", spell === "off" ? "false" : "true");
+  }, [spell]);
   const onSpeechView = useCallback((v: EditorView | null) => {
     speechView.current = v;
     if (!v) { inSpeech.current = false; return; }
+    v.dom.setAttribute("spellcheck", spellRef.current === "off" ? "false" : "true");
     v.dom.addEventListener("focus", () => { inSpeech.current = true; readHeads(); });
   }, [readHeads]);
   const speechT = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1946,6 +1970,14 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
           <h4>POP OUT — A WINDOW THAT STAYS ON TOP</h4>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); }}>The speech doc</button>
           {curTheirs && cur && <button type="button" className="rm-mb" onClick={() => { setMenu(null); void flush().then(() => { if (!popOut("doc", { doc: cur.id.slice(THEIRS.length) })) toast("The browser blocked the window — allow pop-ups for this site"); }); }}>Their doc, “{cur.name}”</button>}
+          <div className="rm-sep" />
+          <h4>SPELLING{K("spelling") ? " · " + K("spelling") : ""}</h4>
+          {SPELL_MODES.map((m) => (
+            <button key={m.id} type="button" role="menuitemradio" aria-checked={spell === m.id} className="rm-mb" onClick={() => { setSpell(m.id); setMenu(null); }} title={m.sub}>
+              {m.name}{spell === m.id && <span className="k">✓</span>}
+            </button>
+          ))}
+          <div className="rm-mnote">Right-click a red underline for what it should be, or to add the word to the dictionary.</div>
           <div className="rm-sep" />
           <h4>THIS FILE</h4>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); run("clean-up"); }}>Clean up<span className="k">{K("clean-up")}</span></button>

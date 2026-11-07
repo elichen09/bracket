@@ -71,6 +71,7 @@ const SECTIONS: Section[] = [
       <><b>Room</b> (top right) shares the speech doc with your partner. You both write it, and every card either of you sends lands in it.</>,
       <>The status line shows where you are (pocket › hat › block › tag), which card, and how many words you&apos;ll read and how long they take. {K("Alt+T")} opens the <b>speech timer</b>.</>,
       <>Room to work: the chevron in a group&apos;s corner folds it into one button (its buttons open under it), and {K("Alt+M")} folds the whole ribbon to one line. Drag the side&apos;s edge (or its ⇔ button) to widen it for the search.</>,
+      <><b>Spelling</b> is the browser&apos;s own checker: right-click a red underline for what it should be, or to add the word to the dictionary. It checks what you write (tags, analytics, headings, notes) and leaves the cards you cut alone; {K("Alt+K")} (or More › Spelling) switches it to everything, or off.</>,
       <><b>Colours</b> (the swatch, top right) picks the palette: Graphite, Ember, Forest, Navy, Oxblood or Paper. The page stays white.</>,
     ],
     keys: [
@@ -81,6 +82,7 @@ const SECTIONS: Section[] = [
       ["Alt+T", "Speech timer"],
       ["Alt+S", "Hide or show the side"],
       ["Alt+M", "Fold the ribbon to one line (again: back)"],
+      ["Alt+K", "Spelling: what you write, everything, or off"],
     ],
     tips: [
       <>Everything from the Card cutter, Evidence and the Doc viewer is here; their old addresses open Round Magic.</>,

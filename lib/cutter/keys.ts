@@ -35,6 +35,7 @@ export const ACTIONS: Action[] = [
   { id: "read-beside", group: "View", label: "Read view beside", key: "alt+R", hint: "This file verbatimised beside the page, following the card you're in (again: closes it)" },
   { id: "next-pane", group: "View", label: "Next page", key: "alt+.", hint: "With two or three pages open, the cursor to the next one" },
   { id: "sidebar", group: "View", label: "Hide or show the side", key: "alt+S", hint: "Files and outline — out of the way for more room" },
+  { id: "spelling", group: "View", label: "Spelling", key: "alt+K", hint: "What the spell checker looks at: what you write (not the cards you cut), everything, or nothing — one press steps through them" },
   { id: "ribbon", group: "View", label: "Fold the ribbon", key: "alt+M", hint: "Round Magic's ribbon down to one line of group buttons (again: back)" },
   { id: "tag", group: "Headings", label: "Tag", key: "alt+4", hint: "A card's tag" },
   { id: "block", group: "Headings", label: "Block", key: "alt+3", hint: "A block — “AT: Econ”" },
