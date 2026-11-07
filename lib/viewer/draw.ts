@@ -8,6 +8,7 @@
  */
 import { sanitize, readDoc, type Head } from "./doc";
 import type { ViewDoc } from "./store";
+import { wordHighlights } from "./wordColors";
 
 export const textToHtml = (t: string) =>
   t.replace(/\r/g, "").split(/\n{2,}/).map((p) => "<p>" + p.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!)).replace(/\n/g, "<br>") + "</p>").join("");
@@ -18,7 +19,9 @@ export async function drawDoc(el: HTMLElement, doc: Pick<ViewDoc, "kind" | "blob
   if (doc.kind === "docx" && doc.blob) {
     const { renderAsync } = await import("docx-preview");
     if (stale()) return null;
-    await renderAsync(doc.blob, el, el, {
+    const fixed = await wordHighlights(doc.blob);
+    if (stale()) return null;
+    await renderAsync(fixed, el, el, {
       inWrapper: false, ignoreWidth: true, ignoreHeight: true, breakPages: false, ignoreLastRenderedPageBreak: true,
       renderHeaders: false, renderFooters: false, renderFootnotes: true, renderEndnotes: true, className: "docx", useBase64URL: true,
     });

@@ -80,6 +80,21 @@ const when = (t: number) => {
     ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : d.toLocaleDateString([], { month: "short", day: "numeric" });
 };
+/**
+ * A .docx read in before its highlight colours were fixed (lib/viewer/wordColors.ts) carries
+ * Word's "green" as CSS drew it — a dark green. Opening it again brings it back to the green it was.
+ */
+const DARK_GREEN = /^(#008000|#006400|green|darkgreen|rgb\(0,\s*(128|100),\s*0\))$/i;
+function brightenGreens(doc: PMNode): PMNode | null {
+  const tr = EditorState.create({ doc }).tr;
+  const H = schema.marks.highlight;
+  doc.descendants((n, pos) => {
+    if (!n.isText) return;
+    const m = n.marks.find((x) => x.type === H && DARK_GREEN.test(String(x.attrs.color).trim()));
+    if (m) { tr.removeMark(pos, pos + n.nodeSize, H); tr.addMark(pos, pos + n.nodeSize, H.create({ color: "#00ff00" })); }
+  });
+  return tr.docChanged ? tr.doc : null;
+}
 const countWords = (doc: PMNode) => (doc.textContent.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -537,23 +552,29 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     const other = keyShowing(fid, key);
     if (other) doc = views.current.get(other)!.state.doc;
     let rec = loaded.current.get(fid);
+    let brightened = false;
     if (!doc || !rec) {
       const f = isTheirs(fid) ? await theirRecord(fid) : await getFile(owner, fid);
       if (!f) { toast("That one is gone"); return; }
       if (!rec) { rec = f; loaded.current.set(fid, f); }
-      if (!doc) doc = docOf(f);
+      if (!doc) {
+        doc = docOf(f);
+        const bright = brightenGreens(doc);
+        if (bright) { doc = bright; brightened = true; }
+      }
     }
     if (!views.current.has(key)) return;
     v.updateState(makeState(doc, isRead(key)));
     viewFile.current.set(key, fid);
     lastFollow.current.delete(key);
+    if (brightened) markDirty(fid);                           // the dark green, put right, is saved
     if (key === activeRef.current) {
       syncActive();
       try { localStorage.setItem(scoped("cutter.last", owner), fid); } catch { /* private */ }
     }
     setTick((n) => n + 1);
     if (then) requestAnimationFrame(() => then(v));
-  }, [owner, flush, makeState, syncActive, theirRecord, toast]);
+  }, [owner, flush, makeState, syncActive, theirRecord, toast, markDirty]);
 
   const fns = useRef({ onTr, loadInto, activate, jumpFromRead });
   fns.current = { onTr, loadInto, activate, jumpFromRead };

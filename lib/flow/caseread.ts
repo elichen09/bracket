@@ -1,4 +1,5 @@
 import { readDoc, sanitize } from "../viewer/doc";
+import { wordHighlights } from "../viewer/wordColors";
 
 /**
  * The other team's case, as the lines of a flow.
@@ -25,7 +26,7 @@ export async function readCase(blob: Blob, name: string): Promise<CaseRead> {
     const n = name.toLowerCase();
     if (n.endsWith(".docx") || blob.type.includes("wordprocessingml")) {
       const { renderAsync } = await import("docx-preview");
-      await renderAsync(blob, holder, holder, {
+      await renderAsync(await wordHighlights(blob), holder, holder, {
         inWrapper: false, ignoreWidth: true, ignoreHeight: true, breakPages: false,
         renderHeaders: false, renderFooters: false, renderFootnotes: false, renderEndnotes: false, className: "docx",
       });

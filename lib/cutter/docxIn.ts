@@ -1,5 +1,6 @@
 import { levelOf } from "../viewer/doc";
 import { isBlankBackground } from "../evidence/docSchema";
+import { wordHighlights } from "../viewer/wordColors";
 
 /**
  * A .docx, as HTML the card cutter can open.
@@ -23,7 +24,7 @@ export async function docxToHtml(blob: Blob): Promise<string> {
   document.body.appendChild(holder);
   try {
     const { renderAsync } = await import("docx-preview");
-    await renderAsync(blob, holder, holder, {
+    await renderAsync(await wordHighlights(blob), holder, holder, {
       inWrapper: false, ignoreWidth: true, ignoreHeight: true, breakPages: false,
       renderHeaders: false, renderFooters: false, renderFootnotes: false, renderEndnotes: false, className: "docx",
     });
