@@ -1460,7 +1460,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     mini: <>
       <B id="underline"><span className="s-u">Cut</span></B>
       <B id="emphasis"><span className="s-emph">Emphasis</span></B>
-      <B id="highlight"><span className="rm-sw" /><span>Highlight</span></B>
+      <B id="highlight"><span className="rm-sw" /><span className="lbl">Highlight</span></B>
     </> },
     { id: "card", name: "Card", sub: "new card, send, reference, clean up, reformat, extension", cols: "c3", body: <>
       <B id="new-card" cls="rm-i">{I.plus}</B>
@@ -1471,7 +1471,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       <B id="new-extension"><span className="s-tag">Extension</span></B>
     </>,
     mini: <>
-      <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span>Send</span></B>
+      <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span className="lbl">Send</span></B>
       <B id="reformat"><span className="s-reformat">Reformat</span></B>
     </> },
     { id: "move", name: "Move", sub: "move up and down, undo, redo", cols: "c2", body: <>
@@ -1489,7 +1489,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       <button type="button" className="rm-b rm-menubtn" data-tip="More — the library, pop-outs, this file" aria-expanded={menu?.id === "more"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("more", e)}>More<span className="rm-carr">▾</span></button>
     </>,
     mini: <>
-      <button type="button" className={"rm-b rm-menubtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}<span>Pages</span><span className="rm-carr">▾</span></button>
+      <button type="button" className={"rm-b rm-menubtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}<span className="lbl">Pages</span><span className="rm-carr">▾</span></button>
     </> },
   ];
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;

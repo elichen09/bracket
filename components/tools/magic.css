@@ -143,6 +143,17 @@
 .rm.ribmin .rm-brand { height: 30px; }
 .rm.ribmin .rm-logo { display: none; }
 .rm.ribmin .rm-titlebox { flex-direction: row; align-items: center; gap: 8px; }
+/* one line, always: the file's name gives way (ellipsis) before anything wraps */
+.rm.ribmin .rm-rib { flex-wrap: nowrap; }
+.rm.ribmin .rm-rib > .rm-g, .rm.ribmin .rm-brand { flex-shrink: 0; }
+.rm.ribmin .rm-spacer { flex: 0 0 8px; }
+.rm.ribmin .rm-titlebox { flex: 1 1 0; min-width: 0; }
+.rm.ribmin .rm-trow:first-child { flex: 1 1 0; min-width: 0; }
+.rm.ribmin .rm-trow + .rm-trow { flex-shrink: 0; }
+.rm.ribmin .rm-title { width: auto; flex: 1 1 auto; min-width: 48px; max-width: 280px; }
+@media (max-width: 1700px) { .rm.ribmin .rm-meta { display: none; } }
+@media (max-width: 1600px) { .rm.ribmin .rm-gmini .lbl { display: none; } .rm.ribmin .rm-gmini .rm-b { gap: 0; } }
+@media (max-width: 1250px) { .rm.ribmin .rm-rib { flex-wrap: wrap; } .rm.ribmin .rm-titlebox { flex: 1 1 auto; } }
 
 /* each button wears what it does */
 .rm .s-pocket { border: 1.5px solid currentColor; padding: 0 5px; font-weight: 700; }
