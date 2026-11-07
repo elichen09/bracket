@@ -128,21 +128,20 @@
 .rm-gfold svg { width: 11px; height: 11px; }
 .rm-g:hover > .rm-gfold, .rm-gfold:focus-visible { opacity: 1; }
 .rm-gfold:hover { color: var(--hi); }
-/* folded: one button the height of the ribbon, its name in mono; its popover has the same buttons */
-.rm-g.rm-gshut { grid-template-rows: 64px; grid-template-columns: auto; }
-.rm-gbtn { height: 64px; padding: 0 12px; font: 500 10.5px var(--rm-mono); letter-spacing: .12em; }
+/* folded: the group's most-used buttons in one row, and a slim ▾ that opens all of them below */
+.rm-g.rm-gmini { grid-template-rows: 30px; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: auto; gap: 3px; align-self: center; }
+.rm-gcar { width: 16px; min-width: 16px; padding: 0; font-size: 9px; color: var(--mut); background: transparent; border-color: transparent; }
+.rm-gcar:hover, .rm-gcar.on { color: var(--hi); background: var(--btn); border-color: var(--btnb); }
 .rm-gpop { min-width: 0; }
 .rm-gpop h4 { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .rm-gpop .rm-linkbtn { padding: 0; font-size: 9.5px; }
 .rm-gpop > .rm-g { border-right: 0; padding: 2px 4px 6px; }
 .rm-gpop > .rm-g > .rm-gfold { display: none; }
 
-/* the whole ribbon folded to one line: group buttons, then the file and the modes */
+/* the whole ribbon folded to one line: each group's mini row, then the file and the modes */
 .rm.ribmin .rm-rib { padding: 5px 8px; }
 .rm.ribmin .rm-brand { height: 30px; }
 .rm.ribmin .rm-logo { display: none; }
-.rm.ribmin .rm-g.rm-gshut { grid-template-rows: 30px; border-right: 0; padding: 0 2px; }
-.rm.ribmin .rm-gbtn { height: 30px; padding: 0 10px; }
 .rm.ribmin .rm-titlebox { flex-direction: row; align-items: center; gap: 8px; }
 
 /* each button wears what it does */
@@ -211,12 +210,12 @@
 .rm-sgrab { flex: 0 0 5px; position: relative; cursor: col-resize; background: var(--side); border-right: 1px solid var(--chrome-edge); z-index: 4; }
 .rm-sgrab::after { content: ""; position: absolute; top: 0; bottom: 0; left: 1px; width: 3px; background: transparent; transition: background .15s; }
 .rm-sgrab:hover::after { background: var(--acc); }
-.rm-shead { display: flex; align-items: center; gap: 2px; padding: 10px 8px 8px; }
-.rm-tabbtn { height: 28px; padding: 0 7px; flex-shrink: 0; border: 1px solid transparent; background: transparent; color: var(--side-mut); font: 500 10.5px var(--rm-mono) !important; letter-spacing: .1em; cursor: pointer; }
+.rm-shead { display: flex; align-items: center; gap: 1px; padding: 10px 6px 8px 8px; }
+.rm-tabbtn { height: 28px; padding: 0 5px; flex-shrink: 0; border: 1px solid transparent; background: transparent; color: var(--side-mut); font: 500 10.5px var(--rm-mono) !important; letter-spacing: .1em; cursor: pointer; }
 .rm-tabbtn:hover { color: var(--hi); }
 .rm-tabbtn[aria-selected="true"] { color: var(--hi); border-color: var(--well-b); background: var(--side-h); }
 .rm-grow { flex: 1; }
-.rm-sico { flex-shrink: 0; width: 26px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--side-mut); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.rm-sico { flex-shrink: 0; width: 24px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--side-mut); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .rm-sico:hover, .rm-sico.on { background: var(--side-h); color: var(--hi); }
 .rm-tabpane { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .rm-depth { display: flex; align-items: center; gap: 4px; padding: 0 10px 8px; }

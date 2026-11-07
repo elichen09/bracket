@@ -1176,9 +1176,9 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     window.addEventListener("pointerdown", away, true);
     return () => { window.removeEventListener("keydown", esc, true); window.removeEventListener("pointerdown", away, true); };
   }, [menu]);
-  const openMenu = (id: string, e: React.MouseEvent<HTMLElement>) => {
+  const openMenu = (id: string, e: React.MouseEvent<HTMLElement>, anchor?: HTMLElement | null) => {
     if (menu?.id === id) { setMenu(null); return; }
-    const r = e.currentTarget.getBoundingClientRect();
+    const r = (anchor || e.currentTarget).getBoundingClientRect();
     const w = id === "pages" || id === "palette" ? 330 : id.startsWith("g:") ? 360 : 240;
     setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: r.bottom + 6 });
   };
@@ -1421,12 +1421,17 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   }, [keys]);
 
   // the ribbon's groups: each folds into one button whose popover holds the same buttons
-  const ribbon: { id: string; name: string; sub: string; cols: string; body: React.ReactNode }[] = [
+  // folded, a group keeps its most-used buttons in one row, and a ▾ for the rest
+  const ribbon: { id: string; name: string; sub: string; cols: string; body: React.ReactNode; mini: React.ReactNode }[] = [
     { id: "file", name: "File", sub: "open, new, download, keys", cols: "c2", body: <>
       <button type="button" className="rm-b rm-i" data-tip="Open a .docx, web page or text as a file of yours" aria-label="Open a file" onClick={() => fileIn.current?.click()} disabled={busy}>{I.folder}</button>
       <B id="new-file" cls="rm-i" label="New file">{I.newfile}</B>
       <button type="button" className="rm-b rm-i" data-tip="Download this file as a .docx" aria-label="Download as .docx" onClick={() => { const fid = viewFile.current.get(activeRef.current); if (fid && !isTheirs(fid)) void download(fid); else toast("Their docs download from where they came from — or keep it as yours first"); }}>{I.down}</button>
       <button type="button" className={"rm-b rm-i" + (keysOpen ? " on" : "")} data-tip="Keys, and the cite format" aria-label="Keys" onClick={() => { setMenu(null); setKeysOpen((o) => !o); setKeyNote(""); }}>{I.keys}</button>
+    </>,
+    mini: <>
+      <button type="button" className="rm-b rm-i" data-tip="Open a .docx, web page or text as a file of yours" aria-label="Open a file" onClick={() => fileIn.current?.click()} disabled={busy}>{I.folder}</button>
+      <B id="new-file" cls="rm-i" label="New file">{I.newfile}</B>
     </> },
     { id: "styles", name: "Styles", sub: "pocket, hat, block, tag, analytic, cite", cols: "c3", body: <>
       <B id="pocket"><span className="s-pocket">Pocket</span></B>
@@ -1434,6 +1439,11 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       <B id="block"><span className="s-block">Block</span></B>
       <B id="tag"><span className="s-tag">Tag</span></B>
       <B id="analytic"><span className="s-ana">Analytic</span></B>
+      <B id="cite"><span className="s-cite">Cite</span></B>
+    </>,
+    mini: <>
+      <B id="tag"><span className="s-tag">Tag</span></B>
+      <B id="block"><span className="s-block">Block</span></B>
       <B id="cite"><span className="s-cite">Cite</span></B>
     </> },
     { id: "cut", name: "Cut", sub: "cut, emphasis, shrink, highlight, clear, condense", cols: "c3", body: <>
@@ -1446,6 +1456,11 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       </span>
       <B id="clear">Clear</B>
       <B id="condense" cls="rm-i">{I.condense}</B>
+    </>,
+    mini: <>
+      <B id="underline"><span className="s-u">Cut</span></B>
+      <B id="emphasis"><span className="s-emph">Emphasis</span></B>
+      <B id="highlight"><span className="rm-sw" /><span>Highlight</span></B>
     </> },
     { id: "card", name: "Card", sub: "new card, send, reference, clean up, reformat, extension", cols: "c3", body: <>
       <B id="new-card" cls="rm-i">{I.plus}</B>
@@ -1454,16 +1469,27 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       <B id="clean-up">Clean up</B>
       <B id="reformat"><span className="s-reformat">Reformat</span></B>
       <B id="new-extension"><span className="s-tag">Extension</span></B>
+    </>,
+    mini: <>
+      <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span>Send</span></B>
+      <B id="reformat"><span className="s-reformat">Reformat</span></B>
     </> },
     { id: "move", name: "Move", sub: "move up and down, undo, redo", cols: "c2", body: <>
       <B id="move-up" cls="rm-i">{I.up}</B>
       <B id="undo" cls="rm-i" label="Undo · Ctrl+Z">{I.undo}</B>
       <B id="move-down" cls="rm-i">{I.dn}</B>
       <B id="redo" cls="rm-i" label="Redo · Ctrl+Y">{I.redo}</B>
+    </>,
+    mini: <>
+      <B id="undo" cls="rm-i" label="Undo · Ctrl+Z">{I.undo}</B>
+      <B id="redo" cls="rm-i" label="Redo · Ctrl+Y">{I.redo}</B>
     </> },
     { id: "view", name: "View", sub: "pages, and more", cols: "c1", body: <>
       <button type="button" className={"rm-b rm-menubtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}<span>Pages</span><span className="rm-carr">▾</span></button>
       <button type="button" className="rm-b rm-menubtn" data-tip="More — the library, pop-outs, this file" aria-expanded={menu?.id === "more"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("more", e)}>More<span className="rm-carr">▾</span></button>
+    </>,
+    mini: <>
+      <button type="button" className={"rm-b rm-menubtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}<span>Pages</span><span className="rm-carr">▾</span></button>
     </> },
   ];
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
@@ -1483,11 +1509,10 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
         {ribbon.map((g) => {
           const shut = ribMin || folded.includes(g.id);
           if (shut) return (
-            <div key={g.id} className="rm-g rm-gshut">
-              <button type="button" className={"rm-b rm-menubtn rm-gbtn" + (menu?.id === "g:" + g.id ? " on" : "")} data-tip={`${g.name}: ${g.sub}`}
-                aria-expanded={menu?.id === "g:" + g.id} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("g:" + g.id, e)}>
-                {g.name.toUpperCase()}<span className="rm-carr">▾</span>
-              </button>
+            <div key={g.id} className="rm-g rm-gmini">
+              {g.mini}
+              <button type="button" className={"rm-b rm-menubtn rm-gcar" + (menu?.id === "g:" + g.id ? " on" : "")} data-tip={`All of ${g.name}: ${g.sub}`} aria-label={`All of ${g.name}`}
+                aria-expanded={menu?.id === "g:" + g.id} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("g:" + g.id, e, e.currentTarget.parentElement)}>▾</button>
             </div>
           );
           return (
