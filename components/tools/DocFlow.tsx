@@ -1172,7 +1172,7 @@ export default function DocFlow({ owner, me, join, open }: { owner?: string; me?
         <button type="button" className="dbtn ink" onClick={() => openPanel()} title={"Commands" + (K("commands") ? " (" + K("commands") + ")" : "")}><Ico n="command" /><span className="lbl">Commands</span> {K("commands") && <kbd>{K("commands")}</kbd>}</button>
         <button type="button" className="dbtn" onClick={copyForDocs} title="Copy for Docs — numbered, red and highlighted, as a Doc"><Ico n="copy" /><span className="lbl">Copy for Docs</span></button>
         <button type="button" className="dbtn" onClick={saveDocx} title="Save as .docx"><Ico n="export" /><span className="lbl">.docx</span></button>
-        <a className="dbtn nosplit" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this"><Ico n="cards" /><span className="lbl">Evidence ↗</span></a>
+        <a className="dbtn nosplit" href="/tools/magic" target="break-evidence" title="Open Round Magic beside this — the library, the speech doc, your files"><Ico n="cards" /><span className="lbl">Round Magic ↗</span></a>
         <FullBtn className="dbtn" full={fs.full} toggle={fs.toggle} />
         <PopBtn className="dbtn" view="docflow" params={(): Record<string, string> => (current ? { id: current } : {})} />
         <a className="dbtn splitlink icoonly" aria-label="Split screen" href="/tools/split?a=docflow" onClick={markHop} title="Split screen — Doc flow beside another tool"><Ico n="split" /><span className="lbl">Split ◫</span></a>

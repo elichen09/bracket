@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import DocViewer from "@/components/tools/DocViewer";
@@ -18,6 +19,14 @@ export default async function DocViewerTool({ searchParams }: { searchParams?: {
   const one = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v) || undefined;
   const room = one(searchParams?.room);
   const sd = one(searchParams?.sd);
+  // the Doc viewer is part of Round Magic now: a partner's room is the speech doc you share, a SpeechDrop room its Round tab
+  if (!searchParams?.embed) {
+    const q = new URLSearchParams();
+    if (room) q.set("room", room);
+    if (sd) q.set("sd", sd);
+    const qs = q.toString();
+    redirect("/tools/magic" + (qs ? "?" + qs : ""));
+  }
   if (!isAdmin() && !room && !sd) {
     return (
       <>

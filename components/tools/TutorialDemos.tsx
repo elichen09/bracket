@@ -60,15 +60,15 @@ function Marked({ text }: { text: string }) {
 /* ================================================================ 00 the map, played */
 
 const LANES = [
-  ["Evidence", "Send list & send doc", "Flow · Send doc tab", "Flow all"],
-  ["SpeechDrop / a .docx", "Doc viewer", "Rehighlight", "Evidence"],
-  ["One room code", "Flow", "Send doc", "Doc viewer"],
+  ["Round Magic", "The speech doc", "Flow · Send doc tab", "Flow all"],
+  ["SpeechDrop / a .docx", "Round tab", "Rehighlight", "Speech doc"],
+  ["One room code", "Flow", "Speech doc", "Round Magic"],
 ];
 const LANE_LAB = ["Your cards", "Their docs", "With your partner"];
 const LANE_SAY = [
-  ["You find “AT: Midterms” in Evidence and press Enter.", "It's copied, in your send list and in the send doc.", "Flow's drawer shows the send doc as you build it.", "Flow all lays every block beside the argument it answers."],
-  ["The other team drops their case on SpeechDrop.", "You open it in the Doc viewer, outline and all.", "Their card, your way: their highlighting grey, yours green.", "Sent: it lands in your send list."],
-  ["You start a room in Flow and read out the code.", "Your partner types it in their Flow: one flow, two people.", "Their Evidence joins too: one send doc for both of you.", "And the Doc viewer can read that send doc live."],
+  ["You find “AT: Midterms” in Round Magic's search and press Enter.", "It's copied, and at the end of the speech doc.", "Flow's drawer shows the send doc as you build it.", "Flow all lays every block beside the argument it answers."],
+  ["The other team drops their case on SpeechDrop.", "You open it from Round Magic's Round tab, outline and all.", "Their card, your way: their highlighting grey, yours green.", "Sent with Alt+Enter: it lands in your speech doc."],
+  ["You start a room in Flow and read out the code.", "Your partner types it in their Flow: one flow, two people.", "Their Round Magic joins too: one speech doc for both of you.", "Either of you sends; it lands for both, live."],
 ];
 
 export function MapDemo({ onDone, done }: { onDone: () => void; done: boolean }) {
@@ -526,16 +526,15 @@ export function CutterDemo({ onDone, done }: { onDone: () => void; done: boolean
 
 /* ================================================================ 05 Split screen */
 
-const SPLIT_TOOLS = ["Evidence", "Flow", "Doc viewer", "Doc flow"];
+const SPLIT_TOOLS = ["Round Magic", "Flow", "Doc flow"];
 function Sketch({ tool }: { tool: string }) {
   if (tool === "Flow") return <div className="sk sk-grid">{Array.from({ length: 12 }, (_, i) => <i key={i} />)}</div>;
-  if (tool === "Evidence") return <div className="sk sk-ev"><i className="q" /><i /><i /><i className="w" /><i /></div>;
-  if (tool === "Doc viewer") return <div className="sk sk-doc"><i className="h" /><i /><i className="w" /><i /><i className="hl" /><i /></div>;
+  if (tool === "Round Magic") return <div className="sk sk-ev"><i className="q" /><i /><i /><i className="w" /><i /></div>;
   return <div className="sk sk-df"><i className="box" /><i className="r" /><i className="u" /><i className="r" /><i className="u" /></div>;
 }
 
 export function SplitDemo({ onDone, done }: { onDone: () => void; done: boolean }) {
-  const [sides, setSides] = useState<[string, string]>(["Evidence", "Flow"]);
+  const [sides, setSides] = useState<[string, string]>(["Round Magic", "Flow"]);
   const [ratio, setRatio] = useState(0.5);
   const [closed, setClosed] = useState<0 | 1 | null>(null);
   const [drag, setDrag] = useState(false);
@@ -557,7 +556,7 @@ export function SplitDemo({ onDone, done }: { onDone: () => void; done: boolean 
     const s: [string, string] = [...sides] as [string, string]; s[side] = t; setSides(s);
   };
   return (
-    <Demo goal="Drag the line between the two tools" done={done} onReset={() => { setSides(["Evidence", "Flow"]); setRatio(0.5); setClosed(null); }}>
+    <Demo goal="Drag the line between the two tools" done={done} onReset={() => { setSides(["Round Magic", "Flow"]); setRatio(0.5); setClosed(null); }}>
       <div className="tu-sp" ref={win} onPointerMove={move} onPointerUp={() => setDrag(false)}>
         <div className="tu-sp-strip">
           {[0, 1].map((side) => closed === side ? null : (
@@ -606,10 +605,10 @@ export function PopDemo({ onDone, done }: { onDone: () => void; done: boolean })
         }}
         onPointerUp={() => { dragFrom.current = null; }}>
         <div className="tu-mainwin">
-          <div className="tu-wbar"><i /><i /><i /><span>Split screen: Evidence | Flow</span>
+          <div className="tu-wbar"><i /><i /><i /><span>Split screen: Round Magic | Flow</span>
             <button type="button" className="tu-popbtn" onClick={() => { setOpen(true); onDone(); }} title="Pop out their doc"><Ico n="pop" /></button>
           </div>
-          <div className="tu-mainpanes"><div><Sketch tool="Evidence" /></div><div><Sketch tool="Flow" /></div></div>
+          <div className="tu-mainpanes"><div><Sketch tool="Round Magic" /></div><div><Sketch tool="Flow" /></div></div>
         </div>
         {open && (
           <div className="tu-popwin" style={{ left: pos.x + "%", top: pos.y + "%" }}>
@@ -720,7 +719,7 @@ export function EveryDemo({ onDone, done, allKeys }: { onDone: () => void; done:
             <span className="brand mono">Flow</span>
             <span className="tu-gap" />
             <button type="button" className="btn"><Ico n="command" /><span className="lbl">Commands</span></button>
-            <button type="button" className="btn"><Ico n="cards" /><span className="lbl">Evidence ↗</span></button>
+            <button type="button" className="btn"><Ico n="cards" /><span className="lbl">Round Magic ↗</span></button>
             <button type="button" className="btn"><Ico n="history" /><span className="lbl">Past flows</span></button>
             <button type="button" className="btn icoonly"><Ico n="full" /></button>
             <button type="button" className="btn icoonly"><Ico n="pop" /></button>

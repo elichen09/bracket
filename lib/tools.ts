@@ -29,34 +29,23 @@ export const TOOLS: Tool[] = [
     storage: "Nothing to keep — it only explains.",
   },
   {
-    slug: "evidence",
-    name: "Evidence",
-    blurb: "Search a cut file by trigger, send cards, and cut the speech doc from what you highlighted.",
+    slug: "magic",
+    name: "Round Magic",
+    blurb: "Cut cards, search the library, send to the speech doc, read the other team's — one window for the round.",
     about:
-      "Paste an evidence document straight out of Google Docs. Headings become blocks and taglines, " +
-      "so the whole file is searchable by trigger; sending a card copies it ready to paste, and the " +
-      "read document is built from the highlighting you already did.",
-    storage: "This browser, kept apart per account — IndexedDB. Nothing is uploaded and nothing reaches the server.",
-  },
-  {
-    slug: "cutter",
-    name: "Card cutter",
-    blurb: "Cut cards into files of your own by key — Ctrl+Alt cut, Ctrl+N shrink, Alt+Z highlight, any of them movable — searchable, and in Evidence too.",
-    about:
-      "Files in a cut file's shape — pocket, hat, block, tag, cite and card — cut with one key per move: Ctrl+Alt cuts " +
-      "(underline at 11pt), Ctrl+N shrinks, Alt+Z highlights, Ctrl+Shift+Space is emphasis in a box, Alt+C the cite, Alt+1–4 " +
-      "the headings. A double-click takes the word without the space after it. Every file is searchable by tag, cite, block " +
-      "and what is read, and is in Evidence's search as well, kept up to date as you cut. Up to three pages side by side when you want " +
-      "them: the read view following your card, two places in one file, or a file to write extensions in beside the cards.",
-    storage: "This browser, kept apart per account — IndexedDB. Evidence reads the files from there; nothing is uploaded.",
+      "The card cutter, Evidence and the Doc viewer as one tool. Your files in the middle, cut by key (Ctrl+Alt cut, Ctrl+N shrink, " +
+      "Alt+Z highlight, Alt+1–4 the headings); the speech doc beside them in Split, where Alt+Enter sends the card you are in and " +
+      "your partner can write with you; the library and the caselist down the side, Enter to send; the other team's docs off " +
+      "SpeechDrop opened in the same editor to rehighlight; and Read mode, the speech as you will read it, timed.",
+    storage: "This browser, kept apart per account — IndexedDB. Your files, your library, their docs; nothing is uploaded. A room passes the speech doc straight between browsers.",
   },
   {
     slug: "split",
     name: "Split screen",
-    blurb: "Any two tools side by side — Evidence, Flow, the Doc viewer, Doc flow — in one window.",
+    blurb: "Any two tools side by side — Round Magic, Flow, Doc flow — in one window.",
     about:
       "Two tools in one window, each whole: pick what goes on each side, drag the line between them to share the room, " +
-      "swap them over. A card sent from Evidence is ready to flow on the other side.",
+      "swap them over. A card sent from Round Magic is ready to flow on the other side.",
     storage: "Whatever each tool keeps; the split only remembers which tools and how wide.",
   },
   {
@@ -91,16 +80,6 @@ export const TOOLS: Tool[] = [
       "Search every word you have flowed, group rounds by tournament, read one back without opening it, and open it " +
       "in the tool it came from.",
     storage: "This browser, kept apart per account — IndexedDB. Nothing is uploaded.",
-  },
-  {
-    slug: "viewer",
-    name: "Doc viewer",
-    blurb: "Read your partner's send doc live, the other team's speech doc off SpeechDrop, or any .docx — searchable, with an outline.",
-    about:
-      "Join the room your partner shares their send doc in and read it as they build it; look in a SpeechDrop room and open " +
-      "any file in it; or open a .docx, a PDF or a pasted Google Doc. Every document gets an outline of its pockets, hats, " +
-      "blocks and tags with how long each block's highlighting takes to read, and a search that marks every match.",
-    storage: "This browser, kept apart per account — IndexedDB, the last fifteen docs opened. A room passes the doc straight between browsers.",
   },
 ];
 

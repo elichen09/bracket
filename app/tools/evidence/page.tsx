@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import Evidence from "@/components/tools/Evidence";
@@ -25,6 +26,8 @@ export default async function EvidenceTool({ searchParams }: { searchParams?: { 
   const embed = !!searchParams?.embed;
   // the floating search over the split screen: Evidence's search and nothing else
   const searchOnly = (Array.isArray(searchParams?.only) ? searchParams?.only[0] : searchParams?.only) === "search";
+  // Evidence is part of Round Magic now; only Split screen's floating search still opens it on its own
+  if (!embed) redirect("/tools/magic" + (room ? `?room=${encodeURIComponent(room)}` : ""));
   if (!isAdmin() && !room) {
     return (
       <>

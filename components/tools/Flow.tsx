@@ -93,7 +93,7 @@ export default function Flow({ join, owner, me, open }: { join?: string; owner?:
         </button>
         {/* Its own tab, reused: the tools talk across tabs, and Evidence's send
             list is the one Flow sends into. */}
-        <a className="btn nosplit" href="/tools/evidence" target="break-evidence" title="Open Evidence beside this"><Ico n="cards" /><span className="lbl">Evidence ↗</span></a>
+        <a className="btn nosplit" href="/tools/magic" target="break-evidence" title="Open Round Magic beside this — the library, the speech doc, your files"><Ico n="cards" /><span className="lbl">Round Magic ↗</span></a>
         <Link className="btn" href="/tools/flows" title="Past flows — every round you have flowed, this one kept there as you go"><Ico n="history" /><span className="lbl">Past flows</span></Link>
         <FullBtn className="btn" full={fs.full} toggle={fs.toggle} />
         <PopBtn className="btn" view="flow" />

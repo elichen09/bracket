@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
 import AdminGate from "@/components/AdminGate";
 import Cutter from "@/components/tools/Cutter";
@@ -11,6 +12,8 @@ export const dynamic = "force-dynamic";
 
 /** Cutting cards into files of your own, by key; every file is in Evidence's search too. */
 export default async function CutterTool({ searchParams }: { searchParams?: { embed?: string | string[] } }) {
+  // the Card cutter is Round Magic's middle now
+  if (!searchParams?.embed) redirect("/tools/magic");
   if (!isAdmin()) {
     return (
       <>

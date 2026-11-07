@@ -33,23 +33,25 @@ import "./finish.css";
  */
 
 const TOOLS = {
-  evidence: { title: "Evidence", src: "/tools/evidence?embed=1" },
+  magic: { title: "Round Magic", src: "/tools/magic?embed=1" },
   flow: { title: "Flow", src: "/tools/flow?embed=1" },
-  viewer: { title: "Doc viewer", src: "/tools/viewer?embed=1" },
   docflow: { title: "Doc flow", src: "/tools/docflow?embed=1" },
-  cutter: { title: "Card cutter", src: "/tools/cutter?embed=1" },
 } as const;
 type ToolKey = keyof typeof TOOLS;
 const KEYS = Object.keys(TOOLS) as ToolKey[];
+/** Evidence, the Card cutter and the Doc viewer are Round Magic now: a split kept from before, or a link, opens it. */
+const MERGED: Record<string, ToolKey> = { evidence: "magic", cutter: "magic", viewer: "magic" };
+const upgrade = (k: unknown) => (typeof k === "string" && MERGED[k]) || k;
 const isTool = (k: unknown): k is ToolKey => typeof k === "string" && k in TOOLS;
 
 const KEY = "tools.split";
 const MIN = 360;          // narrower than this and no tool is usable
 
-export default function Split({ first: want, second: want2 }: { first?: string; second?: string }) {
+export default function Split({ first: asked, second: asked2 }: { first?: string; second?: string }) {
+  const want = upgrade(asked), want2 = upgrade(asked2);
   const box = useRef<HTMLDivElement>(null);
   // two frames, each showing one tool; `left` says which frame is on the left
-  const [tools, setTools] = useState<[ToolKey, ToolKey]>(["evidence", "flow"]);
+  const [tools, setTools] = useState<[ToolKey, ToolKey]>(["magic", "flow"]);
   const [left, setLeft] = useState<0 | 1>(0);
   const [ratio, setRatio] = useState(0.5);
   const [drag, setDrag] = useState(false);
@@ -155,10 +157,11 @@ export default function Split({ first: want, second: want2 }: { first?: string; 
 
   // how it was left — and, from a tool's own Split button, that tool on the left
   useEffect(() => {
-    let t: [ToolKey, ToolKey] = ["evidence", "flow"], l: 0 | 1 = 0, r = 0.5;
+    let t: [ToolKey, ToolKey] = ["magic", "flow"], l: 0 | 1 = 0, r = 0.5;
     try {
       const s = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (s && Array.isArray(s.tools) && isTool(s.tools[0]) && isTool(s.tools[1]) && s.tools[0] !== s.tools[1]) t = [s.tools[0], s.tools[1]];
+      const a = upgrade(s?.tools?.[0]), b = upgrade(s?.tools?.[1]);
+      if (s && Array.isArray(s.tools) && isTool(a) && isTool(b) && a !== b) t = [a, b];
       if (s && (s.left === 0 || s.left === 1)) l = s.left;
       else if (s && typeof s.swap === "boolean") l = s.swap ? 1 : 0;       // the split's first version
       if (s && typeof s.ratio === "number") r = s.ratio;

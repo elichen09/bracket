@@ -71,9 +71,19 @@ function htmlFromDoc(state: EditorState) {
   return holder.innerHTML;
 }
 
-export default function DocEditor({ host, width, owner }: { host: React.RefObject<HTMLDivElement>; width: number; owner?: string }) {
+export default function DocEditor({ host, width, owner, onView, onChange, compact }: {
+  host: React.RefObject<HTMLDivElement>; width: number; owner?: string;
+  /** Round Magic: the editor, each time it is made, so its ribbon can work in it too */
+  onView?: (v: EditorView | null) => void;
+  /** and each change, so its outline follows */
+  onChange?: () => void;
+  /** the ribbon above has the formatting: keep only what is the speech doc's own */
+  compact?: boolean;
+}) {
   const mount = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
+  const hooks = useRef({ onView, onChange });
+  hooks.current = { onView, onChange };
   const save = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quiet = useRef(false);                 // a change we made ourselves
   const [read, setRead] = useState(false);
@@ -146,6 +156,7 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
         const next = v.state.apply(tr);
         v.updateState(next);
         force((n) => n + 1);                    // the toolbar follows the cursor
+        hooks.current.onChange?.();
         // A document handed to us by the engine is not an edit of the draft.
         // Saving it would let the read view, or a rebuild, overwrite what was
         // written — which is exactly how switching tabs used to lose it.
@@ -156,10 +167,11 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
       },
     });
     view.current = v;
+    hooks.current.onView?.(v);
     boundRef.current = !!bound;
     // The engine announced the document before this existed, so ask again.
     if (!bound) (window as any).EV?.renderDoc?.();
-    return () => { v.destroy(); view.current = null; boundRef.current = false; };
+    return () => { v.destroy(); view.current = null; boundRef.current = false; hooks.current.onView?.(null); };
   }, [push, read, shared]);
 
   // ---- joining or leaving a room's send doc ---------------------------------
@@ -363,10 +375,11 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
 
   return (
     <>
-      <div className="docbar">
+      <div className={"docbar" + (compact ? " compact" : "")}>
         <Btn label="↶" title="Undo — Ctrl+Z" act={() => run(isShared ? undoCommand : undo)} style={canUndo ? undefined : { opacity: .35 }} />
         <Btn label="↷" title="Redo — Ctrl+Y" act={() => run(isShared ? redoCommand : redo)} style={canRedo ? undefined : { opacity: .35 }} />
         <span className="fdiv" />
+        {!compact && <>
 
         <select className="fsel style" value={level} title="Style"
           onMouseDown={(e) => e.stopPropagation()} onChange={(e) => setLevel(Number(e.target.value))}>
@@ -398,6 +411,7 @@ export default function DocEditor({ host, width, owner }: { host: React.RefObjec
 
         <span className="fdiv" />
         <Btn label="⏎" title="Page break — shown here; Docs drops these on paste" act={insertBreak} />
+        </>}
         <button type="button" className="fbtn wide" data-act="format"
           title="Title it, drop the analytics, renumber, take out the white space">Format</button>
         <button type="button" className="fbtn wide" onClick={saveDocx}
