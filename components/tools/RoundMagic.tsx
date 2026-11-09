@@ -114,7 +114,7 @@ const kindOf = (name: string, type = ""): DocKind => {
 interface Head { level: number; text: string; pos: number }
 /** One page of the workspace: which file (or doc of theirs), and whether it is for editing or reading. */
 interface Pane { key: string; fileId: string; read: boolean; follow: boolean }
-type Mode = "edit" | "split" | "read";
+type Mode = "edit" | "split" | "speech" | "read";
 type Tab = "outline" | "files" | "search" | "round";
 interface SdFile { i: number; name: string; ctime: number }
 
@@ -319,7 +319,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     try {
       const u = JSON.parse(localStorage.getItem(UI_KEY) || "null");
       if (u) {
-        if (u.mode === "split") { modeRef.current = "split"; setModeState("split"); }
+        if (u.mode === "split" || u.mode === "speech") { modeRef.current = u.mode; setModeState(u.mode); if (u.mode === "speech") inSpeech.current = true; }
         if (["outline", "files", "search", "round"].includes(u.tab)) setTabState(u.tab);
         if (typeof u.speechW === "number") setSpeechW(Math.min(.75, Math.max(.25, u.speechW)));
         if (typeof u.wpm === "number") setWpm(u.wpm);
@@ -353,7 +353,11 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   };
   const scrollerOf = (v: EditorView) => v.dom.closest(".rm-scroll, #docbody") as HTMLElement | null;
   /** The editor the ribbon and the keys work in: the speech doc while the cursor is in it, else the page. */
-  const target = () => (inSpeech.current && speechView.current && modeRef.current === "split" ? speechView.current : view.current);
+  const target = () => {
+    const s = speechView.current;
+    if (s && modeRef.current === "speech") return s;                       // just the speech doc: it is all there is
+    return inSpeech.current && s && modeRef.current === "split" ? s : view.current;
+  };
 
   const makeState = useCallback((doc: PMNode, read: boolean) => EditorState.create({
     doc,
@@ -688,6 +692,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   }, [owner, setFiles]);
 
   const open = useCallback(async (id: string, then?: (v: EditorView) => void) => {
+    if (modeRef.current === "speech") { modeRef.current = "split"; setModeState("split"); inSpeech.current = false; }
     const key = activeRef.current || panesRef.current[0]?.key;
     if (!key) return;
     await setPaneFile(key, id, then);
@@ -918,6 +923,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
 
   const nextPane = useCallback(() => {
     const edits = panesRef.current.filter((p) => !p.read);
+    if (modeRef.current === "speech") return;
     if (modeRef.current === "split" && speechView.current) {
       // the speech doc is the last page in the round
       const i = inSpeech.current ? -1 : edits.findIndex((p) => p.key === activeRef.current);
@@ -940,19 +946,23 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     const body = root.current?.querySelector("#docbody .ProseMirror");
     return body ? fromHtml(body.innerHTML) : null;
   };
+  const readFrom = useRef<Mode>("edit");                   // where Read mode was opened from, to go back to
   const setMode = useCallback((m: Mode) => {
     if (m === "read") {
-      const prefer = modeRef.current === "split" && inSpeech.current ? "speech" : readSrc;
+      const prefer = modeRef.current === "speech" || (modeRef.current === "split" && inSpeech.current) ? "speech" : readSrc;
+      readFrom.current = modeRef.current;
       const d = prefer === "speech" ? speechDoc() : view.current?.state.doc || null;
       setReadSrc(prefer);
       setReadDoc(d);
     }
     modeRef.current = m;
     setModeState(m);
-    if (m !== "split") inSpeech.current = false;
+    if (m === "speech") inSpeech.current = true;
+    else if (m !== "split") inSpeech.current = false;
     requestAnimationFrame(() => {
-      if (m === "split") (window as any).EV?.renderDoc?.();
-      if (m !== "read") view.current?.focus();
+      if (m === "split" || m === "speech") (window as any).EV?.renderDoc?.();
+      if (m === "speech") speechView.current?.focus();
+      else if (m !== "read") view.current?.focus();
       readHeads();
     });
   }, [readSrc, readHeads]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -964,7 +974,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   /** From Read mode, a tag clicked: back to editing it. */
   const editAt = useCallback((pos: number) => {
     const speech = readSrc === "speech";
-    setMode(speech ? "split" : "edit");
+    setMode(speech ? (readFrom.current === "speech" ? "speech" : "split") : "edit");
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const v = speech ? speechView.current : view.current;
       if (!v) return;
@@ -975,6 +985,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
 
   // ---- sending a card to the speech doc ---------------------------------------
   const sendCard = useCallback(async () => {
+    if (modeRef.current === "speech") { toast("Send is from a file — SPLIT puts one beside the speech doc"); return; }
     if (inSpeech.current && modeRef.current === "split") { toast("That is the speech doc — put the cursor in a card of a file to send it"); return; }
     const v = view.current;
     const EV = (window as any).EV;
@@ -1043,6 +1054,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     if (id === "library") { focusLibrary(); return; }
     if (id === "new-file") { void create("Untitled file"); return; }
     if (id === "mode-split") { setMode(modeRef.current === "split" ? "edit" : "split"); return; }
+    if (id === "mode-speech") { setMode(modeRef.current === "speech" ? "split" : "speech"); return; }
     if (id === "mode-read") { setMode(modeRef.current === "read" ? "edit" : "read"); return; }
     if (id === "timer") { setTimer((t) => ({ ...t, open: !t.open })); return; }
     if (id === "ribbon") { setMenu(null); setRibMin((r) => !r); return; }
@@ -1572,8 +1584,9 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
         <div className="rm-spacer" />
         <div className="rm-titlebox">
           <div className="rm-trow">
-            {curTheirs && <span className="rm-badge" title="A doc of theirs — kept apart from your library">THEIRS</span>}
-            <input className="rm-title" value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
+            {mode === "speech" && <span className="rm-title rm-titlefix" title="The speech doc — SPLIT or EDIT for your files">Speech doc</span>}
+            {curTheirs && mode !== "speech" && <span className="rm-badge" title="A doc of theirs — kept apart from your library">THEIRS</span>}
+            <input className="rm-title" hidden={mode === "speech"} value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
               onBlur={(e) => void rename(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); view.current?.focus(); } if (e.key === "Escape") { setName(cur?.name || ""); view.current?.focus(); } }} />
             <span className="rm-meta">{state === "saved" ? "SAVED" : state === "saving" ? "SAVING…" : "EDITING"} · {docStat.cards} CARD{docStat.cards === 1 ? "" : "S"}</span>
@@ -1581,7 +1594,8 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
           <div className="rm-trow end">
             <div className="rm-modes" role="group" aria-label="View">
               <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode("edit")} data-tip={"Just the file"}>EDIT</button>
-              <button type="button" aria-pressed={mode === "split"} onClick={() => setMode("split")} data-tip={tip("mode-split", "The speech doc beside")} className={sentPulse && mode !== "split" ? "pulse" : ""} key={"s" + sentPulse}>SPLIT</button>
+              <button type="button" aria-pressed={mode === "split"} onClick={() => setMode("split")} data-tip={tip("mode-split", "The speech doc beside")} className={sentPulse && mode !== "split" && mode !== "speech" ? "pulse" : ""} key={"s" + sentPulse}>SPLIT</button>
+              <button type="button" aria-pressed={mode === "speech"} onClick={() => setMode("speech")} data-tip={tip("mode-speech", "Just the speech doc")}>SPEECH</button>
               <button type="button" aria-pressed={mode === "read"} onClick={() => setMode("read")} data-tip={tip("mode-read", "Read it, timed")}>READ</button>
             </div>
             <button type="button" className="rm-b rm-room" data-act="room" data-tip="Room — share the speech doc with your partner">
@@ -1856,7 +1870,8 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
                 <b id="doclabel">Send doc</b>
                 <span className="rm-grow" />
                 <button type="button" className={"rm-pbtn" + (speechOutline ? " on" : "")} aria-pressed={speechOutline} onClick={() => setSpeechOutline((o) => !o)} title="The speech doc's sent list and outline">LIST</button>
-                <button type="button" className="rm-pbtn" onClick={() => setMode("edit")} title={tip("mode-split", "Just the file")}>CLOSE</button>
+                <button type="button" className="rm-pbtn" onClick={() => setMode(mode === "speech" ? "split" : "speech")} title={tip("mode-speech", mode === "speech" ? "A file beside it again" : "Just the speech doc")}>{mode === "speech" ? "FILE BESIDE" : "SPEECH ONLY"}</button>
+                <button type="button" className="rm-pbtn" onClick={() => setMode("edit")} title="Just the file">CLOSE</button>
               </div>
               <div className="pane docpane rm-docpane">
                 <div className={"pane right docside" + (speechOutline ? "" : " shut")}>

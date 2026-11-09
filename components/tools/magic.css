@@ -198,6 +198,8 @@
 }
 .rm-title:hover { border-color: var(--btnb); }
 .rm-title:focus { border-color: var(--acc); background: var(--well); text-align: left; }
+.rm-titlefix { display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-titlefix:hover { border-color: transparent; }
 .rm-meta { font: 500 10px var(--rm-mono); letter-spacing: .12em; color: var(--mut); white-space: nowrap; }
 .rm-badge { font: 500 9.5px var(--rm-mono); letter-spacing: .14em; color: #c98a1c; border: 1px solid currentColor; padding: 1px 5px; }
 .rm-modes { display: flex; border: 1px solid var(--btnb); height: 30px; }
@@ -402,6 +404,9 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm[data-mode="split"] .rm-ssplit { display: block; }
 .rm .evi.rm-speech { display: none; flex: 0 0 var(--rm-speech); min-width: 0; font-size: 13px; background: #f3f3f3; color: #111; }
 .rm[data-mode="split"] .evi.rm-speech { display: flex; animation: rmSlide .22s ease-out both; }
+/* just the speech doc: the work area is all of it */
+.rm[data-mode="speech"] .rm-panes, .rm[data-mode="speech"] .rm-ssplit { display: none; }
+.rm[data-mode="speech"] .evi.rm-speech { display: flex; flex: 1 1 auto; border-left: 0; animation: rmIn .18s ease-out both; }
 @keyframes rmSlide { from { opacity: 0; transform: translateX(14px); } }
 .rm .rm-phead.speech { background: color-mix(in srgb, var(--acc) 9%, #fff); border-bottom-color: color-mix(in srgb, var(--acc) 22%, #fff); }
 .rm .rm-phead.speech b { font: 600 12.5px var(--rm-sans); letter-spacing: 0; }

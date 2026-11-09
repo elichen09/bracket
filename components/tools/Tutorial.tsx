@@ -64,7 +64,7 @@ const SECTIONS: Section[] = [
     open: [{ href: "/tools/magic", label: "Open Round Magic" }, { href: "/tools/split?a=magic&b=flow", label: "Round Magic beside Flow" }],
     idea: <p>Down the side, four tabs: the <b>outline</b> of whatever the cursor is in, your <b>files</b>, the library <b>search</b> and the <b>round</b> (SpeechDrop and the other team&apos;s docs). In the middle, the file you&apos;re cutting. The ribbon on top works in whichever document has the cursor, the speech doc included. Each button shows what it does to the text, and hovering one shows its key.</p>,
     steps: [
-      <><b>EDIT</b> is just the file. <b>SPLIT</b> ({K("Alt+B")}) puts the speech doc beside it, and <b>READ</b> ({K("Alt+Shift+R")}) shows the speech doc or the file the way you&apos;ll read it: tags big, highlighted words large and the rest small and grey (or hidden), with how long it takes at your pace and each card&apos;s time down the side. {K("Esc")} goes back.</>,
+      <><b>EDIT</b> is just the file. <b>SPLIT</b> ({K("Alt+B")}) puts the speech doc beside it, <b>SPEECH</b> ({K("Alt+Shift+B")}) is the speech doc alone, the whole width, with the ribbon and outline working in it, and <b>READ</b> ({K("Alt+Shift+R")}) shows the speech doc or the file the way you&apos;ll read it: tags big, highlighted words large and the rest small and grey (or hidden), with how long it takes at your pace and each card&apos;s time down the side. {K("Esc")} goes back.</>,
       <>Put the cursor in a card and press {K("Alt+Enter")} to <b>send</b> it to the end of the speech doc. On a block heading, the whole block goes. The SPLIT button blinks when something lands there.</>,
       <>{K("/")} (or {K("Alt+/")} while typing) jumps to the library search. Type a trigger, move with {K("↑ ↓")}, and {K("Enter")} sends to the speech doc. Switch <b>Library</b> to <b>Caselist</b> to search this year&apos;s open caselist.</>,
       <>The cursor in the speech doc? The ribbon, the outline and the status line follow it there: cut, highlight, reformat and reorder the speech doc with the same keys.</>,
@@ -77,6 +77,7 @@ const SECTIONS: Section[] = [
     keys: [
       ["Alt+Enter", "Send the card (or block) you're in to the speech doc"],
       ["Alt+B", "The speech doc beside the file (again: just the file)"],
+      ["Alt+Shift+B", "Just the speech doc (again: a file beside it)"],
       ["Alt+Shift+R", "Read mode (again, or Esc: back)"],
       ["/ or Alt+/", "Search the library and the caselist"],
       ["Alt+T", "Speech timer"],
