@@ -123,7 +123,7 @@ let paneSeq = 0;
 const newKey = () => "p" + (++paneSeq) + "_" + Date.now().toString(36);
 
 /** What only makes sense with the cursor in a document. */
-const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference", "reformat", "send"]);
+const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference", "reformat", "send", "condense-omitted"]);
 /** What still works in a read page. */
 const IN_READ = new Set(["move-up", "move-down", "send"]);
 
@@ -168,6 +168,7 @@ const I = {
   send: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>,
   plus: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>,
   condense: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /><path d="M18 15v6M15 18l3 3 3-3" /></svg>,
+  pilcrow: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M13 4v16M17 4v16M19 4H9.5a4.5 4.5 0 000 9H13" /></svg>,
   timer: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" /></svg>,
   full: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>,
   pages: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M12 4v16" /></svg>,
@@ -1097,6 +1098,12 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       case "clear": return exec(C.clear);
       case "shrink": return exec(C.shrink);
       case "condense": return exec(C.condense);
+      case "condense-omitted": {
+        const r = C.condenseOmitted(v.state);
+        if (typeof r === "string") toast(r); else v.dispatch(r);
+        v.focus();
+        return;
+      }
       case "new-card": return exec(C.newCard);
       case "move-up": return exec(C.moveBy(-1));
       case "move-down": return exec(C.moveBy(1));
@@ -1503,7 +1510,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       <B id="block"><span className="s-block">Block</span></B>
       <B id="cite"><span className="s-cite">Cite</span></B>
     </> },
-    { id: "cut", name: "Cut", sub: "cut, emphasis, shrink, highlight, clear, condense", cols: "c3", body: <>
+    { id: "cut", name: "Cut", sub: "cut, emphasis, shrink, highlight, clear, condense, condense ¶ none omitted", cols: "c3", body: <>
       <B id="underline"><span className="s-u">Cut</span></B>
       <B id="emphasis"><span className="s-emph">Emphasis</span></B>
       <B id="shrink"><span className="s-big">A</span><span className="s-small">a</span></B>
@@ -1512,7 +1519,10 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
         <button type="button" className="rm-b rm-menubtn rm-car" data-tip="Highlighter colour" aria-label="Highlighter colour" aria-expanded={menu?.id === "hl"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("hl", e)}>▾</button>
       </span>
       <B id="clear">Clear</B>
-      <B id="condense" cls="rm-i">{I.condense}</B>
+      <span className="rm-split2">
+        <B id="condense" cls="rm-i">{I.condense}</B>
+        <B id="condense-omitted" cls="rm-i">{I.pilcrow}</B>
+      </span>
     </>,
     mini: <>
       <B id="underline"><span className="s-u">Cut</span></B>

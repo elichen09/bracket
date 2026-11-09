@@ -90,7 +90,7 @@ const newKey = () => "p" + (++paneSeq) + "_" + Date.now().toString(36);
 /** The keys along the top of the page, the ones used most first. */
 const STRIP = ["underline", "emphasis", "highlight", "shrink", "cite", "tag", "block", "hat", "pocket", "clear", "clean-up", "reformat", "condense", "new-extension", "reference"];
 /** What only makes sense with the cursor in the document. */
-const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference", "reformat"]);
+const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference", "reformat", "condense-omitted"]);
 /** What still works in a read page: reordering cards is fine in a read view. */
 const IN_READ = new Set(["move-up", "move-down"]);
 
@@ -721,6 +721,12 @@ export default function Cutter({ owner }: { owner?: string }) {
       case "clear": return exec(C.clear);
       case "shrink": return exec(C.shrink);
       case "condense": return exec(C.condense);
+      case "condense-omitted": {
+        const r = C.condenseOmitted(v.state);
+        if (typeof r === "string") toast(r); else v.dispatch(r);
+        v.focus();
+        return;
+      }
       case "new-card": return exec(C.newCard);
       case "move-up": return exec(C.moveBy(-1));
       case "move-down": return exec(C.moveBy(1));

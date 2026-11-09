@@ -147,8 +147,8 @@ export function reformat(state: EditorState, color: string, citeFormat = DEFAULT
       const read = !!has(M.underline) || !!hl;
       // read: 11pt (the body's own size, so no size mark at all)
       if (read && pt !== READ_PT) { tr.removeMark(f, t, M.fontSize); sized += t - f; }
-      // not read and shrunk at all: 8pt exactly; bigger than the body: back to it
-      else if (!read && pt < READ_PT && pt !== SHRUNK_PT) { tr.removeMark(f, t, M.fontSize); tr.addMark(f, t, M.fontSize.create({ size: SHRUNK_PT + "pt" })); sized += t - f; }
+      // not read and shrunk, but not as far as 8pt: 8pt exactly (smaller is on purpose — condensed text is 6pt); bigger than the body: back to it
+      else if (!read && pt < READ_PT && pt > SHRUNK_PT) { tr.removeMark(f, t, M.fontSize); tr.addMark(f, t, M.fontSize.create({ size: SHRUNK_PT + "pt" })); sized += t - f; }
       else if (!read && pt > READ_PT) { tr.removeMark(f, t, M.fontSize); sized += t - f; }
     }
     return false;

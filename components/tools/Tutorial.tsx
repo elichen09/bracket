@@ -197,7 +197,7 @@ const SECTIONS: Section[] = [
     idea: <p>A file is a cut file: pocket, hat, block, tag, and under each tag its cite and the card. Each move is one key, and any of them can be moved. Files save as you go, and each one is in the library search too, updated whenever you save.</p>,
     steps: [
       <>Make a file with <b>New file</b>, or <b>Open .docx</b> to bring in one you have (cite, underline, emphasis and highlighting come with it). Rename a file with its <b>✎</b> in the list (or double-click its name), or click the open file&apos;s name in the ribbon. The library takes the new name too.</>,
-      <>Paste the article. {K("Ctrl+Shift+V")} pastes without the source&apos;s formatting, and {K("Alt+Q")} (condense) joins the lines a PDF breaks it into.</>,
+      <>Paste the article. {K("Ctrl+Shift+V")} pastes without the source&apos;s formatting, and {K("Alt+Q")} (condense) joins the lines a PDF breaks it into. Select a stretch you won&apos;t read and press {K("Alt+Shift+Q")}: it stays in the card, whole, at 6pt, with ¶ where the paragraphs broke and a line before and after saying so.</>,
       <>Type the tag and press {K("Alt+4")}. Select the author and date and press {K("Alt+C")} for the cite.</>,
       <>Select what matters and press {K("Ctrl+Alt")} (together, then let go) to cut it (underlined, at 11pt); press it again on cut words for emphasis (bold, underlined, boxed), and a third time to take it all off. {K("Ctrl+Shift+Space")} goes straight to emphasis, {K("Alt+Z")} to highlight. With nothing selected, a key works on the word the cursor is in. A double-click takes the word without the space after it, so a highlight stops where the word does.</>,
       <>{K("Ctrl+N")} shrinks everything that is neither underlined nor bold to 8pt. Chrome keeps Ctrl+N for a new window, so it works with the cutter full screen; anywhere else, give shrink another key. {K("Alt+N")} starts the next card. The coloured squares pick the highlighter, and {K("Alt+Shift+Z")} cycles through them.</>,
@@ -222,6 +222,7 @@ const SECTIONS: Section[] = [
       ["Alt+W", "Clean up: marks off the spaces they spilled onto, double spaces to one"],
       ["Alt+Shift+W", "Reformat: one highlight colour, emphasis boxed, pasted fonts off, cleaned up"],
       ["Alt+Q", "Condense the card into one paragraph"],
+      ["Alt+Shift+Q", "Condense, none omitted: the selected paragraphs into one at 6pt, ¶ where each broke, between <<TEXT CONDENSED - NONE OMITTED>> and <<PARAGRAPH BREAKS RESUME>>"],
       ["Alt+↑ / Alt+↓", "Move the card (or block) the cursor is in up or down"],
       ["Alt+X", "New extension: a new page, a heading ending in the speech, bold lines under it"],
       ["Alt+Shift+X", "Make a line an analytic, Heading 4 (again: plain)"],

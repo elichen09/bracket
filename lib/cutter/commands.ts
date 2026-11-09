@@ -303,6 +303,85 @@ export const condense: Cmd = (state, dispatch) => {
   return true;
 };
 
+/**
+ * Condensed, none omitted: a stretch of the card you won't read, kept whole
+ * but out of the way. The paragraphs the selection touches become one, at
+ * 6pt, with a ¶ where each one broke, between <<TEXT CONDENSED - NONE
+ * OMITTED>> and <<PARAGRAPH BREAKS RESUME>>. Again with the cursor in it (or
+ * on either line): the paragraphs back, at 11pt. A string is why it can't.
+ */
+export const CONDENSED_OPEN = "<<TEXT CONDENSED - NONE OMITTED>>";
+export const CONDENSED_CLOSE = "<<PARAGRAPH BREAKS RESUME>>";
+const TINY = "6pt";
+const PILCROW = " ¶ ";
+// other files word them their own way: <<TEXT CONDENSED NONE OMITTED>>, <<LINE BREAKS CONTINUE>>
+const OPEN_RE = /^<<\s*TEXT\s+CONDENSED\b.*>>$/i;
+const CLOSE_RE = /^<<.*\b(BREAKS?|PARAGRAPHS?)\b.*\b(RESUMES?|CONTINUES?)\b.*>>$/i;
+
+const lineIs = (n: PMNode | undefined, re: RegExp) => !!n && n.type === schema.nodes.paragraph && re.test(n.textContent.trim());
+
+export function condenseOmitted(state: EditorState): Transaction | string {
+  const back = uncondense(state);
+  if (back) return back;
+  const { $from, $to, empty } = state.selection;
+  if (empty) return "Select the paragraphs to condense";
+  const from = $from.depth ? $from.before(1) : $from.pos, to = $to.depth ? $to.after(1) : $to.pos;
+  const paras: PMNode[] = [];
+  let heading = false;
+  state.doc.nodesBetween(from, to, (n) => {
+    if (n.type === schema.nodes.heading) heading = true;
+    else if (n.type === schema.nodes.paragraph && n.textContent.trim()) paras.push(n);
+    return false;
+  });
+  if (heading) return "Only card text condenses — leave the tags out of what's selected";
+  if (paras.length < 2) return "Select two paragraphs or more — it joins them";
+  const tiny = M.fontSize.create({ size: TINY });
+  const parts: PMNode[] = [];
+  paras.forEach((p, i) => {
+    const nodes: PMNode[] = [];
+    p.content.forEach((n) => nodes.push(n.isText ? n.mark(tiny.addToSet(n.marks.filter((m) => m.type !== M.fontSize))) : n));
+    // trim the seams, then a ¶ between
+    if (nodes.length && nodes[0].isText) { const t = nodes[0].text!.replace(/^\s+/, ""); if (t) nodes[0] = schema.text(t, nodes[0].marks); else nodes.shift(); }
+    const l = nodes.length - 1;
+    if (l >= 0 && nodes[l].isText) { const t = nodes[l].text!.replace(/\s+$/, ""); if (t) nodes[l] = schema.text(t, nodes[l].marks); else nodes.pop(); }
+    if (i > 0 && nodes.length) parts.push(schema.text(PILCROW, [tiny]));
+    parts.push(...nodes);
+  });
+  const P = schema.nodes.paragraph;
+  const tr = state.tr.replaceWith(from, to, [P.create(null, schema.text(CONDENSED_OPEN)), P.create(null, parts), P.create(null, schema.text(CONDENSED_CLOSE))]);
+  const body = from + P.create(null, schema.text(CONDENSED_OPEN)).nodeSize;
+  tr.setSelection(TextSelection.create(tr.doc, body + 1));
+  return tr.scrollIntoView();
+}
+
+/** The condensed stretch the cursor is in, as the paragraphs it was; null if it isn't in one. */
+function uncondense(state: EditorState): Transaction | null {
+  const tops: { pos: number; node: PMNode }[] = [];
+  let at = -1;
+  const sel = state.selection.from;
+  state.doc.forEach((node, pos, i) => { tops.push({ pos, node }); if (pos <= sel) at = i; });
+  if (at < 0) return null;
+  const open = [at, at - 1, at - 2].find((o) => o >= 0 && lineIs(tops[o].node, OPEN_RE) && lineIs(tops[o + 2]?.node, CLOSE_RE));
+  if (open === undefined) return null;
+  const mid = tops[open + 1].node;
+  if (mid.type !== schema.nodes.paragraph) return null;
+  // split the paragraph at each ¶; the 6pt comes off
+  const out: PMNode[][] = [[]];
+  mid.content.forEach((n) => {
+    if (!n.isText) { out[out.length - 1].push(n); return; }
+    const marks = n.marks.filter((m) => !(m.type === M.fontSize && m.attrs.size === TINY));
+    n.text!.split(/\s*¶\s*/).forEach((piece, k) => {
+      if (k > 0) out.push([]);
+      if (piece) out[out.length - 1].push(schema.text(piece, marks));
+    });
+  });
+  const P = schema.nodes.paragraph;
+  const from = tops[open].pos, to = tops[open + 2].pos + tops[open + 2].node.nodeSize;
+  const tr = state.tr.replaceWith(from, to, out.filter((c) => c.length).map((c) => P.create(null, c)));
+  tr.setSelection(TextSelection.create(tr.doc, from + 1));
+  return tr.scrollIntoView();
+}
+
 /** Paste as plain text: each line its own paragraph (F3 joins them). */
 export function plainSlice(text: string): Slice {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
