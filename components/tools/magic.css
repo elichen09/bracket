@@ -250,6 +250,9 @@
 .rm-ol:hover { background: var(--side-h); }
 .rm-ol.on { background: var(--side-on); box-shadow: inset 3px 0 0 var(--acc); }
 .rm-ol .lab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-ol .x { flex-shrink: 0; width: 20px; height: 20px; display: grid; place-items: center; font-size: 14px; line-height: 1; color: var(--mut); opacity: 0; transition: opacity .1s, color .1s, background .1s; }
+.rm-ol:hover .x { opacity: 1; }
+.rm-ol .x:hover { color: #fff; background: #b3261e; }
 .rm-ol.k1 .lab { font-weight: 700; font-size: 14px; }
 .rm-ol.k2 .lab { font-weight: 700; text-decoration: underline double; }
 .rm-ol.k3 .lab { font-weight: 600; text-decoration: underline; }
@@ -414,8 +417,15 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm .evi .rm-docpane > .docmain { min-height: 0; }
 .rm .evi .rm-docpane > .docside .dsfold { display: none; }
 .rm .evi .rm-docpane > .docside.shut { display: none; }
-.rm .evi .docbar { font-family: var(--rm-mono); }
-.rm .evi #docbody { background: #f3f3f3; }
+/* it is a page like the others: the same sheet, the same column, the same head */
+.rm .evi.rm-speech { background: #fff; container-type: inline-size; flex-direction: column; }
+.rm .evi.rm-speech.active .rm-phead { box-shadow: inset 0 2px 0 var(--acc); }
+.rm .evi #docbody { background: #fff; scroll-behavior: auto; }
+.rm .evi .rm-phead button.rm-pbtn { border: 1px solid #cfcfcf; padding: 0 8px; background: #fff; font: 500 10px var(--rm-mono); letter-spacing: .1em; color: #222; }
+.rm .evi .rm-phead button.rm-pbtn:hover { border-color: #111; }
+.rm .evi .rm-phead button.rm-pbtn.on { border-color: var(--accD); color: var(--accD); }
+.rm .evi .rm-phead button.rm-pbtn.sq { padding: 0; font-size: 13px; }
+.rm .evi .droprow { flex-shrink: 0; }
 
 /* ------------------------------------------------------------ the status line */
 .rm-status {

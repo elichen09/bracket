@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EditorState, TextSelection, type Command } from "prosemirror-state";
+import { EditorState, TextSelection, type Command, type Plugin } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { DOMParser as PMParser, DOMSerializer, type MarkType } from "prosemirror-model";
 import { history, undo, redo, undoDepth, redoDepth } from "prosemirror-history";
@@ -71,8 +71,15 @@ function htmlFromDoc(state: EditorState) {
   return holder.innerHTML;
 }
 
-export default function DocEditor({ host, width, owner, onView, onChange, compact }: {
+/** What Round Magic's own header does to the speech doc: the buttons this editor used to carry itself. */
+export interface DocApi { saveDocx: () => void; speechDrop: () => void }
+
+export default function DocEditor({ host, width, owner, onView, onChange, compact, plugins, api }: {
   host: React.RefObject<HTMLDivElement>; width: number; owner?: string;
+  /** Round Magic: what its pages have that this did not — its Enter, its spelling — so the speech doc edits as a page does */
+  plugins?: () => Plugin[];
+  /** and a handle on the .docx and SpeechDrop buttons, which live in its header */
+  api?: React.MutableRefObject<DocApi | null>;
   /** Round Magic: the editor, each time it is made, so its ribbon can work in it too */
   onView?: (v: EditorView | null) => void;
   /** and each change, so its outline follows */
@@ -82,8 +89,8 @@ export default function DocEditor({ host, width, owner, onView, onChange, compac
 }) {
   const mount = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const hooks = useRef({ onView, onChange });
-  hooks.current = { onView, onChange };
+  const hooks = useRef({ onView, onChange, plugins });
+  hooks.current = { onView, onChange, plugins };
   const save = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quiet = useRef(false);                 // a change we made ourselves
   const [read, setRead] = useState(false);
@@ -121,10 +128,13 @@ export default function DocEditor({ host, width, owner, onView, onChange, compac
       "Mod-u": toggleMark(schema.marks.underline),
     };
     const start = bound ? initProseMirrorDoc(bound.frag, schema) : null;
+    // the host's own plugins go first, so its keys are heard before the stock ones
+    const extra = hooks.current.plugins?.() || [];
     const state = bound && start ? EditorState.create({
       schema,
       doc: start.doc,
       plugins: [
+        ...extra,
         ySyncPlugin(bound.frag, { mapping: start.mapping }),
         yCursorPlugin(bound.awareness, { cursorBuilder: caret, selectionBuilder: (u: { color: string }) => ({ style: `background-color: ${u.color}2e`, class: "evi-sel" }) }),
         yUndoPlugin(),
@@ -134,6 +144,7 @@ export default function DocEditor({ host, width, owner, onView, onChange, compac
     }) : EditorState.create({
       doc: docFromHtml("<p></p>"),
       plugins: [
+        ...extra,
         history(),
         keymap({
           "Mod-z": undo,
@@ -351,6 +362,8 @@ export default function DocEditor({ host, width, owner, onView, onChange, compac
     }
   }, []);
 
+  if (api) api.current = { saveDocx, speechDrop: () => setDrop((d) => (d ? "" : "open")) };
+
   const insertBreak = () => {
     const v = view.current;
     if (!v) return;
@@ -372,6 +385,30 @@ export default function DocEditor({ host, width, owner, onView, onChange, compac
     <button type="button" className={"fbtn" + (on ? " on" : "")} title={title} style={style}
       onMouseDown={(e) => e.preventDefault()} onClick={act}>{label}</button>
   );
+
+  if (compact) {
+    return (
+      <>
+        {drop && (
+          <div className="droprow">
+            <input value={room} placeholder="SpeechDrop room code" maxLength={16} spellCheck={false} autoFocus
+              onChange={(e) => setRoom(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") toSpeechDrop(); if (e.key === "Escape") setDrop(""); }} />
+            <button type="button" className="fbtn wide" disabled={sending} onClick={toSpeechDrop}>
+              {sending ? "Sending…" : "Send"}
+            </button>
+            {drop !== "open" && <span className="msg">{drop}</span>}
+            <button type="button" className="fbtn" onClick={() => setDrop("")} aria-label="Close" title="Close">×</button>
+          </div>
+        )}
+        <div id="docbody" className="rm-scroll">
+          <div className="rm-col">
+            <div className={"ct-sheet" + (read ? " reading" : "")} ref={mount} />
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

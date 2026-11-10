@@ -28,7 +28,7 @@ import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
 import { useFullscreen } from "./FullBtn";
 import { popOut } from "./PopBtn";
-import DocEditor from "./DocEditor";
+import DocEditor, { type DocApi } from "./DocEditor";
 import MagicRead, { clock } from "./MagicRead";
 import "./evidence.css";
 import "./finish.css";
@@ -203,6 +203,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   /** The speech doc's editor (DocEditor's), and whether it, not a page, has the cursor. */
   const speechView = useRef<EditorView | null>(null);
   const inSpeech = useRef(false);
+  const speechApi = useRef<DocApi | null>(null);
   const [panes, setPanesState] = useState<Pane[]>([]);
   const panesRef = useRef<Pane[]>([]);
   const setPanes = useCallback((next: Pane[]) => { panesRef.current = next; setPanesState(next); }, []);
@@ -1413,6 +1414,16 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     setDrag(null); setDropAt(null);
   };
 
+  /** A heading taken out of the outline: it, and everything under it. The speech doc's list of what was sent follows. */
+  const removeSection = (pos: number) => {
+    const v = target();
+    if (!v || !v.editable) return;
+    const sec = C.sections(v.state.doc).find((x) => x.pos === pos);
+    if (!sec) return;
+    v.dispatch(v.state.tr.delete(sec.pos, sec.end).scrollIntoView());
+    toast("Deleted — Ctrl+Z brings it back");
+  };
+
   // ---- the lines between pages, and between the pages and the speech doc, drag -----------------
   const dragSplit = (e: React.PointerEvent<HTMLDivElement>, i: number) => {
     e.preventDefault();
@@ -1508,12 +1519,17 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   // spelling, changed: every page told, and the speech doc (all of it is checked, or none — it isn't ours to decorate)
   useEffect(() => {
     for (const v of views.current.values()) v.dispatch(v.state.tr.setMeta(spellKey, spell));
-    speechView.current?.dom.setAttribute("spellcheck", spell === "off" ? "false" : "true");
+    const sv = speechView.current;
+    if (sv) sv.dispatch(sv.state.tr.setMeta(spellKey, spell).setMeta("addToHistory", false));
   }, [spell]);
+  /** What makes the speech doc edit as a page does: a page's Enter, a page's spelling. */
+  const speechPlugins = useCallback(() => [
+    keymap({ Enter: X.enterKeepingAnalytics }),
+    spellPlugin(spellRef.current),
+  ], []);
   const onSpeechView = useCallback((v: EditorView | null) => {
     speechView.current = v;
     if (!v) { inSpeech.current = false; return; }
-    v.dom.setAttribute("spellcheck", spellRef.current === "off" ? "false" : "true");
     v.dom.addEventListener("focus", () => { inSpeech.current = true; readHeads(); });
   }, [readHeads]);
   const speechT = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1737,10 +1753,12 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
                   onDragOver={(e) => onRowDrag(e, i)}
                   onDragEnd={() => { setDrag(null); setDropAt(null); }}>
                   <span className="lab">{h.text}</span>
+                  <span className="x" role="button" aria-label={`Delete “${h.text}” and everything under it`} title="Delete this, and everything under it — Ctrl+Z brings it back"
+                    onClick={(e) => { e.stopPropagation(); removeSection(h.pos); }}>×</span>
                 </button>
               )) : <p className="rm-sempty">{heads.length ? "No heading here says that." : `No headings yet. ${K("tag")} makes a line a tag, ${K("block")} a block.`}</p>}
             </nav>
-            <div className="rm-sfoot">Drag a heading to move it, and everything under it. {K("move-up")} / {K("move-down")} move the one you&apos;re in.</div>
+            <div className="rm-sfoot">{headsOf === "speech" ? "The speech doc, as a list: " : ""}Drag a heading to move it, and everything under it; × takes it out. {K("move-up")} / {K("move-down")} move the one you&apos;re in.</div>
           </div>
 
           {/* your files */}
@@ -1955,27 +1973,33 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
             <div className="rm-ssplit" role="separator" aria-orientation="vertical" aria-label="Resize the speech doc" onPointerDown={dragSpeech}
               onDoubleClick={() => setSpeechW(.46)} title="Drag to resize · double-click to reset" />
             {/* the speech doc: Evidence's send doc, its editor, its outline */}
-            <section className="evi withdoc rm-speech" ref={speechBox} aria-label="Speech doc">
+            <section className={"evi withdoc rm-speech" + (headsOf === "speech" && mode === "split" ? " active" : "")} ref={speechBox} aria-label="Speech doc">
               <div className="rm-phead speech">
                 <span className="rm-acc">SPEECH</span>
-                <b id="doclabel">Send doc</b>
+                <b>Speech doc</b>
+                <span className="rm-pmeta" id="sendCount" title="Blocks sent to it" />
                 <span className="rm-grow" />
-                <button type="button" className={"rm-pbtn" + (speechOutline ? " on" : "")} aria-pressed={speechOutline} onClick={() => setSpeechOutline((o) => !o)} title="The speech doc's sent list and outline">LIST</button>
+                <button type="button" className={"rm-pbtn" + (side && tab === "outline" && headsOf === "speech" ? " on" : "")}
+                  onClick={() => { inSpeech.current = true; setTab("outline"); speechView.current?.focus(); readHeads(); }}
+                  title="Its outline, in the side: click a heading to go there, drag one to move it and everything under it">OUTLINE</button>
+                <button type="button" className={"rm-pbtn rm-menubtn" + (menu?.id === "speech" ? " on" : "")} aria-expanded={menu?.id === "speech"}
+                  onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("speech", e)} title="Format, copy, download, SpeechDrop, clear">DOC ▾</button>
                 <button type="button" className="rm-pbtn" onClick={() => setMode(mode === "speech" ? "split" : "speech")} title={tip("mode-speech", mode === "speech" ? "A file beside it again" : "Just the speech doc")}>{mode === "speech" ? "FILE BESIDE" : "SPEECH ONLY"}</button>
-                <button type="button" className="rm-pbtn" onClick={() => setMode("edit")} title="Just the file">CLOSE</button>
+                <button type="button" className="rm-pbtn sq" onClick={() => setMode("edit")} title="Close the speech doc — just the file" aria-label="Close the speech doc">×</button>
               </div>
               <div className="pane docpane rm-docpane">
-                <div className={"pane right docside" + (speechOutline ? "" : " shut")}>
-                  <button type="button" className="dsfold mono" onClick={() => setSpeechOutline((o) => !o)} aria-pressed={speechOutline}>{speechOutline ? "‹" : "›"}<span>Sent</span></button>
+                {/* the engine keeps a list of what was sent and draws it here; Round Magic's outline is the list now */}
+                <div className="pane right docside shut" hidden>
+                  <b id="doclabel" />
                   <div className="tabs mono">
-                    <button data-tab="send" className="on">Send doc <span className="count" id="sendCount" /></button>
+                    <button data-tab="send" className="on">Send doc</button>
                     <button data-tab="read">Read doc</button>
                   </div>
                   <div className="sideacts" id="sideacts" />
                   <div id="sidebody" />
                 </div>
                 <div className="docmain">
-                  <DocEditor host={root} width={Math.max(300, speechWidth)} owner={owner} onView={onSpeechView} onChange={onSpeechChange} compact />
+                  <DocEditor host={root} width={Math.max(300, speechWidth)} owner={owner} onView={onSpeechView} onChange={onSpeechChange} compact plugins={speechPlugins} api={speechApi} />
                 </div>
               </div>
             </section>
@@ -2033,6 +2057,19 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
             </button>
           ))}
           <div className="rm-mnote">The page stays white, the way a cut file is read. Kept in this browser.</div>
+        </div>
+      )}
+      {menu?.id === "speech" && (
+        <div className="rm-menu" style={{ left: menu.x, top: menu.y }} role="menu">
+          <h4>THE SPEECH DOC</h4>
+          <button type="button" className="rm-mb" data-act="format" onClick={() => setMenu(null)} title="Title it, drop the analytics, renumber, take out the white space">Format for sending…</button>
+          <button type="button" className="rm-mb" data-act="copySend" onClick={() => setMenu(null)}>Copy it</button>
+          <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.saveDocx(); }}>Download as .docx</button>
+          <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.speechDrop(); }}>Send to SpeechDrop…</button>
+          <div className="rm-sep" />
+          <button type="button" className="rm-mb" data-act="docReset" onClick={() => setMenu(null)} title="Throw away what was written in it and build it again from the cards sent">Rebuild from the cards sent</button>
+          <button type="button" className="rm-mb" data-act="clearSend" onClick={() => setMenu(null)}>Clear it</button>
+          <div className="rm-mnote">It edits like any page: every ribbon button and key works in it — Reformat, Clean up, Condense, the headings, move up and down.</div>
         </div>
       )}
       {menu?.id === "hl" && (
