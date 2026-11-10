@@ -8,7 +8,7 @@ import { scoped } from "@/lib/owner";
  */
 
 export type DocKind = "html" | "docx" | "pdf" | "text";
-export type Source = "room" | "speechdrop" | "file" | "paste";
+export type Source = "room" | "speechdrop" | "file" | "paste" | "library" | "caselist";
 
 export interface ViewDoc {
   id: string;

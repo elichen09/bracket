@@ -1090,3 +1090,6 @@
 .evi .clblock { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .evi .clblock b { font-weight: 600; color: var(--ink); }
 .evi .clvia { font-style: normal; font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--t-acc, #C4553A); margin-left: 8px; }
+.evi .clopp { color: var(--acc); white-space: nowrap; }
+.evi .arg:hover .tobin { opacity: 1; }
+.evi .tobin.opn { white-space: nowrap; cursor: pointer; }

@@ -350,13 +350,13 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm-phead b { color: #111; font-weight: 600; font-family: var(--rm-sans); letter-spacing: 0; font-size: 12.5px; }
 .rm-acc { color: var(--accD); }
 .rm-acc2 { color: #a35b00; }
-.rm-psel { min-width: 0; max-width: 40%; border: 0; background: transparent; color: #111; font: 600 12.5px var(--rm-sans); padding: 4px 2px; outline: none; cursor: pointer; text-overflow: ellipsis; }
+.rm-psel { flex: 0 1 auto; min-width: 64px; max-width: 40%; border: 0; background: transparent; color: #111; font: 600 12.5px var(--rm-sans); padding: 4px 2px; outline: none; cursor: pointer; text-overflow: ellipsis; }
 .rm-psel:hover, .rm-psel:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
-.rm-pmeta { white-space: nowrap; color: #777; }
+.rm-pmeta { white-space: nowrap; color: #777; flex: 0 5 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rm-pmode { display: inline-flex; border: 1px solid #cfcfcf; flex-shrink: 0; }
 .rm-pmode button { border: 0; background: #fff; font: 500 9.5px var(--rm-mono); letter-spacing: .1em; padding: 3px 7px; color: #777; cursor: pointer; }
 .rm-pmode button[aria-pressed="true"] { background: #111; color: #fff; }
-.rm-pbtn { height: 24px; border: 1px solid #cfcfcf; background: #fff; font: 500 10px var(--rm-mono); letter-spacing: .1em; padding: 0 8px; cursor: pointer; color: #222; white-space: nowrap; }
+.rm-pbtn { flex-shrink: 0; height: 24px; border: 1px solid #cfcfcf; background: #fff; font: 500 10px var(--rm-mono); letter-spacing: .1em; padding: 0 8px; cursor: pointer; color: #222; white-space: nowrap; }
 .rm-pbtn:hover { border-color: #111; }
 .rm-pbtn.on, .rm-pbtn[aria-pressed="true"] { border-color: var(--accD); color: var(--accD); }
 .rm-pbtn.sq { width: 24px; padding: 0; font-size: 13px; }

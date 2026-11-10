@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { EditorState, TextSelection, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
-import { DOMParser as PMParser, DOMSerializer, type Node as PMNode } from "prosemirror-model";
+import { DOMParser as PMParser, DOMSerializer, Fragment as PMFragment, type Node as PMNode } from "prosemirror-model";
 import { history, undo, redo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
@@ -102,7 +102,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 /** A doc of theirs, in a page: its id in the Doc viewer's store, marked so it is never mistaken for a file of yours. */
 const THEIRS = "v:";
 const isTheirs = (id: string) => id.startsWith(THEIRS);
-const SOURCE: Record<string, string> = { room: "Partner", speechdrop: "SpeechDrop", file: "Opened", paste: "Pasted" };
+const SOURCE: Record<string, string> = { room: "Partner", speechdrop: "SpeechDrop", file: "Opened", paste: "Pasted", library: "From your library", caselist: "Off the caselist" };
 const kindOf = (name: string, type = ""): DocKind => {
   const n = name.toLowerCase();
   if (n.endsWith(".docx") || type.includes("wordprocessingml")) return "docx";
@@ -376,23 +376,40 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   }), []);
 
   // ---- the outline and the status line follow whatever has the cursor --------------------
-  const readHeads = useCallback(() => {
+  // Reading a whole document for its headings and its words is not something to do on every key:
+  // the headings are read again only when the document is a different one (and its words a beat
+  // after the typing stops); a cursor that only moved just says where it is now.
+  const headsFor = useRef<{ doc: PMNode | null; heads: Head[] }>({ doc: null, heads: [] });
+  const wordsT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readHeadsNow = useCallback(() => {
     const v = target();
     if (!v) return;
     setHeadsOf(v === speechView.current ? "speech" : "page");
     const { from: sf, to: st, empty } = v.state.selection;
     const c = empty ? null : countIn(v.state.doc, sf, st);
     setSelCount(c && c.words ? c : null);
-    const out: Head[] = [];
-    let cards = 0;
-    v.state.doc.forEach((n, pos) => { if (n.type === schema.nodes.heading) { out.push({ level: n.attrs.level, text: n.textContent.trim() || "(empty)", pos }); if (n.attrs.level === 4) cards++; } });
-    setHeads(out);
-    setDocStat({ read: readWords(v.state.doc), cards });
+    let out = headsFor.current.heads;
+    if (headsFor.current.doc !== v.state.doc) {
+      const doc = v.state.doc;
+      out = [];
+      let cards = 0;
+      doc.forEach((n, pos) => { if (n.type === schema.nodes.heading) { out.push({ level: n.attrs.level, text: n.textContent.trim() || "(empty)", pos }); if (n.attrs.level === 4) cards++; } });
+      headsFor.current = { doc, heads: out };
+      setHeads(out);
+      setDocStat((d) => (d.cards === cards ? d : { ...d, cards }));
+      if (wordsT.current) clearTimeout(wordsT.current);
+      wordsT.current = setTimeout(() => { const w = target(); if (w) { const read = readWords(w.state.doc); setDocStat((d) => (d.read === read ? d : { ...d, read })); } }, 400);
+    }
     const from = v.state.selection.from;
     let i = -1;
-    out.forEach((h, k) => { if (h.pos <= from) i = k; });
+    for (let k = 0; k < out.length && out[k].pos <= from; k++) i = k;
     setAt(i);
   }, []);
+  const headsRaf = useRef(0);
+  const readHeads = useCallback(() => {
+    if (headsRaf.current) return;
+    headsRaf.current = requestAnimationFrame(() => { headsRaf.current = 0; readHeadsNow(); });
+  }, [readHeadsNow]);
   const syncActive = useCallback(() => {
     const fid = viewFile.current.get(activeRef.current);
     const f = fid ? loaded.current.get(fid) || null : null;
@@ -628,7 +645,9 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
         if (v) { v.destroy(); views.current.delete(key); }
         viewFile.current.delete(key);
         lastFollow.current.delete(key);
-        refCbs.current.delete(key);
+        // forgotten only once its page is gone: forgetting it while the page lives made the next
+        // draw hand React a new ref, which tore the editor down and built it again — every draw
+        if (!paneOf(key)) refCbs.current.delete(key);
         if (view.current === v) view.current = null;
       }
     };
@@ -1034,6 +1053,60 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     return () => el.removeEventListener("evi:sent", on);
   }, []);
 
+  // ---- a card from the search, somewhere other than the speech doc ---------------------
+  const openCard = useCallback(async (d: { how: string; html: string; title: string; block: string; whole: boolean; from: string; file?: string; by?: string }) => {
+    // one of your own files' cards, opened: the file itself, at the card
+    if (d.how === "page" && d.file && filesRef.current.some((f) => f.id === d.file)) {
+      const want = (d.whole ? d.block : d.title).replace(/\s+/g, " ").trim().toLowerCase();
+      await open(d.file, (v) => {
+        let pos = -1;
+        v.state.doc.forEach((n, p) => { if (pos < 0 && n.type === schema.nodes.heading && n.textContent.replace(/\s+/g, " ").trim().toLowerCase() === want) pos = p; });
+        if (pos >= 0) goPos(v, pos); else v.focus();
+      });
+      if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+      return;
+    }
+    if (d.how === "page") {
+      // a page of its own, kept with the round's docs and out of the library: to read, rehighlight, send from
+      const rec: ViewDoc = { id: newDocId(), name: d.title.slice(0, 80) || "Card", kind: "html", source: d.from === "caselist" ? "caselist" : "library", by: d.by, at: Date.now(), html: d.html };
+      await keepDoc(owner, rec);
+      void refreshTheirs();
+      if (modeRef.current === "read" || modeRef.current === "speech") { const m = modeRef.current === "speech" ? "split" : "edit"; modeRef.current = m; setModeState(m); inSpeech.current = false; }
+      const fid = THEIRS + rec.id;
+      const key = panesRef.current.length < MAX_PANES ? addPane({ fileId: fid, read: false, follow: true }) : null;
+      if (key) requestAnimationFrame(() => requestAnimationFrame(() => { activate(key); views.current.get(key)?.focus(); }));
+      else await open(fid, (v) => v.focus());
+      toast(`“${rec.name.slice(0, 50)}” opened as a page — Keep as mine makes it a file of yours`);
+      return;
+    }
+    // into whatever has the cursor — a file, or the speech doc — after the card it is in
+    const v = target();
+    if (!v || !v.editable || (v !== speechView.current && isRead(activeRef.current))) { toast("Put the cursor in a file you are editing first"); return; }
+    const doc = fromHtml(d.html);
+    const nodes: PMNode[] = [];
+    // one card goes in under whatever block the cursor is in; a whole block brings its heading
+    doc.forEach((n) => { if (d.whole || !(n.type === schema.nodes.heading && n.attrs.level < 4)) nodes.push(n); });
+    while (nodes.length && !nodes[nodes.length - 1].content.size && nodes[nodes.length - 1].type === schema.nodes.paragraph) nodes.pop();
+    if (!nodes.length) { toast("That card came out empty"); return; }
+    const st = v.state, $f = st.selection.$from;
+    const c = C.cardAround(st);
+    const here = $f.depth ? $f.parent : null;
+    // an empty line is where it was asked for; otherwise after the card the cursor is in
+    const at = here && !here.content.size && here.type === schema.nodes.paragraph ? $f.before(1) : c?.tag ? c.end : $f.depth ? $f.after(1) : st.doc.content.size;
+    const tr = st.tr.insert(at, PMFragment.from(nodes));
+    tr.setSelection(TextSelection.create(tr.doc, Math.min(at + 1, tr.doc.content.size)));
+    v.dispatch(tr.scrollIntoView());
+    requestAnimationFrame(() => goPos(v, at));
+    toast(`In ${v === speechView.current ? "the speech doc" : "the file"}: ${d.title.slice(0, 60)}`);
+  }, [owner, open, addPane, activate, goPos, refreshTheirs, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const on = (e: Event) => { void openCard((e as CustomEvent).detail); };
+    el.addEventListener("evi:open", on);
+    return () => el.removeEventListener("evi:open", on);
+  }, [openCard]);
+
   // ---- the commands ---------------------------------------------------------
   const toggleVerb = useCallback(() => {
     const k = activeRef.current;
@@ -1242,7 +1315,9 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   };
 
   // ---- searching every file ------------------------------------------------------
-  const index = useMemo(() => {
+  const indexFor = useRef<{ files: CutMeta[] | null; ix: { s: unknown; cards: unknown[][]; where: { file: number; i: number }[] } | null }>({ files: null, ix: null });
+  const indexOf = useCallback((files: CutMeta[]) => {
+    if (indexFor.current.files === files && indexFor.current.ix) return indexFor.current.ix;
     const blocks: string[] = [], bi = new Map<string, number>();
     const cards: unknown[][] = [], where: { file: number; i: number }[] = [];
     files.forEach((f, fi) => (f.cards || []).forEach((c) => {
@@ -1251,11 +1326,14 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       cards.push([fi, c.tag, c.cite, 0, b < 0 ? undefined : b, c.read]);
       where.push({ file: fi, i: c.i });
     }));
-    return { s: buildSearch(cards, blocks), cards, where };
-  }, [files]);
+    const ix = { s: buildSearch(cards, blocks), cards, where };
+    indexFor.current = { files, ix };
+    return ix;
+  }, []);
   const results = useMemo(() => {
     const w = q.trim();
     if (w.length < 2) return null;
+    const index = indexOf(files);
     const low = w.toLowerCase();
     const named = files.filter((f) => f.name.toLowerCase().includes(low));
     const { hits } = searchCards(index.s, w, (i: number) => String(index.cards[i][1] || ""));
@@ -1264,18 +1342,19 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       return { key: f.id + ":" + at.i, file: f, i: at.i, tag: String(c[1] || "(no tag)"), cite: String(c[2] || ""), block: f.cards.find((x) => x.i === at.i)?.block || "" };
     });
     return { named, cards };
-  }, [q, files, index]);
+  }, [q, files, indexOf]);
 
   const refHits = useMemo(() => {
     if (!refPick) return [];
     const w = refPick.q.trim();
     if (w.length < 2) return [];
+    const index = indexOf(files);
     const { hits } = searchCards(index.s, w, (i: number) => String(index.cards[i][1] || ""));
     return (hits as { i: number }[]).slice(0, 12).map((h) => {
       const c = index.cards[h.i], at = index.where[h.i], f = files[at.file];
       return { key: f.id + ":" + at.i, file: f, i: at.i, tag: String(c[1] || "(no tag)"), cite: String(c[2] || "") };
     });
-  }, [refPick, index, files]);
+  }, [refPick, indexOf, files]);
   useEffect(() => { if (refPick) requestAnimationFrame(() => refIn.current?.focus()); }, [refPick !== null]); // eslint-disable-line react-hooks/exhaustive-deps
   const putReference = useCallback(async (hit: { file: CutMeta; i: number }) => {
     setRefPick(null);
@@ -1750,7 +1829,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
               </div>
               <div id="results" />
             </div>
-            <div className="rm-sfoot"><b>↑↓</b> move · <b>→</b> arguments · <b>Enter</b> send to the speech doc · <b>Esc</b> clear</div>
+            <div className="rm-sfoot"><b>↑↓</b> move · <b>→</b> arguments · <b>Enter</b> to the speech doc · <b>Shift+Enter</b> into the file you&apos;re in · <b>Ctrl+Enter</b> a page of its own</div>
           </div>
 
           {/* the round: their docs, SpeechDrop, your partner */}
@@ -1821,15 +1900,16 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
                 const meta = theirsHere ? theirFor(p.fileId) : null;
                 const showHead = many || p.read || theirsHere || mode === "split";
                 const pdf = pdfs[p.fileId];
-                return [
-                  i > 0 && <div key={"s" + p.key} className="rm-psplit" role="separator" aria-orientation="vertical" aria-label="Resize the pages"
-                    onPointerDown={(e) => dragSplit(e, i - 1)} onDoubleClick={() => setWidths(panes.map(() => 1))} title="Drag to resize · double-click for equal widths" />,
-                  <section key={p.key} className={"rm-pane" + (p.key === activeKey && many ? " active" : "") + (p.read ? " read" : "") + (theirsHere ? " theirs" : "")}
+                return (
+                  <Fragment key={p.key}>
+                  {i > 0 && <div className="rm-psplit" role="separator" aria-orientation="vertical" aria-label="Resize the pages"
+                    onPointerDown={(e) => dragSplit(e, i - 1)} onDoubleClick={() => setWidths(panes.map(() => 1))} title="Drag to resize · double-click for equal widths" />}
+                  <section className={"rm-pane" + (p.key === activeKey && many ? " active" : "") + (p.read ? " read" : "") + (theirsHere ? " theirs" : "")}
                     style={{ flex: `${widths[i] ?? 1} 1 0` }}
                     onPointerDown={() => { if (!p.read) activate(p.key); }}>
                     {showHead && (
                       <div className="rm-phead">
-                        <span className={theirsHere ? "rm-acc2" : "rm-acc"}>{theirsHere ? "THEIRS" : p.read ? "READ" : "FILE"}</span>
+                        <span className={theirsHere ? "rm-acc2" : "rm-acc"}>{theirsHere ? (meta?.source === "library" || meta?.source === "caselist" ? "CARD" : "THEIRS") : p.read ? "READ" : "FILE"}</span>
                         <select className="rm-psel" value={p.fileId} onChange={(e) => void setPaneFile(p.key, e.target.value)} aria-label="What this page shows">
                           <optgroup label="Your files">{files.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
                           {!!theirs.length && <optgroup label="Their docs">{theirs.map((m) => <option key={m.id} value={THEIRS + m.id}>{m.name}</option>)}</optgroup>}
@@ -1866,8 +1946,9 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
                         <div ref={mountFor(p.key)} />
                       </div>
                     </div>
-                  </section>,
-                ];
+                  </section>
+                  </Fragment>
+                );
               })}
             </div>
 

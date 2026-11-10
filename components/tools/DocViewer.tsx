@@ -45,7 +45,7 @@ const kindOf = (name: string, type = ""): DocKind => {
 };
 const when = (t: number) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-const SOURCE = { room: "Partner", speechdrop: "SpeechDrop", file: "File", paste: "Pasted" } as const;
+const SOURCE = { room: "Partner", speechdrop: "SpeechDrop", file: "File", paste: "Pasted", library: "Library", caselist: "Caselist" } as const;
 
 export default function DocViewer({ owner, me, room, sd }: { owner?: string; me?: string; room?: string; sd?: string }) {
   const root = useRef<HTMLDivElement>(null);
