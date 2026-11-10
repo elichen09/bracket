@@ -17,11 +17,11 @@ export default function LoginPage() {
           </div>
           <div className="auth-side">
             <div className="auth-copy">
-              <p className="crumb mono reveal">Members only</p>
-              <h1 className="reveal">One bracket.<br /><em>Per person.</em></h1>
+              <p className="crumb mono reveal">Your account</p>
+              <h1 className="reveal">Your files.<br /><em>Your keys.</em></h1>
               <p className="prose reveal">
-                An account ties your picks to you: one bracket per tournament, scored on the same
-                leaderboard as everyone else, and a dossier on every team the moment you click it.
+                An account keeps your files, your library and your shortcuts apart from anyone else&apos;s on this
+                computer — and it is how a partner you send a link to gets into the same doc as you.
               </p>
             </div>
             <Suspense fallback={null}>

@@ -1,43 +1,43 @@
 # The Break
 
-Bracket pools for debate elimination rounds. Fill in a Tabroom elim bracket, lock
-it, and it scores itself as results post — a March-Madness-style pool with a
-leaderboard per tournament. Built with Next.js + Supabase; deploys to Vercel (or
-anywhere that runs Next).
+Tools for a debate round, in one window. Built with Next.js + Supabase; deploys
+to Vercel (or anywhere that runs Next).
 
-- **Accounts.** The landing page is public; everything else needs a sign-in
-  (email + password, no confirmation email). Each account gets **one bracket per
-  tournament** — enforced by the API and a unique index.
-- **Team dossiers.** Click any team in a bracket (or the ◔ that appears on a
-  pickable slot) for its Tabroom record, visualised: prelim form, speaker points
-  round by round, side balance, strength of schedule, elim ballots, where it sits in
-  the whole field, the judges it has drawn, and how this pool rates it.
-- **Multiple tournaments**, each with its own bracket, pool and leaderboard.
-- **Share by link** — each bracket has a short 5-character id (no long share codes).
-- **Lock** your bracket, or let each match lock itself when its result lands.
-- **Auto-updating** results pulled from Tabroom on a schedule.
-- **You add tournaments** from `/new` (guarded by an admin key).
+- **Round Magic** (`/tools/magic`) — cut cards by key, search your library and
+  this season's openCaselist as you type, build the speech doc (alone, or with
+  your partner in a room), open the other team's docs off SpeechDrop, read it
+  back timed. Any file can be **shared by link**: whoever opens the link edits
+  it with you, live, the way a Google Doc works.
+- **Flow** and **Doc flow** — flow the round on a grid or in a document, with
+  your partner in the same flow.
+- **Past flows**, **Split screen**, and a **Tutorial** that explains all of it.
 
-Scoring: points double each round so every round is worth the same total, plus an
-upset bonus of 1 point per N seeds of gap (4 in small fields, 8 in fields of 64+),
-capped at double the round value. Rounds already decided before a tournament is
-added don't count. Full explanation lives at `/about`.
+Everything a tool makes is kept in the browser it was made in (IndexedDB and
+localStorage, apart per account). The server holds accounts, the weekly
+caselist index, and — only for a file someone has shared — that file.
+
+The front page is public; everything else needs a sign-in (email + password,
+no confirmation email). The tools themselves open with the admin key, except
+for a link someone was sent: a room, a SpeechDrop, or a shared file.
 
 ---
 
 ## 1. Create the Supabase project
 
 1. Make a project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run `supabase/schema.sql`, then `supabase/seed.sql`
-   (the seed loads the two tournaments already tracked — delete those rows if you
-   want to start clean). **Already running an older copy?** Run
-   `supabase/migrations/002_accounts_and_stats.sql` (accounts) and
-   `supabase/migrations/003_career_cache.sql` (career cache) instead.
+2. In **SQL Editor**, run `supabase/schema.sql`. (The schema still carries the
+   tables of the bracket pools this site used to be; the caselist search reads
+   the team ratings in them to put the strongest teams first, and nothing else
+   uses them.)
 3. In **Authentication → Providers**, leave Email enabled. Accounts are created
    server-side with the service role and auto-confirmed, so the confirmation-email
    setting doesn't matter and Supabase's mail rate limits never bite.
 4. From **Project Settings → API**, copy the Project URL, the `anon` public key,
    and the `service_role` secret key.
+
+Two private Storage buckets are made by the site the first time they are
+needed: `caselist` (the weekly tag indexes) and `shared-docs` (files shared by
+link).
 
 ## 2. Configure environment
 
@@ -46,11 +46,11 @@ Copy `.env.example` to `.env.local` and fill it in:
 | var | what it is |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key (browser, read-only) |
-| `SUPABASE_SERVICE_ROLE_KEY` | service role key (server only — all writes) |
-| `ADMIN_KEY` | passphrase required to add tournaments at `/new` |
-| `UPDATE_SECRET` | shared secret the scheduled updater must send |
-| `TABROOM_USERNAME` / `TABROOM_PASSWORD` | a Tabroom account (results pages need a login) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key (browser) |
+| `SUPABASE_SERVICE_ROLE_KEY` | service role key (server only) |
+| `ADMIN_KEY` | passphrase that opens the tools |
+| `UPDATE_SECRET` | shared secret the caselist indexer must send |
+| `TABROOM_USERNAME` / `TABROOM_PASSWORD` | a Tabroom account — openCaselist signs in with it |
 
 The `NEXT_PUBLIC_*` values are the only ones shipped to the browser. Everything
 else stays server-side.
@@ -68,91 +68,21 @@ npm run dev        # http://localhost:3000
    [vercel.com/new](https://vercel.com/new).
 2. Add all the env vars above in **Project → Settings → Environment Variables**.
 3. Deploy.
-4. Results update hourly through the included GitHub Action
-   (`.github/workflows/update.yml`), since Vercel's Hobby plan only allows daily
-   crons. In the GitHub repo, add **Settings → Secrets and variables → Actions**
-   secrets `SITE_URL` (your deployed URL) and `UPDATE_SECRET` (same value as the
-   app's env var), and it curls the updater every hour.
-
-Admins can also use the "Admin: force update" button on the home page, or
-trigger a refresh by hand:
-
-```bash
-curl -X POST https://YOUR-SITE/api/update -H "x-update-secret: YOUR_UPDATE_SECRET"
-```
-
-## Team statistics
-
-The dossier is built from Tabroom's public REST API (`api.tabroom.com/v1`) — no
-login needed: the event's field, prelim seeds, speaker awards, final places, and the
-per-entry `records` document (every round with side, opponent, ballots, points and
-judges). Documents are cached in memory per server instance (5 minutes while a
-tournament is live, an hour once it's complete) so a busy pool page stays cheap for
-Tabroom. `GET /api/stats/:tournament?code=Emory%20GY` returns the compiled shape.
-
-## Careers (previous seasons)
-
-Every dossier ends with each debater's full Tabroom record: every tournament,
-season by season, with partners, prelim and elim records, deepest elim round,
-titles, speaker averages, and past meetings against teams in the current bracket.
-It comes from Tabroom's per-student results page (`team_results.mhtml?id1=…`), which
-needs a login — the app uses the same `TABROOM_USERNAME` account as the updater —
-and is cached for 12 hours in `student_records`
-(`supabase/migrations/003_career_cache.sql`; optional, memory cache otherwise).
-
-## Adding a tournament
-
-Open `/new`, enter the admin key, and paste the Tabroom **bracket** link
-(`…/bracket.mhtml?tourn_id=…&result_id=…`). The updater finds that event's elim
-rounds on Tabroom's API by itself and walks forward from the first one, so the
-first elim round's **results** link (`…/round_results.mhtml?…&round_id=…`) is only
-a fallback for the rare event whose rounds it can't work out. The bracket fills
-in on the next update, or paste the seeded team list to open it for picks
-immediately.
-
-## How results come in
-
-`/api/update` logs into Tabroom, and for each unfinished tournament:
-
-- pulls the opening-round bracket if it's still empty;
-- finds the event's first elim round on Tabroom's API when no `round_id` is known
-  yet, then reads each round's results page walking forward from the last known
-  one, matching pairings against the bracket (side columns may be labelled
-  Aff/Neg, Pro/Con or Gov/Opp);
-- records the winner and ballot count per match;
-- infers advances for closeouts / undecided matches from the next round's
-  pairings (marked `ADV`, never guessed);
-- sets the tournament's status and, when the final is in, marks it complete.
-
-It never touches anyone's picks.
-
-## Data model
-
-- `tournaments` — one row per tournament (bracket, results, status, Tabroom ids).
-- `entries` — one bracket per person per tournament; carries a private `token`
-  that proves ownership for edits. The browser reads the `entries_public` view,
-  which omits the token.
-
-Row-level security lets the browser only read; every write goes through the API
-routes with the service-role key.
+4. The caselist index is rebuilt by the included GitHub Action
+   (`.github/workflows/caselist-index.yml`), daily, when openCaselist's weekly
+   archive is newer than the index. In the GitHub repo, add **Settings → Secrets
+   and variables → Actions** secrets `SITE_URL` (your deployed URL) and
+   `UPDATE_SECRET` (same value as the app's env var).
 
 ## Layout
 
 ```
-app/
-  page.tsx            home — tournament index
-  t/[id]/page.tsx     one tournament: bracket, pool, leaderboard, results
-  new/page.tsx        add a tournament (admin-key gated)
-  about/page.tsx      scoring explained
-  api/
-    entries/          create + edit brackets (token-checked)
-    tournaments/      add a tournament (admin-key)
-    update/           the Tabroom results updater (secret-gated, cron)
-lib/
-  bracket.ts          scoring + bracket engine (shared client/server)
-  tabroom.ts          Tabroom session + result parsing/sync
-  useBreak.ts         client data hooks (realtime + polling)
-supabase/
-  schema.sql          tables, view, RLS, realtime
-  seed.sql            the two tournaments already tracked
+app/                 the front page, sign-in, and a page per tool under app/tools
+app/api/tools/       caselist (index, cards, ranks), speechdrop, share
+components/tools/    the tools: RoundMagic, Flow, DocFlow, … and their stylesheets
+lib/cutter/          Round Magic's files, keys, commands, and sharing a file
+lib/evidence/        the library and the speech doc (the engine Round Magic mounts)
+lib/caselist/        the caselist index: loading, searching (in a worker), polarity
+lib/flow, lib/docflow  the two flows, and the rooms they share
+scripts/             the caselist indexer the GitHub Action runs
 ```

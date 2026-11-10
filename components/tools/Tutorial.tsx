@@ -66,9 +66,10 @@ const SECTIONS: Section[] = [
     steps: [
       <><b>EDIT</b> is just the file. <b>SPLIT</b> ({K("Alt+B")}) puts the speech doc beside it, <b>SPEECH</b> ({K("Alt+Shift+B")}) is the speech doc alone, the whole width, with the ribbon and outline working in it, and <b>READ</b> ({K("Alt+Shift+R")}) shows the speech doc or the file the way you&apos;ll read it: tags big, highlighted words large and the rest small and grey (or hidden), with how long it takes at your pace and each card&apos;s time down the side. {K("Esc")} goes back.</>,
       <>Put the cursor in a card and press {K("Alt+Enter")} to <b>send</b> it to the end of the speech doc. On a block heading, the whole block goes. The SPLIT button blinks when something lands there.</>,
-      <>{K("/")} (or {K("Alt+/")} while typing) jumps to the library search. Type a trigger, move with {K("↑ ↓")}, and {K("Enter")} sends to the speech doc. Switch <b>Library</b> to <b>Caselist</b> to search this year&apos;s open caselist.</>,
-      <>The cursor in the speech doc? The ribbon, the outline and the status line follow it there: cut, highlight, reformat and reorder the speech doc with the same keys.</>,
-      <><b>Room</b> (top right) shares the speech doc with your partner. You both write it, and every card either of you sends lands in it.</>,
+      <>{K("/")} (or {K("Alt+/")} while typing) jumps to the library search. Type a trigger, move with {K("↑ ↓")}, and {K("Enter")} sends to the speech doc — {K("Shift+Enter")} puts the card in the file you&apos;re in instead, and {K("Ctrl+Enter")} opens it as a page of its own (a card from one of your files opens that file, at the card). Switch <b>Library</b> to <b>Caselist</b> to search this year&apos;s open caselist. The search knows a denial from a claim: &ldquo;econ decline doesn&apos;t cause war&rdquo; finds the cards that say it doesn&apos;t, and leaves out the ones that say it does.</>,
+      <>The speech doc is a page like any other. With the cursor in it, the ribbon, the outline and the status line follow it there: cut, highlight, reformat and reorder it with the same keys. <b>OUTLINE</b> in its head shows it as a list in the side — click a heading to go there, drag one to move it and everything under it, × to take it out — and <b>DOC</b> has Format, Copy, .docx, SpeechDrop, Rebuild and Clear.</>,
+      <><b>Share</b> (top right) gives the file you&apos;re in a link. Whoever is signed in and opens it has the file in their own list and is in it with you — both typing at once, each other&apos;s cursor in view, saved for both — the way a Google Doc works. Stop sharing and the link stops; everyone keeps their copy.</>,
+      <><b>Room</b> (beside it) shares the speech doc with your partner. You both write it, and every card either of you sends lands in it.</>,
       <>The status line shows where you are (pocket › hat › block › tag), which card, and how many words you&apos;ll read and how long they take. {K("Alt+T")} opens the <b>speech timer</b>.</>,
       <>Room to work: the chevron in a group&apos;s corner folds it into one button (its buttons open under it), and {K("Alt+M")} folds the whole ribbon to one line. Drag the side&apos;s edge (or its ⇔ button) to widen it for the search.</>,
       <><b>Spelling</b> is the browser&apos;s own checker: right-click a red underline for what it should be, or to add the word to the dictionary. It checks what you write (tags, analytics, headings, notes) and leaves the cards you cut alone; {K("Alt+K")} (or More › Spelling) switches it to everything, or off.</>,
@@ -100,8 +101,8 @@ const SECTIONS: Section[] = [
     steps: [
       <>Open your evidence doc in Google Docs, press {K("Ctrl+A")} then {K("Ctrl+C")}, click <b>More › Import</b> in Round Magic and paste.</>,
       <>Press {K("/")} and type a trigger (&ldquo;econ&rdquo;, &ldquo;AT: heg&rdquo;). Move with {K("↑ ↓")}. {K("→")} opens a block&apos;s arguments so you can send just one.</>,
-      <>Press {K("Enter")} to send. The card is copied and goes into the <b>speech doc</b> (SPLIT shows it), and its block and tag show in the speech doc&apos;s <b>LIST</b>. Cards from the same block merge into one block. Delete a card from the doc and it's gone for good; sending more never brings it back.</>,
-      <>Click <b>Format</b> above the speech doc. It asks for your code, the speech and the tournament once, then titles the doc, can delete analytics (and put them back), makes highlighting one colour (grey stays grey), numbers responses (or doesn&apos;t), and adds the speech to each heading.</>,
+      <>Press {K("Enter")} to send. The card is copied and goes into the <b>speech doc</b> (SPLIT shows it), and its block and tag show in the speech doc&apos;s <b>OUTLINE</b>. Cards from the same block merge into one block. Delete a card from the doc and it's gone for good; sending more never brings it back.</>,
+      <>Click <b>DOC › Format for sending</b> in the speech doc&apos;s head. It asks for your code, the speech and the tournament once, then titles the doc, can delete analytics (and put them back), makes highlighting one colour (grey stays grey), numbers responses (or doesn&apos;t), and adds the speech to each heading.</>,
       <>To search the open caselist, switch <b>Library</b> to <b>Caselist</b>. It searches this year&apos;s cards by their tags, the blocks they sit in and their highlighted words, with the strongest teams&apos; cards first.</>,
       <>Click <b>Room</b> to share the speech doc with your partner. It&apos;s the same code as your flow room.</>,
     ],
@@ -115,8 +116,8 @@ const SECTIONS: Section[] = [
     ],
     tips: [
       <><b>+ Analytic</b> adds a tagline you write yourself under the last card.</>,
-      <>The speech doc&apos;s <b>LIST</b> is what has been sent to it, with each block&apos;s outline. Click one to jump there.</>,
-      <>The <b>Read</b> tab in the list shows the speech doc as you&apos;ll read it: only what&apos;s highlighted. Round Magic&apos;s READ mode does the same, timed.</>,
+      <>The speech doc&apos;s <b>OUTLINE</b> is what is in it: every block and tag. Click one to jump there, drag it to move it, × to take it out.</>,
+      <>Round Magic&apos;s <b>READ</b> mode shows the speech doc as you&apos;ll read it — only what&apos;s highlighted — timed.</>,
     ],
   },
   {

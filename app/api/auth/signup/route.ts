@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const name = String(body?.name || "").trim().slice(0, 24);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "that email doesn't look right" }, { status: 400 });
   if (password.length < 8) return NextResponse.json({ error: "use at least 8 characters for the password" }, { status: 400 });
-  if (!name) return NextResponse.json({ error: "pick a display name — it's what the leaderboard shows" }, { status: 400 });
+  if (!name) return NextResponse.json({ error: "pick a display name — it's what your partner sees over your cursor" }, { status: 400 });
 
   const db = supabaseAdmin();
   const { error } = await db.auth.admin.createUser({

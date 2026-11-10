@@ -19,10 +19,10 @@ export default function Tools() {
           {!admin ? <AdminGate what="the tools" /> : (
             <>
               <div className="thead">
-                <p className="crumb mono reveal"><Link href="/">← Tournaments</Link></p>
+                <p className="crumb mono reveal"><Link href="/">← The Break</Link></p>
                 <h1 className="reveal">Tools</h1>
                 <p className="hint reveal" style={{ marginTop: 0 }}>
-                  Workbenches, not part of any pool. Each runs on the admin key and keeps its own data.
+                  Each is a workbench of its own and keeps its own data in this browser. Start with the tutorial, or go straight to Round Magic.
                 </p>
               </div>
 

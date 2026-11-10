@@ -1,10 +1,9 @@
 /**
  * The tools, as a list.
  *
- * These are not part of the pool. A bracket pool is for everyone in it; a tool
- * is for whoever runs the thing, and each one is a workbench of its own —
- * self-contained, admin-keyed, and added to over time. Keeping them in a list
- * means the suite page never has to be edited to gain one.
+ * The tools are the site. Each one is a workbench of its own — self-contained,
+ * admin-keyed, and added to over time. Keeping them in a list means the front
+ * page and the suite page never have to be edited to gain one.
  */
 
 export interface Tool {
@@ -35,9 +34,9 @@ export const TOOLS: Tool[] = [
     about:
       "The card cutter, Evidence and the Doc viewer as one tool. Your files in the middle, cut by key (Ctrl+Alt cut, Ctrl+N shrink, " +
       "Alt+Z highlight, Alt+1–4 the headings); the speech doc beside them in Split, where Alt+Enter sends the card you are in and " +
-      "your partner can write with you; the library and the caselist down the side, Enter to send; the other team's docs off " +
+      "your partner can write with you; any file shared by a link, edited together like a Google Doc; the library and the caselist down the side, Enter to send; the other team's docs off " +
       "SpeechDrop opened in the same editor to rehighlight; and Read mode, the speech as you will read it, timed.",
-    storage: "This browser, kept apart per account — IndexedDB. Your files, your library, their docs; nothing is uploaded. A room passes the speech doc straight between browsers.",
+    storage: "This browser, kept apart per account — IndexedDB. Your files, your library, their docs; nothing is uploaded unless you share it. A room passes the speech doc straight between browsers; a file you share by link is kept on the site so the link opens it.",
   },
   {
     slug: "split",

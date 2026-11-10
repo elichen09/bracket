@@ -46,7 +46,7 @@ export default function AuthForm() {
       </div>
       {mode === "up" && (
         <label><span className="mono">Display name</span>
-          <input value={name} maxLength={24} autoComplete="nickname" placeholder="what the leaderboard shows" onChange={(e) => setName(e.target.value)} required />
+          <input value={name} maxLength={24} autoComplete="nickname" placeholder="what your partner sees" onChange={(e) => setName(e.target.value)} required />
         </label>
       )}
       <label><span className="mono">Email</span>
