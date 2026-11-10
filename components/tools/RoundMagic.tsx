@@ -8,7 +8,8 @@ import { DOMParser as PMParser, DOMSerializer, Fragment as PMFragment, type Node
 import { history, undo, redo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
-import { undoCommand, redoCommand } from "y-prosemirror";
+import { undoCommand, redoCommand, ySyncPlugin, yCursorPlugin, yUndoPlugin, initProseMirrorDoc, prosemirrorToYXmlFragment } from "y-prosemirror";
+import { openShare, createShare, stopShare, peekShare, shareLink, NotShared, type Shared } from "@/lib/cutter/share";
 import { schema } from "@/lib/evidence/docSchema";
 import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type CutFile } from "@/lib/cutter/store";
 import * as C from "@/lib/cutter/commands";
@@ -96,6 +97,17 @@ function brightenGreens(doc: PMNode): PMNode | null {
   });
   return tr.docChanged ? tr.doc : null;
 }
+/** A partner's caret in a shared file: a bar in their colour, their name over it. */
+function mateCaret(user: { name: string; color: string }) {
+  const el = document.createElement("span");
+  el.className = "rm-caret";
+  el.style.setProperty("--c", user.color);
+  const tag = document.createElement("span");
+  tag.className = "rm-caret-name";
+  tag.textContent = user.name;
+  el.append("\u2060", tag, "\u2060");
+  return el;
+}
 const countWords = (doc: PMNode) => (doc.textContent.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -177,10 +189,11 @@ const I = {
   menu: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>,
   fold: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>,
   unfold: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>,
+  share: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8v6M14 11h6" /></svg>,
   wide: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M3 12h18" /></svg>,
 };
 
-export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me?: string; room?: string; sd?: string }) {
+export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { owner?: string; me?: string; room?: string; sd?: string; doc?: string }) {
   const root = useRef<HTMLDivElement>(null);
   const qIn = useRef<HTMLInputElement>(null);
   const fileIn = useRef<HTMLInputElement>(null);
@@ -196,6 +209,12 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   const loaded = useRef(new Map<string, CutFile>());
   const theirMeta = useRef(new Map<string, ViewDoc>());     // a doc of theirs open in a page: its record in the viewer's store
   const dirty = useRef(new Set<string>());
+  /** The files open here that are shared: each one's live document (lib/cutter/share.ts). */
+  const shares = useRef(new Map<string, Shared>());
+  const sharing = useRef(new Map<string, Promise<Shared | null>>());
+  const [, setShareTick] = useState(0);
+  /** What a shared document calls back into, defined further down. */
+  const shareFns = useRef({ peerRenamed: (_fid: string, _t: string) => {}, unshare: (_fid: string, _why: "gone" | "stop" | "leave") => {} });
   const refCbs = useRef(new Map<string, (el: HTMLDivElement | null) => void>());
   const lastFollow = useRef(new Map<string, number>());
   /** The page being worked in. */
@@ -361,20 +380,36 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     return inSpeech.current && s && modeRef.current === "split" ? s : view.current;
   };
 
-  const makeState = useCallback((doc: PMNode, read: boolean) => EditorState.create({
-    doc,
-    plugins: [
-      history(),
-      keymap({
-        "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo,
-        "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline),
-        Enter: X.enterKeepingAnalytics,
-      }),
-      keymap(baseKeymap),
-      verbatimPlugin(read),
-      spellPlugin(spellRef.current),
-    ],
-  }), []);
+  const makeState = useCallback((doc: PMNode, read: boolean, fid?: string) => {
+    const fmt = { "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline), Enter: X.enterKeepingAnalytics };
+    const sh = fid ? shares.current.get(fid) : null;
+    if (sh) {
+      // a shared file: the page is bound to the shared document, and what it shows is that document
+      const start = initProseMirrorDoc(sh.frag, schema);
+      return EditorState.create({
+        schema, doc: start.doc,
+        plugins: [
+          ySyncPlugin(sh.frag, { mapping: start.mapping }),
+          yCursorPlugin(sh.awareness, { cursorBuilder: mateCaret, selectionBuilder: (u: { color: string }) => ({ style: `background-color: ${u.color}2e`, class: "rm-matesel" }) }),
+          yUndoPlugin(),
+          keymap({ "Mod-z": undoCommand, "Mod-y": redoCommand, "Shift-Mod-z": redoCommand, ...fmt }),
+          keymap(baseKeymap),
+          verbatimPlugin(read),
+          spellPlugin(spellRef.current),
+        ],
+      });
+    }
+    return EditorState.create({
+      doc,
+      plugins: [
+        history(),
+        keymap({ "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo, ...fmt }),
+        keymap(baseKeymap),
+        verbatimPlugin(read),
+        spellPlugin(spellRef.current),
+      ],
+    });
+  }, []);
 
   // ---- the outline and the status line follow whatever has the cursor --------------------
   // Reading a whole document for its headings and its words is not something to do on every key:
@@ -457,7 +492,8 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
             theirsChanged = true;
             continue;
           }
-          const next: CutFile = { ...base, doc: doc.toJSON(), html: toHtml(doc), cards: C.briefs(doc), words: countWords(doc), updated: Date.now() };
+          const sh = shares.current.get(fid);
+          const next: CutFile = { ...base, doc: doc.toJSON(), html: toHtml(doc), cards: C.briefs(doc), words: countWords(doc), updated: Date.now(), ...(sh ? { y: sh.snapshot() } : {}) };
           await putFile(owner, next);
           loaded.current.set(fid, next);
           setFiles((l) => [stripDoc(next), ...l.filter((x) => x.id !== fid)]);
@@ -541,7 +577,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     v.updateState(v.state.apply(tr));
     if (tr.docChanged) {
       const fid = viewFile.current.get(key);
-      for (const [k, w] of views.current) {
+      if (!(fid && shares.current.has(fid))) for (const [k, w] of views.current) {
         if (k === key || viewFile.current.get(k) !== fid) continue;
         try {
           const t = w.state.tr;
@@ -576,6 +612,50 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     return { id: fid, name: d.name, doc: null, html, cards: [], words: 0, created: d.at, updated: d.at };
   }, [owner]);
 
+  /** A shared file's live document, opened once however many pages show it. */
+  const ensureShare = useCallback((f: CutFile): Promise<Shared | null> => {
+    const fid = f.id;
+    const had = shares.current.get(fid);
+    if (had) return Promise.resolve(had);
+    let p = sharing.current.get(fid);
+    if (p) return p;
+    p = openShare(f.share!, {
+      name: me || "Partner",
+      title: () => loaded.current.get(fid)?.name || f.name,
+      seed: () => { try { return docOf(loaded.current.get(fid) || f); } catch { return null; } },
+      local: f.y || null,
+      onChange: () => setShareTick((n) => n + 1),
+      onTitle: (t) => shareFns.current.peerRenamed(fid, t),
+      onGone: () => shareFns.current.unshare(fid, "gone"),
+    }).then(async (sh) => {
+      // opened from a link before anything of it has arrived: a moment for it to
+      if (!sh.frag.length) await new Promise<void>((res) => {
+        const done = () => { clearTimeout(t); sh.ydoc.off("update", on); res(); };
+        const on = () => { if (sh.frag.length) done(); };
+        const t = setTimeout(done, 3000);
+        sh.ydoc.on("update", on);
+      });
+      if (!sh.frag.length) prosemirrorToYXmlFragment(fromHtml("<p></p>"), sh.frag);
+      shares.current.set(fid, sh);
+      setShareTick((n) => n + 1);
+      return sh;
+    }).catch((e) => {
+      if (e instanceof NotShared) shareFns.current.unshare(fid, "gone");
+      else toast("The shared doc could not be reached: " + String((e as Error)?.message || e));
+      return null;
+    }).finally(() => { sharing.current.delete(fid); });
+    sharing.current.set(fid, p);
+    return p;
+  }, [me, toast]);
+  /** Nobody's page shows it any more: out of its room (it is saved, here and there, first). */
+  const releaseShare = useCallback((fid: string) => {
+    const sh = shares.current.get(fid);
+    if (!sh || keyShowing(fid)) return;
+    shares.current.delete(fid);
+    sh.close();
+    setShareTick((n) => n + 1);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Put a file in a page: from another page that has it open (one document), or from the store. */
   const loadInto = useCallback(async (key: string, fid: string, then?: (v: EditorView) => void) => {
     const v = views.current.get(key);
@@ -593,13 +673,16 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       if (!rec) { rec = f; loaded.current.set(fid, f); }
       if (!doc) {
         doc = docOf(f);
-        const bright = brightenGreens(doc);
+        const bright = rec.share ? null : brightenGreens(doc);
         if (bright) { doc = bright; brightened = true; }
       }
     }
+    // a shared file opens onto the shared document: what is on the page is what everyone in it has
+    if (rec.share && !isTheirs(fid)) await ensureShare(rec);
     if (!views.current.has(key)) return;
-    v.updateState(makeState(doc, isRead(key)));
+    v.updateState(makeState(doc, isRead(key), fid));
     viewFile.current.set(key, fid);
+    if (was && was !== fid) releaseShare(was);
     lastFollow.current.delete(key);
     if (brightened) markDirty(fid);                           // the dark green, put right, is saved
     if (key === activeRef.current) {
@@ -608,10 +691,10 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     }
     setTick((n) => n + 1);
     if (then) requestAnimationFrame(() => then(v));
-  }, [owner, flush, makeState, syncActive, theirRecord, toast, markDirty]);
+  }, [owner, flush, makeState, syncActive, theirRecord, toast, markDirty, ensureShare, releaseShare]);
 
-  const fns = useRef({ onTr, loadInto, activate, jumpFromRead });
-  fns.current = { onTr, loadInto, activate, jumpFromRead };
+  const fns = useRef({ onTr, loadInto, activate, jumpFromRead, releaseShare });
+  fns.current = { onTr, loadInto, activate, jumpFromRead, releaseShare };
   const mountFor = useCallback((key: string) => {
     let cb = refCbs.current.get(key);
     if (cb) return cb;
@@ -644,7 +727,9 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       } else {
         const v = views.current.get(key);
         if (v) { v.destroy(); views.current.delete(key); }
+        const had = viewFile.current.get(key);
         viewFile.current.delete(key);
+        if (had) fns.current.releaseShare(had);
         lastFollow.current.delete(key);
         // forgotten only once its page is gone: forgetting it while the page lives made the next
         // draw hand React a new ref, which tore the editor down and built it again — every draw
@@ -699,11 +784,12 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   }, [setPanes, toast]);
 
   // ---- files ------------------------------------------------------------------
-  const newFile = useCallback(async (fileName: string, html = "<h4></h4><p></p>") => {
+  const newFile = useCallback(async (fileName: string, html = "<h4></h4><p></p>", share?: string) => {
     const doc = fromHtml(html);
     const f: CutFile = {
       id: newFileId(), name: fileName, doc: doc.toJSON(), html: toHtml(doc),
       cards: C.briefs(doc), words: countWords(doc), created: Date.now(), updated: Date.now(),
+      ...(share ? { share } : {}),
     };
     await putFile(owner, f);
     loaded.current.set(f.id, f);
@@ -768,6 +854,29 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     } catch { /* private */ }
   }, [panes, widths, side, activeKey, LAYOUT_KEY]);
 
+  // a shared file's link: the file is opened — made a file of yours first, if this browser has not had it before
+  const linked = useRef(false);
+  useEffect(() => {
+    if (!sharedLink || linked.current || !panes.length) return;
+    linked.current = true;
+    (async () => {
+      try {
+        let f = filesRef.current.find((x) => x.share === sharedLink) || null;
+        if (!f) {
+          const info = await peekShare(sharedLink);
+          const made = await newFile(info.title || "Shared doc", "<p></p>", sharedLink);
+          f = stripDoc(made);
+          toast(`“${made.name}”${info.owner ? ", shared by " + info.owner : ""} — it is in your files now, and you are in it together`);
+        }
+        if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+        await open(f.id, (v) => v.focus());
+      } catch (e) {
+        toast(e instanceof NotShared ? "That link's doc is not shared any more" : "The shared doc would not open: " + String((e as Error)?.message || e));
+      }
+      try { const u = new URL(location.href); u.searchParams.delete("doc"); window.history.replaceState(null, "", u.pathname + u.search); } catch { /* the address keeps it */ }
+    })();
+  }, [sharedLink, panes.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const rename = useCallback(async (n: string) => {
     const fid = viewFile.current.get(activeRef.current);
     const f = fid ? loaded.current.get(fid) : null;
@@ -775,6 +884,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     if (!f || !fid || !clean || clean === f.name) { setName(f?.name || ""); return; }
     loaded.current.set(fid, { ...f, name: clean });
     setName(clean);
+    shares.current.get(fid)?.rename(clean);
     if (isTheirs(fid)) setTheirs((l) => l.map((x) => (THEIRS + x.id === fid ? { ...x, name: clean } : x)));
     else setFiles((l) => l.map((x) => (x.id === fid ? { ...x, name: clean } : x)));
     dirty.current.add(fid);
@@ -792,6 +902,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
       const f = loaded.current.get(id);
       if (!f || f.name === clean) return;
       loaded.current.set(id, { ...f, name: clean });
+      shares.current.get(id)?.rename(clean);
       setFiles((l) => l.map((x) => (x.id === id ? { ...x, name: clean } : x)));
       if (viewFile.current.get(activeRef.current) === id) setName(clean);
       dirty.current.add(id);
@@ -811,6 +922,8 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     const f = filesRef.current.find((x) => x.id === id);
     if (!f || !window.confirm(`Delete “${f.name}”? Its cards leave the library too.`)) return;
     dirty.current.delete(id);
+    const sh = shares.current.get(id);
+    if (sh) { shares.current.delete(id); sh.close(); }
     await dropFile(owner, id);
     loaded.current.delete(id);
     bus.current?.post({ kind: "cutter-changed", id });
@@ -821,6 +934,80 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
     for (const p of panesRef.current) if (p.fileId === id) await setPaneFile(p.key, fallback);
     toast(`Deleted “${f.name}”`);
   }, [owner, newFile, setPaneFile, toast, setFiles]);
+
+  // ---- sharing a file: a link, and everyone with it in the same document --------------
+  const copyLink = useCallback(async (id: string) => {
+    try { await navigator.clipboard.writeText(shareLink(id)); toast("Link copied — whoever opens it is in the file with you"); }
+    catch { toast("The browser would not copy it — the link is in the Share menu to copy by hand"); }
+  }, [toast]);
+  const startShare = useCallback(async (fid: string) => {
+    const k = keyShowing(fid);
+    const v = k ? views.current.get(k) : null;
+    const base = loaded.current.get(fid);
+    if (!v || !base || isTheirs(fid)) return;
+    if (base.share) { void copyLink(base.share); return; }
+    setBusy(true);
+    try {
+      await flush();
+      const id = await createShare(base.name);
+      const doc = v.state.doc;
+      const sh = await openShare(id, {
+        name: me || "Partner", first: true,
+        title: () => loaded.current.get(fid)?.name || base.name,
+        seed: () => doc,
+        onChange: () => setShareTick((n) => n + 1),
+        onTitle: (t) => shareFns.current.peerRenamed(fid, t),
+        onGone: () => shareFns.current.unshare(fid, "gone"),
+      });
+      shares.current.set(fid, sh);
+      const next: CutFile = { ...(loaded.current.get(fid) || base), share: id, y: sh.snapshot() };
+      loaded.current.set(fid, next);
+      await putFile(owner, next);
+      setFiles((l) => l.map((x) => (x.id === fid ? { ...x, share: id } : x)));
+      if (viewFile.current.get(activeRef.current) === fid) setCur(next);
+      // every page showing it, onto the shared document
+      for (const [k2, f2] of viewFile.current) { if (f2 !== fid) continue; const w = views.current.get(k2); if (w) w.updateState(makeState(doc, isRead(k2), fid)); }
+      setShareTick((n) => n + 1);
+      await copyLink(id);
+    } catch (e) {
+      toast("It could not be shared: " + String((e as Error)?.message || e));
+    } finally { setBusy(false); }
+  }, [owner, me, flush, makeState, copyLink, setFiles, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** A shared file made a file of your own again: its owner stopping the sharing, you leaving it, or it having been stopped. */
+  const unshare = useCallback(async (fid: string, why: "gone" | "stop" | "leave") => {
+    const rec = loaded.current.get(fid) || (await getFile(owner, fid)) || null;
+    if (!rec?.share) return;
+    if (why === "stop") { try { await stopShare(rec.share); } catch (e) { toast("It could not be stopped: " + String((e as Error)?.message || e)); return; } }
+    const sh = shares.current.get(fid);
+    const k = keyShowing(fid);
+    const doc = k ? views.current.get(k)!.state.doc : null;
+    if (sh) { shares.current.delete(fid); sh.close(); }
+    const { share: _s, y: _y, ...rest } = rec;
+    const next: CutFile = doc ? { ...rest, doc: doc.toJSON(), html: toHtml(doc), cards: C.briefs(doc), words: countWords(doc), updated: Date.now() } : rest;
+    loaded.current.set(fid, next);
+    await putFile(owner, next);
+    setFiles((l) => l.map((x) => { if (x.id !== fid) return x; const { share: _x, ...m } = x; return m; }));
+    if (viewFile.current.get(activeRef.current) === fid) setCur(next);
+    // the pages showing it: the same words, in a document of their own again
+    if (doc) for (const [k2, f2] of viewFile.current) { if (f2 !== fid) continue; const w = views.current.get(k2); if (w) w.updateState(makeState(doc, isRead(k2))); }
+    setShareTick((n) => n + 1);
+    toast(why === "stop" ? `“${rec.name}” is not shared any more — everyone keeps the copy they had`
+      : why === "leave" ? `You left “${rec.name}” — it is a file of your own now`
+        : `“${rec.name}” is not shared any more — this is your own copy of it`);
+  }, [owner, makeState, setFiles, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  const peerRenamed = useCallback((fid: string, t: string) => {
+    const f = loaded.current.get(fid);
+    const clean = t.replace(/\s+/g, " ").trim();
+    if (!f || !clean || clean === f.name) return;
+    loaded.current.set(fid, { ...f, name: clean });
+    setFiles((l) => l.map((x) => (x.id === fid ? { ...x, name: clean } : x)));
+    if (viewFile.current.get(activeRef.current) === fid) setName(clean);
+    markDirty(fid);
+  }, [setFiles, markDirty]);
+  shareFns.current = { peerRenamed, unshare: (fid, why) => { void unshare(fid, why); } };
+  // leaving the tool leaves every shared file's room
+  useEffect(() => () => { for (const sh of shares.current.values()) sh.close(); shares.current.clear(); }, []);
 
   // ---- docs of theirs ------------------------------------------------------------
   /** Keep a doc of theirs and open it in the page being worked in. */
@@ -1311,7 +1498,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   const openMenu = (id: string, e: React.MouseEvent<HTMLElement>, anchor?: HTMLElement | null) => {
     if (menu?.id === id) { setMenu(null); return; }
     const r = (anchor || e.currentTarget).getBoundingClientRect();
-    const w = id === "pages" || id === "palette" ? 330 : id.startsWith("g:") ? 360 : 240;
+    const w = id === "pages" || id === "palette" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
     setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: r.bottom + 6 });
   };
 
@@ -1556,6 +1743,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
   const activeRead = !!activePane?.read;
   const many = panes.length > 1;
   const curTheirs = !!cur && isTheirs(cur.id);
+  const curShare = cur?.share && !curTheirs ? shares.current.get(cur.id) || null : null;
   const theirFor = (fid: string) => theirMeta.current.get(fid);
   const olRows = heads.map((h, i) => ({ h, i })).filter(({ h }) => h.level <= depth && (!olFilter.trim() || h.text.toLowerCase().includes(olFilter.trim().toLowerCase())));
   // where the cursor is: pocket › hat › block › tag
@@ -1703,6 +1891,11 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
               <button type="button" aria-pressed={mode === "speech"} onClick={() => setMode("speech")} data-tip={tip("mode-speech", "Just the speech doc")}>SPEECH</button>
               <button type="button" aria-pressed={mode === "read"} onClick={() => setMode("read")} data-tip={tip("mode-read", "Read it, timed")}>READ</button>
             </div>
+            <button type="button" className={"rm-b rm-share rm-menubtn" + (cur?.share && !curTheirs ? " on" : "")} aria-expanded={menu?.id === "share"}
+              data-tip={cur?.share ? "Shared — the link, and who is in it" : "Share this file: a link your partner opens to edit it with you"} aria-label="Share this file"
+              onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("share", e)}>
+              {I.share}<span>{cur?.share && !curTheirs ? (curShare?.mates.length ? `Shared · ${curShare.mates.length + 1}` : "Shared") : "Share"}</span>
+            </button>
             <button type="button" className="rm-b rm-room" data-act="room" data-tip="Room — share the speech doc with your partner">
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
@@ -1811,7 +2004,7 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
                         onClick={() => { if (cur?.id !== f.id) void open(f.id, (v) => { if (!renamingRef.current) v.focus(); }); }}
                         onDoubleClick={(e) => { e.preventDefault(); setRenaming(f.id); }} title="Open · double-click to rename">
                         <b>{f.name}</b>
-                        <small>{f.cards.length} CARD{f.cards.length === 1 ? "" : "S"} · {when(f.updated).toUpperCase()}</small>
+                        <small>{f.cards.length} CARD{f.cards.length === 1 ? "" : "S"} · {when(f.updated).toUpperCase()}{f.share && <i className="rm-shared"> · SHARED</i>}</small>
                       </button>
                     )}
                     {renaming !== f.id && (
@@ -1916,7 +2109,8 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
                 const words = p.read && v ? readWords(v.state.doc) : 0;
                 const theirsHere = isTheirs(p.fileId);
                 const meta = theirsHere ? theirFor(p.fileId) : null;
-                const showHead = many || p.read || theirsHere || mode === "split";
+                const live = shares.current.get(p.fileId) || null;
+                const showHead = many || p.read || theirsHere || mode === "split" || !!live;
                 const pdf = pdfs[p.fileId];
                 return (
                   <Fragment key={p.key}>
@@ -1933,6 +2127,13 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
                           {!!theirs.length && <optgroup label="Their docs">{theirs.map((m) => <option key={m.id} value={THEIRS + m.id}>{m.name}</option>)}</optgroup>}
                         </select>
                         {meta && <span className="rm-pmeta">{(SOURCE[meta.source] || meta.source).toUpperCase()}{meta.by ? " · " + meta.by.toUpperCase() : ""}</span>}
+                        {live && (
+                          <span className="rm-mates" title={live.mates.length ? "In it with you: " + live.mates.map((m) => m.name).join(", ") : live.status === "error" ? "Not connected — your edits are kept and go when it is" : "Shared — nobody else is in it right now"}>
+                            <span className={"rm-live " + live.status} />
+                            {live.mates.slice(0, 4).map((m) => <i key={m.client} style={{ background: m.color }}>{(m.name[0] || "?").toUpperCase()}</i>)}
+                            {!live.mates.length && <em>SHARED</em>}
+                          </span>
+                        )}
                         {!pdf && (
                           <span className="rm-pmode" role="group" aria-label="Edit or read">
                             <button type="button" aria-pressed={!p.read} onClick={() => setPaneRead(p.key, false)}>EDIT</button>
@@ -2057,6 +2258,38 @@ export default function RoundMagic({ owner, me, room, sd }: { owner?: string; me
             </button>
           ))}
           <div className="rm-mnote">The page stays white, the way a cut file is read. Kept in this browser.</div>
+        </div>
+      )}
+      {menu?.id === "share" && (
+        <div className="rm-menu wide rm-sharemenu" style={{ left: menu.x, top: menu.y }} role="dialog" aria-label="Share">
+          <h4>THIS FILE</h4>
+          {!cur || curTheirs ? (
+            <div className="rm-mnote">{cur ? "A doc of theirs is kept apart from your files — Keep as mine makes it one, and then it can be shared." : "Open a file to share it."}</div>
+          ) : !cur.share ? (
+            <>
+              <div className="rm-mnote top">Share “{cur.name}” and it has a link. Whoever is signed in and opens the link is in the file with you: you both type in it at once, see each other&apos;s cursor, and it is there for each of you whether or not the other is.</div>
+              <button type="button" className="rm-mb pri" disabled={busy} onClick={() => { void startShare(cur.id); }}>{busy ? "Sharing…" : "Share it, and copy the link"}</button>
+            </>
+          ) : (
+            <>
+              <label className="rm-linkrow">
+                <input readOnly value={shareLink(cur.share)} onFocus={(e) => e.currentTarget.select()} aria-label="The link" spellCheck={false} />
+                <button type="button" onClick={() => void copyLink(cur.share!)}>COPY</button>
+              </label>
+              <div className="rm-who">
+                <span><i style={{ background: "var(--acc)" }}>{(me?.[0] || "Y").toUpperCase()}</i>You</span>
+                {(curShare?.mates || []).map((m) => <span key={m.client}><i style={{ background: m.color }}>{(m.name[0] || "?").toUpperCase()}</i>{m.name}</span>)}
+                {!curShare?.mates.length && <em>{curShare?.status === "error" ? "Not connected right now" : "Nobody else is in it right now"}</em>}
+              </div>
+              <div className="rm-mnote">Anyone signed in with the link can open and edit it. It saves by itself, for everyone.</div>
+              {curShare?.mine
+                ? <button type="button" className="rm-mb" onClick={() => { setMenu(null); if (window.confirm(`Stop sharing “${cur.name}”? The link stops working; everyone keeps the copy they have.`)) void unshare(cur.id, "stop"); }}>Stop sharing</button>
+                : <button type="button" className="rm-mb" onClick={() => { setMenu(null); void unshare(cur.id, "leave"); }}>Leave it — keep a copy of my own</button>}
+            </>
+          )}
+          <div className="rm-sep" />
+          <h4>THE SPEECH DOC</h4>
+          <button type="button" className="rm-mb" data-act="room" onClick={() => setMenu(null)}>Room — one speech doc for you and your partner…</button>
         </div>
       )}
       {menu?.id === "speech" && (

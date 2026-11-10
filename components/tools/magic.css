@@ -601,3 +601,35 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
   .rm-sgrab { display: none; }
   .rm [data-tip]:hover::after { display: none; }
 }
+
+/* ------------------------------------------------------------ a shared file */
+.rm-share { font: 500 11px var(--rm-mono); letter-spacing: .08em; gap: 6px; }
+.rm-share.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.rm-share.on:hover { background: var(--accD); border-color: var(--accD); }
+.rm-shared { font-style: normal; color: var(--acc); }
+.rm-mates { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.rm-mates i { width: 18px; height: 18px; border-radius: 50% !important; display: grid; place-items: center; font: 600 10px var(--rm-sans); font-style: normal; letter-spacing: 0; color: #fff; }
+.rm-mates em { font-style: normal; color: var(--accD); }
+.rm-live { width: 7px; height: 7px; border-radius: 50% !important; background: #b5b5b5; margin-right: 2px; }
+.rm-live.live { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, .18); }
+.rm-live.alone { background: #22c55e; opacity: .55; }
+.rm-live.error { background: #dc2626; }
+.rm-live.joining { background: #e8b84a; }
+.rm-sharemenu .rm-mnote.top { margin: 0 0 8px; padding-top: 0; border-top: 0; }
+.rm-mb.pri { justify-content: center; background: var(--acc); color: #fff; font-weight: 600; }
+.rm-mb.pri:hover { background: var(--accD); }
+.rm-mb.pri:disabled { opacity: .6; cursor: default; }
+.rm-linkrow { display: flex; gap: 0; margin: 2px 0 8px; }
+.rm-linkrow input { flex: 1; min-width: 0; height: 30px; padding: 0 8px; background: var(--well); border: 1px solid var(--well-b); border-right: 0; color: var(--txt); font: 11px var(--rm-mono); outline: none; }
+.rm-linkrow button { height: 30px; padding: 0 12px; border: 1px solid var(--acc); background: var(--acc); color: #fff; font: 600 10px var(--rm-mono); letter-spacing: .12em; cursor: pointer; }
+.rm-linkrow button:hover { background: var(--accD); }
+.rm-who { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 2px 8px 8px; font-size: 12.5px; color: var(--txt); }
+.rm-who span { display: inline-flex; align-items: center; gap: 6px; }
+.rm-who i { width: 18px; height: 18px; border-radius: 50% !important; display: grid; place-items: center; font: 600 10px var(--rm-sans); font-style: normal; color: #fff; }
+.rm-who em { font-style: normal; color: var(--mut); }
+/* a partner's caret and selection in the page */
+.rm .ct-sheet .rm-caret { position: relative; margin: 0 -1px; border-left: 2px solid var(--c); pointer-events: none; }
+.rm .ct-sheet .rm-caret-name {
+  position: absolute; left: -2px; bottom: 100%; padding: 1px 5px; background: var(--c); color: #fff; white-space: nowrap;
+  font: 600 9.5px/1.4 var(--rm-sans); letter-spacing: .02em; text-decoration: none; user-select: none;
+}

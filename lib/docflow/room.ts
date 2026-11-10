@@ -44,6 +44,12 @@ export interface RoomOptions {
   /** Nobody had a flow to give: this browser starts the room's flow itself. */
   onSeed: () => void;
   onTitle: (title: string) => void;
+  /**
+   * For a document kept somewhere a peer can fetch it from: an edit too big
+   * for the wire (a whole file pasted in) is not sent — `carry` puts the
+   * document there, and the peers are told to `fetch` it.
+   */
+  big?: { limit: number; carry: () => Promise<void>; fetch: () => void };
 }
 
 export interface Room { code: string; leave: () => void; rename: (title: string) => void }
@@ -77,12 +83,19 @@ export function openRoom(o: RoomOptions): Room {
   const flush = () => {
     timer = null;
     const data: Record<string, string> = {};
-    if (pendingY.length) data.y = b64(Y.mergeUpdates(pendingY));
+    if (pendingY.length) {
+      const merged = Y.mergeUpdates(pendingY);
+      if (o.big && merged.length > o.big.limit) carried();
+      else data.y = b64(merged);
+    }
     if (pendingAw.size) data.aw = b64(encodeAwarenessUpdate(awareness, [...pendingAw]));
     pendingY = []; pendingAw = new Set();
     if (data.y || data.aw) send("edit", data);
   };
   const soon = () => { if (!timer) timer = setTimeout(flush, 120); };
+  /** Too big to send: kept where the peers can fetch it, and they are told. */
+  const carried = () => { if (o.big) void o.big.carry().then(() => send("poke", {})).catch(() => { /* the next save tries again */ }); };
+  const fits = (u: string | null) => { if (u && o.big && u.length > o.big.limit * 1.4) { carried(); return null; } return u; };
 
   const onUpdate = (u: Uint8Array, origin: unknown) => {
     if (origin === REMOTE) return;
@@ -138,7 +151,7 @@ export function openRoom(o: RoomOptions): Room {
       if (t === "hello") {
         // someone arrived, or came back: give them what they lack, and ask for the same
         if (!synced) return;
-        send("state", { to: payload.from, u: diffFor(payload.sv), sv: b64(Y.encodeStateVector(ydoc)), title: o.title() });
+        send("state", { to: payload.from, u: fits(diffFor(payload.sv)), sv: b64(Y.encodeStateVector(ydoc)), title: o.title() });
         pendingAw.add(ydoc.clientID); soon();
         return;
       }
@@ -148,7 +161,7 @@ export function openRoom(o: RoomOptions): Room {
         const first = !synced;
         synced = true;
         if (first) o.onSynced(payload.title || null);
-        const back = payload.sv ? diffFor(payload.sv) : null;
+        const back = payload.sv ? fits(diffFor(payload.sv)) : null;
         if (back) send("edit", { y: back });
         if (pendingY.length) soon();
         return;
@@ -158,6 +171,7 @@ export function openRoom(o: RoomOptions): Room {
         if (payload.aw) applyAwarenessUpdate(awareness, unb64(payload.aw), REMOTE);
         return;
       }
+      if (t === "poke") { o.big?.fetch(); return; }
       if (t === "title" && typeof payload.title === "string") o.onTitle(payload.title);
     })
     .on("presence", { event: "sync" }, readPresence)

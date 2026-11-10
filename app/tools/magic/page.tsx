@@ -18,11 +18,13 @@ const FONTS = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;7
  * admin key: a partner sent here to build the speech doc is a debater, not
  * an administrator.
  */
-export default async function RoundMagicTool({ searchParams }: { searchParams?: { room?: string | string[]; sd?: string | string[]; embed?: string | string[] } }) {
+export default async function RoundMagicTool({ searchParams }: { searchParams?: { room?: string | string[]; sd?: string | string[]; doc?: string | string[]; embed?: string | string[] } }) {
   const one = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v) || undefined;
   const room = one(searchParams?.room);
   const sd = one(searchParams?.sd);
-  if (!isAdmin() && !room && !sd) {
+  // a shared file's link: whoever was sent it is here to write in it
+  const doc = one(searchParams?.doc);
+  if (!isAdmin() && !room && !sd && !doc) {
     return (
       <>
         <Nav />
@@ -37,7 +39,7 @@ export default async function RoundMagicTool({ searchParams }: { searchParams?: 
       <link rel="stylesheet" href={FONTS} />
       {embed ? <Embedded /> : <Nav />}
       <main>
-        <div className="toolpage"><RoundMagic owner={user?.id} me={user ? displayName(user) : undefined} room={room} sd={sd} /></div>
+        <div className="toolpage"><RoundMagic owner={user?.id} me={user ? displayName(user) : undefined} room={room} sd={sd} doc={doc} /></div>
       </main>
     </>
   );

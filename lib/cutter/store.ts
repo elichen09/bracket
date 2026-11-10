@@ -30,9 +30,13 @@ export interface CutFile {
   words: number;
   created: number;
   updated: number;
+  /** Shared (lib/cutter/share.ts): the id its link carries… */
+  share?: string;
+  /** …and the shared document as this browser last had it, so it opens with nobody else around. */
+  y?: Uint8Array;
 }
 
-export type CutMeta = Omit<CutFile, "doc" | "html">;
+export type CutMeta = Omit<CutFile, "doc" | "html" | "y">;
 
 const STORE = "files";
 export const cutterDbName = (owner?: string | null) => scoped("cutter", owner);
@@ -68,7 +72,7 @@ export const allFiles = (owner?: string | null) => run<CutFile[]>(owner, "readon
 /** Every file without its document, newest first — the list and the search need no more. */
 export async function listFiles(owner?: string | null): Promise<CutMeta[]> {
   const all = await allFiles(owner);
-  return all.map(({ doc: _d, html: _h, ...m }) => m).sort((a, b) => b.updated - a.updated);
+  return all.map(({ doc: _d, html: _h, y: _y, ...m }) => m).sort((a, b) => b.updated - a.updated);
 }
 
 export const getFile = (owner: string | null | undefined, id: string) => run<CutFile | undefined>(owner, "readonly", (s) => s.get(id));
