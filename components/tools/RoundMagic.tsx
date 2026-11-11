@@ -97,6 +97,20 @@ function brightenGreens(doc: PMNode): PMNode | null {
   });
   return tr.docChanged ? tr.doc : null;
 }
+/** Their tag, cut to what a heading says: its numbering off, its first clause, a dozen words at most. */
+function headOf(t: string) {
+  const s = t.replace(/\s+/g, " ").trim().replace(/^\(?\d{1,2}[.)\]:]?\s*[—–-]*\s*/, "");
+  const cut = s.split(/\s*(?:-{2,}|—|–|;|\.\s)\s*/)[0] || s;
+  const w = cut.split(" ");
+  return (w.length > 12 ? w.slice(0, 12).join(" ") + "…" : cut).replace(/[.:,]+$/, "");
+}
+/** Where a heading that says this is, or -1. */
+function headPos(doc: PMNode, text: string) {
+  const want = text.trim().toLowerCase();
+  let pos = -1;
+  doc.forEach((n, p) => { if (pos < 0 && n.type === schema.nodes.heading && n.textContent.trim().toLowerCase() === want) pos = p; });
+  return pos;
+}
 /** A partner's caret in a shared file: a bar in their colour, their name over it. */
 function mateCaret(user: { name: string; color: string }) {
   const el = document.createElement("span");
@@ -190,6 +204,7 @@ const I = {
   fold: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>,
   unfold: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>,
   share: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8v6M14 11h6" /></svg>,
+  answer: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M9 14L4 9l5-5" /><path d="M4 9h9a7 7 0 017 7v4" /></svg>,
   wide: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M3 12h18" /></svg>,
 };
 
@@ -240,6 +255,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [speechOutline, setSpeechOutline] = useState(false);
   const [speechWidth, setSpeechWidth] = useState(700);
   const [sentPulse, setSentPulse] = useState(0);
+  // answering their case: what is being answered, and the heading of the speech doc its answers go under
+  const [answering, setAnsweringState] = useState<{ claim: string; head: string } | null>(null);
+  const answerRef = useRef<{ claim: string; head: string } | null>(null);
+  const setAnswering = useCallback((a: { claim: string; head: string } | null) => {
+    answerRef.current = a;
+    setAnsweringState(a);
+    (window as any).EV?.setAnswer?.(a);
+  }, []);
   const [readSrc, setReadSrc] = useState<"speech" | "file">("file");
   const [readDoc, setReadDoc] = useState<PMNode | null>(null);
   const [wpm, setWpm] = useState(230);
@@ -552,6 +575,17 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       sc.scrollTo({ top: dom.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 24 });
       dom.classList.remove("rm-flash"); void dom.offsetWidth; dom.classList.add("rm-flash");
     }
+  }, []);
+
+  /** A place in a page shown — scrolled to, flashed — without the cursor or the keyboard going there. */
+  const showPos = useCallback((v: EditorView, pos: number) => {
+    requestAnimationFrame(() => {
+      const dom = v.nodeDOM(Math.min(pos, v.state.doc.content.size)) as HTMLElement | null;
+      const sc = scrollerOf(v);
+      if (!dom || !sc || !dom.getBoundingClientRect) return;
+      sc.scrollTo({ top: dom.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 70, behavior: "smooth" });
+      dom.classList.remove("rm-flash"); void dom.offsetWidth; dom.classList.add("rm-flash");
+    });
   }, []);
 
   const jumpFromRead = useCallback((readKey: string, pos: number) => {
@@ -1016,8 +1050,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     void refreshTheirs();
     loaded.current.delete(THEIRS + d.id);
     await open(THEIRS + d.id, (v) => { v.focus(); v.dispatch(v.state.tr.setSelection(TextSelection.atStart(v.state.doc))); });
-    if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
-  }, [owner, refreshTheirs, open]);
+    // their doc is opened to be answered: the speech doc goes beside it
+    if (d.kind !== "pdf" && modeRef.current !== "split") {
+      modeRef.current = "split"; setModeState("split"); inSpeech.current = false;
+      requestAnimationFrame(() => (window as any).EV?.renderDoc?.());
+      toast(`Their doc beside your speech doc — ${keyLabel(keyFor(keysRef.current, "answer")) || "Answer"} on a tag of theirs starts its answer`);
+    }
+  }, [owner, refreshTheirs, open, toast]);
 
   const forgetTheirs = useCallback(async (m: ViewMeta) => {
     const fid = THEIRS + m.id;
@@ -1191,6 +1230,103 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     }));
   }, [readSrc, setMode, goPos]);
 
+  // ---- answering their case -------------------------------------------------------
+  /** The heading answers go under, in the speech doc: found, or put at its end. */
+  const ensureHead = useCallback((head: string) => {
+    const s = speechView.current;
+    if (!s) return -1;
+    let pos = headPos(s.state.doc, head);
+    if (pos < 0) {
+      const d = s.state.doc;
+      const blank = d.childCount === 1 && !d.firstChild!.content.size;
+      const h = schema.nodes.heading.create({ level: 3 }, schema.text(head));
+      pos = blank ? 0 : d.content.size;
+      s.dispatch(blank ? s.state.tr.replaceWith(0, d.content.size, h) : s.state.tr.insert(pos, h));
+    }
+    showPos(s, pos);
+    return pos;
+  }, [showPos]);
+  /** Cards put under the heading being answered — at the end of what is already under it. */
+  const putUnder = useCallback((nodes: PMNode[], said: string) => {
+    const s = speechView.current, a = answerRef.current;
+    if (!s || !a || !nodes.length) return false;
+    let pos = headPos(s.state.doc, a.head);
+    if (pos < 0) pos = ensureHead(a.head);
+    const sec = C.sections(s.state.doc).find((x) => x.pos === pos);
+    if (!sec) return false;
+    // already under it: said, not put in twice
+    const tag = nodes.find((n) => n.type === schema.nodes.heading)?.textContent.trim().toLowerCase();
+    let there = false;
+    if (tag) s.state.doc.nodesBetween(sec.pos, sec.end, (n, p) => { if (p > sec.pos && n.type === schema.nodes.heading && n.textContent.trim().toLowerCase() === tag) there = true; return false; });
+    if (there) { toast(`Already under “${a.head.slice(0, 40)}”: ${said.slice(0, 50)}`); return true; }
+    s.dispatch(s.state.tr.insert(sec.end, PMFragment.from(nodes)));
+    showPos(s, sec.end);
+    setSentPulse((n) => n + 1);
+    // and to Flow, if it is open: the tags of what just went in, ready to flow
+    const tags = nodes.filter((n) => n.type === schema.nodes.heading).map((n) => n.textContent.trim()).filter(Boolean);
+    bus.current?.post({ kind: "sent", title: a.head, trigger: "", tags });
+    toast(`Under “${a.head.slice(0, 40)}”: ${said.slice(0, 60)}`);
+    return true;
+  }, [ensureHead, showPos, toast]);
+
+  /**
+   * Answer this. In a page (their case, most often): what is selected, or the
+   * heading the cursor is under, is what is being answered — it gets a heading
+   * in the speech doc ("AT: …"), the search looks for what answers it, and
+   * Enter there puts a card under that heading. Pressed again from the search,
+   * it is their next tag. In the speech doc, it says: cards go under this heading.
+   */
+  const answer = useCallback(() => {
+    const s = speechView.current;
+    if (s && s.hasFocus()) {
+      const from = s.state.selection.from;
+      let near = "", block = "";
+      s.state.doc.forEach((n, p) => {
+        if (n.type !== schema.nodes.heading || p > from || !n.textContent.trim()) return;
+        near = n.textContent.trim();
+        if (n.attrs.level < 4) block = near;
+      });
+      const head = block || near;
+      if (!head) { toast("Put the cursor under a heading of the speech doc — cards you send will land under it"); return; }
+      setAnswering({ claim: "", head });
+      toast(`Cards you send now land under “${head.slice(0, 50)}”`);
+      return;
+    }
+    const v = view.current;
+    if (!v) return;
+    const st = v.state, inFile = v.hasFocus();
+    let claim = "";
+    if (inFile && !st.selection.empty) claim = st.doc.textBetween(st.selection.from, st.selection.to, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+    else {
+      const hs: { pos: number; text: string; level: number }[] = [];
+      st.doc.forEach((n, p) => { if (n.type === schema.nodes.heading && n.textContent.trim()) hs.push({ pos: p, text: n.textContent.trim(), level: n.attrs.level }); });
+      if (!hs.length) { toast("No headings here to answer — select the words you are answering, then press it again"); return; }
+      let i = -1;
+      hs.forEach((h, k) => { if (h.pos <= st.selection.from) i = k; });
+      // from the page: the heading the cursor is under. From the search, again: their next tag.
+      let k = inFile || !answerRef.current?.claim ? Math.max(i, 0) : i + 1;
+      if (!inFile && hs.some((h) => h.level === 4)) while (k < hs.length && hs[k].level !== 4) k++;
+      if (k >= hs.length) { toast("That was their last tag"); return; }
+      claim = hs[k].text;
+      try { v.dispatch(st.tr.setSelection(TextSelection.create(st.doc, Math.min(hs[k].pos + 1, st.doc.content.size)))); } catch { /* an empty heading */ }
+      showPos(v, hs[k].pos);
+    }
+    if (!claim) return;
+    const head = "AT: " + headOf(claim);
+    const go = () => {
+      ensureHead(head);
+      setTab("search");
+      const q = root.current?.querySelector("#q") as HTMLInputElement | null;
+      if (q) q.value = headOf(claim);
+      setAnswering({ claim, head });
+      requestAnimationFrame(() => { q?.focus(); q?.select(); });
+    };
+    if (modeRef.current !== "split") {
+      modeRef.current = "split"; setModeState("split"); inSpeech.current = false;
+      requestAnimationFrame(() => { (window as any).EV?.renderDoc?.(); requestAnimationFrame(go); });
+    } else go();
+  }, [ensureHead, showPos, setAnswering, setTab, toast]);
+
   // ---- sending a card to the speech doc ---------------------------------------
   const sendCard = useCallback(async () => {
     if (modeRef.current === "speech") { toast("Send is from a file — SPLIT puts one beside the speech doc"); return; }
@@ -1214,6 +1350,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       if (!c?.tag) { toast("Put the cursor in a card (or on a block heading, to send the block)"); return; }
       from = c.tag.pos; to = c.end;
     }
+    // answering: the card goes under what it answers, not to the end
+    if (answerRef.current) {
+      const nodes: PMNode[] = [];
+      d.cut(from, to).forEach((n) => { if (!(n.type === schema.nodes.heading && n.attrs.level < 4)) nodes.push(n); });
+      const said = nodes.find((n) => n.type === schema.nodes.heading)?.textContent || fileName;
+      if (nodes.length && putUnder(nodes, said)) return;
+    }
     // the block it is under names it in the speech doc, as a block from the library would be
     let block = "";
     if (!whole) d.forEach((n, p) => { if (p < from && n.type === schema.nodes.heading && n.attrs.level === 3) block = n.textContent.trim(); });
@@ -1230,7 +1373,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     } catch (e: any) {
       toast("It did not send: " + String(e?.message || e));
     }
-  }, [toast]);
+  }, [toast, putUnder]);
 
   // the library search's sends, too: the Split button says where they went
   useEffect(() => {
@@ -1252,6 +1395,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (pos >= 0) goPos(v, pos); else v.focus();
       });
       if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+      return;
+    }
+    if (d.how === "answer") {
+      const nodes: PMNode[] = [];
+      fromHtml(d.html).forEach((n) => { if (!(n.type === schema.nodes.heading && n.attrs.level < 4)) nodes.push(n); });
+      while (nodes.length && !nodes[nodes.length - 1].content.size && nodes[nodes.length - 1].type === schema.nodes.paragraph) nodes.pop();
+      if (!nodes.length) { toast("That card came out empty"); return; }
+      if (!putUnder(nodes, d.title)) toast("Pick what it answers first — the cursor on a tag of theirs, then Answer");
       return;
     }
     if (d.how === "page") {
@@ -1286,7 +1437,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     v.dispatch(tr.scrollIntoView());
     requestAnimationFrame(() => goPos(v, at));
     toast(`In ${v === speechView.current ? "the speech doc" : "the file"}: ${d.title.slice(0, 60)}`);
-  }, [owner, open, addPane, activate, goPos, refreshTheirs, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [owner, open, addPane, activate, goPos, refreshTheirs, toast, putUnder]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = root.current;
     if (!el) return;
@@ -1328,6 +1479,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       return;
     }
     if (id === "send") { void sendCard(); return; }
+    if (id === "answer") { answer(); return; }
     if (id === "hl-next") {
       const i = C.HIGHLIGHTS.findIndex((h) => h.color === hlRef.current);
       const n = C.HIGHLIGHTS[(i + 1) % C.HIGHLIGHTS.length];
@@ -1414,7 +1566,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         return;
       }
     }
-  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary, answer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runRef = useRef(run);
   runRef.current = run;
@@ -1433,6 +1585,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       // / with nothing being typed in: the library search, wherever it is
       if (e.key === "/" && !typing && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); e.stopPropagation(); focusLibrary(); return; }
       if (e.key === "Escape" && modeRef.current === "read") { e.preventDefault(); setMode("edit"); return; }
+      // Esc in the search with nothing typed: back to the page (their case, while answering it)
+      if (e.key === "Escape" && t && t.id === "q" && !(t as HTMLInputElement).value) {
+        e.preventDefault(); e.stopPropagation();
+        (answerRef.current?.claim ? view.current : target())?.focus();
+        return;
+      }
       const spec = comboOf(e);
       if (!spec) return;
       const id = actionFor(keysRef.current, spec);
@@ -1743,6 +1901,19 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const activeRead = !!activePane?.read;
   const many = panes.length > 1;
   const curTheirs = !!cur && isTheirs(cur.id);
+  // their case, as a list of what has been answered: a tag of theirs with cards under its heading in the speech doc
+  const answered = (() => {
+    const set = new Set<string>();
+    const sv = speechView.current;
+    if (!sv || !curTheirs || headsOf !== "page") return set;
+    let head = "";
+    sv.state.doc.forEach((n) => {
+      if (n.type !== schema.nodes.heading) return;
+      if (n.attrs.level < 4) head = n.textContent.trim().toLowerCase();
+      else if (head) set.add(head);
+    });
+    return set;
+  })();
   const curShare = cur?.share && !curTheirs ? shares.current.get(cur.id) || null : null;
   const theirFor = (fid: string) => theirMeta.current.get(fid);
   const olRows = heads.map((h, i) => ({ h, i })).filter(({ h }) => h.level <= depth && (!olFilter.trim() || h.text.toLowerCase().includes(olFilter.trim().toLowerCase())));
@@ -1814,7 +1985,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     </> },
     { id: "card", name: "Card", sub: "new card, send, reference, clean up, reformat, extension", cols: "c3", body: <>
       <B id="new-card" cls="rm-i">{I.plus}</B>
-      <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span>Send</span></B>
+      <span className="rm-split2">
+        <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span>Send</span></B>
+        <B id="answer" cls="rm-i">{I.answer}</B>
+      </span>
       <B id="reference"><span className="s-ref">Reference</span></B>
       <B id="clean-up">Clean up</B>
       <B id="reformat"><span className="s-reformat">Reformat</span></B>
@@ -1946,6 +2120,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   onDragOver={(e) => onRowDrag(e, i)}
                   onDragEnd={() => { setDrag(null); setDropAt(null); }}>
                   <span className="lab">{h.text}</span>
+                  {answered.has(("AT: " + headOf(h.text)).toLowerCase()) && <span className="ok" title="Answered: there are cards under its heading in the speech doc">✓</span>}
                   <span className="x" role="button" aria-label={`Delete “${h.text}” and everything under it`} title="Delete this, and everything under it — Ctrl+Z brings it back"
                     onClick={(e) => { e.stopPropagation(); removeSection(h.pos); }}>×</span>
                 </button>
@@ -2023,6 +2198,18 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the library: Evidence's search, drawn by its engine */}
           <div className="rm-tabpane" hidden={tab !== "search"}>
+            {answering && (
+              <div className="rm-ansbar">
+                <div className="row">
+                  <span className="lab">{answering.claim ? "ANSWERING" : "SENDING UNDER"}</span>
+                  <span className="rm-grow" />
+                  {answering.claim && <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => run("answer")} title={tip("answer", "Their next tag")}>NEXT ›</button>}
+                  <button type="button" onClick={() => setAnswering(null)} aria-label="Stop answering" title="Stop: the search looks for what you type, and cards go to the end of the speech doc">×</button>
+                </div>
+                <b title={answering.claim || answering.head}>{answering.claim || answering.head}</b>
+                <small><kbd>Enter</kbd> puts a card under <i>{answering.head}</i> in the speech doc{answering.claim ? " · the cards that answer it come first" : ""}</small>
+              </div>
+            )}
             <div className="evi rm-evsearch">
               <div className="srcsw mono" id="srcsw" role="group" aria-label="Search in">
                 <button type="button" data-src="lib" className="on" aria-pressed="true">Library</button>
@@ -2040,7 +2227,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               </div>
               <div id="results" />
             </div>
-            <div className="rm-sfoot"><b>↑↓</b> move · <b>→</b> arguments · <b>Enter</b> to the speech doc · <b>Shift+Enter</b> into the file you&apos;re in · <b>Ctrl+Enter</b> a page of its own</div>
+            <div className="rm-sfoot"><b>↑↓</b> move · <b>→</b> arguments · <b>Enter</b> {answering ? "under what you're answering" : "to the speech doc"} · <b>Shift+Enter</b> into the file you&apos;re in · <b>Ctrl+Enter</b> a page of its own{!answering && K("answer") ? <> · <b>{K("answer")}</b> on a tag of theirs to answer it</> : null}</div>
           </div>
 
           {/* the round: their docs, SpeechDrop, your partner */}
@@ -2147,6 +2334,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                             title="Following: this page keeps the card you're editing in view">{p.follow ? "● FOLLOWING" : "FOLLOW"}</button>
                         )}
                         <span className="rm-grow" />
+                        {theirsHere && !pdf && !p.read && meta?.source !== "library" && meta?.source !== "caselist" && (
+                          <button type="button" className="rm-pbtn acc" onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => { activate(p.key); views.current.get(p.key)?.focus(); run("answer"); }}
+                            title={tip("answer", "Answer the tag the cursor is in (or what's selected): a heading for it in your speech doc, and the search looking for what answers it")}>ANSWER</button>
+                        )}
                         {theirsHere && !pdf && <button type="button" className="rm-pbtn" onClick={() => void keepAsMine(p.fileId)} title="Copy it into a file of yours — and so into your library">KEEP AS MINE</button>}
                         {panes.length < MAX_PANES && (
                           <button type="button" className="rm-pbtn sq" onClick={() => addPane({ fileId: p.fileId, read: false, follow: true }, p.key)} title="Another page of this beside it" aria-label="Split this page">＋</button>
@@ -2179,6 +2371,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <span className="rm-acc">SPEECH</span>
                 <b>Speech doc</b>
                 <span className="rm-pmeta" id="sendCount" title="Blocks sent to it" />
+                {answering && (
+                  <button type="button" className="rm-pbtn on rm-under" onClick={() => setAnswering(null)}
+                    title={`Cards you send land under “${answering.head}” — click to send to the end again`}>↳ {answering.head} ×</button>
+                )}
                 <span className="rm-grow" />
                 <button type="button" className={"rm-pbtn" + (side && tab === "outline" && headsOf === "speech" ? " on" : "")}
                   onClick={() => { inSpeech.current = true; setTab("outline"); speechView.current?.focus(); readHeads(); }}

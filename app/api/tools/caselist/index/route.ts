@@ -52,8 +52,8 @@ export async function POST(req: Request) {
       };
       out.push({
         slug, name: String(w.display_name || slug), zip: all, schools,
-        // an index built before cards kept their block and read words (v2) is rebuilt, archive or no
-        current: (meta as { v?: number } | null)?.v && (meta as { v?: number }).v! >= 2 ? meta?.zip?.name || null : null,
+        // an index built before cards kept this many of their read words (v3) is rebuilt, archive or no
+        current: (meta as { v?: number } | null)?.v && (meta as { v?: number }).v! >= 3 ? meta?.zip?.name || null : null,
         upload: await up(`${slug}.json.gz`),
         uploadMeta: await up(`${slug}.meta.json`),
       });

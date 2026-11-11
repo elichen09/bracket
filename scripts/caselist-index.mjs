@@ -23,7 +23,7 @@
  *   { v: 1, wiki, built, zip: { name, url }, schools: { slug: display },
  *     docs: [[path, offset, csize, method, nameLen]],
  *     cards: [[docIndex, tag, cite, rounds, blockIndex, readWords]],
- *     blocks: [block heading] }                       (v2: blockIndex/readWords/blocks)
+ *     blocks: [block heading] }                       (v2: blockIndex/readWords/blocks; v3: more read words)
  * A card disclosed round after round by one team is one entry; `rounds`
  * counts how many documents it appeared in.
  */
@@ -81,7 +81,8 @@ const marked = (p, how) => {
   for (const r of p.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []) {
     const on = how === "hl"
       ? /<w:highlight w:val="(?!none)[^"]+"/.test(r) || /<w:shd\b[^>]*w:fill="(?!auto|FFFFFF|ffffff)[0-9A-Fa-f]{6}"/.test(r)
-      : /<w:u w:val="(?!none)[^"]+"/.test(r) || /<w:u\/>/.test(r);
+      // underlined outright, or by a character style that underlines — which is how a Verbatim file does it
+      : /<w:u w:val="(?!none)[^"]+"/.test(r) || /<w:u\/>/.test(r) || /<w:rStyle w:val="[^"]*(?:[Uu]nderline|[Ee]mphasis)[^"]*"/.test(r);
     if (!on) { gap = true; continue; }
     const t = unxml((r.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map((x) => x.replace(/<[^>]+>/g, "")).join(""));
     out += (gap && out ? " " : "") + t;
@@ -112,20 +113,25 @@ export async function readTags(docx) {
     if (lvl) { open = null; if (lvl <= 3 && t) block = lvl === 3 ? t.slice(0, 140) : ""; continue; }
     if (!open || !t) continue;
     if (!open.cite) { open.cite = t.slice(0, 220); continue; }
-    if (open.hl.length < 600) open.hl += " " + marked(p, "hl");
-    if (!open.hl.trim() && open.ul.length < 600) open.ul += " " + marked(p, "ul");
+    if (open.hl.length < 2400) open.hl += " " + marked(p, "hl");
+    if (open.ul.length < 1600) open.ul += " " + marked(p, "ul");
   }
   return out;
 }
 
-/** The read words, cut to what a search needs: the distinct ones that say something, at most 28. */
+/**
+ * The read words, cut to what a search needs: the distinct ones that say
+ * something — what is highlighted first, then what is underlined — at most 60
+ * (v3; it was 28, of the highlighting alone, and a card whose tag does not say
+ * what it is about was too often not found by what it says either).
+ */
 const STOP = new Set("a an and are as at be been but by can could do does for from had has have how if in into is it its may more most no not of on or our so such than that the their them then there these they this those to was were what when which who will with would you your".split(" "));
 function readWords(text) {
   const seen = new Set(), out = [];
   for (const w of (String(text || "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [])) {
     if (w.length < 3 || STOP.has(w) || seen.has(w)) continue;
     seen.add(w); out.push(w);
-    if (out.length >= 28) break;
+    if (out.length >= 60) break;
   }
   return out.join(" ");
 }
@@ -155,7 +161,7 @@ export async function buildIndex({ wiki, zipFile, zipName, zipUrl, schools = {} 
         const key = team + "|" + t.tag.toLowerCase().replace(/\W+/g, "") + "|" + t.cite.toLowerCase().replace(/\W+/g, "").slice(0, 60);
         const had = seen.get(key);
         if (had) { had[3]++; continue; }
-        const c = [di, t.tag, t.cite, 1, blockOf(t.block), readWords(t.hl.trim() ? t.hl : t.ul)];
+        const c = [di, t.tag, t.cite, 1, blockOf(t.block), readWords(t.hl + " " + t.ul)];
         seen.set(key, c);
         cards.push(c);
       }
@@ -164,7 +170,7 @@ export async function buildIndex({ wiki, zipFile, zipName, zipUrl, schools = {} 
   }
   fs.closeSync(fd);
   console.log(`  ${wiki}: ${docs.length} docs with tags, ${cards.length} cards, ${failed} unreadable, ${Math.round((Date.now() - t0) / 1000)}s`);
-  return { v: 2, wiki, built: new Date().toISOString(), zip: { name: zipName, url: zipUrl }, schools, docs, cards, blocks };
+  return { v: 3, wiki, built: new Date().toISOString(), zip: { name: zipName, url: zipUrl }, schools, docs, cards, blocks };
 }
 
 const gz = (obj) => zlib.gzipSync(Buffer.from(JSON.stringify(obj)), { level: 9 });

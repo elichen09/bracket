@@ -1093,3 +1093,12 @@
 .evi .clopp { color: var(--acc); white-space: nowrap; }
 .evi .arg:hover .tobin { opacity: 1; }
 .evi .tobin.opn { white-space: nowrap; cursor: pointer; }
+/* a card found by what it says: the words that found it, under its tag */
+.evi .arg.hasx { align-items: flex-start; }
+.evi .arg.hasx .argt { white-space: normal; overflow: visible; }
+.evi .argx { display: block; margin-top: 1px; font-size: 11.5px; line-height: 1.4; color: var(--dim); white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.evi .argx mark { background: none; color: var(--ink); font-weight: 600; }
+.evi .argx i { font-style: normal; font-family: var(--mono); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; border: 1px solid currentColor; padding: 0 4px; }
+.evi .arg.hit:not(.sel) .argt { color: var(--ink); }
+.evi .sel .argx, .evi .sel .argx mark { color: inherit; }
+.evi .sel .argx { opacity: .8; }
