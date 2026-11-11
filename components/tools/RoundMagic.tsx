@@ -1465,7 +1465,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     foldTags(v, on);
     if (v === speechView.current) setSpeechTags(on);
     setTick((n) => n + 1);
-    toast(on ? "Tags only — ▸ opens a card · " + (keyLabel(keyFor(keysRef.current, "tags-only")) || "the same button") + " shows everything again" : "Every card shown");
+    toast(on ? "Tags only — the › after a tag opens it · " + (keyLabel(keyFor(keysRef.current, "tags-only")) || "the same button") + " shows everything again" : "Every card shown");
   }, [setSpeechTags, toast]);
   // the speech doc made again (a room joined, the Read tab left): folded the way it was
   useEffect(() => {

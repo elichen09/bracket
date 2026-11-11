@@ -6,8 +6,9 @@ import { schema } from "../evidence/docSchema";
 /**
  * Tags only: a document folded down to its headings, so it can be read — and
  * reordered — as an outline. Each card's cite and text go out of sight; its
- * tag stays, with a small note after it (the short cite, how long it is) that
- * opens that one card when clicked, and closes it again from the same place.
+ * tag stays
+ * — a small ▸ after it opens just that card (its title says which: the short
+ * cite, how long it is), and the ▾ of an opened one hides it again.
  * Nothing is taken out of the document: it is hidden, and moves with its tag
  * (drag the ⋮⋮, Alt+↑/↓, the outline), and comes back with the same key.
  *
@@ -52,8 +53,11 @@ function chip(view: EditorView, getPos: () => number | undefined, label: string,
   const el = document.createElement("span");
   el.className = "rm-foldchip" + (open ? " open" : "");
   el.contentEditable = "false";
-  el.textContent = label;
-  el.title = open ? "Fold this card back to its tag" : "Show this card's cite and text";
+  // a chevron, drawn: the ▸ character is a speck in most fonts
+  el.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${open ? "M2 3.5l3 3 3-3" : "M3.5 2l3 3-3 3"}"/></svg>`;
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", open ? "Hide this card" : "Show this card");
+  el.title = open ? "Hide this card again" : label ? "Show this card — " + label : "Show this card";
   el.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); });
   el.addEventListener("click", (e) => {
     e.preventDefault(); e.stopPropagation();
@@ -80,7 +84,7 @@ function build(state: EditorState, all: boolean, flip: number[]): { deco: Decora
     if (folded) {
       if (hasBody) {
         const label = [c.cite, c.words ? c.words.toLocaleString() + " words" : ""].filter(Boolean).join(" · ") + " ▸";
-        decos.push(Decoration.widget(end, (v, g) => chip(v, g, label, false), { side: 1, key: "fold:" + c.pos + ":" + label, ignoreSelection: true, stopEvent: () => true }));
+        decos.push(Decoration.widget(end, (v, g) => chip(v, g, label.replace(/ ▸$/, ""), false), { side: 1, key: "fold:" + c.pos + ":" + label, ignoreSelection: true, stopEvent: () => true }));
       }
       bodies.push([c.bodyFrom, c.bodyTo]);
       state.doc.nodesBetween(c.bodyFrom, c.bodyTo, (n, pos) => {
@@ -89,7 +93,7 @@ function build(state: EditorState, all: boolean, flip: number[]): { deco: Decora
         return false;
       });
     } else if (all && hasBody) {
-      decos.push(Decoration.widget(end, (v, g) => chip(v, g, "▴", true), { side: 1, key: "unfold:" + c.pos, ignoreSelection: true, stopEvent: () => true }));
+      decos.push(Decoration.widget(end, (v, g) => chip(v, g, "", true), { side: 1, key: "unfold:" + c.pos, ignoreSelection: true, stopEvent: () => true }));
     }
   }
   return { deco: DecorationSet.create(state.doc, decos), bodies };
