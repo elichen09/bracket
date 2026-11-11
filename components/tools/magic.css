@@ -654,3 +654,22 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm-phead b { white-space: nowrap; }
 .rm-ol .ok { flex-shrink: 0; margin-left: 6px; font-size: 11px; color: #4ade80; }
 .rm-side .evi.rm-evsearch .sel .ttl, .rm-side .evi.rm-evsearch .sel .argt, .rm-side .evi.rm-evsearch .sel .argx, .rm-side .evi.rm-evsearch .sel .argx mark { color: #fff; }
+
+/* ------------------------------------------------------------ where the next card goes, and moving cards */
+.rm .ct-sheet .rm-dropline { position: relative; height: 0; margin: 0; pointer-events: none; user-select: none; }
+.rm .ct-sheet .rm-dropline::before { content: ""; position: absolute; left: -10px; right: 0; top: -1px; border-top: 2px dashed var(--acc); opacity: .75; }
+.rm .ct-sheet .rm-dropline span { position: absolute; right: 0; top: -9px; padding: 0 6px; background: var(--acc); color: #fff; font: 600 9px/16px var(--rm-mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+.rm .ct-sheet h1, .rm .ct-sheet h2, .rm .ct-sheet h3, .rm .ct-sheet h4 { position: relative; }
+.rm .ct-sheet .rm-grip {
+  position: absolute; left: -30px; top: 50%; transform: translateY(-50%); width: 24px; height: 22px;
+  display: grid; place-items: center; font: 700 12px/1 var(--rm-sans); letter-spacing: -2px; color: #9a9a9a;
+  cursor: grab; opacity: 0; user-select: none; text-decoration: none; transition: opacity .1s, color .1s, background .1s;
+}
+.rm .ct-sheet :is(h1, h2, h3, h4):hover > .rm-grip, .rm .ct-sheet .rm-grip:hover { opacity: 1; }
+.rm .ct-sheet .rm-grip:hover { color: #111; background: #ececec; }
+.rm .ct-sheet h1 > .rm-grip { left: -42px; }
+.rm .ct-sheet.ct-verb .rm-grip, .rm .ct-sheet[contenteditable="false"] .rm-grip { display: none; }
+.rm .ct-sheet .rm-lifted { opacity: .35; }
+.rm-dropbar { position: fixed; z-index: 1000; height: 0; border-top: 3px solid var(--rm-a, #8b7cf0); pointer-events: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, .7); }
+.rm-dropbar::before { content: ""; position: absolute; left: -5px; top: -6px; width: 9px; height: 9px; border-radius: 50% !important; background: var(--rm-a, #8b7cf0); }
+body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select: none !important; }

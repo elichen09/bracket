@@ -24,6 +24,8 @@ import { textToHtml } from "@/lib/viewer/draw";
 import { listDocs, getDoc, keepDoc, dropDoc, newDocId, type ViewDoc, type ViewMeta, type DocKind } from "@/lib/viewer/store";
 import { verbatimPlugin, verbKey, readWords, countIn } from "@/lib/cutter/verbatim";
 import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter/spell";
+import { placePlugin, placeCard } from "@/lib/cutter/place";
+import { gripPlugin } from "@/lib/cutter/grips";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -419,6 +421,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           keymap(baseKeymap),
           verbatimPlugin(read),
           spellPlugin(spellRef.current),
+          gripPlugin(),
         ],
       });
     }
@@ -430,6 +433,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         keymap(baseKeymap),
         verbatimPlugin(read),
         spellPlugin(spellRef.current),
+        gripPlugin(),
       ],
     });
   }, []);
@@ -1871,7 +1875,29 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const speechPlugins = useCallback(() => [
     keymap({ Enter: X.enterKeepingAnalytics }),
     spellPlugin(spellRef.current),
+    placePlugin(),
+    gripPlugin(),
   ], []);
+  // a card sent from the search (or Alt+Enter in a file) goes where the speech doc's cursor is
+  useEffect(() => {
+    const placer = (d: { html: string; whole: boolean }) => {
+      const s = speechView.current;
+      if (!s || !s.editable) return null;
+      const nodes: PMNode[] = [];
+      fromHtml(d.html).forEach((n) => nodes.push(n));
+      const r = placeCard(s.state, nodes, d.whole);
+      if (!r) return null;
+      s.dispatch(r.tr.scrollIntoView());
+      setSentPulse((n) => n + 1);
+      return { html: toHtml(s.state.doc), where: r.where };
+    };
+    let tries = 0;
+    const t = setInterval(() => {
+      const EV = (window as any).EV;
+      if (EV?.setPlacer) { EV.setPlacer(placer); clearInterval(t); } else if (++tries > 100) clearInterval(t);
+    }, 100);
+    return () => { clearInterval(t); (window as any).EV?.setPlacer?.(null); };
+  }, []);
   const onSpeechView = useCallback((v: EditorView | null) => {
     speechView.current = v;
     if (!v) { inSpeech.current = false; return; }
