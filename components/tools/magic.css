@@ -673,3 +673,16 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm-dropbar { position: fixed; z-index: 1000; height: 0; border-top: 3px solid var(--rm-a, #8b7cf0); pointer-events: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, .7); }
 .rm-dropbar::before { content: ""; position: absolute; left: -5px; top: -6px; width: 9px; height: 9px; border-radius: 50% !important; background: var(--rm-a, #8b7cf0); }
 body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select: none !important; }
+
+/* ------------------------------------------------------------ tags only */
+.rm .ct-sheet .rm-folded { display: none !important; }
+.rm .ct-sheet .rm-foldchip {
+  display: inline-block; margin-left: 10px; padding: 0 7px; vertical-align: 2px; cursor: pointer; user-select: none;
+  font: 500 10.5px/18px var(--rm-sans); letter-spacing: 0; color: #6b6b6b; background: #f1f1f1; border: 1px solid #e0e0e0;
+  white-space: nowrap; max-width: 60%; overflow: hidden; text-overflow: ellipsis; text-decoration: none; transition: background .1s, color .1s, border-color .1s;
+}
+.rm .ct-sheet .rm-foldchip:hover { color: #111; border-color: #b9b9b9; background: #e9e9e9; }
+.rm .ct-sheet .rm-foldchip.open { opacity: 0; padding: 0 6px; }
+.rm .ct-sheet h4:hover .rm-foldchip.open, .rm .ct-sheet .rm-foldchip.open:hover { opacity: 1; }
+/* folded, a doc of tags sits close together, like an outline */
+.rm .ct-sheet h4:has(> .rm-foldchip:not(.open)) { margin-bottom: 2pt; margin-top: 6pt; }

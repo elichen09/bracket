@@ -26,6 +26,7 @@ import { verbatimPlugin, verbKey, readWords, countIn } from "@/lib/cutter/verbat
 import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter/spell";
 import { placePlugin, placeCard } from "@/lib/cutter/place";
 import { gripPlugin } from "@/lib/cutter/grips";
+import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -278,6 +279,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [palette, setPalette] = useState<PaletteId>("graphite");
   const [sideW, setSideW] = useState(SIDE_W);
   // spelling: what the browser's checker looks at (lib/cutter/spell.ts)
+  // tags only, in the speech doc: kept, so the doc opens the way it was left
+  const [speechTags, setSpeechTagsState] = useState(false);
+  const speechTagsRef = useRef(false);
+  const setSpeechTags = useCallback((on: boolean) => { speechTagsRef.current = on; setSpeechTagsState(on); }, []);
   const [spell, setSpell] = useState<SpellMode>("writing");
   const spellRef = useRef(spell);
   spellRef.current = spell;
@@ -378,6 +383,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (PALETTES.some((p) => p.id === u.palette)) setPalette(u.palette);
         if (typeof u.sideW === "number") setSideW(Math.min(760, Math.max(220, u.sideW)));
         if (SPELL_MODES.some((m) => m.id === u.spell)) setSpell(u.spell);
+        if (typeof u.speechTags === "boolean") setSpeechTags(u.speechTags);
       }
     } catch { /* first time */ }
     setUiReady(true);
@@ -385,8 +391,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   useEffect(() => { try { localStorage.setItem(scoped("cutter.hl", owner), hl); } catch { /* private */ } }, [hl, owner]);
   useEffect(() => {
     if (!uiReady) return;
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell })); } catch { /* private */ }
-  }, [mode, tab, speechW, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, UI_KEY, uiReady]);
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags })); } catch { /* private */ }
+  }, [mode, tab, speechW, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, UI_KEY, uiReady]);
 
   const setTab = useCallback((t: Tab) => { setTabState(t); setSide(true); }, []);
 
@@ -422,6 +428,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           verbatimPlugin(read),
           spellPlugin(spellRef.current),
           gripPlugin(),
+          foldPlugin(),
         ],
       });
     }
@@ -434,6 +441,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         verbatimPlugin(read),
         spellPlugin(spellRef.current),
         gripPlugin(),
+        foldPlugin(),
       ],
     });
   }, []);
@@ -1450,6 +1458,21 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return () => el.removeEventListener("evi:open", on);
   }, [openCard]);
 
+  /** Tags only, on or off, in this editor. */
+  const toggleTags = useCallback((v: EditorView | null) => {
+    if (!v) return;
+    const on = !isFolded(v.state);
+    foldTags(v, on);
+    if (v === speechView.current) setSpeechTags(on);
+    setTick((n) => n + 1);
+    toast(on ? "Tags only — ▸ opens a card · " + (keyLabel(keyFor(keysRef.current, "tags-only")) || "the same button") + " shows everything again" : "Every card shown");
+  }, [setSpeechTags, toast]);
+  // the speech doc made again (a room joined, the Read tab left): folded the way it was
+  useEffect(() => {
+    const s = speechView.current;
+    if (s && isFolded(s.state) !== speechTags) foldTags(s, speechTags);
+  }, [speechTags]);
+
   // ---- the commands ---------------------------------------------------------
   const toggleVerb = useCallback(() => {
     const k = activeRef.current;
@@ -1475,6 +1498,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (id === "mode-read") { setMode(modeRef.current === "read" ? "edit" : "read"); return; }
     if (id === "timer") { setTimer((t) => ({ ...t, open: !t.open })); return; }
     if (id === "ribbon") { setMenu(null); setRibMin((r) => !r); return; }
+    if (id === "tags-only") { toggleTags(target()); return; }
     if (id === "spelling") {
       const i = SPELL_MODES.findIndex((m) => m.id === spellRef.current);
       const n = SPELL_MODES[(i + 1) % SPELL_MODES.length];
@@ -1570,7 +1594,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         return;
       }
     }
-  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary, answer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary, answer, toggleTags]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runRef = useRef(run);
   runRef.current = run;
@@ -1877,6 +1901,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     spellPlugin(spellRef.current),
     placePlugin(),
     gripPlugin(),
+    foldPlugin(speechTagsRef.current),
   ], []);
   // a card sent from the search (or Alt+Enter in a file) goes where the speech doc's cursor is
   useEffect(() => {
@@ -2353,6 +2378,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                             <button type="button" aria-pressed={p.read} onClick={() => setPaneRead(p.key, true)}>VERBATIM</button>
                           </span>
                         )}
+                        {!pdf && !p.read && (() => {
+                          const on = !!v && isFolded(v.state);
+                          return <button type="button" className={"rm-pbtn" + (on ? " on" : "")} aria-pressed={on} onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => { activate(p.key); toggleTags(views.current.get(p.key) || null); }} title={tip("tags-only", "Tags only: every card folded to its tag")}>TAGS</button>;
+                        })()}
                         {p.read && <span className="rm-pmeta">{words} WORDS{words ? ` · ${readTime(words).toUpperCase()}` : ""}</span>}
                         {p.read && many && (
                           <button type="button" className={"rm-pbtn" + (p.follow ? " on" : "")} aria-pressed={p.follow}
@@ -2402,6 +2432,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                     title={`Cards you send land under “${answering.head}” — click to send to the end again`}>↳ {answering.head} ×</button>
                 )}
                 <span className="rm-grow" />
+                <button type="button" className={"rm-pbtn" + (speechTags ? " on" : "")} aria-pressed={speechTags} onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => toggleTags(speechView.current)} title={tip("tags-only", "Tags only: every card folded to its tag, to see the doc as an outline and reorder it")}>TAGS ONLY</button>
                 <button type="button" className={"rm-pbtn" + (side && tab === "outline" && headsOf === "speech" ? " on" : "")}
                   onClick={() => { inSpeech.current = true; setTab("outline"); speechView.current?.focus(); readHeads(); }}
                   title="Its outline, in the side: click a heading to go there, drag one to move it and everything under it">OUTLINE</button>

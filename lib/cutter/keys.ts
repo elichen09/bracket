@@ -36,6 +36,7 @@ export const ACTIONS: Action[] = [
   { id: "read-beside", group: "View", label: "Read view beside", key: "alt+R", hint: "This file verbatimised beside the page, following the card you're in (again: closes it)" },
   { id: "next-pane", group: "View", label: "Next page", key: "alt+.", hint: "With two or three pages open, the cursor to the next one" },
   { id: "sidebar", group: "View", label: "Hide or show the side", key: "alt+S", hint: "Files and outline — out of the way for more room" },
+  { id: "tags-only", group: "View", label: "Tags only", key: "alt+H", hint: "Fold every card down to its tag — the cite and text hidden, not deleted — to see the doc as an outline and reorder it; a card's ▸ opens just that one. Again: everything back. Works on the speech doc or the file you're in" },
   { id: "spelling", group: "View", label: "Spelling", key: "alt+K", hint: "What the spell checker looks at: what you write (not the cards you cut), everything, or nothing — one press steps through them" },
   { id: "ribbon", group: "View", label: "Fold the ribbon", key: "alt+M", hint: "Round Magic's ribbon down to one line of group buttons (again: back)" },
   { id: "tag", group: "Headings", label: "Tag", key: "alt+4", hint: "A card's tag" },
