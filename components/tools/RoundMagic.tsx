@@ -22,7 +22,7 @@ import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize, readTime } from "@/lib/viewer/doc";
 import { textToHtml } from "@/lib/viewer/draw";
 import { listDocs, getDoc, keepDoc, dropDoc, newDocId, type ViewDoc, type ViewMeta, type DocKind } from "@/lib/viewer/store";
-import { verbatimPlugin, verbKey, readWords, countIn } from "@/lib/cutter/verbatim";
+import { verbatimPlugin, verbKey, readWords, countIn, isVerbatim } from "@/lib/cutter/verbatim";
 import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter/spell";
 import { placePlugin, placeCard } from "@/lib/cutter/place";
 import { gripPlugin } from "@/lib/cutter/grips";
@@ -205,6 +205,7 @@ const LAYOUT_MODES = [
   { id: "cockpit", name: "Cockpit", sub: "Outline left, search right, both always open — the pages between", pic: [[0, 0, 60, 6, "c"], [0, 6, 11, 32, "s"], [12, 6, 17, 32, "p"], [30, 6, 17, 32, "d"], [48, 6, 12, 32, "s"]] },
   { id: "stage", name: "Stage", sub: "The page you're in front and centre; the other leans in, click it to swap", pic: [[0, 0, 60, 38, "c"], [3, 4, 36, 30, "p"], [42, 9, 15, 20, "d"]] },
   { id: "dock", name: "Dock", sub: "The ribbon a floating dock at the bottom; the pages run to the top", pic: [[0, 0, 14, 38, "s"], [15, 0, 45, 38, "p"], [12, 31, 38, 5, "c"]] },
+  { id: "twin", name: "Twin", sub: "The speech doc twice: as you write it, and beside it verbatimised or tags only — a second look", pic: [[0, 0, 60, 4, "c"], [0, 4, 12, 34, "s"], [13, 4, 23, 34, "d"], [37, 4, 23, 34, "p"], [40, 9, 15, 2, "c"], [40, 15, 11, 2, "c"], [40, 21, 15, 2, "c"]] },
   { id: "deck", name: "Deck", sub: "One page at a time, full width, with tabs along the top — Alt+[ and Alt+] flip", pic: [[0, 0, 60, 4, "c"], [0, 4, 13, 34, "s"], [14, 5, 10, 4, "d"], [25, 5, 10, 4, "c"], [14, 9, 46, 29, "p"]] },
 ] as const;
 type LayoutId = (typeof LAYOUT_MODES)[number]["id"];
@@ -309,6 +310,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [drawer, setDrawer] = useState(false);
   // Deck: the pages opened this session, as tabs
   const [deckTabs, setDeckTabs] = useState<{ id: string; name: string }[]>([]);
+  // the speech doc verbatimised in place (Alt+V with the cursor in it)
+  const [speechVerb, setSpeechVerb] = useState(false);
+  // Twin: how the second look shows the speech doc
+  const [twinView, setTwinView] = useState<"verbatim" | "tags">("verbatim");
   // what is typed in the library search, for the commands that sit over its results
   const [cmdQ, setCmdQ] = useState("");
   const [cmdSel, setCmdSel] = useState(0);
@@ -1530,9 +1535,19 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
   // ---- the commands ---------------------------------------------------------
   const toggleVerb = useCallback(() => {
+    // the speech doc, when that is where you are: verbatimised in place, and back
+    const s = speechView.current;
+    if (s && (modeRef.current === "speech" || inSpeech.current || s.hasFocus())) {
+      const on = !isVerbatim(s.state);
+      s.dispatch(s.state.tr.setMeta(verbKey, on).setMeta("addToHistory", false));
+      setSpeechVerb(on);
+      if (!on) s.focus();
+      toast(on ? "Speech doc verbatimised — just what you'll read · " + (keyLabel(keyFor(keysRef.current, "verbatim")) || "the same key") + " to edit it again" : "Speech doc: editing");
+      return;
+    }
     const k = activeRef.current;
     if (k) setPaneRead(k, !isRead(k));
-  }, [setPaneRead]);
+  }, [setPaneRead, toast]);
 
   const focusLibrary = useCallback(() => {
     setTab("search");
@@ -1697,6 +1712,61 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setDeckTabs(rest);
     if (deckNow === id) deckOpen(rest.length ? rest[Math.min(i, rest.length - 1)].id : "speech");
   };
+
+  // ---- Twin: the speech doc a second time, read-only, verbatimised or folded to its tags ----------------
+  const twinBox = useRef<HTMLDivElement>(null);
+  const twinViewRef = useRef<EditorView | null>(null);
+  useEffect(() => {
+    if (layoutMode !== "twin") return;
+    // the speech doc is the whole of the work area: no file pages beside it
+    if (mode !== "speech" && mode !== "read") setMode("speech");
+  }, [layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const host = twinBox.current;
+    if (layoutMode !== "twin" || !host) return;
+    const tags = twinView === "tags";
+    const mk = (doc: PMNode) => EditorState.create({ doc, plugins: [verbatimPlugin(!tags), foldPlugin(tags), gripPlugin()] });
+    const s0 = speechView.current;
+    const tv = new EditorView(host, {
+      state: mk(s0 ? s0.state.doc : schema.topNodeType.createAndFill()!),
+      editable: () => false,
+      attributes: { class: "ct-sheet rm-twinsheet" },
+      // a click in the second look: the speech doc goes there, with the cursor
+      handleClickOn: (_v, pos) => {
+        const s = speechView.current;
+        if (!s) return false;
+        const at = Math.min(pos, s.state.doc.content.size);
+        try { s.dispatch(s.state.tr.setSelection(TextSelection.near(s.state.doc.resolve(at))).scrollIntoView()); } catch { /* the docs differ for a moment */ }
+        s.focus();
+        return true;
+      },
+    });
+    twinViewRef.current = tv;
+    let lastDoc: PMNode | null = s0 ? s0.state.doc : null, lastHead = -1;
+    // the speech doc, followed: what is written in it, and where its cursor is
+    const iv = window.setInterval(() => {
+      const s = speechView.current;
+      if (!s) return;
+      if (s.state.doc !== lastDoc) {
+        lastDoc = s.state.doc;
+        tv.dispatch(tv.state.tr.replaceWith(0, tv.state.doc.content.size, s.state.doc.content).setMeta("addToHistory", false));
+      }
+      const head = s.state.selection.head;
+      if (head !== lastHead && s.hasFocus()) {
+        lastHead = head;
+        const scroller = host.closest(".rm-scroll") as HTMLElement | null;
+        try {
+          const c = tv.coordsAtPos(Math.min(head, tv.state.doc.content.size));
+          if (scroller && c.top) {
+            const r = scroller.getBoundingClientRect();
+            if (c.top < r.top + 40 || c.top > r.bottom - 60) scroller.scrollTo({ top: scroller.scrollTop + c.top - r.top - r.height / 3, behavior: "smooth" });
+          }
+        } catch { /* hidden there */ }
+      }
+    }, 200);
+    return () => { clearInterval(iv); tv.destroy(); twinViewRef.current = null; };
+  }, [layoutMode, twinView]);
+  const twinWords = layoutMode === "twin" && speechView.current ? readWords(speechView.current.state.doc) : 0;
 
   // ---- commands, over the search's results -----------------------------------------------------------
   useEffect(() => {
@@ -2067,12 +2137,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     placePlugin(),
     gripPlugin(),
     foldPlugin(speechTagsRef.current),
+    verbatimPlugin(false),
   ], []);
   // a card sent from the search (or Alt+Enter in a file) goes where the speech doc's cursor is
   useEffect(() => {
     const placer = (d: { html: string; whole: boolean }) => {
       const s = speechView.current;
-      if (!s || !s.editable) return null;
+      // read-only only because it is verbatimised: the card still goes in
+      if (!s || (!s.editable && !isVerbatim(s.state))) return null;
       const nodes: PMNode[] = [];
       fromHtml(d.html).forEach((n) => nodes.push(n));
       const r = placeCard(s.state, nodes, d.whole);
@@ -2090,6 +2162,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, []);
   const onSpeechView = useCallback((v: EditorView | null) => {
     speechView.current = v;
+    // a speech doc made again (a room joined, the Read tab left) starts editable
+    setSpeechVerb(false);
     if (!v) { inSpeech.current = false; return; }
     v.dom.addEventListener("focus", () => { inSpeech.current = true; readHeads(); });
   }, [readHeads]);
@@ -2654,6 +2728,20 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               })}
             </div>
 
+            {layoutMode === "twin" && (
+              <section className="rm-pane rm-twin" aria-label="The speech doc, a second look">
+                <div className="rm-phead">
+                  <span className="rm-acc">SECOND LOOK</span>
+                  <b>Speech doc</b>
+                  <div className="rm-pmode" role="group" aria-label="Show it">
+                    <button type="button" aria-pressed={twinView === "verbatim"} onClick={() => setTwinView("verbatim")}>VERBATIM</button>
+                    <button type="button" aria-pressed={twinView === "tags"} onClick={() => setTwinView("tags")}>TAGS</button>
+                  </div>
+                  <span className="rm-pmeta">{twinWords} WORDS{twinWords ? ` · ${readTime(twinWords).toUpperCase()}` : ""}</span>
+                </div>
+                <div className="rm-scroll"><div className={"rm-col" + (twinView === "verbatim" ? " verb" : "")}><div ref={twinBox} /></div></div>
+              </section>
+            )}
             <div className="rm-ssplit" role="separator" aria-orientation="vertical" aria-label="Resize the speech doc" onPointerDown={dragSpeech}
               onDoubleClick={() => { if (layoutMode === "stack") setSpeechH(.42); else setSpeechW(.46); }} title="Drag to resize · double-click to reset" />
             {/* the speech doc: Evidence's send doc, its editor, its outline */}
@@ -2667,6 +2755,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                     title={`Cards you send land under “${answering.head}” — click to send to the end again`}>↳ {answering.head} ×</button>
                 )}
                 <span className="rm-grow" />
+                <button type="button" className={"rm-pbtn" + (speechVerb ? " on" : "")} aria-pressed={speechVerb} onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { inSpeech.current = true; toggleVerb(); }} title={tip("verbatim", "Verbatimise the speech doc: just what you'll read")}>VERBATIM</button>
                 <button type="button" className={"rm-pbtn" + (speechTags ? " on" : "")} aria-pressed={speechTags} onMouseDown={(e) => e.preventDefault()}
                   onClick={() => toggleTags(speechView.current)} title={tip("tags-only", "Tags only: every card folded to its tag, to see the doc as an outline and reorder it")}>TAGS ONLY</button>
                 <button type="button" className={"rm-pbtn" + (side && tab === "outline" && headsOf === "speech" ? " on" : "")}

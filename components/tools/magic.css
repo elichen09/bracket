@@ -1048,3 +1048,11 @@ html[data-rm-layout="focus"]:has(.rm[data-layout="focus"]) .nav { display: none;
 .rm-cmd kbd { font: 500 10.5px var(--rm-mono); color: var(--side-mut); border: 1px solid var(--well-b); padding: 1px 5px; }
 .rm-cmd:hover, .rm-cmd[aria-selected="true"] { background: color-mix(in srgb, var(--acc) 26%, var(--side)); color: var(--hi); }
 .tp-search.cmdmode :is(#results, .binbar, .srcsw) { display: none !important; }
+
+/* ---- Twin: the speech doc, and its second look beside it */
+.rm[data-layout="twin"] .rm-panes, .rm[data-layout="twin"] .rm-ssplit { display: none !important; }
+.rm[data-layout="twin"] .evi.rm-speech { display: flex; flex: 1 1 0; min-width: 0; }
+.rm[data-layout="twin"] .rm-twin { order: 3; flex: 1 1 0; min-width: 0; border-left: 1px solid #d9d9d9; background: #fbfbfb; }
+.rm[data-layout="twin"][data-mode="read"] .rm-twin { display: none; }
+.rm .rm-twin .ct-sheet { cursor: pointer; caret-color: transparent; min-height: 40vh; }
+.rm .rm-twin .rm-phead { background: color-mix(in srgb, var(--acc) 6%, #f4f4f4); }
