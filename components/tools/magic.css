@@ -922,11 +922,11 @@ html[data-rm-layout="focus"]:has(.rm[data-layout="focus"]) .nav { display: none;
 @media (prefers-reduced-motion: reduce) { .rm[data-layout="focus"] .rm-side { transition: none; } }
 
 /* =====================================================================
-   The radical four. Not columns moved about: the window taken apart and
+   The radical three. Not columns moved about: the window taken apart and
    put back another way. Cockpit opens the side's outline and search at
    once, on either side of the pages; Stage puts the page you are in on a
    stage and leans the other in from the wings; Dock floats the ribbon at
-   the bottom; Rail stands it down the left, a design app's tool column.
+   the bottom.
    ===================================================================== */
 
 /* ---- Cockpit: the side taken apart (display: contents) and laid out on the body's grid — outline left, search right */
@@ -987,30 +987,3 @@ html[data-rm-layout="focus"]:has(.rm[data-layout="focus"]) .nav { display: none;
 .rm[data-layout="dock"] .rm-rib [data-tip]:hover::after { top: auto; bottom: calc(100% + 8px); }
 .rm[data-layout="dock"] .rm-rib .rm-titlebox [data-tip]:hover::after { bottom: calc(100% + 8px); }
 
-/* ---- Rail: the ribbon stood on end down the left, its groups stacked */
-.rm[data-layout="rail"] { padding-left: 156px; }
-.rm[data-layout="rail"] .rm-rib {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 156px; z-index: 25;
-  flex-direction: column; flex-wrap: nowrap; align-items: stretch; row-gap: 0; padding: 8px 8px 10px;
-  border-bottom: 0; border-right: 1px solid var(--chrome-edge); overflow: visible;
-}
-.rm[data-layout="rail"] .rm-brand { height: auto; padding: 2px 0 10px; border-right: 0; border-bottom: 1px solid var(--chrome-line); margin-bottom: 8px; }
-.rm[data-layout="rail"] .rm-logo { display: block; }
-.rm[data-layout="rail"] .rm-rib > .rm-g { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 0 8px; margin-bottom: 8px; border-right: 0; border-bottom: 1px solid var(--chrome-line); align-self: stretch; }
-.rm[data-layout="rail"] .rm-rib > .rm-g > * { flex: 1 1 auto; }
-.rm[data-layout="rail"] .rm-rib > .rm-g .rm-gcar { flex: 0 0 26px; }
-.rm[data-layout="rail"] .rm-spacer { flex: 1 1 8px; }
-.rm[data-layout="rail"] .rm-titlebox { flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 6px; margin: 0; padding: 8px 0 0; border-top: 1px solid var(--chrome-line); }
-.rm[data-layout="rail"] .rm-trow { flex-wrap: wrap; height: auto; justify-content: flex-start; gap: 4px; }
-.rm[data-layout="rail"] .rm-trow:first-child { flex: 0 0 auto; }
-.rm[data-layout="rail"] .rm-title { width: 100%; max-width: none; flex: 1 1 100%; }
-.rm[data-layout="rail"] .rm-meta { white-space: normal; }
-.rm[data-layout="rail"] .rm-modes { display: grid; grid-template-columns: 1fr 1fr; height: auto; width: 100%; }
-.rm[data-layout="rail"] .rm-modes button { height: 26px; }
-.rm[data-layout="rail"] .rm-modes button + button { border-left: 0; }
-.rm[data-layout="rail"] .rm-modes button:nth-child(even) { border-left: 1px solid var(--btnb); }
-.rm[data-layout="rail"] .rm-modes button:nth-child(n + 3) { border-top: 1px solid var(--btnb); }
-.rm[data-layout="rail"] :is(.rm-share, .rm-room) { flex: 1 1 100%; justify-content: flex-start; }
-.rm[data-layout="rail"] .rm-rib [data-tip]:hover::after,
-.rm[data-layout="rail"] .rm-rib .rm-titlebox [data-tip]:hover::after { top: 50%; left: calc(100% + 8px); right: auto; transform: translateY(-50%); animation-name: rmTipSide; }
-@keyframes rmTipSide { from { opacity: 0; transform: translate(-3px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }
