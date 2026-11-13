@@ -24,6 +24,7 @@ const SPACE_AFTER = 160;            // 8pt under a paragraph
 const SPACE_AFTER_TAG = 160;        // 8pt under a tag
 const SPACE_AFTER_HEAD = 80;        // 4pt under a block, hat or pocket
 const SPACE_BEFORE_HEAD = 240;      // 12pt over a heading
+const LINE = 276;                   // 1.15 line spacing (240 is single)
 
 /** "#ffff00" -> "FFFF00", which is how OOXML wants a colour. */
 const hex = (c?: string | null) => (c ? String(c).replace(/^#/, "").toUpperCase() : undefined);
@@ -85,7 +86,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
       alignment: style && style.centre ? AlignmentType.CENTER : undefined,
       // Room between things, given the way a word processor gives it: spacing
       // on the paragraph rather than blank lines to delete later.
-      spacing: { before: l ? SPACE_BEFORE_HEAD : 0, after: l === 4 ? SPACE_AFTER_TAG : l ? SPACE_AFTER_HEAD : SPACE_AFTER, line: 240, lineRule: LineRuleType.AUTO },
+      spacing: { before: l ? SPACE_BEFORE_HEAD : 0, after: l === 4 ? SPACE_AFTER_TAG : l ? SPACE_AFTER_HEAD : SPACE_AFTER, line: LINE, lineRule: LineRuleType.AUTO },
       border: style && style.box ? {
         top: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
         bottom: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
@@ -116,7 +117,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
     styles: {
       default: {
         // and what is typed in Word afterwards gets the same room
-        document: { run: { font: "Calibri", size: 11 * PT, color: "000000" }, paragraph: { spacing: { after: SPACE_AFTER, line: 240, lineRule: LineRuleType.AUTO } } },
+        document: { run: { font: "Calibri", size: 11 * PT, color: "000000" }, paragraph: { spacing: { after: SPACE_AFTER, line: LINE, lineRule: LineRuleType.AUTO } } },
         heading1: headingStyle(1), heading2: headingStyle(2), heading3: headingStyle(3), heading4: headingStyle(4),
         // not used here, but black too, for whoever goes on in Word
         heading5: { run: { font: "Calibri", color: "000000", italics: false } },
