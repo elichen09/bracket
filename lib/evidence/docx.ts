@@ -16,7 +16,13 @@ import type { Run, Elem } from "./elements";
 
 const PT = 2;                       // docx sizes are half-points
 const TWIP = 1440;                  // per inch
-const SPACE_AFTER = 120;            // 6pt under a paragraph
+// The room a cut file opened in Word has: 8pt under every paragraph — a card's
+// cite, each paragraph of its text — and under its tag, so the tag, the cite
+// and the card sit apart the way they do in a file cut in Word. (6pt, and 3pt
+// under a tag, packed them together.)
+const SPACE_AFTER = 160;            // 8pt under a paragraph
+const SPACE_AFTER_TAG = 160;        // 8pt under a tag
+const SPACE_AFTER_HEAD = 80;        // 4pt under a block, hat or pocket
 const SPACE_BEFORE_HEAD = 240;      // 12pt over a heading
 
 /** "#ffff00" -> "FFFF00", which is how OOXML wants a colour. */
@@ -37,7 +43,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
   stage("importing");
   const {
     Document, Packer, Paragraph, TextRun, PageBreak, HeadingLevel,
-    AlignmentType, BorderStyle, ShadingType, UnderlineType, PageOrientation,
+    AlignmentType, BorderStyle, ShadingType, UnderlineType, PageOrientation, LineRuleType,
   } = await import("docx");
   stage("imported");
 
@@ -79,7 +85,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
       alignment: style && style.centre ? AlignmentType.CENTER : undefined,
       // Room between things, given the way a word processor gives it: spacing
       // on the paragraph rather than blank lines to delete later.
-      spacing: { before: l ? SPACE_BEFORE_HEAD : 0, after: l ? 60 : SPACE_AFTER },
+      spacing: { before: l ? SPACE_BEFORE_HEAD : 0, after: l === 4 ? SPACE_AFTER_TAG : l ? SPACE_AFTER_HEAD : SPACE_AFTER, line: 240, lineRule: LineRuleType.AUTO },
       border: style && style.box ? {
         top: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
         bottom: { style: BorderStyle.SINGLE, size: 24, color: "333333", space: 8 },
@@ -101,7 +107,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
     },
     paragraph: {
       alignment: LEVEL[l].centre ? AlignmentType.CENTER : AlignmentType.LEFT,
-      spacing: { before: SPACE_BEFORE_HEAD, after: 60 },
+      spacing: { before: SPACE_BEFORE_HEAD, after: l === 4 ? SPACE_AFTER_TAG : SPACE_AFTER_HEAD },
     },
   });
 
@@ -109,7 +115,8 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
     // the defaults themselves, replaced — not a second set beside them, which Word may ignore
     styles: {
       default: {
-        document: { run: { font: "Calibri", size: 11 * PT, color: "000000" } },
+        // and what is typed in Word afterwards gets the same room
+        document: { run: { font: "Calibri", size: 11 * PT, color: "000000" }, paragraph: { spacing: { after: SPACE_AFTER, line: 240, lineRule: LineRuleType.AUTO } } },
         heading1: headingStyle(1), heading2: headingStyle(2), heading3: headingStyle(3), heading4: headingStyle(4),
         // not used here, but black too, for whoever goes on in Word
         heading5: { run: { font: "Calibri", color: "000000", italics: false } },
