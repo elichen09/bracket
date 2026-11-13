@@ -859,7 +859,7 @@ html[data-rm-palette="glacier"]:has(.rm) .nav { --nav-bg: #E8EEF5; --ink: #14202
 
 /* the menu: a picture of each */
 .rm-menu h4 .rm-h4k { float: right; letter-spacing: .06em; text-transform: none; color: var(--mut); opacity: .8; }
-.rm-lays { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 2px 6px 4px; }
+.rm-lays { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px 6px; padding: 2px 6px 4px; }
 .rm-lay { display: grid; justify-items: center; gap: 5px; padding: 7px 4px 6px; border: 1px solid transparent; background: transparent; color: var(--txt); cursor: pointer; }
 .rm-lay:hover { background: var(--pop-h); }
 .rm-lay[aria-checked="true"] { border-color: var(--acc); background: var(--pop-h); }
@@ -920,3 +920,97 @@ html[data-rm-layout="focus"]:has(.rm[data-layout="focus"]) .nav { display: none;
 .rm[data-layout="focus"] .rm-status { opacity: .55; transition: opacity .15s; }
 .rm[data-layout="focus"] .rm-status:hover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .rm[data-layout="focus"] .rm-side { transition: none; } }
+
+/* =====================================================================
+   The radical four. Not columns moved about: the window taken apart and
+   put back another way. Cockpit opens the side's outline and search at
+   once, on either side of the pages; Stage puts the page you are in on a
+   stage and leans the other in from the wings; Dock floats the ribbon at
+   the bottom; Rail stands it down the left, a design app's tool column.
+   ===================================================================== */
+
+/* ---- Cockpit: the side taken apart (display: contents) and laid out on the body's grid — outline left, search right */
+.rm[data-layout="cockpit"] .rm-body {
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: 250px minmax(0, 1fr) clamp(280px, var(--rm-side, 290px), 460px);
+}
+.rm[data-layout="cockpit"].side-hidden .rm-body { grid-template-columns: 0 minmax(0, 1fr) clamp(280px, var(--rm-side, 290px), 460px); }
+.rm[data-layout="cockpit"] .rm-side, .rm[data-layout="cockpit"].side-hidden .rm-side { display: contents; }
+.rm[data-layout="cockpit"] .rm-shead { grid-column: 1; grid-row: 1; background: var(--side); border-right: 1px solid var(--chrome-edge); min-width: 0; overflow: hidden; }
+.rm[data-layout="cockpit"] .rm-tabpane { grid-column: 1; grid-row: 2; background: var(--side); color: var(--side-txt); min-width: 0; border-right: 1px solid var(--chrome-edge); }
+.rm[data-layout="cockpit"] .rm-tabpane.tp-search { display: flex !important; grid-column: 3; grid-row: 1 / 3; padding-top: 10px; border-right: 0; border-left: 1px solid var(--chrome-edge); }
+.rm[data-layout="cockpit"][data-tab="search"] .rm-tabpane.tp-outline { display: flex !important; }
+.rm[data-layout="cockpit"] .rm-shead .tb-search { display: none; }
+.rm[data-layout="cockpit"].side-hidden :is(.rm-shead, .rm-tabpane:not(.tp-search)) { display: none !important; }
+.rm[data-layout="cockpit"] .rm-main { grid-column: 2; grid-row: 1 / 3; min-width: 0; overflow: hidden; }
+.rm[data-layout="cockpit"] :is(.rm-sgrab, .rm-showside) { display: none; }
+.rm[data-layout="cockpit"] .tp-search::before { content: "SEARCH"; display: block; padding: 0 12px 8px; font: 500 10.5px var(--rm-mono); letter-spacing: .14em; color: var(--side-mut); }
+
+/* ---- Stage: the page you are in on the stage; the other leans in from the wings, and comes forward when you click into it */
+.rm[data-layout="stage"] .rm-work { background: var(--chrome); background-image: var(--chrome-glow); padding: 16px 18px 18px; gap: 18px; perspective: 1700px; }
+.rm[data-layout="stage"] .rm-ssplit { display: none !important; }
+.rm[data-layout="stage"] :is(.rm-panes, .evi.rm-speech) {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .2), 0 30px 60px -28px rgba(0, 0, 0, .8);
+  transition: flex-basis .42s cubic-bezier(.2, .8, .2, 1), transform .42s cubic-bezier(.2, .8, .2, 1), opacity .3s, filter .3s;
+}
+.rm[data-layout="stage"][data-mode="split"] .evi.rm-speech { animation: none; }
+.rm[data-layout="stage"][data-mode="split"][data-heads="page"] .rm-panes { flex: 1 1 auto; }
+.rm[data-layout="stage"][data-mode="split"][data-heads="page"] .evi.rm-speech {
+  flex: 0 0 25%; transform: rotateY(-16deg) scale(.9); transform-origin: left center; opacity: .74; filter: saturate(.55); cursor: pointer;
+}
+.rm[data-layout="stage"][data-mode="split"][data-heads="speech"] .evi.rm-speech { flex: 1 1 auto; }
+.rm[data-layout="stage"][data-mode="split"][data-heads="speech"] .rm-panes {
+  flex: 0 0 25%; transform: rotateY(16deg) scale(.9); transform-origin: right center; opacity: .74; filter: saturate(.55); cursor: pointer;
+}
+.rm[data-layout="stage"][data-mode="split"][data-heads="page"] .evi.rm-speech:hover { opacity: .95; transform: rotateY(-9deg) scale(.93); filter: none; }
+.rm[data-layout="stage"][data-mode="split"][data-heads="speech"] .rm-panes:hover { opacity: .95; transform: rotateY(9deg) scale(.93); filter: none; }
+.rm[data-layout="stage"] :is(.rm-panes, .evi.rm-speech) { min-width: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .rm[data-layout="stage"] :is(.rm-panes, .evi.rm-speech) { transition: none; } }
+
+/* ---- Dock: the ribbon, folded to a line, floats over the bottom of the window */
+.rm[data-layout="dock"] .rm-rib {
+  position: absolute; z-index: 40; left: 50%; bottom: 40px; transform: translateX(-50%);
+  /* two tiers: the tools, and under them the file and its controls */
+  width: min(880px, calc(100% - 24px)); flex-wrap: wrap; justify-content: center; row-gap: 6px;
+  padding: 6px 8px; border: 1px solid var(--chrome-line);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), 0 28px 60px -16px rgba(0, 0, 0, .65), 0 0 40px -10px rgba(var(--acc-rgb), .35);
+  animation: rmDockIn .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes rmDockIn { from { opacity: 0; transform: translate(-50%, 20px); } }
+.rm[data-layout="dock"].ribmin .rm-rib { flex-wrap: wrap; }
+.rm[data-layout="dock"] .rm-brand { display: none; }
+.rm[data-layout="dock"].ribmin .rm-titlebox { flex: 1 0 100%; margin-left: 0; justify-content: center; padding-top: 6px; border-top: 1px solid var(--chrome-line); }
+.rm[data-layout="dock"] .rm-titlebox .rm-trow { justify-content: center; }
+.rm[data-layout="dock"] .rm-trow:first-child { flex: 0 1 auto; }
+.rm[data-layout="dock"] .rm-title { width: 150px; max-width: 150px; }
+.rm[data-layout="dock"] .rm-spacer { display: none; }
+.rm[data-layout="dock"] .rm-rib [data-tip]:hover::after { top: auto; bottom: calc(100% + 8px); }
+.rm[data-layout="dock"] .rm-rib .rm-titlebox [data-tip]:hover::after { bottom: calc(100% + 8px); }
+
+/* ---- Rail: the ribbon stood on end down the left, its groups stacked */
+.rm[data-layout="rail"] { padding-left: 156px; }
+.rm[data-layout="rail"] .rm-rib {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 156px; z-index: 25;
+  flex-direction: column; flex-wrap: nowrap; align-items: stretch; row-gap: 0; padding: 8px 8px 10px;
+  border-bottom: 0; border-right: 1px solid var(--chrome-edge); overflow: visible;
+}
+.rm[data-layout="rail"] .rm-brand { height: auto; padding: 2px 0 10px; border-right: 0; border-bottom: 1px solid var(--chrome-line); margin-bottom: 8px; }
+.rm[data-layout="rail"] .rm-logo { display: block; }
+.rm[data-layout="rail"] .rm-rib > .rm-g { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 0 8px; margin-bottom: 8px; border-right: 0; border-bottom: 1px solid var(--chrome-line); align-self: stretch; }
+.rm[data-layout="rail"] .rm-rib > .rm-g > * { flex: 1 1 auto; }
+.rm[data-layout="rail"] .rm-rib > .rm-g .rm-gcar { flex: 0 0 26px; }
+.rm[data-layout="rail"] .rm-spacer { flex: 1 1 8px; }
+.rm[data-layout="rail"] .rm-titlebox { flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 6px; margin: 0; padding: 8px 0 0; border-top: 1px solid var(--chrome-line); }
+.rm[data-layout="rail"] .rm-trow { flex-wrap: wrap; height: auto; justify-content: flex-start; gap: 4px; }
+.rm[data-layout="rail"] .rm-trow:first-child { flex: 0 0 auto; }
+.rm[data-layout="rail"] .rm-title { width: 100%; max-width: none; flex: 1 1 100%; }
+.rm[data-layout="rail"] .rm-meta { white-space: normal; }
+.rm[data-layout="rail"] .rm-modes { display: grid; grid-template-columns: 1fr 1fr; height: auto; width: 100%; }
+.rm[data-layout="rail"] .rm-modes button { height: 26px; }
+.rm[data-layout="rail"] .rm-modes button + button { border-left: 0; }
+.rm[data-layout="rail"] .rm-modes button:nth-child(even) { border-left: 1px solid var(--btnb); }
+.rm[data-layout="rail"] .rm-modes button:nth-child(n + 3) { border-top: 1px solid var(--btnb); }
+.rm[data-layout="rail"] :is(.rm-share, .rm-room) { flex: 1 1 100%; justify-content: flex-start; }
+.rm[data-layout="rail"] .rm-rib [data-tip]:hover::after,
+.rm[data-layout="rail"] .rm-rib .rm-titlebox [data-tip]:hover::after { top: 50%; left: calc(100% + 8px); right: auto; transform: translateY(-50%); animation-name: rmTipSide; }
+@keyframes rmTipSide { from { opacity: 0; transform: translate(-3px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }

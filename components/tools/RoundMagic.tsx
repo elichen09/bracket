@@ -201,6 +201,11 @@ const LAYOUT_MODES = [
   { id: "mirror", name: "Mirror", sub: "Speech doc left, side right", pic: [[0, 0, 60, 6, "c"], [0, 6, 22, 32, "d"], [23, 6, 22, 32, "p"], [46, 6, 14, 32, "s"]] },
   { id: "stack", name: "Stack", sub: "The speech doc under the file", pic: [[0, 0, 60, 6, "c"], [0, 6, 14, 32, "s"], [15, 6, 45, 15, "p"], [15, 22, 45, 16, "d"]] },
   { id: "focus", name: "Focus", sub: "One-line ribbon, side slides in from the edge", pic: [[0, 0, 60, 3, "c"], [10, 3, 22, 35, "p"], [33, 3, 18, 35, "d"], [0, 3, 2, 35, "s"]] },
+  // the radical four: the window rearranged, not just its columns moved
+  { id: "cockpit", name: "Cockpit", sub: "Outline left, search right, both always open — the pages between", pic: [[0, 0, 60, 6, "c"], [0, 6, 11, 32, "s"], [12, 6, 17, 32, "p"], [30, 6, 17, 32, "d"], [48, 6, 12, 32, "s"]] },
+  { id: "stage", name: "Stage", sub: "The page you're in front and centre; the other leans in, click it to swap", pic: [[0, 0, 60, 38, "c"], [3, 4, 36, 30, "p"], [42, 9, 15, 20, "d"]] },
+  { id: "dock", name: "Dock", sub: "The ribbon a floating dock at the bottom; the pages run to the top", pic: [[0, 0, 14, 38, "s"], [15, 0, 45, 38, "p"], [12, 31, 38, 5, "c"]] },
+  { id: "rail", name: "Rail", sub: "The ribbon a tool rail down the left, like a design app", pic: [[0, 0, 9, 38, "c"], [10, 0, 13, 38, "s"], [24, 0, 18, 38, "p"], [43, 0, 17, 38, "d"]] },
 ] as const;
 type LayoutId = (typeof LAYOUT_MODES)[number]["id"];
 const SIDE_W = 290, SIDE_WIDE = 560;
@@ -294,14 +299,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [hideDim, setHideDim] = useState(false);
   const [depth, setDepth] = useState(4);
   const [olFilter, setOlFilter] = useState("");
-  const [menu, setMenu] = useState<null | { id: string; x: number; y: number }>(null);
+  const [menu, setMenu] = useState<null | { id: string; x: number; y: number; up?: number }>(null);
   // the ribbon: folded to one line, or with some of its groups folded into a button each
   const [ribMin, setRibMin] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutId>("classic");
   // Focus: the side is a drawer, out of sight until the pointer reaches the edge or a key asks for it
   const [drawer, setDrawer] = useState(false);
   const focusLayout = layoutMode === "focus";
-  const ribSmall = ribMin || focusLayout;
+  // the dock and the rail are the folded ribbon, laid out another way
+  const ribSmall = ribMin || focusLayout || layoutMode === "dock" || layoutMode === "rail";
   const [folded, setFolded] = useState<string[]>([]);
   const [palette, setPalette] = useState<PaletteId>("graphite");
   const [sideW, setSideW] = useState(SIDE_W);
@@ -1738,8 +1744,20 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (menu?.id === id) { setMenu(null); return; }
     const r = (anchor || e.currentTarget).getBoundingClientRect();
     const w = id === "palette" ? 480 : id === "pages" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
+    const inRib = !!(anchor || e.currentTarget).closest(".rm-rib");
+    // from the dock a menu opens upwards; from the rail, out to its right
+    if (inRib && layoutMode === "dock") { setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: 0, up: window.innerHeight - r.top + 6 }); return; }
+    if (inRib && layoutMode === "rail") {
+      const rail = (anchor || e.currentTarget).closest(".rm-rib")!.getBoundingClientRect();
+      setMenu({ id, x: Math.min(window.innerWidth - w - 8, rail.right + 6), y: Math.max(8, Math.min(r.top, window.innerHeight - 620)) }); return;
+    }
     setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: r.bottom + 6 });
   };
+
+  /** Where a menu sits: under its button, or — opened from the dock — over it, kept on screen. */
+  const menuAt = (m: { x: number; y: number; up?: number }): React.CSSProperties =>
+    typeof m.up === "number" ? { left: m.x, bottom: m.up, maxHeight: `calc(100vh - ${m.up + 8}px)`, overflowY: "auto" }
+      : layoutMode === "rail" ? { left: m.x, top: m.y, maxHeight: `calc(100vh - ${m.y + 8}px)`, overflowY: "auto" } : { left: m.x, top: m.y };
 
   // ---- searching every file ------------------------------------------------------
   const indexFor = useRef<{ files: CutMeta[] | null; ix: { s: unknown; cards: unknown[][]; where: { file: number; i: number }[] } | null }>({ files: null, ix: null });
@@ -2131,7 +2149,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-tab={tab} data-heads={headsOf}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
@@ -2203,7 +2221,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-shead" role="tablist">
             <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "outline"} onClick={() => setTab("outline")}>OUTLINE</button>
             <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "files"} onClick={() => setTab("files")}>FILES</button>
-            <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "search"} onClick={focusLibrary} title={tip("library")}>SEARCH</button>
+            <button type="button" role="tab" className="rm-tabbtn tb-search" aria-selected={tab === "search"} onClick={focusLibrary} title={tip("library")}>SEARCH</button>
             <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "round"} onClick={() => setTab("round")}>ROUND</button>
             <span className="rm-grow" />
             <button type="button" className={"rm-sico" + (sideW > 420 ? " on" : "")} onClick={() => setSideW((w) => (w > 420 ? SIDE_W : SIDE_WIDE))} aria-label={sideW > 420 ? "Narrower" : "Wider"} title={sideW > 420 ? "Narrower — or drag the edge" : "Wider — or drag the edge"}>{I.wide}</button>
@@ -2211,7 +2229,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
 
           {/* outline: of whatever the cursor is in */}
-          <div className="rm-tabpane" hidden={tab !== "outline"}>
+          <div className="rm-tabpane tp-outline" hidden={tab !== "outline"}>
             <div className="rm-depth" role="group" aria-label="Outline depth">
               {[1, 2, 3, 4].map((n) => (
                 <button key={n} type="button" aria-pressed={depth === n} onClick={() => setDepth(n)} title={["Pockets", "Hats", "Blocks", "Tags"][n - 1]}>{n}</button>
@@ -2242,7 +2260,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
 
           {/* your files */}
-          <div className="rm-tabpane" hidden={tab !== "files"}>
+          <div className="rm-tabpane tp-files" hidden={tab !== "files"}>
             <label className="rm-sfilter">{I.search}
               <input ref={qIn} value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search every file${K("find") ? " · " + K("find") : ""}`} spellCheck={false} aria-label="Search every file"
                 onKeyDown={(e) => {
@@ -2309,7 +2327,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
 
           {/* the library: Evidence's search, drawn by its engine */}
-          <div className="rm-tabpane" hidden={tab !== "search"}>
+          <div className="rm-tabpane tp-search" hidden={tab !== "search"}>
             {answering && (
               <div className="rm-ansbar">
                 <div className="row">
@@ -2341,7 +2359,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
 
           {/* the round: their docs, SpeechDrop, your partner */}
-          <div className="rm-tabpane" hidden={tab !== "round"}>
+          <div className="rm-tabpane tp-round" hidden={tab !== "round"}>
             <div className="rm-rsec">
               <div className="rm-cap">SPEECHDROP</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); void listSd(sdCode); }}>
@@ -2554,7 +2572,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
       {/* ------------------------------------------------------------ menus */}
       {openGroup && menu && (
-        <div className="rm-menu rm-gpop" style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className="rm-menu rm-gpop" style={menuAt(menu)} role="menu">
           <h4><span>{openGroup.name.toUpperCase()}</span>
             {!ribMin && <button type="button" className="rm-linkbtn" onClick={() => { setFolded((f) => f.filter((x) => x !== openGroup.id)); setMenu(null); }}>UNFOLD INTO THE RIBBON</button>}
           </h4>
@@ -2562,7 +2580,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {menu?.id === "palette" && (
-        <div className="rm-menu wide pal" style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className="rm-menu wide pal" style={menuAt(menu)} role="menu">
           <h4>LAYOUT{K("layout") ? <span className="rm-h4k">{K("layout")} steps through them</span> : null}</h4>
           <div className="rm-lays">
             {LAYOUT_MODES.map((l) => (
@@ -2590,7 +2608,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {menu?.id === "share" && (
-        <div className="rm-menu wide rm-sharemenu" style={{ left: menu.x, top: menu.y }} role="dialog" aria-label="Share">
+        <div className="rm-menu wide rm-sharemenu" style={menuAt(menu)} role="dialog" aria-label="Share">
           <h4>THIS FILE</h4>
           {!cur || curTheirs ? (
             <div className="rm-mnote">{cur ? "A doc of theirs is kept apart from your files — Keep as mine makes it one, and then it can be shared." : "Open a file to share it."}</div>
@@ -2622,7 +2640,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {menu?.id === "speech" && (
-        <div className="rm-menu" style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className="rm-menu" style={menuAt(menu)} role="menu">
           <h4>THE SPEECH DOC</h4>
           <button type="button" className="rm-mb" data-act="format" onClick={() => setMenu(null)} title="Title it, drop the analytics, renumber, take out the white space">Format for sending…</button>
           <button type="button" className="rm-mb" data-act="copySend" onClick={() => setMenu(null)}>Copy it</button>
@@ -2635,7 +2653,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {menu?.id === "hl" && (
-        <div className="rm-menu" style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className="rm-menu" style={menuAt(menu)} role="menu">
           <h4>HIGHLIGHTER</h4>
           <div className="rm-swrow">
             {C.HIGHLIGHTS.map((h) => (
@@ -2647,7 +2665,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {menu?.id === "pages" && (
-        <div className="rm-menu wide" style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className="rm-menu wide" style={menuAt(menu)} role="menu">
           <h4>PAGES</h4>
           {LAYOUTS.map((l) => {
             const k = "key" in l ? K(l.key) : "";
@@ -2665,7 +2683,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {menu?.id === "more" && (
-        <div className="rm-menu" style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className="rm-menu" style={menuAt(menu)} role="menu">
           <h4>LIBRARY</h4>
           <button type="button" className="rm-mb" data-act="import" onClick={() => setMenu(null)}>Import an evidence file…</button>
           <button type="button" className="rm-mb" data-act="case" onClick={() => setMenu(null)}>Your case…</button>
