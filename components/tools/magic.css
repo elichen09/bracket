@@ -685,3 +685,61 @@ body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select:
 .rm .ct-sheet h4:hover .rm-foldchip.open, .rm .ct-sheet .rm-foldchip.open:hover { opacity: 1; }
 /* folded, a doc of tags sits close together, like an outline */
 .rm .ct-sheet h4:has(> .rm-foldchip:not(.open)) { margin-bottom: 2pt; margin-top: 6pt; }
+
+/* ------------------------------------------------------------ the search, in a narrow side
+   The name gets the line — two lines of it if it needs them — and what can be
+   done to a line waits for the pointer, drawn over its end rather than beside
+   it. Bins are one line until asked for. */
+.rm-side .evi.rm-evsearch { --evi-gut: 10px; }
+.rm-side .evi.rm-evsearch :is(.node, .row, .arg),
+.rm-side .evi.rm-evsearch :is(.node, .row, .arg):hover:not(.sel),
+.rm-side .evi.rm-evsearch :is(.node, .row, .arg).sel {
+  align-items: flex-start; gap: 6px; line-height: 1.32;
+  padding: 3px var(--evi-gut) 3px calc(var(--evi-gut) + var(--step, 0px)); transition: background .1s;
+}
+.rm-side .evi.rm-evsearch .lv2 { --step: 11px; }
+.rm-side .evi.rm-evsearch .lv3 { --step: 22px; }
+.rm-side .evi.rm-evsearch .lv4 { --step: 33px; }
+.rm-side .evi.rm-evsearch .node.lv1 { margin-top: 6px; padding-top: 7px; }
+.rm-side .evi.rm-evsearch .chev { align-self: flex-start; margin-top: 3px; }
+.rm-side .evi.rm-evsearch :is(.ttl, .argt, .nlabel) {
+  white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.rm-side .evi.rm-evsearch .ttl { min-width: 0; font-size: 13px; font-weight: 600; }
+.rm-side .evi.rm-evsearch .argt { font-size: 12.5px; }
+.rm-side .evi.rm-evsearch .arg.hasx .argt { display: block; overflow: visible; }
+.rm-side .evi.rm-evsearch .argx b { font-weight: 600; color: var(--side-txt); }
+.rm-side .evi.rm-evsearch .sel .argx b { color: #fff; }
+.rm-side .evi.rm-evsearch .argx.peek { -webkit-line-clamp: 3; opacity: .92; }
+.rm-side .evi.rm-evsearch #results { padding-bottom: 28px; }
+/* a line's buttons: over its end, when it is pointed at */
+.rm-side .evi.rm-evsearch .acts {
+  position: absolute; right: 0; top: 0; bottom: 0; display: none; align-items: flex-start; gap: 1px;
+  padding: 1px 5px 0 22px; background: linear-gradient(90deg, transparent, var(--surface) 18px);
+}
+.rm-side .evi.rm-evsearch :is(.node, .row, .arg):hover > .acts { display: flex; }
+.rm-side .evi.rm-evsearch .sel > .acts { background: linear-gradient(90deg, transparent, var(--t-deep, var(--ink)) 18px); }
+.rm-side .evi.rm-evsearch .act { width: 22px; height: 22px; display: grid; place-items: center; color: var(--side-mut); cursor: pointer; }
+.rm-side .evi.rm-evsearch .act:hover { color: var(--hi); background: var(--side-on); }
+.rm-side .evi.rm-evsearch .act.bad:hover { color: #f87171; }
+.rm-side .evi.rm-evsearch .sel .act { color: #fff; opacity: .8; }
+.rm-side .evi.rm-evsearch .sel .act:hover { opacity: 1; background: rgba(255, 255, 255, .16); color: #fff; }
+/* already in the speech doc */
+.rm-side .evi.rm-evsearch .arg.sent > .chev::after { content: "\2713"; position: absolute; left: -1px; top: -3px; font: 700 11px/1 var(--rm-sans); color: #4ade80; }
+.rm-side .evi.rm-evsearch .row.sent > .ttl::after { content: " \2713"; color: #4ade80; font-weight: 700; }
+.rm-side .evi.rm-evsearch .arg.sent:not(.sel):not(:hover) .argt { opacity: .62; }
+/* bins: one line, the boxes behind it */
+.rm-side .evi.rm-evsearch .binbar { padding: 0 10px 5px; gap: 5px; align-items: center; }
+.rm-side .evi.rm-evsearch .bin-sum { flex: 1; min-width: 0; height: 24px; display: flex; align-items: center; gap: 6px; text-align: left; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--side-mut); }
+.rm-side .evi.rm-evsearch .bin-sum .chev { align-self: center; margin-top: 0; }
+.rm-side .evi.rm-evsearch .bin-sum .bl { margin-right: 0; }
+.rm-side .evi.rm-evsearch .bin-names { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px var(--rm-sans); letter-spacing: 0; text-transform: none; color: var(--side-txt); }
+.rm-side .evi.rm-evsearch .bin-sum:hover .bin-names { color: var(--hi); }
+.rm-side .evi.rm-evsearch .bin-n-out { flex-shrink: 0; color: var(--side-mut); }
+.rm-side .evi.rm-evsearch .bin-fold { flex-shrink: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--side-mut); text-decoration: underline; text-underline-offset: 3px; }
+.rm-side .evi.rm-evsearch .bin-fold:hover { color: var(--hi); }
+.rm-side .evi.rm-evsearch .bin-list { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding-bottom: 3px; }
+.rm-side .evi.rm-evsearch .binbar.shut .bin-list { display: none; }
+.rm.binning .rm-evsearch .binbar.shut .bin-list { display: flex; }
+.rm-side .evi.rm-evsearch .bin-t { padding: 3px 7px; }
+.rm-sfoot1 { padding: 6px 12px; font-size: 11px; line-height: 1.4; }

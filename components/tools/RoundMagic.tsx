@@ -2272,13 +2272,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <span className="searchmeta mono" id="searchmeta" />
               </div>
               <div className="binbar" id="binbar" hidden />
-              <div className="indexhead mono">
-                <i>Outline</i>
-                <i className="c3"><button className="link" data-act="groups">Fold all</button></i>
-              </div>
               <div id="results" />
             </div>
-            <div className="rm-sfoot"><b>↑↓</b> move · <b>→</b> arguments · <b>Enter</b> {answering ? "under what you're answering" : "to the speech doc"} · <b>Shift+Enter</b> into the file you&apos;re in · <b>Ctrl+Enter</b> a page of its own{!answering && K("answer") ? <> · <b>{K("answer")}</b> on a tag of theirs to answer it</> : null}</div>
+            <div className="rm-sfoot rm-sfoot1" title={"Click a card to send it; click a block to open it. ↑↓ move, → opens a block, ← folds it." + (!answering && K("answer") ? " " + K("answer") + " on a tag of theirs starts answering it." : "")}>
+              <b>Click</b> or <b>Enter</b> {answering ? "puts it under what you're answering" : "sends a card"} · <b>Shift+Enter</b> into your file · <b>Ctrl+Enter</b> opens it
+            </div>
           </div>
 
           {/* the round: their docs, SpeechDrop, your partner */}
