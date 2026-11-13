@@ -205,6 +205,9 @@ const LAYOUT_MODES = [
   { id: "cockpit", name: "Cockpit", sub: "Outline left, search right, both always open — the pages between", pic: [[0, 0, 60, 6, "c"], [0, 6, 11, 32, "s"], [12, 6, 17, 32, "p"], [30, 6, 17, 32, "d"], [48, 6, 12, 32, "s"]] },
   { id: "stage", name: "Stage", sub: "The page you're in front and centre; the other leans in, click it to swap", pic: [[0, 0, 60, 38, "c"], [3, 4, 36, 30, "p"], [42, 9, 15, 20, "d"]] },
   { id: "dock", name: "Dock", sub: "The ribbon a floating dock at the bottom; the pages run to the top", pic: [[0, 0, 14, 38, "s"], [15, 0, 45, 38, "p"], [12, 31, 38, 5, "c"]] },
+  { id: "deck", name: "Deck", sub: "One page at a time, full width, with tabs along the top — Alt+[ and Alt+] flip", pic: [[0, 0, 60, 4, "c"], [0, 4, 13, 34, "s"], [14, 5, 10, 4, "d"], [25, 5, 10, 4, "c"], [14, 9, 46, 29, "p"]] },
+  { id: "spotlight", name: "Spotlight", sub: "No ribbon, no side: just the pages. Ctrl+P or / brings up cards and commands", pic: [[0, 0, 60, 38, "p"], [14, 6, 32, 15, "c"], [16, 10, 28, 3, "s"], [16, 15, 22, 2, "s"]] },
+  { id: "board", name: "Flow-board", sub: "Their doc, your speech doc and the search in three columns, each tag wired to its answer", pic: [[0, 0, 60, 4, "c"], [0, 4, 19, 34, "p"], [20, 4, 19, 34, "d"], [40, 4, 20, 34, "s"], [16, 12, 8, 1, "s"], [16, 22, 8, 1, "s"]] },
 ] as const;
 type LayoutId = (typeof LAYOUT_MODES)[number]["id"];
 const SIDE_W = 290, SIDE_WIDE = 560;
@@ -306,6 +309,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [layoutMode, setLayoutMode] = useState<LayoutId>("classic");
   // Focus: the side is a drawer, out of sight until the pointer reaches the edge or a key asks for it
   const [drawer, setDrawer] = useState(false);
+  // Spotlight: the search, floated in the middle, is open
+  const [spot, setSpot] = useState(false);
+  // Deck: the pages opened this session, as tabs
+  const [deckTabs, setDeckTabs] = useState<{ id: string; name: string }[]>([]);
+  // what is typed in the library search, for the commands that sit over its results
+  const [cmdQ, setCmdQ] = useState("");
+  const [cmdSel, setCmdSel] = useState(0);
   const focusLayout = layoutMode === "focus";
   // the dock is the folded ribbon, laid out another way
   const ribSmall = ribMin || focusLayout || layoutMode === "dock";
@@ -1533,6 +1543,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     requestAnimationFrame(() => { const el = root.current?.querySelector("#q") as HTMLInputElement | null; el?.focus(); el?.select(); });
   }, [setTab]);
 
+  const K = (id: string) => keyLabel(keyFor(keys, id));
   const run = useCallback((id: string) => {
     if (id === "verbatim") { toggleVerb(); return; }
     if (id === "read-beside") { readBeside(); return; }
@@ -1541,6 +1552,17 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       // in Focus the side is a drawer: the key slides it out and back
       if (layoutMode === "focus") { setSide(true); setDrawer((d) => !d); return; }
       setSide((s) => !s); return;
+    }
+    if (id === "command") {
+      // Spotlight's key: cards and commands in the middle of the screen. Elsewhere: the search, with commands after a >
+      focusLibrary();
+      if (layoutMode === "spotlight") setSpot(true);
+      return;
+    }
+    if (id === "tab-next" || id === "tab-prev") {
+      if (layoutMode !== "deck") { toast("Tabs are the Deck layout's — " + (K("layout") || "Colours") + " to get there"); return; }
+      deckStep(id === "tab-next" ? 1 : -1);
+      return;
     }
     if (id === "layout") {
       const i = LAYOUT_MODES.findIndex((l) => l.id === layoutMode);
@@ -1551,7 +1573,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     }
     if (id === "save") { void flush(true); return; }
     if (id === "find") { setTab("files"); requestAnimationFrame(() => { qIn.current?.focus(); qIn.current?.select(); }); return; }
-    if (id === "library") { if (layoutMode === "focus") setDrawer(true); focusLibrary(); return; }
+    if (id === "library") { if (layoutMode === "focus") setDrawer(true); if (layoutMode === "spotlight") setSpot(true); focusLibrary(); return; }
     if (id === "new-file") { void create("Untitled file"); return; }
     if (id === "mode-split") { setMode(modeRef.current === "split" ? "edit" : "split"); return; }
     if (id === "mode-speech") { setMode(modeRef.current === "speech" ? "split" : "speech"); return; }
@@ -1654,7 +1676,167 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         return;
       }
     }
-  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary, answer, toggleTags, layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary, answer, toggleTags, layoutMode, deckTabs, mode, cur, keys]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Deck: tabs for the pages opened this session, and the speech doc ----------------------------
+  useEffect(() => {
+    if (!cur) return;
+    setDeckTabs((t) => (t.some((x) => x.id === cur.id) ? t.map((x) => (x.id === cur.id && x.name !== cur.name ? { ...x, name: cur.name } : x)) : [...t, { id: cur.id, name: cur.name }]));
+  }, [cur?.id, cur?.name]); // eslint-disable-line react-hooks/exhaustive-deps
+  // one page at a time: the deck shows a file or the speech doc, not both
+  useEffect(() => { if (layoutMode === "deck" && mode === "split") setMode("edit"); }, [layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const deckOpen = (id: string) => {
+    if (id === "speech") { setMode("speech"); return; }
+    if (mode !== "edit") setMode("edit");
+    if (cur?.id !== id) void open(id, (v) => v.focus()); else requestAnimationFrame(() => view.current?.focus());
+  };
+  const deckNow = mode === "speech" ? "speech" : cur?.id || "";
+  const deckStep = (d: number) => {
+    const ids = [...deckTabs.map((t) => t.id), "speech"];
+    const i = ids.indexOf(deckNow);
+    deckOpen(ids[(i + d + ids.length) % ids.length]);
+  };
+  const deckClose = (id: string) => {
+    const i = deckTabs.findIndex((t) => t.id === id);
+    const rest = deckTabs.filter((t) => t.id !== id);
+    setDeckTabs(rest);
+    if (deckNow === id) deckOpen(rest.length ? rest[Math.min(i, rest.length - 1)].id : "speech");
+  };
+
+  // ---- Flow-board: three columns, each of their tags wired to the heading that answers it --------------
+  const wires = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (layoutMode !== "board") return;
+    // their doc beside the speech doc is the point of it
+    if (mode === "edit") setMode("split");
+  }, [layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (layoutMode !== "board" || mode !== "split") return;
+    const work = workBox.current;
+    if (!work) return;
+    let raf = 0;
+    const clean = (t: string) => t.replace(/⋮⋮/g, "").replace(/\s+/g, " ").trim();
+    const draw = () => {
+      raf = 0;
+      const svg = wires.current;
+      if (!svg) return;
+      const W = work.getBoundingClientRect();
+      const pane = (work.querySelector(".rm-pane.active") || work.querySelector(".rm-pane")) as HTMLElement | null;
+      const box = pane?.querySelector(".rm-scroll") as HTMLElement | null;
+      const pm = work.querySelector("#docbody .ProseMirror");
+      const sbox = work.querySelector("#docbody") as HTMLElement | null;
+      if (!pane || !box || !pm || !sbox) { svg.innerHTML = ""; return; }
+      // the speech doc's headings, and which have cards under them
+      const heads = new Map<string, { el: Element; has: boolean }>();
+      let curH: { el: Element; has: boolean } | null = null;
+      for (const el of Array.from(pm.children)) {
+        if (/^H[1-3]$/.test(el.tagName)) { curH = { el, has: false }; heads.set(clean(el.textContent || "").toLowerCase(), curH); }
+        else if (el.tagName === "H4" && curH) curH.has = true;
+      }
+      const P = box.getBoundingClientRect(), S = sbox.getBoundingClientRect();
+      const x1 = P.right - W.left - 7, x2 = S.left - W.left + 7;
+      let out = "";
+      pane.querySelectorAll(".ct-sheet h4").forEach((h) => {
+        const t = clean(h.textContent || "");
+        if (!t) return;
+        const hit = heads.get(("AT: " + headOf(t)).toLowerCase());
+        const r = h.getBoundingClientRect();
+        const y = r.top + Math.min(r.height, 22) / 2;
+        if (y < P.top + 4 || y > P.bottom - 4) return;            // their tag is scrolled away
+        const y1 = y - W.top;
+        if (!hit) {
+          out += `<circle cx="${x1}" cy="${y1}" r="3.5" class="w-none"/>`;
+          return;
+        }
+        const hr = hit.el.getBoundingClientRect();
+        const off = hr.top + hr.height / 2 < S.top ? -1 : hr.top + hr.height / 2 > S.bottom ? 1 : 0;
+        const y2 = Math.max(S.top + 10, Math.min(S.bottom - 10, hr.top + hr.height / 2)) - W.top;
+        const cls = hit.has ? "w-done" : "w-open";
+        const mid = (x1 + x2) / 2;
+        out += `<path d="M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}" class="${cls}${off ? " w-off" : ""}"/>`;
+        out += `<circle cx="${x1}" cy="${y1}" r="5" class="${cls}"/>`;
+        if (hit.has) out += `<path d="M${x1 - 2.4} ${y1} l1.7 1.8 l3.1 -3.4" class="w-tick"/>`;
+        out += off ? `<path d="M${x2 - 4} ${y2 + (off < 0 ? 4 : -4)} l4 ${off < 0 ? -6 : 6} l4 ${off < 0 ? 6 : -6}" class="w-arr ${cls}"/>` : `<circle cx="${x2}" cy="${y2}" r="3" class="${cls}"/>`;
+      });
+      svg.setAttribute("viewBox", `0 0 ${W.width} ${W.height}`);
+      svg.innerHTML = out;
+    };
+    const later = () => { if (!raf) raf = requestAnimationFrame(draw); };
+    work.addEventListener("scroll", later, true);
+    const ro = new ResizeObserver(later);
+    ro.observe(work);
+    // the docs change as they are written in
+    const iv = window.setInterval(later, 450);
+    later();
+    return () => { work.removeEventListener("scroll", later, true); ro.disconnect(); clearInterval(iv); cancelAnimationFrame(raf); };
+  }, [layoutMode, mode, panes.length]);
+
+  // ---- Spotlight: the search floated over the pages, gone again on Esc or a click away ----------------
+  useEffect(() => { if (layoutMode !== "spotlight") setSpot(false); }, [layoutMode]);
+  useEffect(() => {
+    if (layoutMode !== "spotlight") return;
+    const q = root.current?.querySelector("#q");
+    const on = () => setSpot(true);
+    q?.addEventListener("focus", on);
+    return () => q?.removeEventListener("focus", on);
+  }, [layoutMode]);
+  useEffect(() => {
+    if (!spot) return;
+    const away = (e: PointerEvent) => {
+      const t = e.target as Element;
+      if (!t.closest?.(".tp-search, .rm-menu, .evi .veil, .rm-spothint")) setSpot(false);
+    };
+    window.addEventListener("pointerdown", away, true);
+    return () => window.removeEventListener("pointerdown", away, true);
+  }, [spot]);
+
+  // ---- commands, over the search's results -----------------------------------------------------------
+  useEffect(() => {
+    const q = root.current?.querySelector("#q") as HTMLInputElement | null;
+    if (!q) return;
+    const on = () => { setCmdQ(q.value); setCmdSel(0); };
+    q.addEventListener("input", on);
+    return () => q.removeEventListener("input", on);
+  }, [uiReady]);
+  /** Everything there is to do, by name: the keyed actions, the modes, the layouts, the colours. */
+  const commands = (() => {
+    const out: { id: string; label: string; key: string; go: () => void }[] = [];
+    ACTIONS.forEach((a) => { if (a.id !== "command") out.push({ id: a.id, label: a.label, key: K(a.id), go: () => run(a.id) }); });
+    ([["edit", "Just the file"], ["split", "Speech doc beside"], ["speech", "Just the speech doc"], ["read", "Read mode"]] as const)
+      .forEach(([m, l]) => out.push({ id: "mode:" + m, label: "Mode: " + l, key: "", go: () => setMode(m) }));
+    LAYOUT_MODES.forEach((l) => out.push({ id: "layout:" + l.id, label: "Layout: " + l.name, key: "", go: () => setLayoutMode(l.id) }));
+    PALETTES.forEach((p) => out.push({ id: "pal:" + p.id, label: "Colours: " + p.name, key: "", go: () => setPalette(p.id) }));
+    return out;
+  })();
+  const cmdMode = cmdQ.startsWith(">");
+  const cmdHits = (() => {
+    const raw = (cmdMode ? cmdQ.slice(1) : cmdQ).trim().toLowerCase();
+    if (!cmdMode && (layoutMode !== "spotlight" || raw.length < 2)) return [];
+    const words = raw.split(/\s+/).filter(Boolean);
+    const scored = commands.map((c) => {
+      const l = c.label.toLowerCase(), lw = l.split(/[^a-z0-9]+/);
+      if (!words.every((w) => l.includes(w))) return null;
+      const s = words.reduce((n, w) => n + (lw.some((x) => x.startsWith(w)) ? 2 : 1), 0) + (l.startsWith(words[0] || "") ? 2 : 0);
+      return { c, s };
+    }).filter(Boolean) as { c: (typeof commands)[number]; s: number }[];
+    scored.sort((a, b) => b.s - a.s);
+    return scored.slice(0, cmdMode ? 9 : 3).map((x) => x.c);
+  })();
+  const runCommand = (c: (typeof commands)[number]) => {
+    const q = root.current?.querySelector("#q") as HTMLInputElement | null;
+    if (q) { q.value = ""; q.dispatchEvent(new Event("input", { bubbles: true })); }
+    setSpot(false);
+    // the page gets the cursor back first: most commands work on it
+    const v = target();
+    v?.focus();
+    requestAnimationFrame(() => c.go());
+  };
+  const onCmdKey = (e: React.KeyboardEvent) => {
+    if (!cmdMode || !(e.target as HTMLElement).matches?.("#q")) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); e.stopPropagation(); setCmdSel((n) => Math.min(cmdHits.length - 1, n + 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); e.stopPropagation(); setCmdSel((n) => Math.max(0, n - 1)); }
+    else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); const c = cmdHits[cmdSel]; if (c) runCommand(c); }
+  };
 
   const runRef = useRef(run);
   runRef.current = run;
@@ -1676,6 +1858,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       // Esc in the search with nothing typed: back to the page (their case, while answering it)
       if (e.key === "Escape" && t && t.id === "q" && !(t as HTMLInputElement).value) {
         e.preventDefault(); e.stopPropagation();
+        setSpot(false);
         (answerRef.current?.claim ? view.current : target())?.focus();
         return;
       }
@@ -2021,7 +2204,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const left = timer.limit - ran;
 
   // ---- drawing --------------------------------------------------------------
-  const K = (id: string) => keyLabel(keyFor(keys, id));
   const tip = (id: string, label?: string) => `${label || ACTION.get(id)?.label || id}${K(id) ? " · " + K(id) : ""}`;
   const groups = useMemo(() => Array.from(new Set(ACTIONS.map((a) => a.group))), []);
   const activePane = panes.find((p) => p.key === activeKey) || null;
@@ -2179,7 +2361,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-tab={tab} data-heads={headsOf}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-tab={tab} data-heads={headsOf} data-spot={spot ? "open" : undefined}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
@@ -2368,7 +2550,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
 
           {/* the library: Evidence's search, drawn by its engine */}
-          <div className="rm-tabpane tp-search" hidden={tab !== "search"}>
+          <div className={"rm-tabpane tp-search" + (cmdMode ? " cmdmode" : "")} hidden={tab !== "search"} onKeyDownCapture={onCmdKey}>
             {answering && (
               <div className="rm-ansbar">
                 <div className="row">
@@ -2391,6 +2573,18 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <input id="q" type="text" placeholder="search the library" autoComplete="off" spellCheck={false} />
                 <span className="searchmeta mono" id="searchmeta" />
               </div>
+              {cmdHits.length > 0 && (
+                <div className="rm-cmds" role="listbox" aria-label="Commands">
+                  {!cmdMode && <div className="rm-cmdh">COMMANDS <span>type &gt; for all of them</span></div>}
+                  {cmdHits.map((c, n) => (
+                    <button key={c.id} type="button" role="option" aria-selected={cmdMode && n === cmdSel} className="rm-cmd"
+                      onMouseDown={(e) => e.preventDefault()} onClick={() => runCommand(c)}>
+                      <span>{c.label}</span>{c.key && <kbd>{c.key}</kbd>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {cmdMode && !cmdHits.length && <p className="rm-sempty">No command called that.</p>}
               <div className="binbar" id="binbar" hidden />
               <div id="results" />
             </div>
@@ -2459,7 +2653,30 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         {/* ------------------------------------------------------------ the work */}
         <div className="rm-main" onPointerDown={() => { if (drawer) setDrawer(false); }}>
           {!side && !focusLayout && <button type="button" className="rm-showside" onClick={() => setSide(true)} aria-label="Show the side" title={tip("sidebar", "Show the side")}>{I.menu}</button>}
+          {layoutMode === "deck" && (
+            <div className="rm-deck" role="tablist" aria-label="Open pages">
+              {deckTabs.map((t) => (
+                <div key={t.id} className={"rm-dtab" + (deckNow === t.id ? " on" : "") + (isTheirs(t.id) ? " theirs" : "")} role="tab" aria-selected={deckNow === t.id}
+                  onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); deckClose(t.id); } }} onClick={() => deckOpen(t.id)} title={t.name}>
+                  {isTheirs(t.id) && <i>THEIRS</i>}<span>{t.name || "Untitled"}</span>
+                  <button type="button" aria-label={`Close ${t.name}`} title="Close the tab (the file stays in Files)" onClick={(e) => { e.stopPropagation(); deckClose(t.id); }}>×</button>
+                </div>
+              ))}
+              <div key={"speech" + sentPulse} className={"rm-dtab speech" + (deckNow === "speech" ? " on" : "") + (sentPulse ? " got" : "")} role="tab" aria-selected={deckNow === "speech"} onClick={() => deckOpen("speech")} title="The speech doc">
+                <b>★</b><span>Speech doc</span>
+              </div>
+              <button type="button" className="rm-dnew" onClick={() => setTab("files")} title="Open another file — it gets a tab" aria-label="Open another file">+</button>
+              <span className="rm-grow" />
+              <span className="rm-dkeys">{K("tab-prev") && K("tab-next") ? `${K("tab-prev")} / ${K("tab-next")}` : ""}</span>
+            </div>
+          )}
+          {layoutMode === "spotlight" && !spot && (
+            <button type="button" className="rm-spothint" onClick={() => run("command")}>
+              <b>{K("command") || "/"}</b> cards and commands · <b>&gt;</b> for every command
+            </button>
+          )}
           <div className="rm-work" ref={workBox}>
+            {layoutMode === "board" && mode === "split" && <svg className="rm-wires" ref={wires} aria-hidden="true" />}
             <div className="rm-panes" ref={panesBox}>
               {panes.map((p, i) => {
                 const v = views.current.get(p.key);
