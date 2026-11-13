@@ -851,3 +851,72 @@ html[data-rm-palette="aurora"]:has(.rm) .nav { --nav-bg: #0A1614; --ink: #E4F3EE
 html[data-rm-palette="volt"]:has(.rm) .nav { --nav-bg: #0B0B0A; --ink: #ECEDE6; --muted: #9C9D93; --line: #262624; --line-soft: #262624; }
 html[data-rm-palette="dusk"]:has(.rm) .nav { --nav-bg: #1F1424; --ink: #F4E9F2; --muted: #BFA5C4; --line: #3A2742; --line-soft: #3A2742; }
 html[data-rm-palette="glacier"]:has(.rm) .nav { --nav-bg: #E8EEF5; --ink: #14202E; --muted: #5A6B80; --line: #C9D5E3; --line-soft: #C9D5E3; }
+
+/* =====================================================================
+   Layouts — where the side, the file and the speech doc sit (data-layout).
+   Classic is the rest of this sheet; these change only the arrangement.
+   ===================================================================== */
+
+/* the menu: a picture of each */
+.rm-menu h4 .rm-h4k { float: right; letter-spacing: .06em; text-transform: none; color: var(--mut); opacity: .8; }
+.rm-lays { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 2px 6px 4px; }
+.rm-lay { display: grid; justify-items: center; gap: 5px; padding: 7px 4px 6px; border: 1px solid transparent; background: transparent; color: var(--txt); cursor: pointer; }
+.rm-lay:hover { background: var(--pop-h); }
+.rm-lay[aria-checked="true"] { border-color: var(--acc); background: var(--pop-h); }
+.rm-lay b { font: 500 10px var(--rm-mono); letter-spacing: .08em; text-transform: uppercase; }
+.rm-lay svg { display: block; outline: 1px solid var(--btnb); }
+.rm-lay .lp-c { fill: var(--btnb-h); opacity: .55; }
+.rm-lay .lp-s { fill: var(--mut); opacity: .55; }
+.rm-lay[aria-checked="true"] .lp-s { opacity: 1; }
+.rm-lay .lp-p { fill: #fff; }
+.rm-lay .lp-d { fill: color-mix(in srgb, var(--acc) 22%, #fff); }
+.rm-lay[aria-checked="true"] .lp-s { fill: var(--acc); }
+.rm-laysub { padding: 0 8px 8px; font-size: 11.5px; color: var(--mut); border-bottom: 1px solid var(--chrome-line); margin-bottom: 4px; }
+
+/* ---- Desk: the pages laid on the chrome, with room round each, and a shadow under them */
+.rm[data-layout="desk"] .rm-body { background: var(--chrome); padding: 10px 10px 0; gap: 0; }
+.rm[data-layout="desk"] .rm-side { border: 1px solid var(--chrome-line); box-shadow: 0 18px 40px -24px rgba(0, 0, 0, .7); }
+.rm[data-layout="desk"] .rm-sgrab { flex-basis: 10px; background: transparent; border: 0; }
+.rm[data-layout="desk"] .rm-main { background: transparent; }
+.rm[data-layout="desk"] .rm-work { gap: 0; padding-bottom: 10px; }
+.rm[data-layout="desk"] :is(.rm-pane, .evi.rm-speech) { box-shadow: 0 0 0 1px rgba(0, 0, 0, .18), 0 22px 48px -26px rgba(0, 0, 0, .75); }
+.rm[data-layout="desk"] :is(.rm-psplit, .rm-ssplit) { width: 10px; background: transparent; }
+.rm[data-layout="desk"] :is(.rm-psplit, .rm-ssplit)::after { background: transparent; }
+.rm[data-layout="desk"] :is(.rm-psplit, .rm-ssplit):hover::after { background: var(--acc); }
+.rm[data-layout="desk"] .rm-status { background: var(--chrome); color: var(--mut); border-top-color: var(--chrome); }
+.rm[data-layout="desk"] .rm-status :is(b, strong) { color: var(--txt); }
+.rm[data-layout="desk"] .rm-showside { left: 10px; top: 10px; }
+
+/* ---- Mirror: the side on the right, the speech doc on the left of the file */
+.rm[data-layout="mirror"] .rm-body { flex-direction: row-reverse; }
+.rm[data-layout="mirror"] .rm-sgrab { border-right: 0; border-left: 1px solid var(--chrome-edge); }
+.rm[data-layout="mirror"] .rm-work { flex-direction: row-reverse; }
+.rm[data-layout="mirror"] .rm-showside { left: auto; right: 8px; }
+.rm[data-layout="mirror"][data-mode="split"] .evi.rm-speech { animation-name: rmSlideL; }
+@keyframes rmSlideL { from { opacity: 0; transform: translateX(-14px); } }
+
+/* ---- Stack: the speech doc under the file, the edge between them dragged up and down */
+.rm[data-layout="stack"][data-mode="split"] .rm-work { flex-direction: column; }
+.rm[data-layout="stack"][data-mode="split"] .rm-panes { flex: 1 1 0; min-height: 0; }
+.rm[data-layout="stack"][data-mode="split"] .evi.rm-speech { flex: 0 0 var(--rm-speech-h, 42%); min-height: 0; animation-name: rmSlideU; }
+.rm[data-layout="stack"][data-mode="split"] .rm-ssplit { width: auto; height: 7px; cursor: row-resize; }
+.rm[data-layout="stack"][data-mode="split"] .rm-ssplit::after { top: 3px; bottom: auto; left: 0; right: 0; width: auto; height: 1px; }
+.rm[data-layout="stack"][data-mode="split"] .rm-ssplit:hover::after { top: 2px; left: 0; width: auto; height: 3px; }
+@keyframes rmSlideU { from { opacity: 0; transform: translateY(14px); } }
+
+/* ---- Focus: the ribbon one line, no site nav, the side a drawer from the left edge */
+html[data-rm-layout="focus"]:has(.rm[data-layout="focus"]) .nav { display: none; }
+.rm[data-layout="focus"] .rm-side, .rm[data-layout="focus"].side-hidden .rm-side {
+  display: flex; position: absolute; z-index: 30; top: 0; bottom: 0; left: 0;
+  transform: translateX(-100%); transition: transform .18s cubic-bezier(.2, .8, .2, 1), box-shadow .18s; visibility: hidden;
+}
+.rm[data-layout="focus"].drawer .rm-side, .rm[data-layout="focus"] .rm-side:focus-within {
+  transform: none; visibility: visible; box-shadow: 18px 0 40px -12px rgba(0, 0, 0, .45);
+}
+.rm[data-layout="focus"] .rm-sgrab { display: none; }
+.rm-hot { position: absolute; z-index: 29; left: 0; top: 0; bottom: 0; width: 8px; }
+.rm-hot::after { content: ""; position: absolute; left: 0; top: 50%; width: 3px; height: 54px; margin-top: -27px; background: var(--acc); opacity: .45; transition: opacity .15s, height .15s; }
+.rm-hot:hover::after { opacity: 1; height: 80px; }
+.rm[data-layout="focus"] .rm-status { opacity: .55; transition: opacity .15s; }
+.rm[data-layout="focus"] .rm-status:hover { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .rm[data-layout="focus"] .rm-side { transition: none; } }

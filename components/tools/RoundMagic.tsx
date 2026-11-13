@@ -189,6 +189,20 @@ const PALETTES = [
   { id: "glacier", name: "Glacier", sub: "Ice, cobalt", chrome: "#E8EEF5", side: "#F1F5FA", acc: "#2563EB" },
 ] as const;
 type PaletteId = (typeof PALETTES)[number]["id"];
+
+/**
+ * The window's layouts: where the side, the file and the speech doc sit.
+ * Drawn in the menu as a picture of each — chrome, side, page, speech doc —
+ * as rects on a 60×38 grid: [x, y, w, h, what].
+ */
+const LAYOUT_MODES = [
+  { id: "classic", name: "Classic", sub: "Side left, the speech doc beside", pic: [[0, 0, 60, 6, "c"], [0, 6, 14, 32, "s"], [15, 6, 22, 32, "p"], [38, 6, 22, 32, "d"]] },
+  { id: "desk", name: "Desk", sub: "Pages laid on the desk, with room round them", pic: [[0, 0, 60, 38, "c"], [2, 8, 12, 28, "s"], [16, 8, 20, 28, "p"], [38, 8, 20, 28, "d"]] },
+  { id: "mirror", name: "Mirror", sub: "Speech doc left, side right", pic: [[0, 0, 60, 6, "c"], [0, 6, 22, 32, "d"], [23, 6, 22, 32, "p"], [46, 6, 14, 32, "s"]] },
+  { id: "stack", name: "Stack", sub: "The speech doc under the file", pic: [[0, 0, 60, 6, "c"], [0, 6, 14, 32, "s"], [15, 6, 45, 15, "p"], [15, 22, 45, 16, "d"]] },
+  { id: "focus", name: "Focus", sub: "One-line ribbon, side slides in from the edge", pic: [[0, 0, 60, 3, "c"], [10, 3, 22, 35, "p"], [33, 3, 18, 35, "d"], [0, 3, 2, 35, "s"]] },
+] as const;
+type LayoutId = (typeof LAYOUT_MODES)[number]["id"];
 const SIDE_W = 290, SIDE_WIDE = 560;
 
 /* ------------------------------------------------------------------ the ribbon's pictures */
@@ -262,6 +276,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const modeRef = useRef<Mode>("edit");
   const [tab, setTabState] = useState<Tab>("files");
   const [speechW, setSpeechW] = useState(0.46);                   // share of the work area
+  const [speechH, setSpeechH] = useState(0.42);                   // its share of the height, in Stack
   const [speechOutline, setSpeechOutline] = useState(false);
   const [speechWidth, setSpeechWidth] = useState(700);
   const [sentPulse, setSentPulse] = useState(0);
@@ -282,6 +297,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [menu, setMenu] = useState<null | { id: string; x: number; y: number }>(null);
   // the ribbon: folded to one line, or with some of its groups folded into a button each
   const [ribMin, setRibMin] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutId>("classic");
+  // Focus: the side is a drawer, out of sight until the pointer reaches the edge or a key asks for it
+  const [drawer, setDrawer] = useState(false);
+  const focusLayout = layoutMode === "focus";
+  const ribSmall = ribMin || focusLayout;
   const [folded, setFolded] = useState<string[]>([]);
   const [palette, setPalette] = useState<PaletteId>("graphite");
   const [sideW, setSideW] = useState(SIDE_W);
@@ -380,12 +400,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (u.mode === "split" || u.mode === "speech") { modeRef.current = u.mode; setModeState(u.mode); if (u.mode === "speech") inSpeech.current = true; }
         if (["outline", "files", "search", "round"].includes(u.tab)) setTabState(u.tab);
         if (typeof u.speechW === "number") setSpeechW(Math.min(.75, Math.max(.25, u.speechW)));
+        if (typeof u.speechH === "number") setSpeechH(Math.min(.75, Math.max(.25, u.speechH)));
         if (typeof u.wpm === "number") setWpm(u.wpm);
         if (typeof u.hideDim === "boolean") setHideDim(u.hideDim);
         if (typeof u.speechOutline === "boolean") setSpeechOutline(u.speechOutline);
         if (typeof u.depth === "number") setDepth(u.depth);
         if (typeof u.limit === "number") setTimer((t) => ({ ...t, limit: u.limit }));
         if (typeof u.ribMin === "boolean") setRibMin(u.ribMin);
+        if (LAYOUT_MODES.some((l) => l.id === u.layout)) setLayoutMode(u.layout);
         if (Array.isArray(u.folded)) setFolded(u.folded.filter((x: unknown) => typeof x === "string"));
         if (PALETTES.some((p) => p.id === u.palette)) setPalette(u.palette);
         if (typeof u.sideW === "number") setSideW(Math.min(760, Math.max(220, u.sideW)));
@@ -404,8 +426,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [palette, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags })); } catch { /* private */ }
-  }, [mode, tab, speechW, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, UI_KEY, uiReady]);
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode })); } catch { /* private */ }
+  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, UI_KEY, uiReady]);
+  // the site's nav steps aside in Focus (magic.css), set on <html> so it can
+  useEffect(() => {
+    if (!uiReady) return;
+    document.documentElement.setAttribute("data-rm-layout", layoutMode);
+    return () => document.documentElement.removeAttribute("data-rm-layout");
+  }, [layoutMode, uiReady]);
+  useEffect(() => { if (!focusLayout) setDrawer(false); }, [focusLayout]);
 
   const setTab = useCallback((t: Tab) => { setTabState(t); setSide(true); }, []);
 
@@ -1501,10 +1530,21 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (id === "verbatim") { toggleVerb(); return; }
     if (id === "read-beside") { readBeside(); return; }
     if (id === "next-pane") { nextPane(); return; }
-    if (id === "sidebar") { setSide((s) => !s); return; }
+    if (id === "sidebar") {
+      // in Focus the side is a drawer: the key slides it out and back
+      if (layoutMode === "focus") { setSide(true); setDrawer((d) => !d); return; }
+      setSide((s) => !s); return;
+    }
+    if (id === "layout") {
+      const i = LAYOUT_MODES.findIndex((l) => l.id === layoutMode);
+      const next = LAYOUT_MODES[(i + 1) % LAYOUT_MODES.length];
+      setLayoutMode(next.id);
+      toast("Layout: " + next.name + " — " + next.sub);
+      return;
+    }
     if (id === "save") { void flush(true); return; }
     if (id === "find") { setTab("files"); requestAnimationFrame(() => { qIn.current?.focus(); qIn.current?.select(); }); return; }
-    if (id === "library") { focusLibrary(); return; }
+    if (id === "library") { if (layoutMode === "focus") setDrawer(true); focusLibrary(); return; }
     if (id === "new-file") { void create("Untitled file"); return; }
     if (id === "mode-split") { setMode(modeRef.current === "split" ? "edit" : "split"); return; }
     if (id === "mode-speech") { setMode(modeRef.current === "speech" ? "split" : "speech"); return; }
@@ -1607,7 +1647,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         return;
       }
     }
-  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary, answer, toggleTags]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flush, create, toast, toggleVerb, readBeside, nextPane, setTab, setMode, sendCard, focusLibrary, answer, toggleTags, layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runRef = useRef(run);
   runRef.current = run;
@@ -1835,8 +1875,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const el = e.currentTarget, body = el.parentElement;
     if (!body) return;
     el.setPointerCapture(e.pointerId);
-    const left = body.getBoundingClientRect().left;
-    const move = (ev: PointerEvent) => setSideW(Math.round(Math.min(Math.min(760, window.innerWidth - 360), Math.max(220, ev.clientX - left))));
+    const br = body.getBoundingClientRect();
+    // Mirror has the side on the right: it widens as the edge goes left
+    const mirror = root.current?.dataset.layout === "mirror";
+    const move = (ev: PointerEvent) => setSideW(Math.round(Math.min(Math.min(760, window.innerWidth - 360), Math.max(220, mirror ? br.right - ev.clientX : ev.clientX - br.left))));
     const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
@@ -1847,7 +1889,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (!box) return;
     el.setPointerCapture(e.pointerId);
     const r = box.getBoundingClientRect();
-    const move = (ev: PointerEvent) => setSpeechW(Math.min(.75, Math.max(.25, (r.right - ev.clientX) / r.width)));
+    const lay = root.current?.dataset.layout;
+    // Stack: the speech doc is under the file, and the edge moves up and down; Mirror: it is on the left
+    const clamp = (x: number) => Math.min(.75, Math.max(.25, x));
+    const move = (ev: PointerEvent) => {
+      if (lay === "stack") setSpeechH(clamp((r.bottom - ev.clientY) / r.height));
+      else setSpeechW(clamp(lay === "mirror" ? (ev.clientX - r.left) / r.width : (r.right - ev.clientX) / r.width));
+    };
     const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
@@ -2083,8 +2131,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribMin ? " ribmin" : "") + (menu ? " menuopen" : "")} ref={root} data-mode={mode} data-palette={palette}
-      style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode}
+      style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
 
@@ -2095,7 +2143,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <span className="rm-logo" aria-label="Round Magic">ROUND<br />MAGIC</span>
         </div>
         {ribbon.map((g) => {
-          const shut = ribMin || folded.includes(g.id);
+          const shut = ribSmall || folded.includes(g.id);
           if (shut) return (
             <div key={g.id} className="rm-g rm-gmini">
               {g.mini}
@@ -2138,7 +2186,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
             <button type="button" className={"rm-b rm-i" + (timer.open ? " on" : "")} data-tip={tip("timer", "Speech timer")} aria-label="Speech timer" aria-pressed={timer.open} onClick={() => run("timer")}>{I.timer}</button>
-            <button type="button" className={"rm-b rm-i rm-menubtn" + (menu?.id === "palette" ? " on" : "")} data-tip="Colours" aria-label="Colours" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
+            <button type="button" className={"rm-b rm-i rm-menubtn" + (menu?.id === "palette" ? " on" : "")} data-tip={"Colours and layout" + (K("layout") ? " · " + K("layout") + " next layout" : "")} aria-label="Colours and layout" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
               <span className="rm-palsw" aria-hidden="true"><i /><i /></span>
             </button>
             <button type="button" className={"rm-b rm-i" + (full ? " on" : "")} data-tip={full ? "Leave full screen" : "Full screen — every key is yours"} aria-label="Full screen" onClick={toggleFull}>{I.full}</button>
@@ -2346,11 +2394,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
         </aside>
 
+        {focusLayout && <div className="rm-hot" aria-hidden="true" onPointerEnter={() => { setSide(true); setDrawer(true); }} />}
         {side && <div className="rm-sgrab" role="separator" aria-orientation="vertical" aria-label="Resize the side" onPointerDown={dragSide}
           onDoubleClick={() => setSideW((w) => (w > 420 ? SIDE_W : SIDE_WIDE))} title="Drag to widen the side · double-click: wide or narrow" />}
         {/* ------------------------------------------------------------ the work */}
-        <div className="rm-main">
-          {!side && <button type="button" className="rm-showside" onClick={() => setSide(true)} aria-label="Show the side" title={tip("sidebar", "Show the side")}>{I.menu}</button>}
+        <div className="rm-main" onPointerDown={() => { if (drawer) setDrawer(false); }}>
+          {!side && !focusLayout && <button type="button" className="rm-showside" onClick={() => setSide(true)} aria-label="Show the side" title={tip("sidebar", "Show the side")}>{I.menu}</button>}
           <div className="rm-work" ref={workBox}>
             <div className="rm-panes" ref={panesBox}>
               {panes.map((p, i) => {
@@ -2431,7 +2480,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             </div>
 
             <div className="rm-ssplit" role="separator" aria-orientation="vertical" aria-label="Resize the speech doc" onPointerDown={dragSpeech}
-              onDoubleClick={() => setSpeechW(.46)} title="Drag to resize · double-click to reset" />
+              onDoubleClick={() => { if (layoutMode === "stack") setSpeechH(.42); else setSpeechW(.46); }} title="Drag to resize · double-click to reset" />
             {/* the speech doc: Evidence's send doc, its editor, its outline */}
             <section className={"evi withdoc rm-speech" + (headsOf === "speech" && mode === "split" ? " active" : "")} ref={speechBox} aria-label="Speech doc">
               <div className="rm-phead speech">
@@ -2514,6 +2563,18 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       )}
       {menu?.id === "palette" && (
         <div className="rm-menu wide pal" style={{ left: menu.x, top: menu.y }} role="menu">
+          <h4>LAYOUT{K("layout") ? <span className="rm-h4k">{K("layout")} steps through them</span> : null}</h4>
+          <div className="rm-lays">
+            {LAYOUT_MODES.map((l) => (
+              <button key={l.id} type="button" role="menuitemradio" aria-checked={layoutMode === l.id} className="rm-lay" onClick={() => setLayoutMode(l.id)} title={l.name + " — " + l.sub}>
+                <svg viewBox="0 0 60 38" width="60" height="38" aria-hidden="true">
+                  {l.pic.map(([x, y, w, h, k], n) => <rect key={n} x={x} y={y} width={w} height={h} className={"lp-" + k} />)}
+                </svg>
+                <b>{l.name}</b>
+              </button>
+            ))}
+          </div>
+          <div className="rm-laysub">{(LAYOUT_MODES.find((l) => l.id === layoutMode) || LAYOUT_MODES[0]).sub}</div>
           <h4>COLOURS</h4>
           <div className="rm-pals">
             {PALETTES.map((p) => (
