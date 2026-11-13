@@ -5,7 +5,8 @@ import Presence from "./Presence";
 import { COZY_FONT, SHAPE_KEY, THEME_KEY } from "@/lib/toolTheme";
 
 /**
- * The tools' colour scheme — one button in every tool's banner.
+ * The tools' colour scheme — one button in every tool's banner. Five quiet
+ * ones, and six louder: a near-black banner lit in one neon.
  *
  * A scheme is a set of colours and nothing else (finish.css holds them); the
  * choice is a property of this browser, the way a desk lamp is, and is set on
@@ -25,6 +26,12 @@ const THEMES = [
   { id: "navy", name: "Navy", note: "Night blue, cool paper, coral", sw: ["#1B2437", "#284C80", "#A8603A", "#B9502F", "#FFFEFB"] },
   { id: "oxblood", name: "Oxblood", note: "Deep wine, warm paper, teal", sw: ["#3A1719", "#2F7A74", "#8E3337", "#2F7F79", "#FFFCFA"] },
   { id: "graphite", name: "Graphite", note: "Charcoal, white paper, violet", sw: ["#2A2C31", "#1F5E8C", "#B64F1E", "#6D48E0", "#FFFFFF"] },
+  { id: "midnight", name: "Midnight", note: "Ink black, electric cyan", sw: ["#0B0F17", "#1668B8", "#B5521B", "#22D3EE", "#FDFEFF"] },
+  { id: "synthwave", name: "Synthwave", note: "Deep indigo, hot pink", sw: ["#1A1233", "#3F51C9", "#C21F78", "#FF4FA3", "#FFFDFF"] },
+  { id: "aurora", name: "Aurora", note: "Black teal, mint, orchid", sw: ["#0D1B18", "#0B7A63", "#8A3FA0", "#34E0A1", "#FCFFFD"] },
+  { id: "volt", name: "Volt", note: "Pure black, acid lime", sw: ["#0C0C0B", "#1F5E8C", "#B5451B", "#D4FF3A", "#FFFFFF"] },
+  { id: "dusk", name: "Dusk", note: "Plum, amber, rose", sw: ["#23172A", "#5A489E", "#AC5A1A", "#FFB454", "#FFFCFB"] },
+  { id: "glacier", name: "Glacier", note: "Ice banner, cobalt", sw: ["#EAF1F8", "#1D5FA8", "#B4472E", "#2563EB", "#FFFFFF"] },
 ] as const;
 
 export function applyTheme(id: string) {

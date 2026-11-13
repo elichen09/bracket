@@ -77,7 +77,7 @@ const SECTIONS: Section[] = [
       <>The status line shows where you are (pocket › hat › block › tag), which card, and how many words you&apos;ll read and how long they take. {K("Alt+T")} opens the <b>speech timer</b>.</>,
       <>Room to work: the chevron in a group&apos;s corner folds it into one button (its buttons open under it), and {K("Alt+M")} folds the whole ribbon to one line. Drag the side&apos;s edge (or its ⇔ button) to widen it for the search.</>,
       <><b>Spelling</b> is the browser&apos;s own checker: right-click a red underline for what it should be, or to add the word to the dictionary. It checks what you write (tags, analytics, headings, notes) and leaves the cards you cut alone; {K("Alt+K")} (or More › Spelling) switches it to everything, or off.</>,
-      <><b>Colours</b> (the swatch, top right) picks the palette: Graphite, Ember, Forest, Navy, Oxblood or Paper. The page stays white.</>,
+      <><b>Colours</b> (the swatch, top right) picks the palette — Graphite, Ember, Forest, Navy, Oxblood, Paper, and the louder six: Midnight (cyan), Synthwave (hot pink), Aurora (mint), Volt (acid lime), Dusk (amber) and Glacier (ice and cobalt). The menu stays open so you can try them one after another; the bar at the top of the site wears the palette too. The page stays white.</>,
     ],
     keys: [
       ["Alt+Enter", "Send the card (or block) you're in to the speech doc"],
@@ -318,7 +318,7 @@ const SECTIONS: Section[] = [
     steps: [
       <><b>Jump</b>: press {K("Ctrl+Shift+K")} in any tool, type a few letters (&ldquo;rm&rdquo;, &ldquo;flow&rdquo;, &ldquo;doc&rdquo;) and press {K("Enter")}. With nothing typed, {K("Enter")} goes back to the tool you were just in, and a number picks its row. You stay on the same flow.</>,
       <>In Split screen, Jump changes the side you pressed it in, so the other side keeps going. Rows further down put a tool on the other side, swap the sides, start round mode, or leave the split. From a tool on its own, &ldquo;Flow + Round Magic&rdquo; opens those two side by side.</>,
-      <><b>Colours</b> offers five schemes (Forest, Paper, Navy, Oxblood, Graphite) and a <b>Feel</b>. <b>Sharp</b> is square and crisp. <b>Cozy</b> is warm and rounded, with a softer typeface and lamp-light. The choice applies to every tool in this browser.</>,
+      <><b>Colours</b> offers eleven schemes (Forest, Paper, Navy, Oxblood, Graphite, and the louder Midnight, Synthwave, Aurora, Volt, Dusk and Glacier) and a <b>Feel</b>. <b>Sharp</b> is square and crisp. <b>Cozy</b> is warm and rounded, with a softer typeface and lamp-light. The choice applies to every tool in this browser.</>,
       <><b>Full screen</b> gives the tool the whole screen, even from a side of Split screen. {K("Esc")} brings it back.</>,
       <><b>Pop out</b> is covered above.</>,
       <><b>Split</b> opens Split screen with this tool on the left.</>,

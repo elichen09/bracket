@@ -27,6 +27,7 @@ import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter
 import { placePlugin, placeCard } from "@/lib/cutter/place";
 import { gripPlugin } from "@/lib/cutter/grips";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
+import { RM_PALETTE_KEY } from "@/lib/toolTheme";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -180,6 +181,12 @@ const PALETTES = [
   { id: "navy", name: "Navy", sub: "Deep blue, sky", chrome: "#121A2A", side: "#151F32", acc: "#5B9BFF" },
   { id: "oxblood", name: "Oxblood", sub: "Dark red, ember", chrome: "#221416", side: "#261719", acc: "#E0703A" },
   { id: "paper", name: "Paper", sub: "Light, terracotta", chrome: "#EFEBE3", side: "#F6F3EC", acc: "#C4553A" },
+  { id: "midnight", name: "Midnight", sub: "Ink black, electric cyan", chrome: "#0B0F17", side: "#0E131C", acc: "#22D3EE" },
+  { id: "synthwave", name: "Synthwave", sub: "Deep indigo, hot pink", chrome: "#160F2B", side: "#1A1233", acc: "#FF4FA3" },
+  { id: "aurora", name: "Aurora", sub: "Black teal, mint", chrome: "#0A1614", side: "#0D1B18", acc: "#34E0A1" },
+  { id: "volt", name: "Volt", sub: "Pure black, acid lime", chrome: "#0B0B0A", side: "#0E0E0D", acc: "#D4FF3A" },
+  { id: "dusk", name: "Dusk", sub: "Plum, amber", chrome: "#1F1424", side: "#23172A", acc: "#FFB454" },
+  { id: "glacier", name: "Glacier", sub: "Ice, cobalt", chrome: "#E8EEF5", side: "#F1F5FA", acc: "#2563EB" },
 ] as const;
 type PaletteId = (typeof PALETTES)[number]["id"];
 const SIDE_W = 290, SIDE_WIDE = 560;
@@ -389,6 +396,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setUiReady(true);
   }, [owner]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem(scoped("cutter.hl", owner), hl); } catch { /* private */ } }, [hl, owner]);
+  // the site's nav, above the ribbon, wears the palette too (magic.css) — and from before the page paints, next time (lib/toolTheme)
+  useEffect(() => {
+    if (!uiReady) return;
+    document.documentElement.setAttribute("data-rm-palette", palette);
+    try { localStorage.setItem(RM_PALETTE_KEY, palette); } catch { /* private */ }
+  }, [palette, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
     try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags })); } catch { /* private */ }
@@ -1684,7 +1697,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openMenu = (id: string, e: React.MouseEvent<HTMLElement>, anchor?: HTMLElement | null) => {
     if (menu?.id === id) { setMenu(null); return; }
     const r = (anchor || e.currentTarget).getBoundingClientRect();
-    const w = id === "pages" || id === "palette" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
+    const w = id === "palette" ? 480 : id === "pages" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
     setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: r.bottom + 6 });
   };
 
@@ -2500,15 +2513,18 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {menu?.id === "palette" && (
-        <div className="rm-menu wide" style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className="rm-menu wide pal" style={{ left: menu.x, top: menu.y }} role="menu">
           <h4>COLOURS</h4>
-          {PALETTES.map((p) => (
-            <button key={p.id} type="button" role="menuitemradio" aria-checked={palette === p.id} className="rm-mb lay" onClick={() => { setPalette(p.id); setMenu(null); }}>
-              <span className="rm-palpic" aria-hidden="true" style={{ background: p.chrome }}><i style={{ background: p.side }} /><i style={{ background: "#fff" }} /><b style={{ background: p.acc }} /></span>
-              <span className="rm-lt"><b>{p.name}</b><small>{p.sub}</small></span>
-              {palette === p.id && <span className="k">✓</span>}
-            </button>
-          ))}
+          <div className="rm-pals">
+            {PALETTES.map((p) => (
+              // the menu stays open: try one after another, and see each on the whole tool
+              <button key={p.id} type="button" role="menuitemradio" aria-checked={palette === p.id} className="rm-mb lay" onClick={() => setPalette(p.id)}>
+                <span className="rm-palpic" aria-hidden="true" style={{ background: p.chrome }}><i style={{ background: p.side }} /><i style={{ background: "#fff" }} /><b style={{ background: p.acc }} /></span>
+                <span className="rm-lt"><b>{p.name}</b><small>{p.sub}</small></span>
+                {palette === p.id && <span className="k">✓</span>}
+              </button>
+            ))}
+          </div>
           <div className="rm-mnote">The page stays white, the way a cut file is read. Kept in this browser.</div>
         </div>
       )}

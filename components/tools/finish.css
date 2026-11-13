@@ -1,5 +1,5 @@
 /* =====================================================================
-   The finish every tool shares, in five colour schemes.
+   The finish every tool shares, in eleven colour schemes.
 
    Evidence (.evi), Flow (.flw), Doc flow (.dfl) and Past flows (.pfl) sit
    on one desk under one banner, and every colour they share comes from the
@@ -91,6 +91,110 @@ html[data-tool-theme="graphite"] .toolpage {
   --t-con: #B64F1E; --t-con-ink: #93400F; --t-con-head: #FBECE3; --t-con-bg: #FDF7F2; --t-con-rgb: 182, 79, 30;
   --t-vision: #0E7490; --t-live: #ECEEF3;
 }
+
+/* ---- The louder six. The same paper desk — it is read on — under a banner
+   that is nearly black, lit from its corner in the scheme's own colour
+   (--bn-glow), with the one bright thing in it the banner's main button.
+   On paper the accent is that colour taken dark enough to carry white text.
+   Checked the same way as the five above: Pro and Con at least 9.6 apart
+   under protanopia and deuteranopia, white at 4.5:1 on Pro, Con and accent. ---- */
+
+/* ---- Midnight: ink black, electric cyan ---- */
+html[data-tool-theme="midnight"] .toolpage {
+  --t-ground: #E3E8EE; --t-panel: #EBEFF4; --t-surface: #FAFCFE; --t-surface-2: #F1F4F8; --t-paper: #FDFEFF;
+  --t-line: #B3BDCA; --t-line-soft: #D5DCE5; --t-ink: #0E141C; --t-muted: #4A5564; --t-dim: #768394;
+  --bn: #0B0F17; --bn-top: #101724; --bn-bot: #080B12; --bn-glow: #0F3A4D; --bn-edge: #04060A;
+  --bn-ink: #E6EDF7; --bn-rgb: 230, 237, 247; --bn-well: rgba(255, 255, 255, .06); --bn-grain: var(--grain-light);
+  --bn-main: #22D3EE; --bn-main-ink: #06222B;
+  --t-acc: #0B7C99; --t-acc-hi: #0E96B8; --t-acc-rgb: 11, 124, 153;
+  --t-deep: #0B0F17; --t-deep-2: #152131; --t-deep-ink: #E6EDF7;
+  --t-pro: #1668B8; --t-pro-ink: #0F528F; --t-pro-head: #E5EEF8; --t-pro-bg: #F5F8FC; --t-pro-rgb: 22, 104, 184;
+  --t-con: #B5521B; --t-con-ink: #8F3F12; --t-con-head: #FAEBE2; --t-con-bg: #FDF6F1; --t-con-rgb: 181, 82, 27;
+  --t-vision: #6D48C7; --t-live: #E4EDF3;
+}
+
+/* ---- Synthwave: deep indigo, hot pink ---- */
+html[data-tool-theme="synthwave"] .toolpage {
+  --t-ground: #E9E4F0; --t-panel: #F0ECF5; --t-surface: #FCFAFE; --t-surface-2: #F4F0F9; --t-paper: #FFFDFF;
+  --t-line: #BDB3CC; --t-line-soft: #DBD4E6; --t-ink: #170F26; --t-muted: #564C6B; --t-dim: #837898;
+  --bn: #1A1233; --bn-top: #221842; --bn-bot: #140D29; --bn-glow: #5A1F6E; --bn-edge: #0B0718;
+  --bn-ink: #EEE8FF; --bn-rgb: 238, 232, 255; --bn-well: rgba(0, 0, 0, .26); --bn-grain: var(--grain-light);
+  --bn-main: #FF4FA3; --bn-main-ink: #2A0A1C;
+  --t-acc: #7A3FE0; --t-acc-hi: #9460F0; --t-acc-rgb: 122, 63, 224;
+  --t-deep: #1A1233; --t-deep-2: #2A1E4E; --t-deep-ink: #EEE8FF;
+  --t-pro: #3F51C9; --t-pro-ink: #2F3FA6; --t-pro-head: #EAECF9; --t-pro-bg: #F7F7FD; --t-pro-rgb: 63, 81, 201;
+  --t-con: #C21F78; --t-con-ink: #9A155E; --t-con-head: #FBE8F2; --t-con-bg: #FDF5F9; --t-con-rgb: 194, 31, 120;
+  --t-vision: #0E7490; --t-live: #EFE6F5;
+}
+
+/* ---- Aurora: black teal, mint ---- */
+html[data-tool-theme="aurora"] .toolpage {
+  --t-ground: #E2EBE7; --t-panel: #EAF1EE; --t-surface: #F9FCFA; --t-surface-2: #F0F5F2; --t-paper: #FCFFFD;
+  --t-line: #B2C2BA; --t-line-soft: #D4DFD9; --t-ink: #0C1A16; --t-muted: #48594F; --t-dim: #728279;
+  --bn: #0D1B18; --bn-top: #122520; --bn-bot: #091411; --bn-glow: #0F4A3C; --bn-edge: #050C0B;
+  --bn-ink: #E4F3EE; --bn-rgb: 228, 243, 238; --bn-well: rgba(0, 0, 0, .26); --bn-grain: var(--grain-light);
+  --bn-main: #34E0A1; --bn-main-ink: #06281B;
+  --t-acc: #0A7F57; --t-acc-hi: #0E9A6A; --t-acc-rgb: 10, 127, 87;
+  --t-deep: #0D1B18; --t-deep-2: #173029; --t-deep-ink: #E4F3EE;
+  --t-pro: #0B7A63; --t-pro-ink: #08604E; --t-pro-head: #E3F1EC; --t-pro-bg: #F5FAF8; --t-pro-rgb: 11, 122, 99;
+  --t-con: #8A3FA0; --t-con-ink: #6E2F82; --t-con-head: #F3E8F6; --t-con-bg: #FAF5FB; --t-con-rgb: 138, 63, 160;
+  --t-vision: #1F5E8C; --t-live: #E3EFE9;
+}
+
+/* ---- Volt: pure black, acid lime ---- */
+html[data-tool-theme="volt"] .toolpage {
+  --t-ground: #E6E7E1; --t-panel: #EEEFEA; --t-surface: #FFFFFF; --t-surface-2: #F4F5F0; --t-paper: #FFFFFF;
+  --t-line: #B8BAAE; --t-line-soft: #D9DBD0; --t-ink: #0D0E0B; --t-muted: #51534A; --t-dim: #7C7F73;
+  --bn: #0C0C0B; --bn-top: #141413; --bn-bot: #080807; --bn-glow: #2C3508; --bn-edge: #000000;
+  --bn-ink: #F1F2EC; --bn-rgb: 241, 242, 236; --bn-well: rgba(255, 255, 255, .07); --bn-grain: var(--grain-light);
+  --bn-main: #D4FF3A; --bn-main-ink: #151A00;
+  --t-acc: #55750A; --t-acc-hi: #6A8F10; --t-acc-rgb: 85, 117, 10;
+  --t-deep: #0C0C0B; --t-deep-2: #1C1D18; --t-deep-ink: #F1F2EC;
+  --t-pro: #1F5E8C; --t-pro-ink: #184B70; --t-pro-head: #E6EEF5; --t-pro-bg: #F6F9FB; --t-pro-rgb: 31, 94, 140;
+  --t-con: #B5451B; --t-con-ink: #8F350F; --t-con-head: #FBEAE2; --t-con-bg: #FDF6F2; --t-con-rgb: 181, 69, 27;
+  --t-vision: #6D48E0; --t-live: #EEF1E2;
+}
+
+/* ---- Dusk: plum, amber ---- */
+html[data-tool-theme="dusk"] .toolpage {
+  --t-ground: #EDE5E8; --t-panel: #F3ECEF; --t-surface: #FCF9F8; --t-surface-2: #F6F0F1; --t-paper: #FFFCFB;
+  --t-line: #C7B9C0; --t-line-soft: #E1D6DB; --t-ink: #1D1420; --t-muted: #5C4E5C; --t-dim: #897989;
+  --bn: #23172A; --bn-top: #2C1D35; --bn-bot: #1C1222; --bn-glow: #5E2A4A; --bn-edge: #120B16;
+  --bn-ink: #F4E9F2; --bn-rgb: 244, 233, 242; --bn-well: rgba(0, 0, 0, .24); --bn-grain: var(--grain-light);
+  --bn-main: #FFB454; --bn-main-ink: #2A1700;
+  --t-acc: #B0356F; --t-acc-hi: #C94A85; --t-acc-rgb: 176, 53, 111;
+  --t-deep: #23172A; --t-deep-2: #35233F; --t-deep-ink: #F4E9F2;
+  --t-pro: #5A489E; --t-pro-ink: #473880; --t-pro-head: #ECE9F5; --t-pro-bg: #F8F6FB; --t-pro-rgb: 90, 72, 158;
+  --t-con: #AC5A1A; --t-con-ink: #8E4A14; --t-con-head: #F8ECDF; --t-con-bg: #FCF6EF; --t-con-rgb: 172, 90, 26;
+  --t-vision: #2F7A74; --t-live: #F1E6E6;
+}
+
+/* ---- Glacier: ice banner, cobalt ---- */
+html[data-tool-theme="glacier"] .toolpage {
+  --t-ground: #DFE7F0; --t-panel: #E8EEF5; --t-surface: #FBFDFF; --t-surface-2: #F0F5FA; --t-paper: #FFFFFF;
+  --t-line: #AEBCCD; --t-line-soft: #D0DAE6; --t-ink: #111B27; --t-muted: #4B5B6E; --t-dim: #74849A;
+  --bn: #EAF1F8; --bn-top: #F3F8FC; --bn-bot: #E2EBF4; --bn-glow: #FFFFFF; --bn-edge: #111B27;
+  --bn-ink: #111B27; --bn-rgb: 17, 27, 39; --bn-well: rgba(0, 0, 0, .04); --bn-grain: var(--grain);
+  --bn-main: #1E3A8A; --bn-main-ink: #FFFFFF;
+  --t-acc: #2563EB; --t-acc-hi: #3B76F6; --t-acc-rgb: 37, 99, 235;
+  --t-deep: #172A46; --t-deep-2: #223A5E; --t-deep-ink: #EAF1F8;
+  --t-pro: #1D5FA8; --t-pro-ink: #174B86; --t-pro-head: #E6EEF8; --t-pro-bg: #F5F8FC; --t-pro-rgb: 29, 95, 168;
+  --t-con: #B4472E; --t-con-ink: #8E3722; --t-con-head: #FAEAE5; --t-con-bg: #FDF6F3; --t-con-rgb: 180, 71, 46;
+  --t-vision: #0F766E; --t-live: #E6EEF6;
+}
+
+/* In the louder six the site's nav, over the banner, is the banner's colour: one dark head, not cream on black.
+   (Round Magic dresses the nav itself, from its own palette.) */
+html:is([data-tool-theme="midnight"], [data-tool-theme="synthwave"], [data-tool-theme="aurora"], [data-tool-theme="volt"], [data-tool-theme="dusk"], [data-tool-theme="glacier"]):has(.toolpage):not(:has(.rm)) .nav {
+  --ground: var(--nav-bg); --line-soft: var(--line);
+  background: var(--nav-bg); color: var(--ink); backdrop-filter: none; border-bottom-color: var(--line);
+}
+html[data-tool-theme="midnight"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #0B0F17; --ink: #E6EDF7; --muted: #8FA1B8; --line: #1E2836; }
+html[data-tool-theme="synthwave"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #1A1233; --ink: #EEE8FF; --muted: #A99BD0; --line: #2E2250; }
+html[data-tool-theme="aurora"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #0D1B18; --ink: #E4F3EE; --muted: #8FB3A8; --line: #1B332E; }
+html[data-tool-theme="volt"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #0C0C0B; --ink: #F1F2EC; --muted: #9C9D93; --line: #262624; }
+html[data-tool-theme="dusk"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #23172A; --ink: #F4E9F2; --muted: #BFA5C4; --line: #3A2742; }
+html[data-tool-theme="glacier"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #EAF1F8; --ink: #111B27; --muted: #5A6B80; --line: #C9D5E3; }
 
 /* ------------------------------------------------------------ the desk */
 .toolpage .evi, .toolpage .flw, .toolpage .dfl, .toolpage .pfl {
@@ -245,12 +349,16 @@ html[data-tool-theme="graphite"] .toolpage {
 .toolpage .themes .th-dots i { width: 8px; height: 8px; border: 1px solid rgba(var(--bn-rgb), .5); }
 .toolpage .themes .th-dots i + i { margin-left: -2px; }
 .toolpage .themes .th-pop {
-  position: absolute; right: 0; top: calc(100% + 10px); z-index: 70; width: 300px; padding: 12px;
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 70; width: min(520px, calc(100vw - 16px)); padding: 12px;
+  max-height: calc(100vh - 90px); overflow: auto;
   background: var(--t-paper); color: var(--t-ink); border: 1px solid var(--t-ink);
-  box-shadow: 0 30px 70px -28px rgba(0, 0, 0, .5); display: grid; gap: 6px;
+  box-shadow: 0 30px 70px -28px rgba(0, 0, 0, .5); display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
   animation: thPop .2s cubic-bezier(.22, 1, .36, 1) both;
 }
 @keyframes thPop { from { opacity: 0; transform: translateY(-4px); } }
+.toolpage .themes .th-h, .toolpage .themes .th-shapes { grid-column: 1 / -1; }
+.toolpage .themes .th-opt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toolpage .themes .th-name { min-width: 0; }
 .toolpage .themes .th-h { font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--t-dim); padding: 2px 2px 6px; }
 .toolpage .themes .th-opt {
   display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; text-align: left;

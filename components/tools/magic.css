@@ -10,7 +10,10 @@
 
    Every colour of the chrome is a token, and a palette (data-palette on the
    root) is just a set of them — graphite, ember, forest, navy, oxblood,
-   paper. The page stays white in all of them.
+   paper, and the louder six: midnight, synthwave, aurora, volt, dusk,
+   glacier. Those also light the ribbon (--chrome-glow), and say what colour
+   text is on their accent (--on-acc): white is lost on a neon. The page
+   stays white in all of them.
 
    Everything is scoped under .rm. The library's pieces (search, speech doc,
    dialogs) sit in .evi wrappers so evidence.css still dresses them — the
@@ -27,6 +30,8 @@
   --pop: #232323; --pop-h: #333;
   --acc: #8b7cf0; --accD: #5b4bc4; --acc-soft: #3a3363; --acc-ink: #c9c1ff; --acc-rgb: 139, 124, 240;
   --ana: #b9c2ff; --mode-on: #f2f2f2; --mode-on-ink: #111;
+  /* text on the accent; and the light a palette puts across the ribbon */
+  --on-acc: #fff; --chrome-glow: none;
 
   --hl: var(--rm-hl, #00ff00);
   --rm-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
@@ -80,6 +85,78 @@
   --pop: #FFFFFF; --pop-h: #F0ECE3;
   --acc: #C4553A; --accD: #A8432B; --acc-soft: #F6DED6; --acc-ink: #8A3420; --acc-rgb: 196, 85, 58; --ana: #2F4FA8;
   --mode-on: #1C1B19; --mode-on-ink: #fff;
+}
+/* ---- the louder six: near-black chrome, one neon, and its light across the ribbon ---- */
+.rm[data-palette="midnight"] {
+  --chrome: #0B0F17; --chrome-line: #1E2836; --chrome-edge: #04060A;
+  --btn: #141B27; --btn-h: #1B2534; --btn-a: #223044; --btnb: #263347; --btnb-h: #46618A;
+  --txt: #E6EDF7; --mut: #8FA1B8;
+  --side: #0E131C; --side-h: #172030; --side-on: #1B2638; --side-line: #1E2836;
+  --side-txt: #DCE6F2; --side-mut: #8A9BB2; --well: #070A10; --well-b: #263347;
+  --pop: #111823; --pop-h: #1B2534;
+  --acc: #22D3EE; --accD: #0E7490; --acc-soft: #0F3440; --acc-ink: #A5F3FC; --acc-rgb: 34, 211, 238; --ana: #7DD3FC;
+  --on-acc: #04222B;
+  --chrome-glow: radial-gradient(60% 240% at 0% 0%, rgba(34, 211, 238, .13), transparent 62%), radial-gradient(50% 200% at 100% 100%, rgba(91, 110, 255, .10), transparent 60%);
+}
+.rm[data-palette="synthwave"] {
+  --chrome: #160F2B; --chrome-line: #2E2250; --chrome-edge: #0B0718;
+  --btn: #221842; --btn-h: #2B1F52; --btn-a: #352763; --btnb: #3A2B68; --btnb-h: #6A52B0;
+  --txt: #EEE8FF; --mut: #A99BD0;
+  --side: #1A1233; --side-h: #261B49; --side-on: #2C2054; --side-line: #2E2250;
+  --side-txt: #E6DEFA; --side-mut: #A294C8; --well: #0F0A20; --well-b: #3A2B68;
+  --pop: #1E1539; --pop-h: #2B1F52;
+  --acc: #FF4FA3; --accD: #C2186B; --acc-soft: #4A1A45; --acc-ink: #FFB3D6; --acc-rgb: 255, 79, 163; --ana: #7DE3FF;
+  --on-acc: #2A0A1C;
+  --chrome-glow: radial-gradient(60% 240% at 0% 0%, rgba(255, 79, 163, .20), transparent 62%), radial-gradient(55% 220% at 100% 100%, rgba(125, 227, 255, .13), transparent 60%);
+}
+.rm[data-palette="aurora"] {
+  --chrome: #0A1614; --chrome-line: #1B332E; --chrome-edge: #050C0B;
+  --btn: #12231F; --btn-h: #182E29; --btn-a: #1F3A34; --btnb: #234039; --btnb-h: #3F7A6C;
+  --txt: #E4F3EE; --mut: #8FB3A8;
+  --side: #0D1B18; --side-h: #152B26; --side-on: #19332D; --side-line: #1B332E;
+  --side-txt: #DCEEE8; --side-mut: #88AAA0; --well: #07100E; --well-b: #234039;
+  --pop: #10201C; --pop-h: #182E29;
+  --acc: #34E0A1; --accD: #0A7F57; --acc-soft: #0F3A2C; --acc-ink: #A7F3D0; --acc-rgb: 52, 224, 161; --ana: #9BE8FF;
+  --on-acc: #052A1C;
+  --chrome-glow: radial-gradient(60% 240% at 0% 0%, rgba(52, 224, 161, .16), transparent 62%), radial-gradient(55% 220% at 100% 100%, rgba(120, 110, 255, .12), transparent 60%);
+}
+.rm[data-palette="volt"] {
+  --chrome: #0B0B0A; --chrome-line: #262624; --chrome-edge: #000;
+  --btn: #171716; --btn-h: #20201E; --btn-a: #2A2A27; --btnb: #2C2C29; --btnb-h: #55554E;
+  --txt: #ECEDE6; --mut: #9C9D93;
+  --side: #0E0E0D; --side-h: #1B1B19; --side-on: #222220; --side-line: #262624;
+  --side-txt: #E6E7DF; --side-mut: #97988E; --well: #050505; --well-b: #2C2C29;
+  --pop: #151514; --pop-h: #20201E;
+  --acc: #D4FF3A; --accD: #55750A; --acc-soft: #2C3A0A; --acc-ink: #E9FF9A; --acc-rgb: 212, 255, 58; --ana: #7DE3FF;
+  --on-acc: #141A00;
+  --chrome-glow: radial-gradient(50% 220% at 0% 0%, rgba(212, 255, 58, .10), transparent 60%);
+}
+.rm[data-palette="dusk"] {
+  --chrome: #1F1424; --chrome-line: #3A2742; --chrome-edge: #120B16;
+  --btn: #2D1E35; --btn-h: #382641; --btn-a: #432E4E; --btnb: #463052; --btnb-h: #7A5590;
+  --txt: #F4E9F2; --mut: #BFA5C4;
+  --side: #23172A; --side-h: #32213B; --side-on: #392644; --side-line: #3A2742;
+  --side-txt: #EFE2EE; --side-mut: #B59CBA; --well: #160E1A; --well-b: #463052;
+  --pop: #291B31; --pop-h: #382641;
+  --acc: #FFB454; --accD: #A05E00; --acc-soft: #4A3018; --acc-ink: #FFDCA8; --acc-rgb: 255, 180, 84; --ana: #FF9EC4;
+  --on-acc: #2A1700;
+  --chrome-glow: radial-gradient(60% 240% at 0% 0%, rgba(255, 120, 150, .16), transparent 62%), radial-gradient(55% 220% at 100% 100%, rgba(255, 180, 84, .12), transparent 60%);
+}
+.rm[data-palette="glacier"] {
+  --chrome: #E8EEF5; --chrome-line: #C9D5E3; --chrome-edge: #BECBDB;
+  --btn: #FFFFFF; --btn-h: #F1F5FA; --btn-a: #E3EBF4; --btnb: #BECBDB; --btnb-h: #6F86A3;
+  --txt: #14202E; --mut: #5A6B80; --hi: #000;
+  --side: #F1F5FA; --side-h: #E4ECF5; --side-on: #D9E4F0; --side-line: #CFDAE7;
+  --side-txt: #1A2634; --side-mut: #5F7085; --well: #FFFFFF; --well-b: #C9D5E3;
+  --pop: #FFFFFF; --pop-h: #EDF2F8;
+  --acc: #2563EB; --accD: #1D4ED8; --acc-soft: #DCE8FF; --acc-ink: #1E40AF; --acc-rgb: 37, 99, 235; --ana: #7C3AED;
+  --mode-on: #14202E; --mode-on-ink: #fff;
+  --chrome-glow: linear-gradient(100deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 45%), radial-gradient(50% 220% at 100% 100%, rgba(37, 99, 235, .10), transparent 60%);
+}
+/* the ribbon wears the palette's light; the side's head and the status line take a thread of the accent */
+.rm-rib { background-image: var(--chrome-glow); }
+.rm:is([data-palette="midnight"], [data-palette="synthwave"], [data-palette="aurora"], [data-palette="volt"], [data-palette="dusk"]) .rm-rib {
+  border-bottom-color: rgba(var(--acc-rgb), .38); box-shadow: 0 1px 14px -4px rgba(var(--acc-rgb), .45);
 }
 .rm *, .rm *::before, .rm *::after { box-sizing: border-box; border-radius: 0; }
 .rm button { font: inherit; color: inherit; }
@@ -331,7 +408,8 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm.binning .rm-evsearch .bin { border-style: dashed; }
 .rm.binning .rm-evsearch .bin.over { border-style: solid; border-color: var(--acc); background: var(--surface-2); }
 .rm-side .evi.rm-evsearch #results { flex: 1; min-height: 0; overflow: auto; scrollbar-color: var(--well-b) transparent; }
-.rm-side .evi.rm-evsearch ::selection { background: var(--acc); color: #fff; }
+.rm-side .evi.rm-evsearch ::selection { background: var(--acc); color: var(--on-acc); }
+.rm .evi mark { color: var(--on-acc); }
 
 /* ------------------------------------------------------------ the work */
 .rm-main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
@@ -507,6 +585,11 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 /* ------------------------------------------------------------ menus, dialogs, the toast */
 .rm-menu { position: fixed; z-index: 70; min-width: 240px; max-width: calc(100vw - 16px); background: var(--pop); border: 1px solid var(--btnb); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); padding: 6px; color: var(--txt); animation: rmIn .12s ease-out both; }
 .rm-menu.wide { width: 330px; }
+.rm-menu.pal { width: 480px; }
+.rm-pals { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4px; }
+.rm-pals .rm-mb { gap: 10px; padding: 6px 8px; }
+.rm-pals .rm-mb[aria-checked="true"] { background: var(--pop-h); box-shadow: inset 2px 0 0 var(--acc); }
+.rm-pals .rm-lt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-menu h4 { margin: 6px 8px 4px; font: 500 10px var(--rm-mono); letter-spacing: .14em; color: var(--mut); }
 .rm-mb { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; border: 0; background: transparent; color: var(--txt); text-align: left; padding: 7px 8px; font-size: 13px; cursor: pointer; }
 .rm-mb:hover { background: var(--pop-h); }
@@ -604,7 +687,7 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 
 /* ------------------------------------------------------------ a shared file */
 .rm-share { font: 500 11px var(--rm-mono); letter-spacing: .08em; gap: 6px; }
-.rm-share.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.rm-share.on { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
 .rm-share.on:hover { background: var(--accD); border-color: var(--accD); }
 .rm-shared { font-style: normal; color: var(--acc); }
 .rm-mates { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
@@ -616,12 +699,12 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm-live.error { background: #dc2626; }
 .rm-live.joining { background: #e8b84a; }
 .rm-sharemenu .rm-mnote.top { margin: 0 0 8px; padding-top: 0; border-top: 0; }
-.rm-mb.pri { justify-content: center; background: var(--acc); color: #fff; font-weight: 600; }
-.rm-mb.pri:hover { background: var(--accD); }
+.rm-mb.pri { justify-content: center; background: var(--acc); color: var(--on-acc); font-weight: 600; }
+.rm-mb.pri:hover { background: var(--accD); color: #fff; }
 .rm-mb.pri:disabled { opacity: .6; cursor: default; }
 .rm-linkrow { display: flex; gap: 0; margin: 2px 0 8px; }
 .rm-linkrow input { flex: 1; min-width: 0; height: 30px; padding: 0 8px; background: var(--well); border: 1px solid var(--well-b); border-right: 0; color: var(--txt); font: 11px var(--rm-mono); outline: none; }
-.rm-linkrow button { height: 30px; padding: 0 12px; border: 1px solid var(--acc); background: var(--acc); color: #fff; font: 600 10px var(--rm-mono); letter-spacing: .12em; cursor: pointer; }
+.rm-linkrow button { height: 30px; padding: 0 12px; border: 1px solid var(--acc); background: var(--acc); color: var(--on-acc); font: 600 10px var(--rm-mono); letter-spacing: .12em; cursor: pointer; }
 .rm-linkrow button:hover { background: var(--accD); }
 .rm-who { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 2px 8px 8px; font-size: 12.5px; color: var(--txt); }
 .rm-who span { display: inline-flex; align-items: center; gap: 6px; }
@@ -653,12 +736,12 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm-side .evi.rm-evsearch .ttl { min-width: 42%; }
 .rm-phead b { white-space: nowrap; }
 .rm-ol .ok { flex-shrink: 0; margin-left: 6px; font-size: 11px; color: #4ade80; }
-.rm-side .evi.rm-evsearch .sel .ttl, .rm-side .evi.rm-evsearch .sel .argt, .rm-side .evi.rm-evsearch .sel .argx, .rm-side .evi.rm-evsearch .sel .argx mark { color: #fff; }
+.rm-side .evi.rm-evsearch .sel .ttl, .rm-side .evi.rm-evsearch .sel .argt, .rm-side .evi.rm-evsearch .sel .argx, .rm-side .evi.rm-evsearch .sel .argx mark { color: var(--hi); }
 
 /* ------------------------------------------------------------ where the next card goes, and moving cards */
 .rm .ct-sheet .rm-dropline { position: relative; height: 0; margin: 0; pointer-events: none; user-select: none; }
 .rm .ct-sheet .rm-dropline::before { content: ""; position: absolute; left: -10px; right: 0; top: -1px; border-top: 2px dashed var(--acc); opacity: .75; }
-.rm .ct-sheet .rm-dropline span { position: absolute; right: 0; top: -9px; padding: 0 6px; background: var(--acc); color: #fff; font: 600 9px/16px var(--rm-mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+.rm .ct-sheet .rm-dropline span { position: absolute; right: 0; top: -9px; padding: 0 6px; background: var(--acc); color: var(--on-acc); font: 600 9px/16px var(--rm-mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
 .rm .ct-sheet h1, .rm .ct-sheet h2, .rm .ct-sheet h3, .rm .ct-sheet h4 { position: relative; }
 .rm .ct-sheet .rm-grip {
   position: absolute; left: -30px; top: 50%; transform: translateY(-50%); width: 24px; height: 22px;
@@ -709,7 +792,7 @@ body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select:
 .rm-side .evi.rm-evsearch .argt { font-size: 12.5px; }
 .rm-side .evi.rm-evsearch .arg.hasx .argt { display: block; overflow: visible; }
 .rm-side .evi.rm-evsearch .argx b { font-weight: 600; color: var(--side-txt); }
-.rm-side .evi.rm-evsearch .sel .argx b { color: #fff; }
+.rm-side .evi.rm-evsearch .sel .argx b { color: var(--hi); }
 .rm-side .evi.rm-evsearch .argx.peek { -webkit-line-clamp: 3; opacity: .92; }
 .rm-side .evi.rm-evsearch #results { padding-bottom: 28px; }
 /* a line's buttons: over its end, when it is pointed at */
@@ -722,8 +805,8 @@ body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select:
 .rm-side .evi.rm-evsearch .act { width: 22px; height: 22px; display: grid; place-items: center; color: var(--side-mut); cursor: pointer; }
 .rm-side .evi.rm-evsearch .act:hover { color: var(--hi); background: var(--side-on); }
 .rm-side .evi.rm-evsearch .act.bad:hover { color: #f87171; }
-.rm-side .evi.rm-evsearch .sel .act { color: #fff; opacity: .8; }
-.rm-side .evi.rm-evsearch .sel .act:hover { opacity: 1; background: rgba(255, 255, 255, .16); color: #fff; }
+.rm-side .evi.rm-evsearch .sel .act { color: var(--hi); opacity: .8; }
+.rm-side .evi.rm-evsearch .sel .act:hover { opacity: 1; background: rgba(var(--acc-rgb), .28); color: var(--hi); }
 /* already in the speech doc */
 .rm-side .evi.rm-evsearch .arg.sent > .chev::after { content: "\2713"; position: absolute; left: -1px; top: -3px; font: 700 11px/1 var(--rm-sans); color: #4ade80; }
 .rm-side .evi.rm-evsearch .row.sent > .ttl::after { content: " \2713"; color: #4ade80; font-weight: 700; }
@@ -743,3 +826,28 @@ body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select:
 .rm.binning .rm-evsearch .binbar.shut .bin-list { display: flex; }
 .rm-side .evi.rm-evsearch .bin-t { padding: 3px 7px; }
 .rm-sfoot1 { padding: 6px 12px; font-size: 11px; line-height: 1.4; }
+
+/* On the white page a neon is a whisper: there the louder palettes' accent is their dark one, carrying white. */
+.rm:is([data-palette="midnight"], [data-palette="aurora"], [data-palette="volt"], [data-palette="dusk"]) :is(.ct-sheet, .rm-dropbar) { --acc: var(--accD); --on-acc: #fff; --acc-rgb: var(--accD-rgb); }
+.rm[data-palette="midnight"] { --accD-rgb: 14, 116, 144; }
+.rm[data-palette="aurora"] { --accD-rgb: 10, 127, 87; }
+.rm[data-palette="volt"] { --accD-rgb: 85, 117, 10; }
+.rm[data-palette="dusk"] { --accD-rgb: 160, 94, 0; }
+
+/* ------------------------------------------------------------ the site's nav, over the ribbon
+   One window: the strip above the ribbon is the palette's chrome, not the
+   site's cream. <html data-rm-palette> is set before the page paints. */
+html:has(.rm) .nav {
+  --nav-bg: #1b1b1b; --ink: #ececec; --muted: #a8a8a8; --line: #333; --line-soft: #333; --ground: var(--nav-bg);
+  background: var(--nav-bg); color: var(--ink); backdrop-filter: none; border-bottom-color: var(--line);
+}
+html[data-rm-palette="forest"]:has(.rm) .nav { --nav-bg: #1F2C24; --ink: #F1EBDD; --muted: #B3B7A5; --line: #33453A; --line-soft: #33453A; }
+html[data-rm-palette="navy"]:has(.rm) .nav { --nav-bg: #121A2A; --ink: #E8EEF8; --muted: #9FB0C8; --line: #26334A; --line-soft: #26334A; }
+html[data-rm-palette="oxblood"]:has(.rm) .nav { --nav-bg: #221416; --ink: #F3E6E2; --muted: #C2A5A0; --line: #3b2427; --line-soft: #3b2427; }
+html[data-rm-palette="paper"]:has(.rm) .nav { --nav-bg: #EFEBE3; --ink: #1C1B19; --muted: #6B6559; --line: #D6CFC1; --line-soft: #D6CFC1; }
+html[data-rm-palette="midnight"]:has(.rm) .nav { --nav-bg: #0B0F17; --ink: #E6EDF7; --muted: #8FA1B8; --line: #1E2836; --line-soft: #1E2836; }
+html[data-rm-palette="synthwave"]:has(.rm) .nav { --nav-bg: #160F2B; --ink: #EEE8FF; --muted: #A99BD0; --line: #2E2250; --line-soft: #2E2250; }
+html[data-rm-palette="aurora"]:has(.rm) .nav { --nav-bg: #0A1614; --ink: #E4F3EE; --muted: #8FB3A8; --line: #1B332E; --line-soft: #1B332E; }
+html[data-rm-palette="volt"]:has(.rm) .nav { --nav-bg: #0B0B0A; --ink: #ECEDE6; --muted: #9C9D93; --line: #262624; --line-soft: #262624; }
+html[data-rm-palette="dusk"]:has(.rm) .nav { --nav-bg: #1F1424; --ink: #F4E9F2; --muted: #BFA5C4; --line: #3A2742; --line-soft: #3A2742; }
+html[data-rm-palette="glacier"]:has(.rm) .nav { --nav-bg: #E8EEF5; --ink: #14202E; --muted: #5A6B80; --line: #C9D5E3; --line-soft: #C9D5E3; }
