@@ -206,8 +206,6 @@ const LAYOUT_MODES = [
   { id: "stage", name: "Stage", sub: "The page you're in front and centre; the other leans in, click it to swap", pic: [[0, 0, 60, 38, "c"], [3, 4, 36, 30, "p"], [42, 9, 15, 20, "d"]] },
   { id: "dock", name: "Dock", sub: "The ribbon a floating dock at the bottom; the pages run to the top", pic: [[0, 0, 14, 38, "s"], [15, 0, 45, 38, "p"], [12, 31, 38, 5, "c"]] },
   { id: "deck", name: "Deck", sub: "One page at a time, full width, with tabs along the top — Alt+[ and Alt+] flip", pic: [[0, 0, 60, 4, "c"], [0, 4, 13, 34, "s"], [14, 5, 10, 4, "d"], [25, 5, 10, 4, "c"], [14, 9, 46, 29, "p"]] },
-  { id: "spotlight", name: "Spotlight", sub: "No ribbon, no side: just the pages. Ctrl+P or / brings up cards and commands", pic: [[0, 0, 60, 38, "p"], [14, 6, 32, 15, "c"], [16, 10, 28, 3, "s"], [16, 15, 22, 2, "s"]] },
-  { id: "board", name: "Flow-board", sub: "Their doc, your speech doc and the search in three columns, each tag wired to its answer", pic: [[0, 0, 60, 4, "c"], [0, 4, 19, 34, "p"], [20, 4, 19, 34, "d"], [40, 4, 20, 34, "s"], [16, 12, 8, 1, "s"], [16, 22, 8, 1, "s"]] },
 ] as const;
 type LayoutId = (typeof LAYOUT_MODES)[number]["id"];
 const SIDE_W = 290, SIDE_WIDE = 560;
@@ -309,8 +307,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [layoutMode, setLayoutMode] = useState<LayoutId>("classic");
   // Focus: the side is a drawer, out of sight until the pointer reaches the edge or a key asks for it
   const [drawer, setDrawer] = useState(false);
-  // Spotlight: the search, floated in the middle, is open
-  const [spot, setSpot] = useState(false);
   // Deck: the pages opened this session, as tabs
   const [deckTabs, setDeckTabs] = useState<{ id: string; name: string }[]>([]);
   // what is typed in the library search, for the commands that sit over its results
@@ -1554,9 +1550,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       setSide((s) => !s); return;
     }
     if (id === "command") {
-      // Spotlight's key: cards and commands in the middle of the screen. Elsewhere: the search, with commands after a >
+      // the search, with every command after a >
       focusLibrary();
-      if (layoutMode === "spotlight") setSpot(true);
       return;
     }
     if (id === "tab-next" || id === "tab-prev") {
@@ -1573,7 +1568,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     }
     if (id === "save") { void flush(true); return; }
     if (id === "find") { setTab("files"); requestAnimationFrame(() => { qIn.current?.focus(); qIn.current?.select(); }); return; }
-    if (id === "library") { if (layoutMode === "focus") setDrawer(true); if (layoutMode === "spotlight") setSpot(true); focusLibrary(); return; }
+    if (id === "library") { if (layoutMode === "focus") setDrawer(true); focusLibrary(); return; }
     if (id === "new-file") { void create("Untitled file"); return; }
     if (id === "mode-split") { setMode(modeRef.current === "split" ? "edit" : "split"); return; }
     if (id === "mode-speech") { setMode(modeRef.current === "speech" ? "split" : "speech"); return; }
@@ -1703,93 +1698,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (deckNow === id) deckOpen(rest.length ? rest[Math.min(i, rest.length - 1)].id : "speech");
   };
 
-  // ---- Flow-board: three columns, each of their tags wired to the heading that answers it --------------
-  const wires = useRef<SVGSVGElement>(null);
-  useEffect(() => {
-    if (layoutMode !== "board") return;
-    // their doc beside the speech doc is the point of it
-    if (mode === "edit") setMode("split");
-  }, [layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (layoutMode !== "board" || mode !== "split") return;
-    const work = workBox.current;
-    if (!work) return;
-    let raf = 0;
-    const clean = (t: string) => t.replace(/⋮⋮/g, "").replace(/\s+/g, " ").trim();
-    const draw = () => {
-      raf = 0;
-      const svg = wires.current;
-      if (!svg) return;
-      const W = work.getBoundingClientRect();
-      const pane = (work.querySelector(".rm-pane.active") || work.querySelector(".rm-pane")) as HTMLElement | null;
-      const box = pane?.querySelector(".rm-scroll") as HTMLElement | null;
-      const pm = work.querySelector("#docbody .ProseMirror");
-      const sbox = work.querySelector("#docbody") as HTMLElement | null;
-      if (!pane || !box || !pm || !sbox) { svg.innerHTML = ""; return; }
-      // the speech doc's headings, and which have cards under them
-      const heads = new Map<string, { el: Element; has: boolean }>();
-      let curH: { el: Element; has: boolean } | null = null;
-      for (const el of Array.from(pm.children)) {
-        if (/^H[1-3]$/.test(el.tagName)) { curH = { el, has: false }; heads.set(clean(el.textContent || "").toLowerCase(), curH); }
-        else if (el.tagName === "H4" && curH) curH.has = true;
-      }
-      const P = box.getBoundingClientRect(), S = sbox.getBoundingClientRect();
-      const x1 = P.right - W.left - 7, x2 = S.left - W.left + 7;
-      let out = "";
-      pane.querySelectorAll(".ct-sheet h4").forEach((h) => {
-        const t = clean(h.textContent || "");
-        if (!t) return;
-        const hit = heads.get(("AT: " + headOf(t)).toLowerCase());
-        const r = h.getBoundingClientRect();
-        const y = r.top + Math.min(r.height, 22) / 2;
-        if (y < P.top + 4 || y > P.bottom - 4) return;            // their tag is scrolled away
-        const y1 = y - W.top;
-        if (!hit) {
-          out += `<circle cx="${x1}" cy="${y1}" r="3.5" class="w-none"/>`;
-          return;
-        }
-        const hr = hit.el.getBoundingClientRect();
-        const off = hr.top + hr.height / 2 < S.top ? -1 : hr.top + hr.height / 2 > S.bottom ? 1 : 0;
-        const y2 = Math.max(S.top + 10, Math.min(S.bottom - 10, hr.top + hr.height / 2)) - W.top;
-        const cls = hit.has ? "w-done" : "w-open";
-        const mid = (x1 + x2) / 2;
-        out += `<path d="M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}" class="${cls}${off ? " w-off" : ""}"/>`;
-        out += `<circle cx="${x1}" cy="${y1}" r="5" class="${cls}"/>`;
-        if (hit.has) out += `<path d="M${x1 - 2.4} ${y1} l1.7 1.8 l3.1 -3.4" class="w-tick"/>`;
-        out += off ? `<path d="M${x2 - 4} ${y2 + (off < 0 ? 4 : -4)} l4 ${off < 0 ? -6 : 6} l4 ${off < 0 ? 6 : -6}" class="w-arr ${cls}"/>` : `<circle cx="${x2}" cy="${y2}" r="3" class="${cls}"/>`;
-      });
-      svg.setAttribute("viewBox", `0 0 ${W.width} ${W.height}`);
-      svg.innerHTML = out;
-    };
-    const later = () => { if (!raf) raf = requestAnimationFrame(draw); };
-    work.addEventListener("scroll", later, true);
-    const ro = new ResizeObserver(later);
-    ro.observe(work);
-    // the docs change as they are written in
-    const iv = window.setInterval(later, 450);
-    later();
-    return () => { work.removeEventListener("scroll", later, true); ro.disconnect(); clearInterval(iv); cancelAnimationFrame(raf); };
-  }, [layoutMode, mode, panes.length]);
-
-  // ---- Spotlight: the search floated over the pages, gone again on Esc or a click away ----------------
-  useEffect(() => { if (layoutMode !== "spotlight") setSpot(false); }, [layoutMode]);
-  useEffect(() => {
-    if (layoutMode !== "spotlight") return;
-    const q = root.current?.querySelector("#q");
-    const on = () => setSpot(true);
-    q?.addEventListener("focus", on);
-    return () => q?.removeEventListener("focus", on);
-  }, [layoutMode]);
-  useEffect(() => {
-    if (!spot) return;
-    const away = (e: PointerEvent) => {
-      const t = e.target as Element;
-      if (!t.closest?.(".tp-search, .rm-menu, .evi .veil, .rm-spothint")) setSpot(false);
-    };
-    window.addEventListener("pointerdown", away, true);
-    return () => window.removeEventListener("pointerdown", away, true);
-  }, [spot]);
-
   // ---- commands, over the search's results -----------------------------------------------------------
   useEffect(() => {
     const q = root.current?.querySelector("#q") as HTMLInputElement | null;
@@ -1811,7 +1719,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const cmdMode = cmdQ.startsWith(">");
   const cmdHits = (() => {
     const raw = (cmdMode ? cmdQ.slice(1) : cmdQ).trim().toLowerCase();
-    if (!cmdMode && (layoutMode !== "spotlight" || raw.length < 2)) return [];
+    if (!cmdMode) return [];
     const words = raw.split(/\s+/).filter(Boolean);
     const scored = commands.map((c) => {
       const l = c.label.toLowerCase(), lw = l.split(/[^a-z0-9]+/);
@@ -1825,7 +1733,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const runCommand = (c: (typeof commands)[number]) => {
     const q = root.current?.querySelector("#q") as HTMLInputElement | null;
     if (q) { q.value = ""; q.dispatchEvent(new Event("input", { bubbles: true })); }
-    setSpot(false);
     // the page gets the cursor back first: most commands work on it
     const v = target();
     v?.focus();
@@ -1858,7 +1765,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       // Esc in the search with nothing typed: back to the page (their case, while answering it)
       if (e.key === "Escape" && t && t.id === "q" && !(t as HTMLInputElement).value) {
         e.preventDefault(); e.stopPropagation();
-        setSpot(false);
         (answerRef.current?.claim ? view.current : target())?.focus();
         return;
       }
@@ -2361,7 +2267,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-tab={tab} data-heads={headsOf} data-spot={spot ? "open" : undefined}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
@@ -2575,7 +2481,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               </div>
               {cmdHits.length > 0 && (
                 <div className="rm-cmds" role="listbox" aria-label="Commands">
-                  {!cmdMode && <div className="rm-cmdh">COMMANDS <span>type &gt; for all of them</span></div>}
                   {cmdHits.map((c, n) => (
                     <button key={c.id} type="button" role="option" aria-selected={cmdMode && n === cmdSel} className="rm-cmd"
                       onMouseDown={(e) => e.preventDefault()} onClick={() => runCommand(c)}>
@@ -2670,13 +2575,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               <span className="rm-dkeys">{K("tab-prev") && K("tab-next") ? `${K("tab-prev")} / ${K("tab-next")}` : ""}</span>
             </div>
           )}
-          {layoutMode === "spotlight" && !spot && (
-            <button type="button" className="rm-spothint" onClick={() => run("command")}>
-              <b>{K("command") || "/"}</b> cards and commands · <b>&gt;</b> for every command
-            </button>
-          )}
           <div className="rm-work" ref={workBox}>
-            {layoutMode === "board" && mode === "split" && <svg className="rm-wires" ref={wires} aria-hidden="true" />}
             <div className="rm-panes" ref={panesBox}>
               {panes.map((p, i) => {
                 const v = views.current.get(p.key);
