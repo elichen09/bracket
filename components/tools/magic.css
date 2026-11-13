@@ -987,3 +987,26 @@ html[data-rm-layout="focus"]:has(.rm[data-layout="focus"]) .nav { display: none;
 .rm[data-layout="dock"] .rm-rib [data-tip]:hover::after { top: auto; bottom: calc(100% + 8px); }
 .rm[data-layout="dock"] .rm-rib .rm-titlebox [data-tip]:hover::after { bottom: calc(100% + 8px); }
 
+
+/* ------------------------------------------------------------ the outline, as Word's navigation pane draws it
+   A tree: a fold mark before each heading with anything under it (› shut, turned down open), children
+   indented under it, the biggest headings bold, the rest plain — the writer's words, not restyled with
+   underlines. The heading you're in is a soft band of the accent across the whole row. */
+.rm-slist .rm-ol {
+  min-height: 26px; padding: 2px 8px 2px calc(6px + var(--d, 0) * 16px); gap: 2px;
+  font: 400 13.5px/1.25 var(--rm-sans); color: var(--side-txt); letter-spacing: 0;
+}
+.rm-slist .rm-ol .lab { text-decoration: none; font-weight: inherit; font-size: inherit; }
+.rm-slist .rm-ol.r0 { font-weight: 700; font-size: 14.5px; color: var(--hi); }
+.rm-slist .rm-ol.r0 + .rm-ol.r0, .rm-slist .rm-ol.r0:not(:first-child) { margin-top: 2px; }
+.rm-slist .rm-ol.r1 { font-weight: 500; }
+.rm-slist .rm-ol.k4 { color: var(--side-mut); font-size: 13px; }
+.rm-slist .rm-ol .tw { flex: 0 0 16px; width: 16px; height: 18px; display: grid; place-items: center; color: var(--side-mut); }
+.rm-slist .rm-ol .tw svg { transition: transform .12s ease; }
+.rm-slist .rm-ol .tw.open svg { transform: rotate(90deg); }
+.rm-slist .rm-ol .tw.open, .rm-slist .rm-ol .tw.shut { cursor: pointer; }
+.rm-slist .rm-ol .tw.open:hover, .rm-slist .rm-ol .tw.shut:hover { color: var(--hi); }
+.rm-slist .rm-ol:hover { background: color-mix(in srgb, var(--side-h) 80%, transparent); }
+.rm-slist .rm-ol.on { background: color-mix(in srgb, var(--acc) 26%, var(--side)); box-shadow: none; color: var(--hi); }
+.rm-slist .rm-ol.on.k4 { color: var(--hi); }
+.rm-slist .rm-ol.drop::before, .rm-slist .rm-ol.drop-after::after { left: calc(22px + var(--d, 0) * 16px); }

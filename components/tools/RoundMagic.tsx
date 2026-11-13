@@ -298,6 +298,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [hideDim, setHideDim] = useState(false);
   const [depth, setDepth] = useState(4);
   const [olFilter, setOlFilter] = useState("");
+  // the outline's folds, the way Word's navigation pane has them: a heading opened or shut by hand, over what the depth buttons say
+  const [olFold, setOlFold] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<null | { id: string; x: number; y: number; up?: number }>(null);
   // the ribbon: folded to one line, or with some of its groups folded into a button each
   const [ribMin, setRibMin] = useState(false);
@@ -2041,7 +2043,40 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   })();
   const curShare = cur?.share && !curTheirs ? shares.current.get(cur.id) || null : null;
   const theirFor = (fid: string) => theirMeta.current.get(fid);
-  const olRows = heads.map((h, i) => ({ h, i })).filter(({ h }) => h.level <= depth && (!olFilter.trim() || h.text.toLowerCase().includes(olFilter.trim().toLowerCase())));
+  // The outline as a tree. Each heading knows whether it has anything under it (a fold mark) and whether
+  // it is open: by hand, or else by the depth buttons. A row shows when everything over it is open.
+  // Indented from the biggest heading the doc has, so a file with no pocket starts at the edge.
+  const olWhose = (headsOf === "speech" ? "speech" : cur?.id || "") + "|";
+  const olTop = heads.length ? Math.min(...heads.map((h) => h.level)) : 1;
+  const olTree = (() => {
+    const seen = new Map<string, number>();
+    const out: { h: Head; i: number; key: string; kids: boolean; open: boolean; show: boolean; parent: number }[] = [];
+    const stack: number[] = [];                       // indices into out of the open path
+    heads.forEach((h, i) => {
+      const base = h.level + ":" + h.text;
+      const n = (seen.get(base) || 0) + 1;
+      seen.set(base, n);
+      const key = olWhose + base + ":" + n;
+      while (stack.length && out[stack[stack.length - 1]].h.level >= h.level) stack.pop();
+      const parent = stack.length ? stack[stack.length - 1] : -1;
+      const kids = i + 1 < heads.length && heads[i + 1].level > h.level;
+      const open = key in olFold ? olFold[key] : h.level < depth;
+      const show = parent < 0 || (out[parent].show && out[parent].open);
+      out.push({ h, i, key, kids, open, show, parent });
+      stack.push(out.length - 1);
+    });
+    return out;
+  })();
+  const olQ = olFilter.trim().toLowerCase();
+  const olRows = olQ ? olTree.filter((r) => r.h.text.toLowerCase().includes(olQ)) : olTree.filter((r) => r.show);
+  // the heading the cursor is in — or, folded away, the nearest one over it that shows
+  const olAt = (() => {
+    let k = at >= 0 && at < olTree.length ? at : -1;
+    if (olQ) return k;
+    while (k >= 0 && !olTree[k].show) k = olTree[k].parent;
+    return k;
+  })();
+  const olToggle = (key: string, open: boolean) => setOlFold((f) => ({ ...f, [key]: !open }));
   // where the cursor is: pocket › hat › block › tag
   const crumb = (() => {
     if (at < 0) return "";
@@ -2227,7 +2262,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-tabpane tp-outline" hidden={tab !== "outline"}>
             <div className="rm-depth" role="group" aria-label="Outline depth">
               {[1, 2, 3, 4].map((n) => (
-                <button key={n} type="button" aria-pressed={depth === n} onClick={() => setDepth(n)} title={["Pockets", "Hats", "Blocks", "Tags"][n - 1]}>{n}</button>
+                <button key={n} type="button" aria-pressed={depth === n} onClick={() => { setDepth(n); setOlFold({}); }} title={["Pockets", "Hats", "Blocks", "Tags"][n - 1]}>{n}</button>
               ))}
               <span className="rm-olof">{headsOf === "speech" ? "SPEECH DOC" : "THIS FILE"}</span>
             </div>
@@ -2235,15 +2270,26 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             <nav className={"rm-slist" + (drag !== null ? " dragging" : "")} aria-label="Outline"
               onDragOver={(e) => { if (drag !== null && e.target === e.currentTarget) { e.preventDefault(); const ok = dropTarget(drag, heads.length) !== null; setDropAt(ok ? heads.length : null); } }}
               onDrop={(e) => { e.preventDefault(); dropRow(); }}>
-              {olRows.length ? olRows.map(({ h, i }) => (
+              {olRows.length ? olRows.map(({ h, i, key, kids, open }) => (
                 <button key={i} type="button" draggable
-                  className={`rm-ol k${h.level}` + (i === at ? " on" : "") + (drag === i ? " lifted" : "") + (dropAt === i ? " drop" : "") + (dropAt === heads.length && i === heads.length - 1 ? " drop-after" : "")}
-                  style={{ ["--d" as string]: h.level - 1 }}
-                  title="Click to go there · drag to move it, and everything under it"
+                  className={`rm-ol k${h.level} r${h.level - olTop}` + (i === olAt ? " on" : "") + (drag === i ? " lifted" : "") + (dropAt === i ? " drop" : "") + (dropAt === heads.length && i === heads.length - 1 ? " drop-after" : "")}
+                  style={{ ["--d" as string]: h.level - olTop }}
+                  title={h.text}
+                  aria-expanded={kids && !olQ ? open : undefined}
                   onClick={() => { const v = target(); if (v) goPos(v, h.pos); }}
+                  onDoubleClick={() => { if (kids) olToggle(key, open); }}
+                  onKeyDown={(e) => {
+                    if (!kids || olQ) return;
+                    if (e.key === "ArrowRight" && !open) { e.preventDefault(); olToggle(key, open); }
+                    if (e.key === "ArrowLeft" && open) { e.preventDefault(); olToggle(key, open); }
+                  }}
                   onDragStart={(e) => { setDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", h.text); }}
                   onDragOver={(e) => onRowDrag(e, i)}
                   onDragEnd={() => { setDrag(null); setDropAt(null); }}>
+                  <span className={"tw" + (kids && !olQ ? (open ? " open" : " shut") : "")} aria-hidden="true"
+                    onClick={kids && !olQ ? (e) => { e.stopPropagation(); olToggle(key, open); } : undefined}>
+                    {kids && !olQ && <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 2l3 3-3 3" /></svg>}
+                  </span>
                   <span className="lab">{h.text}</span>
                   {answered.has(("AT: " + headOf(h.text)).toLowerCase()) && <span className="ok" title="Answered: there are cards under its heading in the speech doc">✓</span>}
                   <span className="x" role="button" aria-label={`Delete “${h.text}” and everything under it`} title="Delete this, and everything under it — Ctrl+Z brings it back"
