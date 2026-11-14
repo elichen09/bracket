@@ -146,6 +146,9 @@ export async function readFlow(docId: string, tabFromLink: string): Promise<ApiF
     || tabs[0];
   if (!tab) throw new Error("That Doc has nothing in it");
   const content = tab.documentTab?.body?.content || [];
+  // The Break's own response lists (lettered A. a. i.): whatever level Google put them at, they're responses
+  const lists = tab.documentTab?.lists || {};
+  const responseList = (id: string) => /UPPER_ALPHA/.test(lists[id]?.listProperties?.nestingLevels?.[0]?.glyphType || "");
   const sections: ApiSection[] = [{ title: "", rows: [] }];
   const cur = () => sections[sections.length - 1];
   const counter = new Map<string, number>();
@@ -160,7 +163,7 @@ export async function readFlow(docId: string, tabFromLink: string): Promise<ApiF
     if (p.bullet) {
       const level = p.bullet.nestingLevel || 0;
       if (!text) continue;
-      if (level === 0) {
+      if (level === 0 && !responseList(p.bullet.listId)) {
         const id = p.bullet.listId;
         if (partList && id !== partList && cur().rows.length) sections.push({ title: "", rows: [] });
         partList = id;
