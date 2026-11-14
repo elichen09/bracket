@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toDocsHtml, type FlowSection } from "@/lib/gflowTable";
+import { RESPONSE_COLOUR } from "@/lib/gdocsApi";
 import { scoped } from "@/lib/owner";
 
 /**
@@ -190,7 +191,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                     )}
                   </td>
                   <td className="r">
-                    <textarea data-cell value={r.responses.join("\n")} rows={Math.max(1, r.responses.length)} spellCheck={false} placeholder={r.added >= 0 ? "" : "Respond…"} onKeyDown={keys}
+                    <textarea data-cell value={r.responses.join("\n")} rows={Math.max(1, r.responses.length)} spellCheck={false} style={{ color: RESPONSE_COLOUR }} placeholder={r.added >= 0 ? "" : "Respond…"} onKeyDown={keys}
                       onChange={(e) => {
                         const v = linesOf(e.target.value);
                         if (r.added >= 0) edit(s.k, (x) => ({ ...x, added: x.added.map((a, j) => (j === r.added ? { ...a, responses: v } : a)) }));

@@ -16,7 +16,7 @@
  * Writing a row: its old responses are deleted and the new ones inserted
  * after the argument as new paragraphs (which take the argument's list and
  * level), then made a lettered list one level in (a leading tab is how the
- * API is told the level), in black. An argument added at the end of a part is
+ * API is told the level), in red. An argument added at the end of a part is
  * inserted after the part's last argument the same way — so it is that list's
  * next number — and that argument's responses are put back after it. Every
  * write names the revision it was worked out against; if the Doc has moved on
@@ -187,7 +187,15 @@ export async function readFlow(docId: string, tabFromLink: string): Promise<ApiF
 // ------------------------------------------------------------------ writing
 export interface RowWrite { row: ApiRow; responses: string[]; add: { arg: string; responses: string[] }[] }
 
-const BLACK = { color: { rgbColor: { red: 0, green: 0, blue: 0 } } };
+/** Responses are written in red. */
+export const RESPONSE_COLOUR = "#ff0000";
+const RED = { color: { rgbColor: { red: 1, green: 0, blue: 0 } } };
+/**
+ * The list a row's responses are made into. Not the argument's preset (1. a. i.): Google adds lines to the
+ * list right above them when its preset matches — at the top level, as more arguments. This one's second
+ * level is lettered just the same (A. a. i.), and the lines go in at that second level.
+ */
+const RESPONSE_PRESET = "NUMBERED_UPPERALPHA_ALPHA_ROMAN";
 
 export function rowRequests(w: RowWrite, tabId: string, bodyEnd: number): any[] {
   const reqs: any[] = [];
@@ -225,9 +233,9 @@ export function rowRequests(w: RowWrite, tabId: string, bodyEnd: number): any[] 
     // a second level has, set outright so nothing left over from the first list pushes it about.
     for (const g of [...groups].reverse()) {
       const lines = (text.slice(g.from, g.to).match(/\t/g) || []).length;
-      reqs.push({ updateTextStyle: { range: range(P + g.from, P + g.to), textStyle: { foregroundColor: BLACK }, fields: "foregroundColor" } });
+      reqs.push({ updateTextStyle: { range: range(P + g.from, P + g.to), textStyle: { foregroundColor: RED }, fields: "foregroundColor" } });
       reqs.push({ deleteParagraphBullets: { range: range(P + g.from, P + g.to) } });
-      reqs.push({ createParagraphBullets: { range: range(P + g.from, P + g.to), bulletPreset: "NUMBERED_DECIMAL_ALPHA_ROMAN" } });
+      reqs.push({ createParagraphBullets: { range: range(P + g.from, P + g.to), bulletPreset: RESPONSE_PRESET } });
       reqs.push({ updateParagraphStyle: {
         range: range(P + g.from, P + g.to - lines),
         paragraphStyle: { indentStart: { magnitude: 72, unit: "PT" }, indentFirstLine: { magnitude: 54, unit: "PT" } },

@@ -107,7 +107,7 @@ export function toDocsHtml(sections: { title: string; rows: { n: number; arg: st
       text += `${r.n}. ${r.arg}\n`;
       const rs = r.responses.filter((x) => x.trim());
       if (rs.length) {
-        html += `<ol style="list-style-type:lower-alpha">` + rs.map((x) => `<li><span style="color:#000000">${esc(x)}</span></li>`).join("") + `</ol>`;
+        html += `<ol style="list-style-type:lower-alpha">` + rs.map((x) => `<li style="color:#ff0000"><span style="color:#ff0000">${esc(x)}</span></li>`).join("") + `</ol>`;
         rs.forEach((x, i) => { text += `    ${String.fromCharCode(97 + (i % 26))}. ${x}\n`; });
       }
       html += `</li>`;
