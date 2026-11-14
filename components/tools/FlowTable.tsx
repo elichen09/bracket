@@ -154,8 +154,8 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     const after = () => document.activeElement as HTMLTextAreaElement;
     // Tab: the next cell, ready to add to; ↑ ↓ off a cell's edge: the row above or below
     if (e.key === "Tab") { if (go(t, e.shiftKey ? -1 : 1)) { e.preventDefault(); place(after(), after().value.length); } return; }
-    if (e.key === "ArrowDown" && !t.value.slice(t.selectionEnd).includes("\n")) { if (go(t, 1)) { e.preventDefault(); place(after(), 0); } return; }
-    if (e.key === "ArrowUp" && !t.value.slice(0, t.selectionStart).includes("\n")) { if (go(t, -1)) { e.preventDefault(); place(after(), after().value.length); } return; }
+    if (e.key === "ArrowDown") { if (go(t, 1)) { e.preventDefault(); place(after(), 0); } return; }
+    if (e.key === "ArrowUp") { if (go(t, -1)) { e.preventDefault(); place(after(), after().value.length); } return; }
     if (e.key === "Escape") t.blur();
   };
 
@@ -191,12 +191,56 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                     )}
                   </td>
                   <td className="r">
-                    <textarea data-cell value={r.responses.join("\n")} rows={Math.max(1, r.responses.length)} spellCheck={false} style={{ color: RESPONSE_COLOUR }} placeholder={r.added >= 0 ? "" : "Respond…"} onKeyDown={keys}
-                      onChange={(e) => {
-                        const v = linesOf(e.target.value);
-                        if (r.added >= 0) edit(s.k, (x) => ({ ...x, added: x.added.map((a, j) => (j === r.added ? { ...a, responses: v } : a)) }));
-                        else edit(s.k, (x) => ({ ...x, rows: { ...x.rows, [r.arg]: v } }));
-                      }} />
+                    {/* each response its own cell; the dashed one at the bottom starts another */}
+                    {[...r.responses, ""].map((line, li, all) => {
+                      const extra = li === all.length - 1;
+                      if (extra && r.responses.length && !r.responses[r.responses.length - 1].trim()) return null;
+                      const set = (next: string[]) => {
+                        if (r.added >= 0) edit(s.k, (x) => ({ ...x, added: x.added.map((a, j) => (j === r.added ? { ...a, responses: next } : a)) }));
+                        else edit(s.k, (x) => ({ ...x, rows: { ...x.rows, [r.arg]: next } }));
+                      };
+                      const key = s.k + ":" + ri + ":" + li;
+                      return (
+                        <textarea key={li} data-cell data-resp={key} value={line} rows={1} spellCheck={false} className={"resp" + (extra ? " more" : "")}
+                          style={{ color: RESPONSE_COLOUR }} placeholder={extra ? (r.responses.length ? "+ another response" : r.added >= 0 ? "" : "Respond…") : ""}
+                          onKeyDown={(e) => {
+                            const t = e.currentTarget;
+                            // Enter: a new cell under this one (what was after the cursor goes with it)
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (extra && !line.trim()) return;
+                              const cur = [...r.responses];
+                              const head = t.value.slice(0, t.selectionStart), tail = t.value.slice(t.selectionEnd);
+                              if (extra) cur.push(head, tail); else cur.splice(li, 1, head, tail);
+                              set(cur);
+                              requestAnimationFrame(() => {
+                                const n = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-resp="${CSS.escape(s.k + ":" + ri + ":" + (li + 1))}"]`);
+                                if (n) { n.focus(); n.setSelectionRange(0, 0); }
+                              });
+                              return;
+                            }
+                            // Backspace at the start of a cell: it joins the one above
+                            if (e.key === "Backspace" && t.selectionStart === 0 && t.selectionEnd === 0 && li > 0 && !extra) {
+                              e.preventDefault();
+                              const cur = [...r.responses], prev = cur[li - 1], at = prev.length;
+                              cur.splice(li - 1, 2, prev + line);
+                              set(cur);
+                              requestAnimationFrame(() => {
+                                const n = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-resp="${CSS.escape(s.k + ":" + ri + ":" + (li - 1))}"]`);
+                                if (n) { n.focus(); n.setSelectionRange(at, at); }
+                              });
+                              return;
+                            }
+                            keys(e);
+                          }}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/\n/g, " ");
+                            const cur = [...r.responses];
+                            if (extra) { if (!v) return; cur.push(v); } else cur[li] = v;
+                            set(cur);
+                          }} />
+                      );
+                    })}
                   </td>
                 </tr>
               ))}

@@ -162,8 +162,8 @@ export async function readFlow(docId: string, tabFromLink: string): Promise<ApiF
     const text = clean(runs.map((e: any) => e.textRun.content).join(""));
     if (p.bullet) {
       const level = p.bullet.nestingLevel || 0;
-      if (!text) continue;
-      if (level === 0 && !responseList(p.bullet.listId)) {
+      if (!text || text === PLACEHOLDER) continue;
+      if (level === 0 && !responseList(p.bullet.listId) && text !== PLACEHOLDER) {
         const id = p.bullet.listId;
         if (partList && id !== partList && cur().rows.length) sections.push({ title: "", rows: [] });
         partList = id;
@@ -193,64 +193,57 @@ export interface RowWrite { row: ApiRow; responses: string[]; add: { arg: string
 /** Responses are written in red. */
 export const RESPONSE_COLOUR = "#ff0000";
 const RED = { color: { rgbColor: { red: 1, green: 0, blue: 0 } } };
-/**
- * The list a row's responses are made into. Not the argument's preset (1. a. i.): Google adds lines to the
- * list right above them when its preset matches — at the top level, as more arguments. This one's second
- * level is lettered just the same (A. a. i.), and the lines go in at that second level.
- */
-const RESPONSE_PRESET = "NUMBERED_UPPERALPHA_ALPHA_ROMAN";
+const PRESET = "NUMBERED_DECIMAL_ALPHA_ROMAN";
+const PLACEHOLDER = "~the-break~";
 
+/**
+ * Writing a row, the way the Google Docs check showed works (run on a real Doc, 2026-11-14):
+ * lines made a list together are nested by their leading tabs counted from the first line of the
+ * range, and joined to the list right above them when that list's preset matches — so they become
+ * the argument's own lettered sub-points. Lines already in a list are left alone by Google, so the
+ * new lines are taken out of it first. And so the first argument of a list (with no list above
+ * it) works the same as the rest, the range starts with a placeholder line at the top level just
+ * under the argument, which is deleted after — the argument itself is never touched.
+ *
+ *   old responses deleted;
+ *   after the argument: "\n~the-break~\n\tresponse 1\n\tresponse 2\nnew argument\n\tits response …"
+ *   all of it out of the list, then made a list again (joins the argument's, levels from the tabs);
+ *   responses red; the placeholder line deleted.
+ */
 export function rowRequests(w: RowWrite, tabId: string, bodyEnd: number): any[] {
   const reqs: any[] = [];
   const { row } = w;
   const range = (a: number, b: number) => ({ startIndex: a, endIndex: b, tabId });
-  let leftover = false;
+  let removed = 0, leftover = false;
   if (row.respStart !== null && row.respEnd !== null) {
     // the last newline of the tab can't be deleted: leave that paragraph, empty, and take its bullet off after
-    if (row.respEnd >= bodyEnd) { reqs.push({ deleteContentRange: { range: range(row.respStart, row.respEnd - 1) } }); leftover = true; }
-    else reqs.push({ deleteContentRange: { range: range(row.respStart, row.respEnd) } });
+    if (row.respEnd >= bodyEnd) { reqs.push({ deleteContentRange: { range: range(row.respStart, row.respEnd - 1) } }); leftover = true; removed = row.respEnd - 1 - row.respStart; }
+    else { reqs.push({ deleteContentRange: { range: range(row.respStart, row.respEnd) } }); removed = row.respEnd - row.respStart; }
   }
-  const P = row.end - 1;
-  let text = "";
-  const groups: { from: number; to: number }[] = [];
-  const responses = (lines: string[]) => {
-    const ls = lines.map((x) => x.trim()).filter(Boolean);
-    if (!ls.length) return;
-    const g = { from: text.length + 1, to: 0 };
-    ls.forEach((l) => { text += "\n\t" + l; });
-    g.to = text.length;
-    groups.push(g);
-  };
-  responses(w.responses);
-  for (const a of w.add) {
-    if (!a.arg.trim()) continue;
-    text += "\n" + a.arg.trim();
-    responses(a.responses);
-  }
-  if (text) {
+  const resp = w.responses.map((x) => x.trim()).filter(Boolean);
+  const adds = w.add.filter((a) => a.arg.trim());
+  if (resp.length || adds.length) {
+    const P = row.end - 1;
+    let text = "";
+    const reds: { from: number; to: number }[] = [];
+    const lines = (ls: string[]) => ls.map((x) => x.trim()).filter(Boolean).forEach((l) => { const from = text.length + 2; text += "\n\t" + l; reds.push({ from, to: text.length }); });
+    const hold = resp.length > 0;
+    if (hold) text += "\n" + PLACEHOLDER;
+    lines(resp);
+    for (const a of adds) { text += "\n" + a.arg.trim(); lines(a.responses); }
+    const from = P + 1, to = P + text.length;
     reqs.push({ insertText: { location: { index: P, tabId }, text } });
-    // From the last group back, so a tab taken out of one doesn't move the next. The new lines come in
-    // as items of the argument's numbered list (they take the paragraph they were typed into after) —
-    // and Google won't re-bullet a line that's already in a list, so: out of the list first, then a
-    // lettered list one level in (the leading tab says the level, and is taken out), then the indent
-    // a second level has, set outright so nothing left over from the first list pushes it about.
-    for (const g of [...groups].reverse()) {
-      const lines = (text.slice(g.from, g.to).match(/\t/g) || []).length;
-      reqs.push({ updateTextStyle: { range: range(P + g.from, P + g.to), textStyle: { foregroundColor: RED }, fields: "foregroundColor" } });
-      reqs.push({ deleteParagraphBullets: { range: range(P + g.from, P + g.to) } });
-      reqs.push({ createParagraphBullets: { range: range(P + g.from, P + g.to), bulletPreset: RESPONSE_PRESET } });
-      reqs.push({ updateParagraphStyle: {
-        range: range(P + g.from, P + g.to - lines),
-        paragraphStyle: { indentStart: { magnitude: 72, unit: "PT" }, indentFirstLine: { magnitude: 54, unit: "PT" } },
-        fields: "indentStart,indentFirstLine",
-      } });
+    for (const r of reds) reqs.push({ updateTextStyle: { range: range(P + r.from, P + r.to), textStyle: { foregroundColor: RED }, fields: "foregroundColor" } });
+    reqs.push({ deleteParagraphBullets: { range: range(from, to) } });
+    reqs.push({ createParagraphBullets: { range: range(from, to), bulletPreset: PRESET } });
+    // the placeholder sits before every tab, so its place hasn't moved
+    if (hold) reqs.push({ deleteContentRange: { range: range(from, from + PLACEHOLDER.length + 1) } });
+    if (leftover) {
+      const tabs = reds.length, end = bodyEnd - removed + text.length - tabs - (hold ? PLACEHOLDER.length + 1 : 0);
+      reqs.push({ deleteParagraphBullets: { range: range(end - 1, end) } });
     }
-  }
-  if (leftover) {
-    // the emptied last paragraph: plain, not a bullet with nothing after it
-    const removed = (row.respEnd! - 1) - row.respStart!;
-    const tabs = groups.length ? groups.reduce((t, g) => t + (text.slice(g.from, g.to).match(/\t/g) || []).length, 0) : 0;
-    const end = bodyEnd - removed + text.length - tabs;
+  } else if (leftover) {
+    const end = bodyEnd - removed;
     reqs.push({ deleteParagraphBullets: { range: range(end - 1, end) } });
   }
   return reqs;

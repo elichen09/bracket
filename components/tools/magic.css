@@ -1273,3 +1273,10 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm-gcheck textarea { width: 100%; height: 220px; resize: vertical; background: var(--well); color: var(--side-txt); border: 1px solid var(--well-b); font: 11px/1.4 var(--rm-mono); padding: 6px; }
 .rm-gcheck a.rm-linkbtn { text-decoration: none; }
 .rm .rm-gcheckbtn { margin: 0 10px 8px; width: calc(100% - 20px); justify-content: center; }
+
+/* responses: a cell each, stacked in the row; the dashed one below starts another */
+.rm-fts td.r { padding: 0; }
+.rm-fts td.r textarea.resp { border-bottom: 1px solid #ececec; min-height: 30px; }
+.rm-fts td.r textarea.resp:last-child { border-bottom: 0; }
+.rm-fts td.r textarea.resp.more { color: #b5b5b5; }
+.rm-fts td.r textarea.resp.more:focus { color: inherit; }

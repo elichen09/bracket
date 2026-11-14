@@ -1710,6 +1710,22 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       setGCheck({ busy: false, report: r.report, url: r.docUrl });
     } catch (e) { setGCheck({ busy: false, report: "ERROR " + (e as Error).message, url: "" }); }
   };
+  // the speech doc into your partner's Google Doc: a "speech doc" tab, and "(rhetoric speech doc)" inside it, verbatimised
+  const [gSending, setGSending] = useState(false);
+  const sendToGoogle = async () => {
+    const sv = speechView.current;
+    if (!sv) { toast("The speech doc isn't open"); return; }
+    if (!gConn) { setTab("round"); toast("Connect Google first (Round tab), then send again"); return; }
+    if (!gfLink.trim()) { setTab("round"); toast("Paste your partner's Google Doc link in the Round tab first"); return; }
+    setGSending(true);
+    try {
+      const { sendSpeechDoc } = await import("@/lib/gdocsSpeech");
+      const r = await sendSpeechDoc(gdocId(gfLink), sv.state.doc);
+      toast("Sent — in the Doc's “speech doc” tab, with “(rhetoric speech doc)” inside it");
+      void r;
+    } catch (e) { toast("Couldn't send it: " + (e as Error).message); }
+    finally { setGSending(false); }
+  };
   const gDisconnect = () => { signOut(); setGConn(false); setApiFlow(null); toast("Disconnected from Google"); };
   useEffect(() => {
     if (!gfOn || !gfLink.trim()) return;
@@ -2950,6 +2966,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" data-act="copySend" onClick={() => setMenu(null)}>Copy it</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.saveDocx(); }}>Download as .docx</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.speechDrop(); }}>Send to SpeechDrop…</button>
+          <button type="button" className="rm-mb" disabled={gSending} onClick={() => { setMenu(null); void sendToGoogle(); }}
+            title="Into your partner's Google Doc: a “speech doc” tab, and inside it “(rhetoric speech doc)” verbatimised — each send replaces them">
+            {gSending ? "Sending to the Google Doc…" : "Send to the Google Doc"}<span className="k">{gConn ? "" : "connect first"}</span></button>
           <div className="rm-sep" />
           <button type="button" className="rm-mb" data-act="docReset" onClick={() => setMenu(null)} title="Throw away what was written in it and build it again from the cards sent">Rebuild from the cards sent</button>
           <button type="button" className="rm-mb" data-act="clearSend" onClick={() => setMenu(null)}>Clear it</button>
