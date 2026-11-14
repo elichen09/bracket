@@ -1,5 +1,5 @@
 /* =====================================================================
-   The finish every tool shares, in eleven colour schemes.
+   The finish every tool shares, in seventeen colour schemes.
 
    Evidence (.evi), Flow (.flw), Doc flow (.dfl) and Past flows (.pfl) sit
    on one desk under one banner, and every colour they share comes from the
@@ -195,6 +195,90 @@ html[data-tool-theme="aurora"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #0
 html[data-tool-theme="volt"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #0C0C0B; --ink: #F1F2EC; --muted: #9C9D93; --line: #262624; }
 html[data-tool-theme="dusk"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #23172A; --ink: #F4E9F2; --muted: #BFA5C4; --line: #3A2742; }
 html[data-tool-theme="glacier"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #EAF1F8; --ink: #111B27; --muted: #5A6B80; --line: #C9D5E3; }
+
+
+/* ---- The light six (shared with Round Magic's palettes): a light banner in the scheme's colour, its
+   signature carried in the banner's texture (--bn-grain) and edge; the same Pro/Con check as the rest. ---- */
+html[data-tool-theme="blueprint"] .toolpage {
+  --t-ground: #E3EAF3; --t-panel: #F0F3F8; --t-surface: #F4F7FA; --t-surface-2: #F5F8FB; --t-paper: #FFFFFF;
+  --t-line: #B4BCC8; --t-line-soft: #CED5DF; --t-ink: #0E1B2E; --t-muted: #4A5A70; --t-dim: #73839A;
+  --bn: #EEF4FB; --bn-top: #F4F8FC; --bn-bot: #EEF4FB; --bn-glow: #F8FBFD; --bn-edge: #1F5FBF;
+  --bn-ink: #0E2A52; --bn-rgb: 14, 42, 82; --bn-well: rgba(0, 0, 0, .04); --bn-grain: repeating-linear-gradient(0deg, rgba(31, 95, 191, .09) 0 1px, transparent 1px 16px), repeating-linear-gradient(90deg, rgba(31, 95, 191, .09) 0 1px, transparent 1px 16px);
+  --bn-main: #174A96; --bn-main-ink: #FFFFFF;
+  --t-acc: #1F5FBF; --t-acc-hi: #4177C9; --t-acc-rgb: 31, 95, 191;
+  --t-deep: #0E2A52; --t-deep-2: #324A6C; --t-deep-ink: #EEF4FB;
+  --t-pro: #1F5FBF; --t-pro-ink: #184A95; --t-pro-head: #E9EFF9; --t-pro-bg: #F6F9FC; --t-pro-rgb: 31, 95, 191;
+  --t-con: #C2410C; --t-con-ink: #9B340A; --t-con-head: #F9ECE7; --t-con-bg: #FDF7F5; --t-con-rgb: 194, 65, 12;
+  --t-vision: #6D48C7; --t-live: #EDF2FA;
+}
+html[data-tool-theme="blueprint"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #EEF4FB; --ink: #0E2A52; --muted: #4A6690; --line: #C9D8EC; --ground: #EEF4FB; --line-soft: #C9D8EC; background: #EEF4FB; color: #0E2A52; backdrop-filter: none; border-bottom-color: #C9D8EC; }
+html[data-tool-theme="sakura"] .toolpage {
+  --t-ground: #F3E6EA; --t-panel: #F8F0F3; --t-surface: #FAF4F5; --t-surface-2: #FBF5F6; --t-paper: #FFFDFD;
+  --t-line: #C7B8BE; --t-line-soft: #DFD1D6; --t-ink: #2A1420; --t-muted: #6A4E5B; --t-dim: #957885;
+  --bn: #FBEEF2; --bn-top: #FCF4F7; --bn-bot: #FBEEF2; --bn-glow: #FDF8FA; --bn-edge: #E6C2CF;
+  --bn-ink: #3D1A2B; --bn-rgb: 61, 26, 43; --bn-well: rgba(0, 0, 0, .04); --bn-grain: linear-gradient(100deg, rgba(255, 255, 255, .5), rgba(246, 217, 228, .6));
+  --bn-main: #A12A57; --bn-main-ink: #FFFFFF;
+  --t-acc: #C2366B; --t-acc-hi: #CB5481; --t-acc-rgb: 194, 54, 107;
+  --t-deep: #3D1A2B; --t-deep-2: #5A3C4B; --t-deep-ink: #FBEEF2;
+  --t-pro: #3E5BA9; --t-pro-ink: #304784; --t-pro-head: #ECEFF6; --t-pro-bg: #F7F8FC; --t-pro-rgb: 62, 91, 169;
+  --t-con: #C2366B; --t-con-ink: #9B2B56; --t-con-head: #F9EBF0; --t-con-bg: #FDF7F9; --t-con-rgb: 194, 54, 107;
+  --t-vision: #2F7A74; --t-live: #FAEFF3;
+}
+html[data-tool-theme="sakura"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #FBEEF2; --ink: #3D1A2B; --muted: #83546A; --line: #EFD3DD; --ground: #FBEEF2; --line-soft: #EFD3DD; background: #FBEEF2; color: #3D1A2B; backdrop-filter: none; border-bottom-color: #EFD3DD; }
+html[data-tool-theme="matcha"] .toolpage {
+  --t-ground: #E6EBDD; --t-panel: #F0F4EA; --t-surface: #F4F6EE; --t-surface-2: #F5F7F0; --t-paper: #FDFEFA;
+  --t-line: #B9BEB0; --t-line-soft: #D1D7C8; --t-ink: #18200F; --t-muted: #4E5A42; --t-dim: #7A8670;
+  --bn: #EEF2E6; --bn-top: #F4F7EF; --bn-bot: #EEF2E6; --bn-glow: #F8FAF5; --bn-edge: #46631F;
+  --bn-ink: #1F2A14; --bn-rgb: 31, 42, 20; --bn-well: rgba(0, 0, 0, .04); --bn-grain: var(--grain);
+  --bn-main: #46631F; --bn-main-ink: #FFFFFF;
+  --t-acc: #5A7D2A; --t-acc-hi: #73904A; --t-acc-rgb: 90, 125, 42;
+  --t-deep: #1F2A14; --t-deep-2: #414A37; --t-deep-ink: #EEF2E6;
+  --t-pro: #2C5F8A; --t-pro-ink: #224A6C; --t-pro-head: #EAEFF3; --t-pro-bg: #F7F9FA; --t-pro-rgb: 44, 95, 138;
+  --t-con: #9A5420; --t-con-ink: #7B431A; --t-con-head: #F5EEE9; --t-con-bg: #FBF8F6; --t-con-rgb: 154, 84, 32;
+  --t-vision: #5B4A8B; --t-live: #F2F5EE;
+}
+html[data-tool-theme="matcha"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #EEF2E6; --ink: #1F2A14; --muted: #56654A; --line: #D3DCC3; --ground: #EEF2E6; --line-soft: #D3DCC3; background: #EEF2E6; color: #1F2A14; backdrop-filter: none; border-bottom-color: #D3DCC3; }
+html[data-tool-theme="library"] .toolpage {
+  --t-ground: #EBE2CF; --t-panel: #F4EEE0; --t-surface: #F7F2E5; --t-surface-2: #F8F3E7; --t-paper: #FFFCF4;
+  --t-line: #BFB5A4; --t-line-soft: #D7CEBC; --t-ink: #22170D; --t-muted: #5E4D3B; --t-dim: #8A7761;
+  --bn: #F3EBDA; --bn-top: #F7F2E7; --bn-bot: #F3EBDA; --bn-glow: #FAF7F0; --bn-edge: #B8923A;
+  --bn-ink: #2B1D12; --bn-rgb: 43, 29, 18; --bn-well: rgba(0, 0, 0, .04); --bn-grain: var(--grain);
+  --bn-main: #651823; --bn-main-ink: #FFFFFF;
+  --t-acc: #7A1F2B; --t-acc-hi: #8E414B; --t-acc-rgb: 122, 31, 43;
+  --t-deep: #2B1D12; --t-deep-2: #4B3F36; --t-deep-ink: #F3EBDA;
+  --t-pro: #2B4C7E; --t-pro-ink: #223B62; --t-pro-head: #EAEDF2; --t-pro-bg: #F7F8FA; --t-pro-rgb: 43, 76, 126;
+  --t-con: #7A1F2B; --t-con-ink: #621922; --t-con-head: #F2E9EA; --t-con-bg: #FAF6F7; --t-con-rgb: 122, 31, 43;
+  --t-vision: #3F5566; --t-live: #F4EDEE;
+}
+html[data-tool-theme="library"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #F3EBDA; --ink: #2B1D12; --muted: #6A5640; --line: #DCCDAF; --ground: #F3EBDA; --line-soft: #DCCDAF; background: #F3EBDA; color: #2B1D12; backdrop-filter: none; border-bottom-color: #DCCDAF; }
+html[data-tool-theme="lilac"] .toolpage {
+  --t-ground: #ECE8F7; --t-panel: #F5F2FB; --t-surface: #F7F5FC; --t-surface-2: #F8F6FC; --t-paper: #FFFEFF;
+  --t-line: #BEBACB; --t-line-soft: #D7D3E3; --t-ink: #1C1530; --t-muted: #58507A; --t-dim: #857DA3;
+  --bn: #F1EDFB; --bn-top: #F6F3FC; --bn-bot: #F1EDFB; --bn-glow: #F9F8FD; --bn-edge: #D0C5EE;
+  --bn-ink: #241A3D; --bn-rgb: 36, 26, 61; --bn-well: rgba(0, 0, 0, .04); --bn-grain: linear-gradient(110deg, rgba(237, 230, 253, .9), rgba(251, 232, 243, .9));
+  --bn-main: #6237BF; --bn-main-ink: #FFFFFF;
+  --t-acc: #7C4DDB; --t-acc-hi: #9068E0; --t-acc-rgb: 124, 77, 219;
+  --t-deep: #241A3D; --t-deep-2: #453C5A; --t-deep-ink: #F1EDFB;
+  --t-pro: #3F5BC9; --t-pro-ink: #31479D; --t-pro-head: #ECEFFA; --t-pro-bg: #F7F8FD; --t-pro-rgb: 63, 91, 201;
+  --t-con: #B23A84; --t-con-ink: #8E2E6A; --t-con-head: #F7EBF3; --t-con-bg: #FCF7FA; --t-con-rgb: 178, 58, 132;
+  --t-vision: #0E7490; --t-live: #F5F1FC;
+}
+html[data-tool-theme="lilac"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #F1EDFB; --ink: #241A3D; --muted: #655887; --line: #DDD4F3; --ground: #F1EDFB; --line-soft: #DDD4F3; background: #F1EDFB; color: #241A3D; backdrop-filter: none; border-bottom-color: #DDD4F3; }
+html[data-tool-theme="citrus"] .toolpage {
+  --t-ground: #F6EED8; --t-panel: #FAF5E6; --t-surface: #FBF7EB; --t-surface-2: #FCF8EC; --t-paper: #FFFDF7;
+  --t-line: #C4BEAD; --t-line-soft: #DFD8C4; --t-ink: #141414; --t-muted: #4F4A3C; --t-dim: #7D7666;
+  --bn: #FFF8E6; --bn-top: #FFFAEF; --bn-bot: #FFF8E6; --bn-glow: #FFFCF5; --bn-edge: #1A1A1A;
+  --bn-ink: #1A1A1A; --bn-rgb: 26, 26, 26; --bn-well: rgba(0, 0, 0, .04); --bn-grain: linear-gradient(transparent, transparent);
+  --bn-main: #F26B1D; --bn-main-ink: #1A1A1A;
+  --t-acc: #B84A0C; --t-acc-hi: #C36530; --t-acc-rgb: 184, 74, 12;
+  --t-deep: #1A1A1A; --t-deep-2: #3C3C3C; --t-deep-ink: #FFF8E6;
+  --t-pro: #1F6FB2; --t-pro-ink: #18578B; --t-pro-head: #E9F1F7; --t-pro-bg: #F6F9FC; --t-pro-rgb: 31, 111, 178;
+  --t-con: #B84A0C; --t-con-ink: #933B0A; --t-con-head: #F8EDE7; --t-con-bg: #FCF8F5; --t-con-rgb: 184, 74, 12;
+  --t-vision: #6D48E0; --t-live: #F9F1EC;
+}
+html[data-tool-theme="citrus"]:has(.toolpage):not(:has(.rm)) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A; --muted: #5A5038; --line: #F0DFB0; --ground: #FFF8E6; --line-soft: #F0DFB0; background: #FFF8E6; color: #1A1A1A; backdrop-filter: none; border-bottom-color: #F0DFB0; }
+html[data-tool-theme="citrus"] .toolpage :is(.dbtn, .btn, .dv-btn, .pf-btn, .th-btn) { border-width: 2px; box-shadow: 2px 2px 0 #1A1A1A; }
+html[data-tool-theme="library"] .toolpage :is(.mono, .th-h) { font-variant: small-caps; }
 
 /* ------------------------------------------------------------ the desk */
 .toolpage .evi, .toolpage .flw, .toolpage .dfl, .toolpage .pfl {

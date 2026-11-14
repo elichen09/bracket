@@ -32,6 +32,12 @@ const THEMES = [
   { id: "volt", name: "Volt", note: "Pure black, acid lime", sw: ["#0C0C0B", "#1F5E8C", "#B5451B", "#D4FF3A", "#FFFFFF"] },
   { id: "dusk", name: "Dusk", note: "Plum, amber, rose", sw: ["#23172A", "#5A489E", "#AC5A1A", "#FFB454", "#FFFCFB"] },
   { id: "glacier", name: "Glacier", note: "Ice banner, cobalt", sw: ["#EAF1F8", "#1D5FA8", "#B4472E", "#2563EB", "#FFFFFF"] },
+  { id: "blueprint", name: "Blueprint", note: "Drafting grid, blueprint blue", sw: ["#EEF4FB", "#1F5FBF", "#C2410C", "#1F5FBF", "#FFFFFF"] },
+  { id: "sakura", name: "Sakura", note: "Blush, plum, cherry", sw: ["#FBEEF2", "#3E5BA9", "#C2366B", "#C2366B", "#FFFDFD"] },
+  { id: "matcha", name: "Matcha", note: "Sage, tea green, paper", sw: ["#EEF2E6", "#2C5F8A", "#9A5420", "#5A7D2A", "#FDFEFA"] },
+  { id: "library", name: "Library", note: "Parchment, oxblood, gold", sw: ["#F3EBDA", "#2B4C7E", "#7A1F2B", "#7A1F2B", "#FFFCF4"] },
+  { id: "lilac", name: "Lilac", note: "Lavender haze, violet", sw: ["#F1EDFB", "#3F5BC9", "#B23A84", "#7C4DDB", "#FFFEFF"] },
+  { id: "citrus", name: "Citrus", note: "Cream, tangerine, hard black lines", sw: ["#FFF8E6", "#1F6FB2", "#B84A0C", "#F26B1D", "#FFFDF7"] },
 ] as const;
 
 export function applyTheme(id: string) {
@@ -112,7 +118,7 @@ export default function ThemePicker() {
   return (
     <div className="themes" ref={box}>
       <button type="button" className="th-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open} title="Colour scheme — every tool, in this browser">
-        <span className="th-dots" aria-hidden="true">{now.sw.slice(1, 4).map((c) => <i key={c} style={{ background: c }} />)}</span>
+        <span className="th-dots" aria-hidden="true">{now.sw.slice(1, 4).map((c, n) => <i key={n} style={{ background: c }} />)}</span>
         <span className="lbl">Colours</span>
       </button>
       <Presence show={open}>

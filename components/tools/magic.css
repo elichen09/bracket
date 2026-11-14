@@ -585,8 +585,8 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 /* ------------------------------------------------------------ menus, dialogs, the toast */
 .rm-menu { position: fixed; z-index: 70; min-width: 240px; max-width: calc(100vw - 16px); background: var(--pop); border: 1px solid var(--btnb); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); padding: 6px; color: var(--txt); animation: rmIn .12s ease-out both; }
 .rm-menu.wide { width: 330px; }
-.rm-menu.pal { width: 480px; }
-.rm-pals { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4px; }
+.rm-menu.pal { width: 600px; max-height: calc(100vh - 24px); overflow-y: auto; }
+.rm-pals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 4px; }
 .rm-pals .rm-mb { gap: 10px; padding: 6px 8px; }
 .rm-pals .rm-mb[aria-checked="true"] { background: var(--pop-h); box-shadow: inset 2px 0 0 var(--acc); }
 .rm-pals .rm-lt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1056,3 +1056,165 @@ html[data-rm-layout="focus"]:has(.rm[data-layout="focus"]) .nav { display: none;
 .rm[data-layout="twin"][data-mode="read"] .rm-twin { display: none; }
 .rm .rm-twin .ct-sheet { cursor: pointer; caret-color: transparent; min-height: 40vh; }
 .rm .rm-twin .rm-phead { background: color-mix(in srgb, var(--acc) 6%, #f4f4f4); }
+
+/* =====================================================================
+   The light six — each a different room to work in, not just a colour.
+   Tokens first, then each one's signature: Blueprint's drafting grid and
+   dashed rules; Sakura's blush and soft lift; Matcha's paper grain and
+   double rule; Library's parchment, gold and small capitals; Lilac's haze
+   and frosted panels; Citrus's hard black lines and offset shadows. Each
+   reads in a face of its own; the page you cut on stays Calibri, white.
+   ===================================================================== */
+.rm[data-palette="blueprint"] {
+  --chrome: #EEF4FB; --chrome-line: #C9D8EC; --chrome-edge: #B4C7E2;
+  --btn: #FFFFFF; --btn-h: #EAF2FC; --btn-a: #DCE9F9; --btnb: #B4C7E2; --btnb-h: #5C86C4;
+  --txt: #0E2A52; --mut: #4A6690; --hi: #071A3A;
+  --side: #F4F8FD; --side-h: #E6EFFA; --side-on: #D9E7F8; --side-line: #CCDAEE;
+  --side-txt: #12305A; --side-mut: #4E6A92; --well: #FFFFFF; --well-b: #B4C7E2;
+  --pop: #FFFFFF; --pop-h: #EDF3FC;
+  --acc: #1F5FBF; --accD: #174A96; --acc-soft: #DCE8FA; --acc-ink: #174A96; --acc-rgb: 31, 95, 191; --accD-rgb: 23, 74, 150; --ana: #C2410C;
+  --mode-on: #0E2A52; --mode-on-ink: #EEF4FB; --on-acc: #FFFFFF;
+  --rm-sans: "IBM Plex Mono", ui-monospace, monospace; --rm-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+html[data-rm-palette="blueprint"]:has(.rm) .nav { --nav-bg: #EEF4FB; --ink: #0E2A52; --muted: #4A6690; --line: #C9D8EC; --line-soft: #C9D8EC; }
+.rm[data-palette="sakura"] {
+  --chrome: #FBEEF2; --chrome-line: #EFD3DD; --chrome-edge: #E6C2CF;
+  --btn: #FFFFFF; --btn-h: #FDF3F6; --btn-a: #F8E2EA; --btnb: #EBC9D5; --btnb-h: #C77895;
+  --txt: #3D1A2B; --mut: #83546A; --hi: #2A0F1D;
+  --side: #FDF5F7; --side-h: #F8E6EC; --side-on: #F3D9E2; --side-line: #F0D8E0;
+  --side-txt: #43202F; --side-mut: #85596C; --well: #FFFFFF; --well-b: #EBC9D5;
+  --pop: #FFFFFF; --pop-h: #FBEEF2;
+  --acc: #C2366B; --accD: #A12A57; --acc-soft: #FADCE6; --acc-ink: #8E2149; --acc-rgb: 194, 54, 107; --accD-rgb: 161, 42, 87; --ana: #7A4FB0;
+  --mode-on: #3D1A2B; --mode-on-ink: #FBEEF2; --on-acc: #FFFFFF;
+  --rm-sans: "Zen Maru Gothic", "Segoe UI", sans-serif; --rm-mono: "Zen Maru Gothic", "Segoe UI", sans-serif;
+}
+html[data-rm-palette="sakura"]:has(.rm) .nav { --nav-bg: #FBEEF2; --ink: #3D1A2B; --muted: #83546A; --line: #EFD3DD; --line-soft: #EFD3DD; }
+.rm[data-palette="matcha"] {
+  --chrome: #EEF2E6; --chrome-line: #D3DCC3; --chrome-edge: #C3CEB0;
+  --btn: #FBFCF7; --btn-h: #F1F5E8; --btn-a: #E4EBD5; --btnb: #C8D3B4; --btnb-h: #6F8A4A;
+  --txt: #1F2A14; --mut: #56654A; --hi: #121A0A;
+  --side: #F4F7EE; --side-h: #E7EDDA; --side-on: #DCE5CA; --side-line: #D6DFC6;
+  --side-txt: #243019; --side-mut: #5A6A4C; --well: #FFFFFF; --well-b: #C8D3B4;
+  --pop: #FBFCF7; --pop-h: #EEF2E6;
+  --acc: #5A7D2A; --accD: #46631F; --acc-soft: #E1EBCB; --acc-ink: #3D5719; --acc-rgb: 90, 125, 42; --accD-rgb: 70, 99, 31; --ana: #8A5A2B;
+  --mode-on: #1F2A14; --mode-on-ink: #EEF2E6; --on-acc: #FFFFFF;
+  --rm-sans: "Zen Kaku Gothic New", "Segoe UI", sans-serif; --rm-mono: "Zen Kaku Gothic New", "Segoe UI", sans-serif;
+}
+html[data-rm-palette="matcha"]:has(.rm) .nav { --nav-bg: #EEF2E6; --ink: #1F2A14; --muted: #56654A; --line: #D3DCC3; --line-soft: #D3DCC3; }
+.rm[data-palette="library"] {
+  --chrome: #F3EBDA; --chrome-line: #DCCDAF; --chrome-edge: #CDBB98;
+  --btn: #FBF6EA; --btn-h: #F5ECDA; --btn-a: #ECDFC4; --btnb: #D3C19C; --btnb-h: #8E6E3E;
+  --txt: #2B1D12; --mut: #6A5640; --hi: #1A0F06;
+  --side: #F7F0E1; --side-h: #EDE2CB; --side-on: #E5D6B8; --side-line: #E0D2B6;
+  --side-txt: #2E2015; --side-mut: #6C5843; --well: #FFFFFF; --well-b: #D3C19C;
+  --pop: #FBF6EA; --pop-h: #F3EBDA;
+  --acc: #7A1F2B; --accD: #651823; --acc-soft: #F0D9D6; --acc-ink: #651823; --acc-rgb: 122, 31, 43; --accD-rgb: 101, 24, 35; --ana: #2F5D50;
+  --mode-on: #2B1D12; --mode-on-ink: #F3EBDA; --on-acc: #FFFFFF;
+  --rm-sans: "EB Garamond", Georgia, serif; --rm-mono: "EB Garamond", Georgia, serif;
+}
+html[data-rm-palette="library"]:has(.rm) .nav { --nav-bg: #F3EBDA; --ink: #2B1D12; --muted: #6A5640; --line: #DCCDAF; --line-soft: #DCCDAF; }
+.rm[data-palette="lilac"] {
+  --chrome: #F1EDFB; --chrome-line: #DDD4F3; --chrome-edge: #D0C5EE;
+  --btn: #FFFFFF; --btn-h: #F6F2FE; --btn-a: #ECE5FC; --btnb: #D6CBF1; --btnb-h: #8B6FD6;
+  --txt: #241A3D; --mut: #655887; --hi: #150D2A;
+  --side: #F6F3FD; --side-h: #ECE6FB; --side-on: #E3DAF8; --side-line: #E2DAF6;
+  --side-txt: #2A2044; --side-mut: #695C8C; --well: #FFFFFF; --well-b: #D6CBF1;
+  --pop: #FFFFFF; --pop-h: #F3EFFC;
+  --acc: #7C4DDB; --accD: #6237BF; --acc-soft: #E7DDFB; --acc-ink: #5A2FB0; --acc-rgb: 124, 77, 219; --accD-rgb: 98, 55, 191; --ana: #C2367F;
+  --mode-on: #241A3D; --mode-on-ink: #F1EDFB; --on-acc: #FFFFFF;
+  --rm-sans: Quicksand, "Segoe UI", sans-serif; --rm-mono: Quicksand, "Segoe UI", sans-serif;
+}
+html[data-rm-palette="lilac"]:has(.rm) .nav { --nav-bg: #F1EDFB; --ink: #241A3D; --muted: #655887; --line: #DDD4F3; --line-soft: #DDD4F3; }
+.rm[data-palette="citrus"] {
+  --chrome: #FFF8E6; --chrome-line: #F0DFB0; --chrome-edge: #1A1A1A;
+  --btn: #FFFFFF; --btn-h: #FFF3C4; --btn-a: #FFE58A; --btnb: #1A1A1A; --btnb-h: #1A1A1A;
+  --txt: #1A1A1A; --mut: #5A5038; --hi: #000000;
+  --side: #FFFBEF; --side-h: #FFF1C9; --side-on: #FFE7A3; --side-line: #F0DFB0;
+  --side-txt: #1E1A10; --side-mut: #62563A; --well: #FFFFFF; --well-b: #1A1A1A;
+  --pop: #FFFFFF; --pop-h: #FFF3C4;
+  --acc: #F26B1D; --accD: #B84A0C; --acc-soft: #FFE0C7; --acc-ink: #A3430B; --acc-rgb: 242, 107, 29; --accD-rgb: 184, 74, 12; --ana: #2E7D32;
+  --mode-on: #1A1A1A; --mode-on-ink: #FFF8E6; --on-acc: #1A1A1A;
+  --rm-sans: "Space Grotesk", "Segoe UI", sans-serif; --rm-mono: "Space Mono", ui-monospace, monospace;
+}
+html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A; --muted: #5A5038; --line: #F0DFB0; --line-soft: #F0DFB0; }
+/* the library search reads in the palette's face too */
+.rm:is([data-palette="blueprint"], [data-palette="sakura"], [data-palette="matcha"], [data-palette="library"], [data-palette="lilac"], [data-palette="citrus"]) .rm-side .evi {
+  --mono: var(--rm-mono); --sans: var(--rm-sans); font-family: var(--rm-sans);
+}
+.rm:is([data-palette="blueprint"], [data-palette="sakura"], [data-palette="matcha"], [data-palette="library"], [data-palette="lilac"], [data-palette="citrus"]) :is(.rm-rib, .rm-side, .rm-phead, .rm-menu, .rm-status, .rm-deck) {
+  font-family: var(--rm-sans);
+}
+
+/* ---- Blueprint: a drafting table. A grid under the ribbon, the side and the page heads; dashed rules that go solid when touched */
+.rm[data-palette="blueprint"] :is(.rm-rib, .rm-side, .rm-menu, .rm-deck) {
+  background-image: repeating-linear-gradient(0deg, rgba(31, 95, 191, .08) 0 1px, transparent 1px 16px), repeating-linear-gradient(90deg, rgba(31, 95, 191, .08) 0 1px, transparent 1px 16px);
+}
+.rm[data-palette="blueprint"] .rm-rib { border-bottom: 2px solid var(--acc); }
+.rm[data-palette="blueprint"] :is(.rm-b, .rm-pbtn, .rm-depth button, .rm-sfilter, .rm-tabbtn[aria-selected="true"]) { border-style: dashed; }
+.rm[data-palette="blueprint"] :is(.rm-b, .rm-pbtn):hover { border-style: solid; }
+.rm[data-palette="blueprint"] .rm-phead { background-color: #F4F8FD; background-image: repeating-linear-gradient(90deg, rgba(31, 95, 191, .07) 0 1px, transparent 1px 16px); border-bottom: 1px dashed #9DB6DC; }
+.rm[data-palette="blueprint"] .rm-g { border-right-style: dashed; }
+.rm[data-palette="blueprint"] .rm-logo { letter-spacing: .2em; color: var(--acc); }
+.rm[data-palette="blueprint"] .rm-status { background: #EEF4FB; color: #2C4C7A; border-top: 1px dashed #9DB6DC; }
+
+/* ---- Sakura: blush, and buttons that rise a little to meet the pointer */
+.rm[data-palette="sakura"] .rm-rib { background-image: linear-gradient(100deg, #FDF4F7 0%, #F9E2EA 55%, #F6D9E4 100%); }
+.rm[data-palette="sakura"] .rm-side { background-image: linear-gradient(180deg, #FDF5F7 0%, #FBEAF0 100%); }
+.rm[data-palette="sakura"] :is(.rm-b, .rm-pbtn) { box-shadow: 0 1px 0 rgba(161, 42, 87, .12); transition: transform .14s ease, box-shadow .14s ease, background .1s; }
+.rm[data-palette="sakura"] :is(.rm-b, .rm-pbtn):hover { transform: translateY(-1px); box-shadow: 0 4px 10px -4px rgba(161, 42, 87, .35); }
+.rm[data-palette="sakura"] :is(.rm-tabbtn, .rm-pbtn, .rm-modes button, .rm-cap) { letter-spacing: .06em; }
+.rm[data-palette="sakura"] .rm-phead { background: #FDF3F6; border-bottom-color: #F0D3DE; }
+.rm[data-palette="sakura"] .rm-status { background: #FBEEF2; color: #7A4A5E; border-top-color: #EFD3DD; }
+
+/* ---- Matcha: handmade paper, a double rule like a tea scroll's mount, quiet */
+.rm[data-palette="matcha"] :is(.rm-rib, .rm-side, .rm-menu) { background-image: var(--rm-grain-dark); }
+.rm[data-palette="matcha"] { --rm-grain-dark: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .28  0 0 0 0 .1  0 0 0 .11 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.rm[data-palette="matcha"] .rm-rib { border-bottom: 4px double var(--accD); }
+.rm[data-palette="matcha"] .rm-phead { background: #F4F7EE; border-bottom-color: #D6DFC6; }
+.rm[data-palette="matcha"] :is(.rm-tabbtn, .rm-pbtn, .rm-modes button) { letter-spacing: .08em; }
+.rm[data-palette="matcha"] .rm-b { box-shadow: inset 0 -2px 0 rgba(70, 99, 31, .08); }
+.rm[data-palette="matcha"] .rm-status { background: #EEF2E6; color: #4A5A3A; border-top: 4px double #C3CEB0; }
+
+/* ---- Library: a reading room. Parchment, oxblood, a gold rule; labels in small capitals, not shouted */
+.rm[data-palette="library"] :is(.rm-rib, .rm-side, .rm-menu) { background-image: var(--rm-grain-warm); }
+.rm[data-palette="library"] { --rm-grain-warm: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .25  0 0 0 0 .1  0 0 0 .13 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.rm[data-palette="library"] .rm-rib { border-bottom: 1px solid #B8923A; box-shadow: 0 3px 0 -1px #F3EBDA, 0 4px 0 -1px #B8923A; }
+.rm[data-palette="library"] :is(.rm-tabbtn, .rm-pbtn, .rm-modes button, .rm-cap, .rm-depth button, .rm-logo, .rm-meta, .rm-pmeta, .rm-status, .rm-dkeys, .rm-lay b, .rm-menu h4) {
+  text-transform: lowercase; font-variant: small-caps; letter-spacing: .08em; font-size: 13px;
+}
+.rm[data-palette="library"] .rm-b { font-size: 14.5px; }
+.rm[data-palette="library"] .rm-title { font-style: italic; }
+.rm[data-palette="library"] .rm-phead { background: #FAF4E6; border-bottom: 1px solid #D8C49A; }
+.rm[data-palette="library"] .rm-phead b { font-style: italic; font-size: 14px; }
+.rm[data-palette="library"] .rm-status { background: #F3EBDA; color: #5E4A33; border-top: 1px solid #B8923A; }
+.rm[data-palette="library"] .rm-slist .rm-ol { font-size: 15px; }
+
+/* ---- Lilac: a haze behind everything, panels of frosted glass over it, a soft glow where you are */
+.rm[data-palette="lilac"] { background: #fff; }
+.rm[data-palette="lilac"] .rm-rib { background-image: linear-gradient(110deg, #EDE6FD 0%, #F3E8FB 45%, #FBE8F3 100%); border-bottom-color: #D9CCF3; }
+.rm[data-palette="lilac"] .rm-body { background: linear-gradient(160deg, #EFE8FF 0%, #F7EEFB 60%, #FCEBF4 100%); }
+.rm[data-palette="lilac"] .rm-side { background: rgba(250, 247, 255, .72); backdrop-filter: blur(14px) saturate(1.2); border-right: 1px solid rgba(124, 77, 219, .14); }
+.rm[data-palette="lilac"] .rm-sgrab { background: transparent; border-right-color: rgba(124, 77, 219, .14); }
+.rm[data-palette="lilac"] :is(.rm-b, .rm-pbtn) { transition: box-shadow .16s ease, background .1s; }
+.rm[data-palette="lilac"] :is(.rm-b, .rm-pbtn):hover { box-shadow: 0 0 0 3px rgba(124, 77, 219, .14), 0 6px 18px -8px rgba(124, 77, 219, .5); }
+.rm[data-palette="lilac"] .rm-menu { background: rgba(255, 255, 255, .86); backdrop-filter: blur(16px); box-shadow: 0 24px 60px -20px rgba(98, 55, 191, .45); }
+.rm[data-palette="lilac"] .rm-phead { background: rgba(247, 243, 255, .9); border-bottom-color: #E2DAF6; }
+.rm[data-palette="lilac"] .rm-status { background: #F4EFFD; color: #5A4E80; border-top-color: #E2DAF6; }
+
+/* ---- Citrus: neo-brutalist. Hard black outlines, flat offset shadows, everything pressed in when pressed */
+.rm[data-palette="citrus"] .rm-rib { border-bottom: 3px solid #1A1A1A; }
+.rm[data-palette="citrus"] :is(.rm-b, .rm-pbtn, .rm-modes, .rm-depth button, .rm-sfilter, .rm-dtab, .rm-dnew) { border: 2px solid #1A1A1A; box-shadow: 2px 2px 0 #1A1A1A; }
+.rm[data-palette="citrus"] .rm-modes button + button { border-left: 2px solid #1A1A1A; }
+.rm[data-palette="citrus"] :is(.rm-b, .rm-pbtn, .rm-depth button):active { transform: translate(2px, 2px); box-shadow: none; }
+.rm[data-palette="citrus"] :is(.rm-b, .rm-pbtn):hover { background: #FFE58A; }
+.rm[data-palette="citrus"] .rm-b.send, .rm[data-palette="citrus"] .rm-b.on, .rm[data-palette="citrus"] .rm-b[aria-pressed="true"] { background: #F26B1D; color: #1A1A1A; }
+.rm[data-palette="citrus"] .rm-b { font-weight: 600; }
+.rm[data-palette="citrus"] :is(.rm-tabbtn, .rm-pbtn, .rm-modes button) { font-weight: 700 !important; }
+.rm[data-palette="citrus"] .rm-tabbtn[aria-selected="true"] { background: #FFE58A; border: 2px solid #1A1A1A; }
+.rm[data-palette="citrus"] .rm-side { border-right: 3px solid #1A1A1A; }
+.rm[data-palette="citrus"] .rm-sgrab { border-right: 0; }
+.rm[data-palette="citrus"] .rm-phead { background: #FFF3C4; border-bottom: 2px solid #1A1A1A; }
+.rm[data-palette="citrus"] .rm-menu { border: 3px solid #1A1A1A; box-shadow: 6px 6px 0 #1A1A1A; }
+.rm[data-palette="citrus"] .rm-status { background: #FFF8E6; color: #1A1A1A; border-top: 3px solid #1A1A1A; }
+.rm[data-palette="citrus"] .rm-slist .rm-ol.on { box-shadow: inset 4px 0 0 #1A1A1A; }
+@media (prefers-reduced-motion: reduce) { .rm[data-palette="sakura"] :is(.rm-b, .rm-pbtn):hover { transform: none; } }

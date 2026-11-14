@@ -187,7 +187,17 @@ const PALETTES = [
   { id: "volt", name: "Volt", sub: "Pure black, acid lime", chrome: "#0B0B0A", side: "#0E0E0D", acc: "#D4FF3A" },
   { id: "dusk", name: "Dusk", sub: "Plum, amber", chrome: "#1F1424", side: "#23172A", acc: "#FFB454" },
   { id: "glacier", name: "Glacier", sub: "Ice, cobalt", chrome: "#E8EEF5", side: "#F1F5FA", acc: "#2563EB" },
+  { id: "blueprint", name: "Blueprint", sub: "Drafting grid, blueprint blue", chrome: "#EEF4FB", side: "#F4F8FD", acc: "#1F5FBF" },
+  { id: "sakura", name: "Sakura", sub: "Blush, plum, cherry", chrome: "#FBEEF2", side: "#FDF5F7", acc: "#C2366B" },
+  { id: "matcha", name: "Matcha", sub: "Sage, tea green, paper", chrome: "#EEF2E6", side: "#F4F7EE", acc: "#5A7D2A" },
+  { id: "library", name: "Library", sub: "Parchment, oxblood, gold", chrome: "#F3EBDA", side: "#F7F0E1", acc: "#7A1F2B" },
+  { id: "lilac", name: "Lilac", sub: "Lavender haze, violet", chrome: "#F1EDFB", side: "#F6F3FD", acc: "#7C4DDB" },
+  { id: "citrus", name: "Citrus", sub: "Cream, tangerine, hard black lines", chrome: "#FFF8E6", side: "#FFFBEF", acc: "#F26B1D" },
 ] as const;
+/** The palettes with light chrome, listed apart in the menu. */
+const LIGHT_PALETTES = new Set(["paper", "glacier", "blueprint", "sakura", "matcha", "library", "lilac", "citrus"]);
+/** The light six each read in a face of their own (the page you cut on stays Calibri): fetched the first time one is picked. */
+const PALETTE_FONT: Partial<Record<string, string>> = { blueprint: "IBM+Plex+Mono:wght@400;500;600", sakura: "Zen+Maru+Gothic:wght@400;500;700", matcha: "Zen+Kaku+Gothic+New:wght@400;500;700", library: "EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400", lilac: "Quicksand:wght@400;500;600;700", citrus: "Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700" };
 type PaletteId = (typeof PALETTES)[number]["id"];
 
 /**
@@ -436,6 +446,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setUiReady(true);
   }, [owner]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem(scoped("cutter.hl", owner), hl); } catch { /* private */ } }, [hl, owner]);
+  // a palette with a face of its own: the face, fetched once
+  useEffect(() => {
+    const f = PALETTE_FONT[palette];
+    if (!f || document.getElementById("rm-font-" + palette)) return;
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.id = "rm-font-" + palette;
+    l.href = "https://fonts.googleapis.com/css2?family=" + f + "&display=swap";
+    document.head.appendChild(l);
+  }, [palette]);
   // the site's nav, above the ribbon, wears the palette too (magic.css) — and from before the page paints, next time (lib/toolTheme)
   useEffect(() => {
     if (!uiReady) return;
@@ -1903,7 +1922,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openMenu = (id: string, e: React.MouseEvent<HTMLElement>, anchor?: HTMLElement | null) => {
     if (menu?.id === id) { setMenu(null); return; }
     const r = (anchor || e.currentTarget).getBoundingClientRect();
-    const w = id === "palette" ? 480 : id === "pages" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
+    const w = id === "palette" ? 600 : id === "pages" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
     const inRib = !!(anchor || e.currentTarget).closest(".rm-rib");
     // from the dock a menu opens upwards
     if (inRib && layoutMode === "dock") { setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: 0, up: window.innerHeight - r.top + 6 }); return; }
@@ -2840,9 +2859,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             ))}
           </div>
           <div className="rm-laysub">{(LAYOUT_MODES.find((l) => l.id === layoutMode) || LAYOUT_MODES[0]).sub}</div>
-          <h4>COLOURS</h4>
+          {([["DARK", PALETTES.filter((p) => !LIGHT_PALETTES.has(p.id))], ["LIGHT", PALETTES.filter((p) => LIGHT_PALETTES.has(p.id))]] as const).map(([group, list]) => (
+          <Fragment key={group}>
+          <h4>{group}</h4>
           <div className="rm-pals">
-            {PALETTES.map((p) => (
+            {list.map((p) => (
               // the menu stays open: try one after another, and see each on the whole tool
               <button key={p.id} type="button" role="menuitemradio" aria-checked={palette === p.id} className="rm-mb lay" onClick={() => setPalette(p.id)}>
                 <span className="rm-palpic" aria-hidden="true" style={{ background: p.chrome }}><i style={{ background: p.side }} /><i style={{ background: "#fff" }} /><b style={{ background: p.acc }} /></span>
@@ -2851,6 +2872,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               </button>
             ))}
           </div>
+          </Fragment>
+          ))}
           <div className="rm-mnote">The page stays white, the way a cut file is read. Kept in this browser.</div>
         </div>
       )}
