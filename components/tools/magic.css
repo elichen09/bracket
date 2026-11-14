@@ -1307,3 +1307,7 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm-ft.compact .rm-fts td textarea, .rm-ft.compact .rm-fts td .arg { min-height: 0; padding: 3px 5px; font-size: 12px; line-height: 1.25; }
 .rm-ft.compact .rm-fts td.r textarea.resp { min-height: 0; }
 .rm-ft.compact .rm-fts tr.new td textarea { padding: 2px 5px; }
+
+/* the Round tab scrolls: SpeechDrop, the partner's flow and every doc of theirs, however many */
+.rm-tabpane.tp-round { overflow-y: auto; scrollbar-color: var(--well-b) transparent; }
+.rm-tabpane.tp-round > .rm-rsec { flex-shrink: 0; }
