@@ -54,7 +54,6 @@ export const ACTIONS: Action[] = [
   { id: "find", group: "Files", label: "Search every file", key: "mod+shift+F", hint: "Tags, cites, blocks and what is read" },
   { id: "new-file", group: "Files", label: "New file", key: "alt+shift+N", hint: "" },
   { id: "send", group: "Round", label: "Send to speech doc", key: "alt+Enter", hint: "The card the cursor is in — or the whole block, on a block heading — into the speech doc, where its cursor is (after the card it's in; at the end until you've clicked in it)" },
-  { id: "answer", group: "Round", label: "Answer this", key: "alt+J", hint: "In their case: the tag the cursor is in (or what's selected) gets a heading in your speech doc — AT: … — and the search looks for what answers it; Enter then puts a card under that heading. Again, from the search: their next tag. In the speech doc: cards you send land under the heading you're in" },
   { id: "mode-split", group: "Round", label: "Speech doc beside", key: "alt+B", hint: "Your file and the speech doc side by side (again: just the file)" },
   { id: "mode-speech", group: "Round", label: "Just the speech doc", key: "alt+shift+B", hint: "The speech doc alone, the whole width — the ribbon, outline and keys work in it (again: a file beside it)" },
   { id: "mode-read", group: "Round", label: "Read mode", key: "alt+shift+R", hint: "The speech doc or this file as you'll read it, with the time it takes (again, or Esc: back)" },
