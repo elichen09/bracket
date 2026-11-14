@@ -100,27 +100,33 @@ const rgb = (c?: string) => {
 };
 const SIZE = [11, 26, 22, 16, 13];
 
-/** The requests that fill an empty tab with these paragraphs. */
+/**
+ * The requests that fill an empty tab with these paragraphs.
+ *
+ * In this order, because Google resets a paragraph's text to its named style when the style is set:
+ * first every paragraph's style (heading or normal, and the room around it — the .docx export's:
+ * 8pt under a paragraph and a tag, 4pt under a block, 12pt over a heading, 1.15 lines), then the
+ * text over all of it (Calibri 11, black), then each heading's look, then each run as it was.
+ */
 function fill(paras: Para[], tabId: string): any[][] {
   const text = paras.map((p) => p.runs.map((r) => r.text.replace(/\n/g, " ")).join("")).join("\n");
   if (!text) return [];
   const range = (a: number, b: number) => ({ startIndex: a, endIndex: b, tabId });
   const first = [{ insertText: { location: { index: 1, tabId }, text } }];
-  const style: any[] = [
-    { updateTextStyle: { range: range(1, 1 + text.length), textStyle: { weightedFontFamily: { fontFamily: "Calibri" }, fontSize: { magnitude: 11, unit: "PT" }, foregroundColor: rgb("#000000") }, fields: "weightedFontFamily,fontSize,foregroundColor" } },
-  ];
+  const paraStyles: any[] = [], headings: any[] = [], runs: any[] = [];
+  const PTS = (n: number) => ({ magnitude: n, unit: "PT" });
   let at = 1;
   for (const p of paras) {
     const len = p.runs.reduce((n, r) => n + r.text.replace(/\n/g, " ").length, 0);
     const pr = range(at, at + len + 1);
-    if (p.level) {
-      style.push({ updateParagraphStyle: { range: pr, paragraphStyle: { namedStyleType: "HEADING_" + p.level, alignment: p.level < 4 ? "CENTER" : "START",
-        ...(p.level === 1 ? Object.fromEntries(["borderTop", "borderBottom", "borderLeft", "borderRight"].map((k) => [k, { color: rgb("#333333"), width: { magnitude: 3, unit: "PT" }, padding: { magnitude: 6, unit: "PT" }, dashStyle: "SOLID" }])) : {}) },
-        fields: "namedStyleType,alignment" + (p.level === 1 ? ",borderTop,borderBottom,borderLeft,borderRight" : "") } });
-      if (len) style.push({ updateTextStyle: { range: range(at, at + len), textStyle: { bold: true, italic: false, underline: p.level === 2 || p.level === 3, fontSize: { magnitude: SIZE[p.level], unit: "PT" }, foregroundColor: rgb("#000000"), weightedFontFamily: { fontFamily: "Calibri" } }, fields: "bold,italic,underline,fontSize,foregroundColor,weightedFontFamily" } });
-    } else {
-      style.push({ updateParagraphStyle: { range: pr, paragraphStyle: { namedStyleType: "NORMAL_TEXT" }, fields: "namedStyleType" } });
-    }
+    const box = p.level === 1 ? Object.fromEntries(["borderTop", "borderBottom", "borderLeft", "borderRight"].map((k) => [k, { color: rgb("#333333"), width: PTS(3), padding: PTS(6), dashStyle: "SOLID" }])) : {};
+    paraStyles.push({ updateParagraphStyle: { range: pr, paragraphStyle: {
+      namedStyleType: p.level ? "HEADING_" + p.level : "NORMAL_TEXT",
+      alignment: p.level && p.level < 4 ? "CENTER" : "START",
+      spaceAbove: PTS(p.level ? 12 : 0), spaceBelow: PTS(p.level && p.level < 4 ? 4 : 8), lineSpacing: 115,
+      ...box,
+    }, fields: "namedStyleType,alignment,spaceAbove,spaceBelow,lineSpacing" + (p.level === 1 ? ",borderTop,borderBottom,borderLeft,borderRight" : "") } });
+    if (p.level && len) headings.push({ updateTextStyle: { range: range(at, at + len), textStyle: { bold: true, italic: false, underline: p.level === 2 || p.level === 3, fontSize: PTS(SIZE[p.level]) }, fields: "bold,italic,underline,fontSize" } });
     let r0 = at;
     for (const r of p.runs) {
       const n = r.text.replace(/\n/g, " ").length;
@@ -129,15 +135,17 @@ function fill(paras: Para[], tabId: string): any[][] {
       if (r.i) { ts.italic = true; f.push("italic"); }
       if (r.u) { ts.underline = true; f.push("underline"); }
       if (r.s) { ts.strikethrough = true; f.push("strikethrough"); }
-      if (r.size) { ts.fontSize = { magnitude: r.size, unit: "PT" }; f.push("fontSize"); }
+      if (r.size) { ts.fontSize = PTS(r.size); f.push("fontSize"); }
       if (r.font) { ts.weightedFontFamily = { fontFamily: r.font.split(",")[0].replace(/["']/g, "").trim() }; f.push("weightedFontFamily"); }
       const fg = rgb(r.color); if (fg) { ts.foregroundColor = fg; f.push("foregroundColor"); }
       const bg = rgb(r.bg); if (bg) { ts.backgroundColor = bg; f.push("backgroundColor"); }
-      if (n && f.length) style.push({ updateTextStyle: { range: range(r0, r0 + n), textStyle: ts, fields: f.join(",") } });
+      if (n && f.length) runs.push({ updateTextStyle: { range: range(r0, r0 + n), textStyle: ts, fields: f.join(",") } });
       r0 += n;
     }
     at += len + 1;
   }
+  const base = { updateTextStyle: { range: range(1, 1 + text.length), textStyle: { weightedFontFamily: { fontFamily: "Calibri" }, fontSize: PTS(11), foregroundColor: rgb("#000000"), bold: false, italic: false, underline: false }, fields: "weightedFontFamily,fontSize,foregroundColor,bold,italic,underline" } };
+  const style = [...paraStyles, base, ...headings, ...runs];
   const chunks: any[][] = [first];
   for (let i = 0; i < style.length; i += 400) chunks.push(style.slice(i, i + 400));
   return chunks;
