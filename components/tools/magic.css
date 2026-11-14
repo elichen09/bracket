@@ -1261,3 +1261,11 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm-fts tr.mine td.r { background: #fffbe6; }
 .rm-fts tr.mine td.n { box-shadow: inset 3px 0 0 #e8b84a; }
 .rm-fts tr.new td { border-style: dashed; }
+
+/* connecting Google, in the Round tab */
+.rm-gconn { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 10px 8px; font-size: 12px; color: var(--side-txt); }
+.rm-gconn .dot { width: 8px; height: 8px; border-radius: 50% !important; background: #777; display: inline-block; }
+.rm-gconn .dot.live { background: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, .2); }
+.rm .rm-gbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--well-b); background: #fff; color: #1f1f1f; font: 600 10.5px var(--rm-mono); letter-spacing: .1em; cursor: pointer; }
+.rm .rm-gbtn:hover { border-color: #1f1f1f; }
+.rm-ftbar .bad { color: #b3261e; }

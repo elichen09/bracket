@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { parseSections, toDocsHtml, type FlowSection } from "@/lib/gflowTable";
+import { useEffect, useRef, useState } from "react";
+import { toDocsHtml, type FlowSection } from "@/lib/gflowTable";
 import { scoped } from "@/lib/owner";
 
 /**
@@ -27,10 +27,14 @@ const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, 
 // kept as typed — a line just started with Enter is still there; blank lines are dropped only on the way out
 const linesOf = (v: string) => v.split("\n");
 
-export default function FlowTable({ html, docKey, owner, onLook, toast }: {
-  html: string; docKey: string; owner?: string | null; onLook: (text: string) => void; toast: (s: string) => void;
+/** What has changed in one part, to be written into the Doc. */
+export interface SectionWrite { si: number; rows: { arg: string; responses: string[] }[]; added: { arg: string; responses: string[] }[] }
+
+export default function FlowTable({ sections, docKey, owner, onLook, toast, writer }: {
+  sections: FlowSection[]; docKey: string; owner?: string | null; onLook: (text: string) => void; toast: (s: string) => void;
+  /** connected to Google: what you write goes into the Doc by itself */
+  writer?: (w: SectionWrite[]) => Promise<void>;
 }) {
-  const sections = useMemo(() => parseSections(html), [html]);
   const store = scoped("gflow.edits", owner) + ":" + docKey;
   const [edits, setEdits] = useState<All>({});
   // what was written is read back first; only after that is anything written over it
@@ -56,7 +60,8 @@ export default function FlowTable({ html, docKey, owner, onLook, toast }: {
         const k = secKey(s, i), e = next[k];
         if (!e) return;
         const rows = { ...e.rows };
-        s.rows.forEach((r) => { if (rows[r.arg] && same(rows[r.arg].filter((x) => x.trim()), r.responses)) { delete rows[r.arg]; changed = true; } });
+        const typing = (document.activeElement as HTMLElement | null)?.closest?.("tr")?.getAttribute("data-arg");
+        s.rows.forEach((r) => { if (rows[r.arg] && r.arg !== typing && same(rows[r.arg].map((x) => x.trim()).filter(Boolean), r.responses)) { delete rows[r.arg]; changed = true; } });
         const added = e.added.filter((a) => !s.rows.some((r) => r.arg === a.arg.trim()) || (changed = true, false));
         next[k] = { rows, added };
       });
@@ -74,7 +79,7 @@ export default function FlowTable({ html, docKey, owner, onLook, toast }: {
     return {
       k, title: s.title,
       rows: [
-        ...s.rows.map((r) => ({ ...r, responses: e.rows[r.arg] ?? r.responses, mine: !!e.rows[r.arg] && !same(e.rows[r.arg].filter((x) => x.trim()), r.responses), added: -1 })),
+        ...s.rows.map((r) => ({ ...r, responses: e.rows[r.arg] ?? r.responses, mine: !!e.rows[r.arg] && !same(e.rows[r.arg].map((x) => x.trim()).filter(Boolean), r.responses), added: -1 })),
         ...e.added.map((a, j) => ({ a, j })).filter(({ a }) => a.arg.trim() || a.responses.some((x) => x.trim()))
           .map(({ a, j }) => ({ n: ++n, arg: a.arg, color: colour, responses: a.responses, mine: true, added: j })),
       ],
@@ -82,6 +87,36 @@ export default function FlowTable({ html, docKey, owner, onLook, toast }: {
     };
   });
   const pending = merged.reduce((t, s) => t + s.rows.filter((r) => r.mine).length, 0);
+
+  // ---- connected: what you write goes into the Doc a moment after you stop
+  const [saving, setSaving] = useState<"" | "saving" | "error">("");
+  const mergedRef = useRef(merged);
+  mergedRef.current = merged;
+  const busy = useRef(false);
+  const timer = useRef(0);
+  const flush = async () => {
+    if (!writer) return;
+    if (busy.current) { clearTimeout(timer.current); timer.current = window.setTimeout(() => void flush(), 700); return; }
+    // an argument still being typed waits until you leave its row
+    const here = (document.activeElement as HTMLElement | null)?.closest?.("tr")?.getAttribute("data-addkey");
+    const writes: SectionWrite[] = [];
+    mergedRef.current.forEach((s, si) => {
+      const rows = s.rows.filter((r) => r.added < 0 && r.mine).map((r) => ({ arg: r.arg, responses: r.responses.map((x) => x.trim()).filter(Boolean) }));
+      const added = s.rows.filter((r) => r.added >= 0 && r.arg.trim() && here !== s.k + ":" + r.added)
+        .map((r) => ({ arg: r.arg.trim(), responses: r.responses.map((x) => x.trim()).filter(Boolean) }));
+      if (rows.length || added.length) writes.push({ si, rows, added });
+    });
+    if (!writes.length) return;
+    busy.current = true;
+    setSaving("saving");
+    try { await writer(writes); setSaving(""); }
+    catch (e) { setSaving("error"); toast((e as Error).message || "Couldn't write to the Doc"); }
+    // what wasn't written stays marked, and goes in once Google is connected again
+    finally { busy.current = false; }
+  };
+  const later = (ms = 1100) => { if (!writer) return; clearTimeout(timer.current); timer.current = window.setTimeout(() => void flush(), ms); };
+  useEffect(() => { later(); }, [edits, writer]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   const copy = async () => {
     const { html: h, text } = toDocsHtml(merged.map((s) => ({ title: s.title, rows: s.rows.filter((r) => r.arg.trim()).map((r) => ({ n: r.n, arg: r.arg.trim(), color: r.color, responses: r.responses })) })));
@@ -116,11 +151,13 @@ export default function FlowTable({ html, docKey, owner, onLook, toast }: {
   if (!sections.length) return <p className="rm-gferr">No numbered lists in the flow tab yet.</p>;
 
   return (
-    <div className="rm-ft" ref={box}>
+    <div className="rm-ft" ref={box} onBlur={() => later(250)}>
       <div className="rm-ftbar">
-        <span>{pending ? `${pending} change${pending === 1 ? "" : "s"} not in the Doc yet` : "Everything here is in the Doc"}</span>
+        <span className={saving === "error" ? "bad" : ""}>{writer
+          ? (saving === "saving" ? "Writing into the Doc…" : saving === "error" ? "Couldn't write it — it'll try again" : pending ? `${pending} change${pending === 1 ? "" : "s"} going into the Doc…` : "Saved in the Doc")
+          : (pending ? `${pending} change${pending === 1 ? "" : "s"} not in the Doc yet` : "Everything here is in the Doc")}</span>
         <span className="rm-grow" />
-        <button type="button" className={"rm-pbtn" + (pending ? " acc" : "")} onClick={() => void copy()} title="The flow as the Doc's numbered and lettered lists — paste it over the flow tab (click in it, Ctrl+A, Ctrl+V)">COPY FOR DOCS</button>
+        <button type="button" className={"rm-pbtn" + (pending && !writer ? " acc" : "")} onClick={() => void copy()} title="The flow as the Doc's numbered and lettered lists — paste it over the flow tab (click in it, Ctrl+A, Ctrl+V)">COPY FOR DOCS</button>
       </div>
       {merged.map((s) => (
         <section key={s.k} className="rm-fts">
@@ -130,7 +167,7 @@ export default function FlowTable({ html, docKey, owner, onLook, toast }: {
             <thead><tr><th>#</th><th>Argument</th><th>Responses</th></tr></thead>
             <tbody>
               {s.rows.map((r, ri) => (
-                <tr key={ri} className={r.mine ? "mine" : ""}>
+                <tr key={ri} className={r.mine ? "mine" : ""} data-arg={r.added < 0 ? r.arg : undefined} data-addkey={r.added >= 0 ? s.k + ":" + r.added : undefined}>
                   <td className="n">{r.n}</td>
                   <td className="a">
                     {r.added >= 0 ? (

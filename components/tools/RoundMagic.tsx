@@ -29,7 +29,9 @@ import { gripPlugin } from "@/lib/cutter/grips";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { RM_PALETTE_KEY } from "@/lib/toolTheme";
 import { parseFlow, gdocId, type FlowItem } from "@/lib/gflow";
-import FlowTable from "./FlowTable";
+import FlowTable, { type SectionWrite } from "./FlowTable";
+import { parseSections, type FlowSection } from "@/lib/gflowTable";
+import { readFlow, writeRows, isStale, getToken, hasToken, wasConnected, warmUp, signOut, SignInExpired, type ApiFlow, type ApiRow, type RowWrite } from "@/lib/gdocsApi";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -1677,29 +1679,53 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const twinWords = layoutMode === "twin" && speechView.current ? readWords(speechView.current.state.doc) : 0;
 
   // ---- your partner's flow, from a Google Doc -----------------------------------------------------------
-  // Read every few seconds while it is watched and this tab is in front; the same HTML twice is not read again.
+  // Signed into Google: the Docs API — the tab called "flow", read and written. Not: Google's export of
+  // the Doc (shared by link), read only. Either way read every few seconds while this tab is in front.
+  const [gConn, setGConn] = useState(false);
+  const [apiFlow, setApiFlow] = useState<ApiFlow | null>(null);
+  const gfTab = (gfLink.match(/[?&#]tab=(t\.[A-Za-z0-9_-]+)/) || [])[1] || "";
+  // signed in here before: back in without a pop-up (Google hands a token over while you're signed into it)
+  const [gExpired, setGExpired] = useState(false);
   useEffect(() => {
-    // only the read view reads it: in the editor, Google keeps it live itself
+    if (!uiReady) return;
+    if (hasToken()) { setGConn(true); return; }
+    // signed in before, but the hour is up: one click renews it
+    if (wasConnected()) { setGExpired(true); warmUp(); }
+  }, [uiReady]);
+  useEffect(() => { if (tab === "round" && !gConn) warmUp(); }, [tab, gConn]);
+  const gConnect = async () => {
+    try {
+      await getToken(true);
+      setGConn(true); setGExpired(false);
+      toast("Connected to Google — what you write in the table goes into the Doc");
+    } catch (e) { toast((e as Error).message); }
+  };
+  const gDisconnect = () => { signOut(); setGConn(false); setApiFlow(null); toast("Disconnected from Google"); };
+  useEffect(() => {
     if (!gfOn || !gfLink.trim()) return;
-    let stop = false, busy = false, last = "", prev = new Set<string>(), first = true;
+    let stop = false, busy = false, last = "";
     const pull = async () => {
       if (busy || stop || document.visibilityState !== "visible") return;
       busy = true;
       try {
+        if (gConn) {
+          const f = await readFlow(gdocId(gfLink), gfTab);
+          if (stop) return;
+          const sig = JSON.stringify(f.sections);
+          if (sig !== last) { last = sig; setApiFlow(f); }
+          setGf((g) => ({ items: [], html: "", fresh: new Set(), ...(g || {}), at: Date.now(), err: "" }));
+          return;
+        }
         const r = await fetch("/api/tools/gdoc?doc=" + encodeURIComponent(gfLink.trim()), { cache: "no-store" });
         const j = await r.json();
         if (stop) return;
         if (!r.ok) { setGf((g) => ({ items: g?.items || [], html: g?.html || "", at: g?.at || 0, err: j.error || "Couldn't read it", fresh: new Set() })); return; }
         if (j.html === last) { setGf((g) => (g ? { ...g, at: Date.now(), err: "" } : g)); return; }
         last = j.html;
-        const items = parseFlow(j.html);
-        const now = new Set(items.map((x) => x.text));
-        // what your partner has just written, marked for a moment
-        const fresh = first ? new Set<string>() : new Set(items.map((x) => x.text).filter((t) => !prev.has(t)));
-        prev = now; first = false;
-        setGf({ items, html: j.html, at: Date.now(), err: "", fresh });
-      } catch {
-        if (!stop) setGf((g) => ({ items: g?.items || [], html: g?.html || "", at: g?.at || 0, err: "Couldn't reach The Break — trying again", fresh: new Set() }));
+        setGf({ items: parseFlow(j.html), html: j.html, at: Date.now(), err: "", fresh: new Set() });
+      } catch (e) {
+        if (e instanceof SignInExpired) { setGConn(false); setGExpired(true); toast(e.message); return; }
+        if (!stop) setGf((g) => ({ items: g?.items || [], html: g?.html || "", at: g?.at || 0, err: gConn ? (e as Error).message : "Couldn't reach The Break — trying again", fresh: new Set() }));
       } finally { busy = false; }
     };
     void pull();
@@ -1707,12 +1733,44 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const vis = () => { if (document.visibilityState === "visible") void pull(); };
     document.addEventListener("visibilitychange", vis);
     return () => { stop = true; clearInterval(iv); document.removeEventListener("visibilitychange", vis); };
-  }, [gfOn, gfLink]);
+  }, [gfOn, gfLink, gConn, gfTab]);
+  /** The table's changes into the Doc: worked out against the Doc as it is right now, and again if your partner moved it first. */
+  const gWrite = useCallback(async (writes: SectionWrite[]) => {
+    const id = gdocId(gfLink);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const fresh = await readFlow(id, gfTab);
+      const list: RowWrite[] = [];
+      const forRow = (row: ApiRow) => {
+        let w = list.find((x) => x.row === row);
+        if (!w) { w = { row, responses: row.responses, add: [] }; list.push(w); }
+        return w;
+      };
+      const findRow = (si: number, arg: string) => fresh.sections[si]?.rows.find((r) => r.arg === arg) || fresh.sections.flatMap((x) => x.rows).find((r) => r.arg === arg);
+      for (const w of writes) {
+        for (const r of w.rows) { const row = findRow(w.si, r.arg); if (row) forRow(row).responses = r.responses; }
+        if (w.added.length) {
+          const sec = fresh.sections[w.si], last = sec?.rows[sec.rows.length - 1];
+          if (!last) throw new Error("Add arguments under one that's in the Doc already");
+          // an argument already in the Doc isn't added twice
+          forRow(last).add.push(...w.added.filter((a) => !sec.rows.some((r) => r.arg === a.arg)));
+        }
+      }
+      try {
+        await writeRows(id, fresh, list);
+        setApiFlow(await readFlow(id, gfTab));
+        return;
+      } catch (e) {
+        if (isStale(e) && attempt < 2) continue;      // your partner typed in between: work it out again
+        throw e;
+      }
+    }
+  }, [gfLink, gfTab]);
+  const flowSections: FlowSection[] = gConn ? apiFlow?.sections || [] : gf?.html ? parseSections(gf.html) : [];
   const gfWatch = () => {
     if (!gfLink.trim()) { toast("Paste the link to your partner's Google Doc first"); return; }
-    setGf(null); setGfOn(true); setGfShow(true);
+    setGf(null); setApiFlow(null); setGfOn(true); setGfShow(true);
     if (modeRef.current !== "split") setMode("split");
-    toast("Your partner's flow as tables — write responses in the cells, COPY FOR DOCS to put them in the Doc");
+    toast(gConn ? "Your partner's flow — what you write in the table goes into the Doc" : "Your partner's flow as tables — Connect Google to write into the Doc");
   };
   // a line of their flow, clicked: the library searched for it
   const lookFor = (text: string) => {
@@ -2514,13 +2572,26 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <input value={gfLink} onChange={(e) => { setGfLink(e.target.value); if (gfOn) setGfOn(false); }} placeholder="Link to their Google Doc" spellCheck={false} aria-label="Your partner's Google Doc" />
                 <button type="submit" disabled={!gfLink.trim()}>{gfOn ? "↻" : "OPEN"}</button>
               </form>
+              <div className="rm-gconn">
+                {gConn ? (
+                  <><span className="dot live" /> <span>Google connected — the table writes into the Doc</span>
+                    <button type="button" className="rm-linkbtn" onClick={gDisconnect}>DISCONNECT</button></>
+                ) : (
+                  <button type="button" className="rm-gbtn" onClick={() => void gConnect()} title="Sign in with Google so what you write in the table goes into the Doc by itself">
+                    <svg width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6c1.9-5.6 7.1-9.8 13.6-9.8z" /><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z" /><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.8-6z" /><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.5 0-11.7-4.2-13.6-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z" /></svg>
+                    {gExpired ? "RECONNECT GOOGLE" : "CONNECT GOOGLE"}
+                  </button>
+                )}
+              </div>
               {gfOn ? (
                 <p className="rm-sempty">
-                  {gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>As tables · read {gfSince}s ago</> : "Reading it…"}
+                  {gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>{gConn ? "Live" : "Read only"} · read {gfSince}s ago</> : "Reading it…"}
                   {" "}<button type="button" className="rm-linkbtn" onClick={() => setGfShow((s) => !s)}>{gfShow ? "HIDE" : "SHOW"}</button>
                   <button type="button" className="rm-linkbtn" onClick={() => { setGfOn(false); setGf(null); }}>CLOSE</button>
                 </p>
-              ) : <p className="rm-sempty">Open the Doc&apos;s <b>flow</b> tab in Google Docs and copy the address bar (it ends <b>?tab=t.…</b>) — only that tab is read. Shared <b>Anyone with the link</b>. Its numbered lists become tables to write responses in.</p>}
+              ) : <p className="rm-sempty">{gConn
+                ? <>Paste any link to the Doc — its tab called <b>flow</b> is found by itself. You need to be able to edit it (your partner shares it with you).</>
+                : <><b>Connect Google</b> and the table writes into the Doc as you type, and finds the <b>flow</b> tab by itself. Without it: the flow tab&apos;s link (it ends <b>?tab=t.…</b>), shared <b>Anyone with the link</b>, read only — <b>COPY FOR DOCS</b> to paste it back.</>}</p>}
             </div>
             <div className="rm-rsec">
               <div className="rm-cap">SPEECHDROP</div>
@@ -2684,7 +2755,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <div className="rm-scroll">
                   {gf?.err && <p className="rm-gferr">{gf.err}</p>}
                   {!gf && <p className="rm-gferr" style={{ color: "#777" }}>Reading the Doc…</p>}
-                  {gf?.html && <FlowTable html={gf.html} docKey={gdocId(gfLink) + (gfLink.match(/[?&#]tab=(t\.[A-Za-z0-9_-]+)/)?.[1] ? ":" + gfLink.match(/[?&#]tab=(t\.[A-Za-z0-9_-]+)/)![1] : "")} owner={owner} onLook={lookFor} toast={toast} />}
+                  {gConn && apiFlow && apiFlow.tabTitle.trim().toLowerCase() !== "flow" && <p className="rm-gferr" style={{ color: "#8a6100" }}>No tab called &ldquo;flow&rdquo; in this Doc — showing &ldquo;{apiFlow.tabTitle}&rdquo;.</p>}
+                  {(flowSections.length > 0 || (gf && !gf.err)) && <FlowTable sections={flowSections} docKey={gdocId(gfLink) + (gfTab ? ":" + gfTab : "")} owner={owner} onLook={lookFor} toast={toast} writer={gConn ? gWrite : undefined} />}
                 </div>
               </section>
             )}
