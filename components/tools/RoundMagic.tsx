@@ -2565,7 +2565,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               </form>
               {gfOn ? (
                 <p className="rm-sempty">
-                  {gfView === "edit" ? <>Open beside the speech doc — editing in Google Docs</> : gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>Reading · {gf.items.length} lines · {gfSince}s ago</> : "Reading it…"}
+                  {gfView === "edit" ? <>Open beside the speech doc — type in it; Ctrl+B / I / U format</> : gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>Reading · {gf.items.length} lines · {gfSince}s ago</> : "Reading it…"}
                   {" "}<button type="button" className="rm-linkbtn" onClick={() => setGfShow((s) => !s)}>{gfShow ? "HIDE" : "SHOW"}</button>
                   <button type="button" className="rm-linkbtn" onClick={() => { setGfOn(false); setGf(null); }}>CLOSE</button>
                 </p>
@@ -2735,7 +2735,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   <button type="button" className="rm-pbtn sq" onClick={() => { setGfOn(false); setGf(null); }} aria-label="Close your partner's Doc" title="Close it">×</button>
                 </div>
                 {gfView === "edit" && (
-                  <iframe className="rm-gfedit" src={`https://docs.google.com/document/d/${gdocId(gfLink)}/edit`} title="Your partner's Google Doc"
+                  <iframe className="rm-gfedit" src={`https://docs.google.com/document/d/${gdocId(gfLink)}/edit?rm=minimal`} title="Your partner's Google Doc"
                     allow="clipboard-read; clipboard-write" referrerPolicy="no-referrer-when-downgrade" />
                 )}
                 <div className="rm-scroll" hidden={gfView === "edit"}>
