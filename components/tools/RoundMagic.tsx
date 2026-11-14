@@ -2687,18 +2687,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the library: Evidence's search, drawn by its engine */}
           <div className={"rm-tabpane tp-search" + (cmdMode ? " cmdmode" : "")} hidden={tab !== "search"} onKeyDownCapture={onCmdKey}>
-            {answering && (
-              <div className="rm-ansbar">
-                <div className="row">
-                  <span className="lab">{answering.claim ? "ANSWERING" : "SENDING UNDER"}</span>
-                  <span className="rm-grow" />
-                  {answering.claim && <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => run("answer")} title={tip("answer", "Their next tag")}>NEXT ›</button>}
-                  <button type="button" onClick={() => setAnswering(null)} aria-label="Stop answering" title="Stop: the search looks for what you type, and cards go to the end of the speech doc">×</button>
-                </div>
-                <b title={answering.claim || answering.head}>{answering.claim || answering.head}</b>
-                <small><kbd>Enter</kbd> puts a card under <i>{answering.head}</i> in the speech doc{answering.claim ? " · the cards that answer it come first" : ""}</small>
-              </div>
-            )}
             <div className="evi rm-evsearch">
               <div className="srcsw mono" id="srcsw" role="group" aria-label="Search in">
                 <button type="button" data-src="lib" className="on" aria-pressed="true">Library</button>
