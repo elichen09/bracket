@@ -65,3 +65,27 @@ export function gdocId(raw: string): string {
   const m = raw.trim().match(/\/document\/(?:u\/\d+\/)?d\/([A-Za-z0-9_-]{20,80})/);
   return m ? m[1] : raw.trim();
 }
+
+/**
+ * The Doc as it looks: Google's own stylesheet and its body, made safe to put
+ * on the page — no scripts, no handlers, no frames, links that go nowhere.
+ * Shown inside a shadow root, so its styles (p, li, h1… and its .c0 classes)
+ * stay inside it and the page's stay out.
+ */
+export function docView(html: string): { css: string; body: string; bodyClass: string } {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script, iframe, object, embed, form, link, meta, base").forEach((n) => n.remove());
+  doc.querySelectorAll("*").forEach((el) => {
+    for (const a of Array.from(el.attributes)) if (/^on/i.test(a.name) || (a.name === "href" && /^\s*javascript:/i.test(a.value))) el.removeAttribute(a.name);
+  });
+  const css = Array.from(doc.querySelectorAll("style")).map((x) => x.textContent || "").join("\n")
+    // nothing in it may reach outside: no imports, no fonts fetched
+    .replace(/@import[^;]+;/g, "")
+    .replace(/<\/?style/gi, "");
+  doc.querySelectorAll("style").forEach((x) => x.remove());
+  return { css, body: doc.body.innerHTML, bodyClass: doc.body.getAttribute("class") || "" };
+}
+
+/** The lines of a shown Doc that are arguments to click: every list item, paragraph and heading with words in it. */
+export const LINE_SEL = "li, p, h1, h2, h3, h4, h5, h6";
+export const lineText = (el: Element) => clean(el.textContent || "");

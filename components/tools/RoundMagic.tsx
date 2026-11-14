@@ -28,7 +28,7 @@ import { placePlugin, placeCard } from "@/lib/cutter/place";
 import { gripPlugin } from "@/lib/cutter/grips";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { RM_PALETTE_KEY } from "@/lib/toolTheme";
-import { parseFlow, type FlowItem } from "@/lib/gflow";
+import { parseFlow, docView, LINE_SEL, lineText, type FlowItem } from "@/lib/gflow";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -195,6 +195,20 @@ const PALETTES = [
   { id: "lilac", name: "Lilac", sub: "Lavender haze, violet", chrome: "#F1EDFB", side: "#F6F3FD", acc: "#7C4DDB" },
   { id: "citrus", name: "Citrus", sub: "Cream, tangerine, hard black lines", chrome: "#FFF8E6", side: "#FFFBEF", acc: "#F26B1D" },
 ] as const;
+/** Inside the partner's Doc (a shadow root): Google's page margins off, every line a thing to click, its state marked. */
+const GF_CSS = `
+:host { display: block; }
+.gd { max-width: none !important; padding: 14px 22px 140px !important; background: #fff !important; }
+.gd .x-line { cursor: pointer; transition: background .12s; }
+.gd .x-line:hover { background: color-mix(in srgb, var(--acc, #8b7cf0) 10%, #fff); }
+.gd .x-done::after { content: "  ✓"; color: #16a34a; font-weight: 700; font-family: system-ui, sans-serif; }
+.gd .x-open::after { content: "  ◐"; color: #b45309; font-family: system-ui, sans-serif; }
+.gd .x-on { background: color-mix(in srgb, var(--acc, #8b7cf0) 16%, #fff); box-shadow: inset 3px 0 0 var(--acc, #8b7cf0); }
+.gd .x-fresh { animation: gfFresh 2.4s ease-out; }
+@keyframes gfFresh { 0%, 40% { background: #fff3a8; } }
+.gd a { cursor: pointer; }
+.gd img { max-width: 100%; height: auto; }
+`;
 /** The palettes with light chrome, listed apart in the menu. */
 const LIGHT_PALETTES = new Set(["paper", "glacier", "blueprint", "sakura", "matcha", "library", "lilac", "citrus"]);
 /** The light six each read in a face of their own (the page you cut on stays Calibri): fetched the first time one is picked. */
@@ -331,7 +345,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [gfLink, setGfLink] = useState("");
   const [gfOn, setGfOn] = useState(false);
   const [gfShow, setGfShow] = useState(true);
-  const [gf, setGf] = useState<{ items: FlowItem[]; at: number; err: string; fresh: Set<string> } | null>(null);
+  const [gf, setGf] = useState<{ items: FlowItem[]; html: string; at: number; err: string; fresh: Set<string> } | null>(null);
   const [cmdSel, setCmdSel] = useState(0);
   const focusLayout = layoutMode === "focus";
   // the dock is the folded ribbon, laid out another way
@@ -1383,7 +1397,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       const q = root.current?.querySelector("#q") as HTMLInputElement | null;
       if (q) q.value = headOf(claim);
       setAnswering({ claim, head });
-      requestAnimationFrame(() => { q?.focus(); q?.select(); });
+      // the search tab may only now be coming into view: focus it once it has
+      const take = () => { q?.focus(); q?.select(); };
+      requestAnimationFrame(take);
+      setTimeout(() => { if (document.activeElement !== q) take(); }, 80);
     };
     if (modeRef.current !== "split") {
       modeRef.current = "split"; setModeState("split"); inSpeech.current = false;
@@ -1823,7 +1840,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         const r = await fetch("/api/tools/gdoc?doc=" + encodeURIComponent(gfLink.trim()), { cache: "no-store" });
         const j = await r.json();
         if (stop) return;
-        if (!r.ok) { setGf((g) => ({ items: g?.items || [], at: g?.at || 0, err: j.error || "Couldn't read it", fresh: new Set() })); return; }
+        if (!r.ok) { setGf((g) => ({ items: g?.items || [], html: g?.html || "", at: g?.at || 0, err: j.error || "Couldn't read it", fresh: new Set() })); return; }
         if (j.html === last) { setGf((g) => (g ? { ...g, at: Date.now(), err: "" } : g)); return; }
         last = j.html;
         const items = parseFlow(j.html);
@@ -1831,9 +1848,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         // what your partner has just written, marked for a moment
         const fresh = first ? new Set<string>() : new Set(items.map((x) => x.text).filter((t) => !prev.has(t)));
         prev = now; first = false;
-        setGf({ items, at: Date.now(), err: "", fresh });
+        setGf({ items, html: j.html, at: Date.now(), err: "", fresh });
       } catch {
-        if (!stop) setGf((g) => ({ items: g?.items || [], at: g?.at || 0, err: "Couldn't reach The Break — trying again", fresh: new Set() }));
+        if (!stop) setGf((g) => ({ items: g?.items || [], html: g?.html || "", at: g?.at || 0, err: "Couldn't reach The Break — trying again", fresh: new Set() }));
       } finally { busy = false; }
     };
     void pull();
@@ -1862,6 +1879,49 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return m;
   })();
   gfNext.current = gfOn && gfShow ? gf?.items || null : null;
+  const gfHost = useRef<HTMLDivElement>(null);
+  const gfShadow = useRef<ShadowRoot | null>(null);
+  const gfClick = useRef<(t: string) => void>(() => {});
+  gfClick.current = (t: string) => startAnswer(t);
+  // the Doc, as your partner sees it: Google's own styles, kept inside a shadow root
+  useEffect(() => {
+    const host = gfHost.current;
+    if (!host || !gf?.html) return;
+    const root = gfShadow.current && gfShadow.current.host === host ? gfShadow.current : (host.shadowRoot || host.attachShadow({ mode: "open" }));
+    if (gfShadow.current !== root) {
+      gfShadow.current = root;
+      root.addEventListener("click", (e) => {
+        const t = e.target as Element;
+        if (t.closest?.("a")) e.preventDefault();
+        const line = t.closest?.(LINE_SEL);
+        // a paragraph inside a list item or a table cell is part of that line
+        const el = line && line.parentElement?.closest("li") ? line.parentElement.closest("li")! : line;
+        const text = el ? lineText(el) : "";
+        if (text) gfClick.current(text);
+      });
+    }
+    const { css, body, bodyClass } = docView(gf.html);
+    const scroller = host.closest(".rm-scroll") as HTMLElement | null;
+    const top = scroller?.scrollTop || 0;
+    root.innerHTML = `<style>${css}</style><style>${GF_CSS}</style><div class="${bodyClass.replace(/"/g, "")} gd">${body}</div>`;
+    if (scroller) scroller.scrollTop = top;
+  }, [gf?.html, gfShow, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  // which lines are answered, being answered, or just written
+  useEffect(() => {
+    const root = gfShadow.current;
+    if (!root || !gf) return;
+    root.querySelectorAll(LINE_SEL).forEach((el) => {
+      if (el.parentElement?.closest("li")) return;
+      const t = lineText(el);
+      if (!t) return;
+      const at = ("AT: " + headOf(t)).toLowerCase();
+      el.classList.toggle("x-done", speechAts.get(at) === true);
+      el.classList.toggle("x-open", speechAts.get(at) === false);
+      el.classList.toggle("x-on", answering?.claim === t);
+      el.classList.toggle("x-fresh", gf.fresh.has(t));
+      el.classList.add("x-line");
+    });
+  });
   const gfSince = gf?.at ? Math.max(0, Math.round((Date.now() - gf.at) / 1000)) : null;
 
   // ---- commands, over the search's results -----------------------------------------------------------
@@ -2850,7 +2910,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <div className="rm-scroll">
                   {gf?.err && <p className="rm-gferr">{gf.err}</p>}
                   {gf && !gf.items.length && !gf.err && <p className="rm-gferr">Nothing in the Doc yet.</p>}
-                  <div className="rm-gfl">
+                  <div ref={gfHost} className="rm-gfdoc" />
+                  <div className="rm-gfl" hidden>
                     {(gf?.items || []).map((it, n) => {
                       const at = ("AT: " + headOf(it.text)).toLowerCase();
                       const st = speechAts.has(at) ? (speechAts.get(at) ? "done" : "open") : "";

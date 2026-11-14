@@ -1245,3 +1245,4 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm .rm-gfi.fresh { animation: rmFresh 2.4s ease-out; }
 @keyframes rmFresh { 0%, 40% { background: #fff3a8; } }
 .rm-gferr { margin: 12px 18px; font: 13px var(--rm-sans); color: #b3261e; }
+.rm .rm-gfdoc { min-height: 100%; background: #fff; }
