@@ -1218,3 +1218,30 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm[data-palette="citrus"] .rm-status { background: #FFF8E6; color: #1A1A1A; border-top: 3px solid #1A1A1A; }
 .rm[data-palette="citrus"] .rm-slist .rm-ol.on { box-shadow: inset 4px 0 0 #1A1A1A; }
 @media (prefers-reduced-motion: reduce) { .rm[data-palette="sakura"] :is(.rm-b, .rm-pbtn):hover { transform: none; } }
+
+/* ------------------------------------------------------------ your partner's flow, from a Google Doc
+   It takes the file's place beside the speech doc: an outline, each line an argument to answer.
+   ✓ answered (cards under its AT: heading), ◐ its heading is in but empty; what was just written flashes. */
+.rm.gflow-on[data-mode="split"] .rm-panes { display: none; }
+.rm .rm-gflow { flex: 1 1 0; min-width: 0; background: #fff; }
+.rm-gflow .rm-phead { background: color-mix(in srgb, var(--acc) 7%, #f4f4f4); }
+.rm-gfl { padding: 12px 10px 120px; display: grid; gap: 1px; max-width: 900px; }
+.rm .rm-gfi {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
+  padding: 4px 8px 4px calc(8px + var(--d, 0) * 18px); color: #1a1a1a; font: 400 13.5px/1.35 Calibri, Carlito, "Segoe UI", sans-serif;
+}
+.rm .rm-gfi .t { flex: 1; min-width: 0; }
+.rm .rm-gfi .m { flex-shrink: 0; font: 600 9.5px var(--rm-mono); letter-spacing: .1em; color: var(--accD); opacity: 0; }
+.rm .rm-gfi:hover { background: color-mix(in srgb, var(--acc) 8%, #fff); }
+.rm .rm-gfi:hover .m { opacity: 1; }
+.rm .rm-gfi.h { margin-top: 12px; padding-top: 6px; border-top: 1px solid #e3e3e3; font-weight: 700; font-size: 15px; }
+.rm .rm-gfi.h:first-child { margin-top: 0; border-top: 0; }
+.rm .rm-gfi.d1:not(.h) { font-weight: 600; }
+.rm .rm-gfi.li .t::before { content: "•"; margin-right: 7px; color: #9a9a9a; }
+.rm .rm-gfi.done .m { opacity: 1; color: #16a34a; font-size: 12px; }
+.rm .rm-gfi.done .t { color: #6b6b6b; }
+.rm .rm-gfi.open .m { opacity: 1; color: #b45309; font-size: 12px; }
+.rm .rm-gfi.on { background: color-mix(in srgb, var(--acc) 14%, #fff); box-shadow: inset 3px 0 0 var(--acc); }
+.rm .rm-gfi.fresh { animation: rmFresh 2.4s ease-out; }
+@keyframes rmFresh { 0%, 40% { background: #fff3a8; } }
+.rm-gferr { margin: 12px 18px; font: 13px var(--rm-sans); color: #b3261e; }

@@ -257,6 +257,7 @@ const SECTIONS: Section[] = [
     open: [{ href: "/tools/magic", label: "Open Round Magic" }],
     idea: <p>A doc of theirs opens in the same editor as your files, marked <b>THEIRS</b>, with the same outline, keys and Read mode. It&apos;s kept with your recent docs, never in your library.</p>,
     steps: [
+      <><b>Your partner&apos;s flow, from a Google Doc:</b> they flow in a Google Doc as a bulleted outline, shared &ldquo;Anyone with the link&rdquo; (Viewer). Paste its link under <b>Partner&apos;s flow</b> in the <b>Round</b> tab and press <b>Watch</b>: the flow takes the file&apos;s place beside the speech doc and is read again every few seconds, so new arguments appear (flashing) as they&apos;re written. Click an argument to answer it — its AT: heading goes into the speech doc and the search looks for answers. ✓ marks the ones with cards under them, ◐ the ones whose heading is still empty. <b>FILE</b> goes back to your file; the flow keeps being read.</>,
       <>In the <b>Round</b> tab, type their <b>SpeechDrop</b> room code and press <b>Look</b>, then click a file. Or <b>Open theirs</b> for a .docx or PDF, or <b>Paste a doc</b> for a Google Doc.</>,
       <>Use the <b>Outline</b> to jump around, and <b>READ</b> to see how long their speech is.</>,
       <>Rehighlight a card: select its text and press {K("Alt+G")} to grey their highlighting, then {K("Alt+Z")} your own words green. {K("Alt+Enter")} sends it to your speech doc.</>,

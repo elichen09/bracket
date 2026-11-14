@@ -28,6 +28,7 @@ import { placePlugin, placeCard } from "@/lib/cutter/place";
 import { gripPlugin } from "@/lib/cutter/grips";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { RM_PALETTE_KEY } from "@/lib/toolTheme";
+import { parseFlow, type FlowItem } from "@/lib/gflow";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -326,6 +327,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [twinView, setTwinView] = useState<"verbatim" | "tags">("verbatim");
   // what is typed in the library search, for the commands that sit over its results
   const [cmdQ, setCmdQ] = useState("");
+  // your partner's flow, in a Google Doc shared by link: where it is, whether it is watched and shown, and what it says
+  const [gfLink, setGfLink] = useState("");
+  const [gfOn, setGfOn] = useState(false);
+  const [gfShow, setGfShow] = useState(true);
+  const [gf, setGf] = useState<{ items: FlowItem[]; at: number; err: string; fresh: Set<string> } | null>(null);
   const [cmdSel, setCmdSel] = useState(0);
   const focusLayout = layoutMode === "focus";
   // the dock is the folded ribbon, laid out another way
@@ -429,6 +435,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (["outline", "files", "search", "round"].includes(u.tab)) setTabState(u.tab);
         if (typeof u.speechW === "number") setSpeechW(Math.min(.75, Math.max(.25, u.speechW)));
         if (typeof u.speechH === "number") setSpeechH(Math.min(.75, Math.max(.25, u.speechH)));
+        if (typeof u.gfLink === "string") setGfLink(u.gfLink);
         if (typeof u.wpm === "number") setWpm(u.wpm);
         if (typeof u.hideDim === "boolean") setHideDim(u.hideDim);
         if (typeof u.speechOutline === "boolean") setSpeechOutline(u.speechOutline);
@@ -463,8 +470,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [palette, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode })); } catch { /* private */ }
-  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, UI_KEY, uiReady]);
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink })); } catch { /* private */ }
+  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, UI_KEY, uiReady]);
   // the site's nav steps aside in Focus (magic.css), set on <html> so it can
   useEffect(() => {
     if (!uiReady) return;
@@ -1367,7 +1374,36 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
    * Enter there puts a card under that heading. Pressed again from the search,
    * it is their next tag. In the speech doc, it says: cards go under this heading.
    */
+  /** Answer this claim: its "AT: …" heading in the speech doc, and the search looking for what answers it. */
+  const startAnswer = useCallback((claim: string) => {
+    const head = "AT: " + headOf(claim);
+    const go = () => {
+      ensureHead(head);
+      setTab("search");
+      const q = root.current?.querySelector("#q") as HTMLInputElement | null;
+      if (q) q.value = headOf(claim);
+      setAnswering({ claim, head });
+      requestAnimationFrame(() => { q?.focus(); q?.select(); });
+    };
+    if (modeRef.current !== "split") {
+      modeRef.current = "split"; setModeState("split"); inSpeech.current = false;
+      requestAnimationFrame(() => { (window as any).EV?.renderDoc?.(); requestAnimationFrame(go); });
+    } else go();
+  }, [ensureHead, setAnswering, setTab]);
+
+  // the partner's flow, for NEXT: what is on it, while it is showing
+  const gfNext = useRef<FlowItem[] | null>(null);
   const answer = useCallback(() => {
+    // answering from the partner's flow: NEXT is the next argument on it
+    const was = answerRef.current?.claim, flow = gfNext.current;
+    if (was && flow && !view.current?.hasFocus() && !speechView.current?.hasFocus()) {
+      const i = flow.findIndex((x) => x.text === was);
+      if (i >= 0) {
+        const nx = flow.slice(i + 1).find((x) => x.kind !== "h");
+        if (nx) startAnswer(nx.text); else toast("That was the last argument on their flow");
+        return;
+      }
+    }
     const s = speechView.current;
     if (s && s.hasFocus()) {
       const from = s.state.selection.from;
@@ -1403,20 +1439,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       showPos(v, hs[k].pos);
     }
     if (!claim) return;
-    const head = "AT: " + headOf(claim);
-    const go = () => {
-      ensureHead(head);
-      setTab("search");
-      const q = root.current?.querySelector("#q") as HTMLInputElement | null;
-      if (q) q.value = headOf(claim);
-      setAnswering({ claim, head });
-      requestAnimationFrame(() => { q?.focus(); q?.select(); });
-    };
-    if (modeRef.current !== "split") {
-      modeRef.current = "split"; setModeState("split"); inSpeech.current = false;
-      requestAnimationFrame(() => { (window as any).EV?.renderDoc?.(); requestAnimationFrame(go); });
-    } else go();
-  }, [ensureHead, showPos, setAnswering, setTab, toast]);
+    startAnswer(claim);
+  }, [showPos, setAnswering, toast, startAnswer]);
 
   // ---- sending a card to the speech doc ---------------------------------------
   const sendCard = useCallback(async () => {
@@ -1786,6 +1810,59 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return () => { clearInterval(iv); tv.destroy(); twinViewRef.current = null; };
   }, [layoutMode, twinView]);
   const twinWords = layoutMode === "twin" && speechView.current ? readWords(speechView.current.state.doc) : 0;
+
+  // ---- your partner's flow, from a Google Doc -----------------------------------------------------------
+  // Read every few seconds while it is watched and this tab is in front; the same HTML twice is not read again.
+  useEffect(() => {
+    if (!gfOn || !gfLink.trim()) return;
+    let stop = false, busy = false, last = "", prev = new Set<string>(), first = true;
+    const pull = async () => {
+      if (busy || stop || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        const r = await fetch("/api/tools/gdoc?doc=" + encodeURIComponent(gfLink.trim()), { cache: "no-store" });
+        const j = await r.json();
+        if (stop) return;
+        if (!r.ok) { setGf((g) => ({ items: g?.items || [], at: g?.at || 0, err: j.error || "Couldn't read it", fresh: new Set() })); return; }
+        if (j.html === last) { setGf((g) => (g ? { ...g, at: Date.now(), err: "" } : g)); return; }
+        last = j.html;
+        const items = parseFlow(j.html);
+        const now = new Set(items.map((x) => x.text));
+        // what your partner has just written, marked for a moment
+        const fresh = first ? new Set<string>() : new Set(items.map((x) => x.text).filter((t) => !prev.has(t)));
+        prev = now; first = false;
+        setGf({ items, at: Date.now(), err: "", fresh });
+      } catch {
+        if (!stop) setGf((g) => ({ items: g?.items || [], at: g?.at || 0, err: "Couldn't reach The Break — trying again", fresh: new Set() }));
+      } finally { busy = false; }
+    };
+    void pull();
+    const iv = window.setInterval(() => void pull(), 4000);
+    const vis = () => { if (document.visibilityState === "visible") void pull(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { stop = true; clearInterval(iv); document.removeEventListener("visibilitychange", vis); };
+  }, [gfOn, gfLink]);
+  const gfWatch = () => {
+    if (!gfLink.trim()) { toast("Paste the link to your partner's Google Doc first"); return; }
+    setGf(null); setGfOn(true); setGfShow(true);
+    if (modeRef.current !== "split") setMode("split");
+    toast("Watching your partner's flow — click an argument to answer it");
+  };
+  // what is answered already: a heading "AT: …" in the speech doc, and whether it has cards under it
+  const speechAts = (() => {
+    const m = new Map<string, boolean>();
+    const sv = speechView.current;
+    if (!sv || !gfOn) return m;
+    let head = "";
+    sv.state.doc.forEach((n) => {
+      if (n.type !== schema.nodes.heading) return;
+      if (n.attrs.level < 4) { head = n.textContent.trim().toLowerCase(); if (!m.has(head)) m.set(head, false); }
+      else if (head) m.set(head, true);
+    });
+    return m;
+  })();
+  gfNext.current = gfOn && gfShow ? gf?.items || null : null;
+  const gfSince = gf?.at ? Math.max(0, Math.round((Date.now() - gf.at) / 1000)) : null;
 
   // ---- commands, over the search's results -----------------------------------------------------------
   useEffect(() => {
@@ -2360,7 +2437,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "") + (gfOn && gfShow ? " gflow-on" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
@@ -2594,6 +2671,20 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           {/* the round: their docs, SpeechDrop, your partner */}
           <div className="rm-tabpane tp-round" hidden={tab !== "round"}>
             <div className="rm-rsec">
+              <div className="rm-cap">PARTNER&apos;S FLOW · GOOGLE DOC</div>
+              <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); gfWatch(); }}>
+                <input value={gfLink} onChange={(e) => { setGfLink(e.target.value); if (gfOn) setGfOn(false); }} placeholder="Link to their Google Doc" spellCheck={false} aria-label="Your partner's Google Doc" />
+                <button type="submit" disabled={!gfLink.trim()}>{gfOn ? "↻" : "WATCH"}</button>
+              </form>
+              {gfOn ? (
+                <p className="rm-sempty">
+                  {gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>Watching · {gf.items.length} lines · read {gfSince}s ago</> : "Reading it…"}
+                  {" "}<button type="button" className="rm-linkbtn" onClick={() => setGfShow((s) => !s)}>{gfShow ? "HIDE" : "SHOW"}</button>
+                  <button type="button" className="rm-linkbtn" onClick={() => { setGfOn(false); setGf(null); }}>STOP</button>
+                </p>
+              ) : <p className="rm-sempty">In the Doc: Share › General access › <b>Anyone with the link</b> (Viewer). It&apos;s read every few seconds; click an argument to answer it.</p>}
+            </div>
+            <div className="rm-rsec">
               <div className="rm-cap">SPEECHDROP</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); void listSd(sdCode); }}>
                 <input value={sdCode} onChange={(e) => setSdCode(e.target.value)} placeholder="Room code or link" spellCheck={false} aria-label="SpeechDrop room" />
@@ -2747,6 +2838,35 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               })}
             </div>
 
+            {gfOn && gfShow && mode === "split" && (
+              <section className="rm-pane rm-gflow" aria-label="Your partner's flow">
+                <div className="rm-phead">
+                  <span className="rm-acc">PARTNER&apos;S FLOW</span>
+                  <span className="rm-pmeta">{gf?.err ? "" : gf ? `${gf.items.length} LINES · ${gfSince ?? 0}S AGO` : "READING…"}</span>
+                  <span className="rm-grow" />
+                  <button type="button" className="rm-pbtn" onClick={() => setGfShow(false)} title="Back to your file — the flow keeps being read (Round tab: SHOW)">FILE</button>
+                  <button type="button" className="rm-pbtn sq" onClick={() => { setGfOn(false); setGf(null); }} aria-label="Stop watching the flow" title="Stop watching">×</button>
+                </div>
+                <div className="rm-scroll">
+                  {gf?.err && <p className="rm-gferr">{gf.err}</p>}
+                  {gf && !gf.items.length && !gf.err && <p className="rm-gferr">Nothing in the Doc yet.</p>}
+                  <div className="rm-gfl">
+                    {(gf?.items || []).map((it, n) => {
+                      const at = ("AT: " + headOf(it.text)).toLowerCase();
+                      const st = speechAts.has(at) ? (speechAts.get(at) ? "done" : "open") : "";
+                      return (
+                        <button key={n + ":" + it.text} type="button" className={`rm-gfi ${it.kind} d${Math.min(it.depth, 5)}` + (st ? " " + st : "") + (gf?.fresh.has(it.text) ? " fresh" : "") + (answering?.claim === it.text ? " on" : "")}
+                          style={{ ["--d" as string]: it.depth }} onClick={() => startAnswer(it.text)}
+                          title={st === "done" ? "Answered — cards are under its heading in the speech doc" : st === "open" ? "Its heading is in the speech doc — no cards under it yet" : "Answer this: its heading goes in the speech doc and the search looks for answers"}>
+                          <span className="t">{it.text}</span>
+                          <span className="m">{st === "done" ? "✓" : st === "open" ? "◐" : "ANSWER ›"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            )}
             {layoutMode === "twin" && (
               <section className="rm-pane rm-twin" aria-label="The speech doc, a second look">
                 <div className="rm-phead">
