@@ -21,6 +21,8 @@ export const maxDuration = 20;
  */
 
 const ID = /^[A-Za-z0-9_-]{20,80}$/;
+/** A Doc's tab: its link, copied while the tab is open, ends ?tab=t.… */
+const TAB = /[?&#]tab=(t\.[A-Za-z0-9_-]{1,60})/;
 const MAX = 4 * 1024 * 1024;
 
 function idOf(raw: string): string {
@@ -31,10 +33,12 @@ function idOf(raw: string): string {
 
 export async function GET(req: Request) {
   if (!(await currentUser())) return NextResponse.json({ error: "sign in first" }, { status: 401 });
-  const id = idOf(new URL(req.url).searchParams.get("doc") || "");
+  const raw = new URL(req.url).searchParams.get("doc") || "";
+  const id = idOf(raw);
+  const tab = (raw.match(TAB) || [])[1] || "";
   if (!ID.test(id)) return NextResponse.json({ error: "That isn't a Google Doc link" }, { status: 400 });
   try {
-    const res = await fetch(`https://docs.google.com/document/d/${id}/export?format=html`, {
+    const res = await fetch(`https://docs.google.com/document/d/${id}/export?format=html${tab ? "&tab=" + tab : ""}`, {
       redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(15_000),
       headers: { "user-agent": "Mozilla/5.0 (compatible; TheBreak/1.0)" },
     });
@@ -45,7 +49,7 @@ export async function GET(req: Request) {
     if (!res.ok) return NextResponse.json({ error: `Google said ${res.status}` }, { status: 502 });
     const html = await res.text();
     if (html.length > MAX) return NextResponse.json({ error: "That Doc is too big to read as a flow" }, { status: 413 });
-    return NextResponse.json({ id, html }, { headers: { "cache-control": "no-store" } });
+    return NextResponse.json({ id, tab, html }, { headers: { "cache-control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ error: "Couldn't reach Google Docs: " + ((e as Error).message || "timed out") }, { status: 502 });
   }
