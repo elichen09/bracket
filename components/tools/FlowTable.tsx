@@ -94,22 +94,32 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
   mergedRef.current = merged;
   const busy = useRef(false);
   const timer = useRef(0);
+  // what each row was last written as: the same thing is never written twice (if the Doc reads it back
+  // differently, writing it again would only add it again)
+  const sent = useRef(new Map<string, string>());
+  const [stuck, setStuck] = useState(0);
   const flush = async () => {
     if (!writer) return;
     if (busy.current) { clearTimeout(timer.current); timer.current = window.setTimeout(() => void flush(), 700); return; }
     // an argument still being typed waits until you leave its row
     const here = (document.activeElement as HTMLElement | null)?.closest?.("tr")?.getAttribute("data-addkey");
     const writes: SectionWrite[] = [];
+    const marks: [string, string][] = [];
+    let held = 0;
+    const fresh = (key: string, value: string) => { if (sent.current.get(key) === value) { held++; return false; } marks.push([key, value]); return true; };
     mergedRef.current.forEach((s, si) => {
-      const rows = s.rows.filter((r) => r.added < 0 && r.mine).map((r) => ({ arg: r.arg, responses: r.responses.map((x) => x.trim()).filter(Boolean) }));
+      const rows = s.rows.filter((r) => r.added < 0 && r.mine).map((r) => ({ arg: r.arg, responses: r.responses.map((x) => x.trim()).filter(Boolean) }))
+        .filter((r) => fresh(s.k + "|" + r.arg, JSON.stringify(r.responses)));
       const added = s.rows.filter((r) => r.added >= 0 && r.arg.trim() && here !== s.k + ":" + r.added)
-        .map((r) => ({ arg: r.arg.trim(), responses: r.responses.map((x) => x.trim()).filter(Boolean) }));
+        .map((r) => ({ arg: r.arg.trim(), responses: r.responses.map((x) => x.trim()).filter(Boolean) }))
+        .filter((a) => fresh(s.k + "|+" + a.arg, JSON.stringify(a.responses)));
       if (rows.length || added.length) writes.push({ si, rows, added });
     });
+    setStuck(held);
     if (!writes.length) return;
     busy.current = true;
     setSaving("saving");
-    try { await writer(writes); setSaving(""); }
+    try { await writer(writes); marks.forEach(([k, v]) => sent.current.set(k, v)); setSaving(""); }
     catch (e) { setSaving("error"); toast((e as Error).message || "Couldn't write to the Doc"); }
     // what wasn't written stays marked, and goes in once Google is connected again
     finally { busy.current = false; }
@@ -154,7 +164,9 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     <div className="rm-ft" ref={box} onBlur={() => later(250)}>
       <div className="rm-ftbar">
         <span className={saving === "error" ? "bad" : ""}>{writer
-          ? (saving === "saving" ? "Writing into the Doc…" : saving === "error" ? "Couldn't write it — it'll try again" : pending ? `${pending} change${pending === 1 ? "" : "s"} going into the Doc…` : "Saved in the Doc")
+          ? (saving === "saving" ? "Writing into the Doc…" : saving === "error" ? "Couldn't write it — it'll try again"
+            : stuck && stuck >= pending ? `Written — but the Doc shows ${stuck === 1 ? "a row" : stuck + " rows"} differently; change ${stuck === 1 ? "it" : "them"} here to write again`
+            : pending ? `${pending} change${pending === 1 ? "" : "s"} going into the Doc…` : "Saved in the Doc")
           : (pending ? `${pending} change${pending === 1 ? "" : "s"} not in the Doc yet` : "Everything here is in the Doc")}</span>
         <span className="rm-grow" />
         <button type="button" className={"rm-pbtn" + (pending && !writer ? " acc" : "")} onClick={() => void copy()} title="The flow as the Doc's numbered and lettered lists — paste it over the flow tab (click in it, Ctrl+A, Ctrl+V)">COPY FOR DOCS</button>

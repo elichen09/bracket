@@ -218,10 +218,21 @@ export function rowRequests(w: RowWrite, tabId: string, bodyEnd: number): any[] 
   }
   if (text) {
     reqs.push({ insertText: { location: { index: P, tabId }, text } });
-    // from the last group back, so a tab taken out of one doesn't move the next
+    // From the last group back, so a tab taken out of one doesn't move the next. The new lines come in
+    // as items of the argument's numbered list (they take the paragraph they were typed into after) —
+    // and Google won't re-bullet a line that's already in a list, so: out of the list first, then a
+    // lettered list one level in (the leading tab says the level, and is taken out), then the indent
+    // a second level has, set outright so nothing left over from the first list pushes it about.
     for (const g of [...groups].reverse()) {
+      const lines = (text.slice(g.from, g.to).match(/\t/g) || []).length;
       reqs.push({ updateTextStyle: { range: range(P + g.from, P + g.to), textStyle: { foregroundColor: BLACK }, fields: "foregroundColor" } });
+      reqs.push({ deleteParagraphBullets: { range: range(P + g.from, P + g.to) } });
       reqs.push({ createParagraphBullets: { range: range(P + g.from, P + g.to), bulletPreset: "NUMBERED_DECIMAL_ALPHA_ROMAN" } });
+      reqs.push({ updateParagraphStyle: {
+        range: range(P + g.from, P + g.to - lines),
+        paragraphStyle: { indentStart: { magnitude: 72, unit: "PT" }, indentFirstLine: { magnitude: 54, unit: "PT" } },
+        fields: "indentStart,indentFirstLine",
+      } });
     }
   }
   if (leftover) {
