@@ -325,6 +325,35 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [gfLink, setGfLink] = useState("");
   const [gfOn, setGfOn] = useState(false);
   const [gfShow, setGfShow] = useState(true);
+  // the flow panel's place and size on the screen
+  const [gfPos, setGfPos] = useState({ x: 0, y: 0, w: 380, h: 460 });
+  const gfPosRef = useRef(gfPos);
+  gfPosRef.current = gfPos;
+  const fitGf = (p: { x: number; y: number; w: number; h: number }) => {
+    const W = window.innerWidth, H = window.innerHeight;
+    const w = Math.min(Math.max(240, p.w), W - 16), h = Math.min(Math.max(160, p.h), H - 16);
+    return { w, h, x: Math.min(Math.max(8, p.x), W - w - 8), y: Math.min(Math.max(8, p.y), H - h - 8) };
+  };
+  // first time open: at the right, under the ribbon
+  useEffect(() => { if (gfOn && gfPos.x === 0 && gfPos.y === 0) setGfPos(fitGf({ x: window.innerWidth - 400, y: 150, w: 380, h: 460 })); }, [gfOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const gfDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const el = e.currentTarget, sx = e.clientX, sy = e.clientY, p0 = gfPosRef.current;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => setGfPos(fitGf({ ...p0, x: p0.x + ev.clientX - sx, y: p0.y + ev.clientY - sy }));
+    const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  };
+  const gfResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const el = e.currentTarget, sx = e.clientX, sy = e.clientY, p0 = gfPosRef.current;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => setGfPos(fitGf({ ...p0, w: p0.w + ev.clientX - sx, h: p0.h + ev.clientY - sy }));
+    const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  };
   // the Doc itself, to write in (Google's editor, framed) — or read: formatted, a line clicked looks for it in the library
   const [gf, setGf] = useState<{ items: FlowItem[]; html: string; at: number; err: string; fresh: Set<string> } | null>(null);
   const [cmdSel, setCmdSel] = useState(0);
@@ -431,6 +460,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (typeof u.speechW === "number") setSpeechW(Math.min(.75, Math.max(.25, u.speechW)));
         if (typeof u.speechH === "number") setSpeechH(Math.min(.75, Math.max(.25, u.speechH)));
         if (typeof u.gfLink === "string") setGfLink(u.gfLink);
+        if (u.gfPos && typeof u.gfPos.x === "number") setGfPos(fitGf(u.gfPos));
+        else setGfPos(fitGf({ x: window.innerWidth - 400, y: 120, w: 380, h: 460 }));
         // open when the page was left: open again
         if (u.gfOn === true && typeof u.gfLink === "string" && u.gfLink) setGfOn(true);
         if (typeof u.wpm === "number") setWpm(u.wpm);
@@ -467,8 +498,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [palette, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink, gfOn })); } catch { /* private */ }
-  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, gfOn, UI_KEY, uiReady]);
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink, gfOn, gfPos })); } catch { /* private */ }
+  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, gfOn, gfPos, UI_KEY, uiReady]);
   // the site's nav steps aside in Focus (magic.css), set on <html> so it can
   useEffect(() => {
     if (!uiReady) return;
@@ -1700,16 +1731,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       toast("Connected to Google — what you write in the table goes into the Doc");
     } catch (e) { toast((e as Error).message); }
   };
-  // the one-click check of how Google really takes list writes, and whether tabs can be made
-  const [gCheck, setGCheck] = useState<{ busy: boolean; report: string; url: string } | null>(null);
-  const runCheck = async () => {
-    setGCheck({ busy: true, report: "", url: "" });
-    try {
-      const { runDocsCheck } = await import("@/lib/gdocsProbe");
-      const r = await runDocsCheck();
-      setGCheck({ busy: false, report: r.report, url: r.docUrl });
-    } catch (e) { setGCheck({ busy: false, report: "ERROR " + (e as Error).message, url: "" }); }
-  };
   // the speech doc into your partner's Google Doc: a "speech doc" tab, and "(rhetoric speech doc)" inside it, verbatimised
   const [gSending, setGSending] = useState(false);
   const sendToGoogle = async () => {
@@ -1795,7 +1816,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const gfWatch = () => {
     if (!gfLink.trim()) { toast("Paste the link to your partner's Google Doc first"); return; }
     setGf(null); setApiFlow(null); setGfOn(true); setGfShow(true);
-    if (modeRef.current !== "split") setMode("split");
     toast(gConn ? "Your partner's flow — what you write in the table goes into the Doc" : "Your partner's flow as tables — Connect Google to write into the Doc");
   };
   // a line of their flow, clicked: the library searched for it
@@ -2372,7 +2392,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "") + (gfOn && gfShow ? " gflow-on" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
+    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
@@ -2598,35 +2618,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <input value={gfLink} onChange={(e) => { setGfLink(e.target.value); if (gfOn) setGfOn(false); }} placeholder="Link to their Google Doc" spellCheck={false} aria-label="Your partner's Google Doc" />
                 <button type="submit" disabled={!gfLink.trim()}>{gfOn ? "↻" : "OPEN"}</button>
               </form>
-              <div className="rm-gconn">
-                {gConn ? (
-                  <><span className="dot live" /> <span>Google connected — the table writes into the Doc</span>
-                    <button type="button" className="rm-linkbtn" onClick={gDisconnect}>DISCONNECT</button>
-</>
-                ) : (
-                  <button type="button" className="rm-gbtn" onClick={() => void gConnect()} title="Sign in with Google so what you write in the table goes into the Doc by itself">
-                    <svg width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6c1.9-5.6 7.1-9.8 13.6-9.8z" /><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z" /><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.8-6z" /><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.5 0-11.7-4.2-13.6-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z" /></svg>
-                    {gExpired ? "RECONNECT GOOGLE" : "CONNECT GOOGLE"}
-                  </button>
-                )}
-              </div>
-              <button type="button" className="rm-gbtn rm-gcheckbtn" disabled={!!gCheck?.busy} onClick={() => void (gConn ? runCheck() : gConnect().then(() => { if (hasToken()) void runCheck(); }))}
-                title="Makes a scratch Doc in your Drive, tries each way of writing a lettered response, and shows what Google did">
-                {gCheck?.busy ? "CHECKING… (about 20 seconds)" : "GOOGLE DOCS CHECK"}
-              </button>
-              {gCheck && !gCheck.busy && (
-                <div className="rm-gcheck">
-                  <textarea readOnly value={gCheck.report} onFocus={(e) => e.currentTarget.select()} />
-                  <div>
-                    <button type="button" className="rm-linkbtn" onClick={() => { void navigator.clipboard.writeText(gCheck.report); toast("Copied — paste it to Claude"); }}>COPY RESULT</button>
-                    {gCheck.url && <a className="rm-linkbtn" href={gCheck.url} target="_blank" rel="noreferrer">OPEN THE SCRATCH DOC ↗</a>}
-                    <button type="button" className="rm-linkbtn" onClick={() => setGCheck(null)}>CLOSE</button>
-                  </div>
-                </div>
+              {!gConn && (
+                <button type="button" className="rm-gbtn rm-gcheckbtn" onClick={() => void gConnect()} title="Sign in with Google so what you write in the flow goes into the Doc by itself">
+                  <svg width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6c1.9-5.6 7.1-9.8 13.6-9.8z" /><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z" /><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.8-6z" /><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.5 0-11.7-4.2-13.6-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z" /></svg>
+                  {gExpired ? "RECONNECT GOOGLE" : "CONNECT GOOGLE"}
+                </button>
               )}
               {gfOn ? (
                 <p className="rm-sempty">
-                  {gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>{gConn ? "Live" : "Read only"} · read {gfSince}s ago</> : "Reading it…"}
+                  {gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>Open in its own panel</> : "Reading it…"}
                   {" "}<button type="button" className="rm-linkbtn" onClick={() => setGfShow((s) => !s)}>{gfShow ? "HIDE" : "SHOW"}</button>
                   <button type="button" className="rm-linkbtn" onClick={() => { setGfOn(false); setGf(null); }}>CLOSE</button>
                 </p>
@@ -2783,24 +2783,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               })}
             </div>
 
-            {gfOn && gfShow && mode === "split" && (
-              <section className="rm-pane rm-gflow" aria-label="Your partner's flow">
-                <div className="rm-phead">
-                  <span className="rm-acc">PARTNER&apos;S FLOW</span>
-                  {<span className="rm-pmeta">{gf?.err ? "" : gf ? `${gf.items.length} LINES · ${gfSince ?? 0}S AGO` : "READING…"}</span>}
-                  <span className="rm-grow" />
-                  <a className="rm-pbtn" href={`https://docs.google.com/document/d/${gdocId(gfLink)}/edit`} target="_blank" rel="noreferrer" title="Open it in Google Docs, in a new tab">DOCS ↗</a>
-                  <button type="button" className="rm-pbtn" onClick={() => setGfShow(false)} title="Back to your file (Round tab: SHOW brings the Doc back)">FILE</button>
-                  <button type="button" className="rm-pbtn sq" onClick={() => { setGfOn(false); setGf(null); }} aria-label="Close your partner's Doc" title="Close it">×</button>
-                </div>
-                <div className="rm-scroll">
-                  {gf?.err && <p className="rm-gferr">{gf.err}</p>}
-                  {!gf && <p className="rm-gferr" style={{ color: "#777" }}>Reading the Doc…</p>}
-                  {gConn && apiFlow && apiFlow.tabTitle.trim().toLowerCase() !== "flow" && <p className="rm-gferr" style={{ color: "#8a6100" }}>No tab called &ldquo;flow&rdquo; in this Doc — showing &ldquo;{apiFlow.tabTitle}&rdquo;.</p>}
-                  {(flowSections.length > 0 || (gf && !gf.err)) && <FlowTable sections={flowSections} docKey={gdocId(gfLink) + (gfTab ? ":" + gfTab : "")} owner={owner} onLook={lookFor} toast={toast} writer={gConn ? gWrite : undefined} />}
-                </div>
-              </section>
-            )}
             {layoutMode === "twin" && (
               <section className="rm-pane rm-twin" aria-label="The speech doc, a second look">
                 <div className="rm-phead">
@@ -3095,6 +3077,25 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
 
+      {/* your partner's flow: a small panel that floats over everything — drag its top to move it, its corner to size it */}
+      {gfOn && gfShow && (
+        <div className="rm-gfpop" style={{ left: gfPos.x, top: gfPos.y, width: gfPos.w, height: gfPos.h }} role="dialog" aria-label="Your partner's flow">
+          <div className="rm-gfbar" onPointerDown={gfDrag}>
+            <b>FLOW</b>
+            <span className={"dot" + (gConn ? " live" : "")} title={gConn ? "Connected to Google — what you write goes into the Doc" : "Read only — Connect Google in the Round tab to write into the Doc"} />
+            <span className="t">{gf?.err ? <span className="bad">{gf.err}</span> : gf ? `${gfSince ?? 0}s` : "…"}</span>
+            <span className="rm-grow" />
+            <a href={`https://docs.google.com/document/d/${gdocId(gfLink)}/edit`} target="_blank" rel="noreferrer" title="Open the Doc in Google Docs" onPointerDown={(e) => e.stopPropagation()}>↗</a>
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGfShow(false)} title="Hide (Round tab: SHOW brings it back)" aria-label="Hide the flow">–</button>
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => { setGfOn(false); setGf(null); }} title="Close it" aria-label="Close the flow">×</button>
+          </div>
+          <div className="rm-gfbody">
+            {!gf && <p className="rm-gferr" style={{ color: "#777" }}>Reading the Doc…</p>}
+            {(flowSections.length > 0 || (gf && !gf.err)) && <FlowTable compact sections={flowSections} docKey={gdocId(gfLink) + (gfTab ? ":" + gfTab : "")} owner={owner} onLook={lookFor} toast={toast} writer={gConn ? gWrite : undefined} />}
+          </div>
+          <div className="rm-gfsize" onPointerDown={gfResize} aria-hidden="true" />
+        </div>
+      )}
       {toastMsg && <div className="rm-toast" key={toastMsg.n} role="status">{toastMsg.t}</div>}
 
       {/* the library's own dialogs, its toast, and where it builds what it copies */}

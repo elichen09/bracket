@@ -214,6 +214,17 @@ export function rowRequests(w: RowWrite, tabId: string, bodyEnd: number): any[] 
   const reqs: any[] = [];
   const { row } = w;
   const range = (a: number, b: number) => ({ startIndex: a, endIndex: b, tabId });
+  // The gentle way, whenever it can be: the row has responses already, so the new ones are typed in
+  // straight after them — new lines take the paragraph they follow, list, level, indent and all — and
+  // then the old ones are deleted. No list is made or re-made, so nothing else in the Doc changes.
+  const kept = w.responses.map((x) => x.trim()).filter(Boolean);
+  if (row.respStart !== null && row.respEnd !== null && kept.length && !w.add.some((a) => a.arg.trim())) {
+    const P2 = row.respEnd - 1, text = "\n" + kept.join("\n");
+    reqs.push({ insertText: { location: { index: P2, tabId }, text } });
+    reqs.push({ updateTextStyle: { range: range(P2 + 1, P2 + text.length), textStyle: { foregroundColor: RED }, fields: "foregroundColor" } });
+    reqs.push({ deleteContentRange: { range: range(row.respStart, row.respEnd) } });
+    return reqs;
+  }
   let removed = 0, leftover = false;
   if (row.respStart !== null && row.respEnd !== null) {
     // the last newline of the tab can't be deleted: leave that paragraph, empty, and take its bullet off after

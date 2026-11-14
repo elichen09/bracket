@@ -31,8 +31,8 @@ const linesOf = (v: string) => v.split("\n");
 /** What has changed in one part, to be written into the Doc. */
 export interface SectionWrite { si: number; rows: { arg: string; responses: string[] }[]; added: { arg: string; responses: string[] }[] }
 
-export default function FlowTable({ sections, docKey, owner, onLook, toast, writer }: {
-  sections: FlowSection[]; docKey: string; owner?: string | null; onLook: (text: string) => void; toast: (s: string) => void;
+export default function FlowTable({ sections, docKey, owner, onLook, toast, writer, compact }: {
+  sections: FlowSection[]; compact?: boolean; docKey: string; owner?: string | null; onLook: (text: string) => void; toast: (s: string) => void;
   /** connected to Google: what you write goes into the Doc by itself */
   writer?: (w: SectionWrite[]) => Promise<void>;
 }) {
@@ -162,7 +162,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
   if (!sections.length) return <p className="rm-gferr">No numbered lists in the flow tab yet.</p>;
 
   return (
-    <div className="rm-ft" ref={box} onBlur={() => later(250)}>
+    <div className={"rm-ft" + (compact ? " compact" : "")} ref={box} onBlur={() => later(250)}>
       <div className="rm-ftbar">
         <span className={saving === "error" ? "bad" : ""}>{writer
           ? (saving === "saving" ? "Writing into the Doc…" : saving === "error" ? "Couldn't write it — it'll try again"
@@ -177,7 +177,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
           {s.title && <h3>{s.title}</h3>}
           <table>
             <colgroup><col className="n" /><col className="a" /><col className="r" /></colgroup>
-            <thead><tr><th>#</th><th>Argument</th><th>Responses</th></tr></thead>
+            {!compact && <thead><tr><th>#</th><th>Argument</th><th>Responses</th></tr></thead>}
             <tbody>
               {s.rows.map((r, ri) => (
                 <tr key={ri} className={r.mine ? "mine" : ""} data-arg={r.added < 0 ? r.arg : undefined} data-addkey={r.added >= 0 ? s.k + ":" + r.added : undefined}>
