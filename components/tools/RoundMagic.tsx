@@ -28,7 +28,7 @@ import { placePlugin, placeCard } from "@/lib/cutter/place";
 import { gripPlugin } from "@/lib/cutter/grips";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { RM_PALETTE_KEY } from "@/lib/toolTheme";
-import { parseFlow, docView, LINE_SEL, lineText, type FlowItem } from "@/lib/gflow";
+import { parseFlow, docView, gdocId, LINE_SEL, lineText, type FlowItem } from "@/lib/gflow";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
@@ -333,6 +333,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [gfLink, setGfLink] = useState("");
   const [gfOn, setGfOn] = useState(false);
   const [gfShow, setGfShow] = useState(true);
+  // the Doc itself, to write in (Google's editor, framed) — or read: formatted, a line clicked looks for it in the library
+  const [gfView, setGfView] = useState<"edit" | "read">("edit");
   const [gf, setGf] = useState<{ items: FlowItem[]; html: string; at: number; err: string; fresh: Set<string> } | null>(null);
   const [cmdSel, setCmdSel] = useState(0);
   const focusLayout = layoutMode === "focus";
@@ -438,6 +440,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (typeof u.speechW === "number") setSpeechW(Math.min(.75, Math.max(.25, u.speechW)));
         if (typeof u.speechH === "number") setSpeechH(Math.min(.75, Math.max(.25, u.speechH)));
         if (typeof u.gfLink === "string") setGfLink(u.gfLink);
+        if (u.gfView === "read" || u.gfView === "edit") setGfView(u.gfView);
         if (typeof u.wpm === "number") setWpm(u.wpm);
         if (typeof u.hideDim === "boolean") setHideDim(u.hideDim);
         if (typeof u.speechOutline === "boolean") setSpeechOutline(u.speechOutline);
@@ -472,8 +475,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [palette, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink })); } catch { /* private */ }
-  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, UI_KEY, uiReady]);
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink, gfView })); } catch { /* private */ }
+  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, gfView, UI_KEY, uiReady]);
   // the site's nav steps aside in Focus (magic.css), set on <html> so it can
   useEffect(() => {
     if (!uiReady) return;
@@ -1686,7 +1689,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // ---- your partner's flow, from a Google Doc -----------------------------------------------------------
   // Read every few seconds while it is watched and this tab is in front; the same HTML twice is not read again.
   useEffect(() => {
-    if (!gfOn || !gfLink.trim()) return;
+    // only the read view reads it: in the editor, Google keeps it live itself
+    if (!gfOn || !gfLink.trim() || gfView !== "read") return;
     let stop = false, busy = false, last = "", prev = new Set<string>(), first = true;
     const pull = async () => {
       if (busy || stop || document.visibilityState !== "visible") return;
@@ -1713,12 +1717,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const vis = () => { if (document.visibilityState === "visible") void pull(); };
     document.addEventListener("visibilitychange", vis);
     return () => { stop = true; clearInterval(iv); document.removeEventListener("visibilitychange", vis); };
-  }, [gfOn, gfLink]);
+  }, [gfOn, gfLink, gfView]);
   const gfWatch = () => {
     if (!gfLink.trim()) { toast("Paste the link to your partner's Google Doc first"); return; }
     setGf(null); setGfOn(true); setGfShow(true);
     if (modeRef.current !== "split") setMode("split");
-    toast("Watching your partner's flow — click a line to look for it in the library");
+    toast(gfView === "edit" ? "Your partner's Doc, beside the speech doc — write in it as in Google Docs" : "Reading your partner's flow — click a line to look for it in the library");
   };
   // a line of their flow, clicked: the library searched for it
   const lookFor = (text: string) => {
@@ -2557,15 +2561,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               <div className="rm-cap">PARTNER&apos;S FLOW · GOOGLE DOC</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); gfWatch(); }}>
                 <input value={gfLink} onChange={(e) => { setGfLink(e.target.value); if (gfOn) setGfOn(false); }} placeholder="Link to their Google Doc" spellCheck={false} aria-label="Your partner's Google Doc" />
-                <button type="submit" disabled={!gfLink.trim()}>{gfOn ? "↻" : "WATCH"}</button>
+                <button type="submit" disabled={!gfLink.trim()}>{gfOn ? "↻" : "OPEN"}</button>
               </form>
               {gfOn ? (
                 <p className="rm-sempty">
-                  {gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>Watching · {gf.items.length} lines · read {gfSince}s ago</> : "Reading it…"}
+                  {gfView === "edit" ? <>Open beside the speech doc — editing in Google Docs</> : gf?.err ? <span className="bad">{gf.err}</span> : gf ? <>Reading · {gf.items.length} lines · {gfSince}s ago</> : "Reading it…"}
                   {" "}<button type="button" className="rm-linkbtn" onClick={() => setGfShow((s) => !s)}>{gfShow ? "HIDE" : "SHOW"}</button>
-                  <button type="button" className="rm-linkbtn" onClick={() => { setGfOn(false); setGf(null); }}>STOP</button>
+                  <button type="button" className="rm-linkbtn" onClick={() => { setGfOn(false); setGf(null); }}>CLOSE</button>
                 </p>
-              ) : <p className="rm-sempty">In the Doc: Share › General access › <b>Anyone with the link</b> (Viewer). It&apos;s read every few seconds; click a line to look for it in the library.</p>}
+              ) : <p className="rm-sempty">Opens the Doc itself beside your speech doc, to write in with your partner. You can edit it if you&apos;re signed into Google with access to it — or if it&apos;s shared <b>Anyone with the link</b> as <b>Editor</b>.</p>}
             </div>
             <div className="rm-rsec">
               <div className="rm-cap">SPEECHDROP</div>
@@ -2720,12 +2724,21 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               <section className="rm-pane rm-gflow" aria-label="Your partner's flow">
                 <div className="rm-phead">
                   <span className="rm-acc">PARTNER&apos;S FLOW</span>
-                  <span className="rm-pmeta">{gf?.err ? "" : gf ? `${gf.items.length} LINES · ${gfSince ?? 0}S AGO` : "READING…"}</span>
+                  <div className="rm-pmode" role="group" aria-label="Show the Doc">
+                    <button type="button" aria-pressed={gfView === "edit"} onClick={() => setGfView("edit")} title="The Doc itself, in Google's editor — write in it with your partner">EDIT</button>
+                    <button type="button" aria-pressed={gfView === "read"} onClick={() => setGfView("read")} title="Read it formatted; click a line to look for it in the library">READ</button>
+                  </div>
+                  {gfView === "read" && <span className="rm-pmeta">{gf?.err ? "" : gf ? `${gf.items.length} LINES · ${gfSince ?? 0}S AGO` : "READING…"}</span>}
                   <span className="rm-grow" />
-                  <button type="button" className="rm-pbtn" onClick={() => setGfShow(false)} title="Back to your file — the flow keeps being read (Round tab: SHOW)">FILE</button>
-                  <button type="button" className="rm-pbtn sq" onClick={() => { setGfOn(false); setGf(null); }} aria-label="Stop watching the flow" title="Stop watching">×</button>
+                  <a className="rm-pbtn" href={`https://docs.google.com/document/d/${gdocId(gfLink)}/edit`} target="_blank" rel="noreferrer" title="Open it in Google Docs, in a new tab">DOCS ↗</a>
+                  <button type="button" className="rm-pbtn" onClick={() => setGfShow(false)} title="Back to your file (Round tab: SHOW brings the Doc back)">FILE</button>
+                  <button type="button" className="rm-pbtn sq" onClick={() => { setGfOn(false); setGf(null); }} aria-label="Close your partner's Doc" title="Close it">×</button>
                 </div>
-                <div className="rm-scroll">
+                {gfView === "edit" && (
+                  <iframe className="rm-gfedit" src={`https://docs.google.com/document/d/${gdocId(gfLink)}/edit`} title="Your partner's Google Doc"
+                    allow="clipboard-read; clipboard-write" referrerPolicy="no-referrer-when-downgrade" />
+                )}
+                <div className="rm-scroll" hidden={gfView === "edit"}>
                   {gf?.err && <p className="rm-gferr">{gf.err}</p>}
                   {gf && !gf.items.length && !gf.err && <p className="rm-gferr">Nothing in the Doc yet.</p>}
                   <div ref={gfHost} className="rm-gfdoc" />
