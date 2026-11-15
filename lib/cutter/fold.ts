@@ -84,7 +84,7 @@ function build(state: EditorState, all: boolean, flip: number[]): { deco: Decora
     if (folded) {
       if (hasBody) {
         const label = [c.cite, c.words ? c.words.toLocaleString() + " words" : ""].filter(Boolean).join(" · ") + " ▸";
-        decos.push(Decoration.widget(end, (v, g) => chip(v, g, label.replace(/ ▸$/, ""), false), { side: 1, key: "fold:" + c.pos + ":" + label, ignoreSelection: true, stopEvent: () => true }));
+        decos.push(Decoration.widget(end, (v, g) => chip(v, g, label.replace(/ ▸$/, ""), false), { side: 1, key: "fold:" + label, ignoreSelection: true, stopEvent: () => true }));
       }
       bodies.push([c.bodyFrom, c.bodyTo]);
       state.doc.nodesBetween(c.bodyFrom, c.bodyTo, (n, pos) => {
@@ -93,7 +93,7 @@ function build(state: EditorState, all: boolean, flip: number[]): { deco: Decora
         return false;
       });
     } else if (all && hasBody) {
-      decos.push(Decoration.widget(end, (v, g) => chip(v, g, "", true), { side: 1, key: "unfold:" + c.pos, ignoreSelection: true, stopEvent: () => true }));
+      decos.push(Decoration.widget(end, (v, g) => chip(v, g, "", true), { side: 1, key: "unfold", ignoreSelection: true, stopEvent: () => true }));
     }
   }
   return { deco: DecorationSet.create(state.doc, decos), bodies };

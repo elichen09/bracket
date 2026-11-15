@@ -579,8 +579,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       out = [];
       let cards = 0;
       doc.forEach((n, pos) => { if (n.type === schema.nodes.heading) { out.push({ level: n.attrs.level, text: n.textContent.trim() || "(empty)", pos }); if (n.attrs.level === 4) cards++; } });
+      // the outline draws again only when a heading itself changed — not for every letter typed in a
+      // card, which only moves where the headings sit (read fresh from headsFor when one is clicked)
+      const was = headsFor.current.heads;
       headsFor.current = { doc, heads: out };
-      setHeads(out);
+      if (out.length !== was.length || out.some((h, k) => h.level !== was[k].level || h.text !== was[k].text)) setHeads(out);
       setDocStat((d) => (d.cards === cards ? d : { ...d, cards }));
       if (wordsT.current) clearTimeout(wordsT.current);
       wordsT.current = setTimeout(() => { const w = target(); if (w) { const read = readWords(w.state.doc); setDocStat((d) => (d.read === read ? d : { ...d, read })); } }, 400);
@@ -2047,13 +2050,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // ---- dragging in the outline ---------------------------------------------------
   const [drag, setDrag] = useState<number | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
+  /** Where heading i is now: the outline's list keeps the headings, not where typing has pushed them. */
+  const headPos = (i: number) => headsFor.current.heads[i]?.pos ?? heads[i]?.pos;
   const dropTarget = (from: number, i: number): number | null => {
     const v = target();
     if (!v) return null;
     const secs = C.sections(v.state.doc);
-    const me = secs.find((s) => s.pos === heads[from]?.pos);
+    const me = secs.find((s) => s.pos === headPos(from));
     if (!me) return null;
-    const t = i < heads.length ? heads[i].pos : v.state.doc.content.size;
+    const t = i < heads.length ? headPos(i) : v.state.doc.content.size;
     return t >= me.pos && t <= me.end ? null : t;
   };
   const onRowDrag = (e: React.DragEvent, i: number) => {
@@ -2069,7 +2074,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const v = target();
     if (v && drag !== null && dropAt !== null) {
       const t = dropTarget(drag, dropAt);
-      const tr = t === null ? null : C.moveSection(v.state, heads[drag].pos, t);
+      const tr = t === null ? null : C.moveSection(v.state, headPos(drag), t);
       if (tr) {
         v.dispatch(tr);
         const pos = v.state.selection.$from.before(1);
@@ -2489,7 +2494,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   style={{ ["--d" as string]: h.level - olTop }}
                   title={h.text}
                   aria-expanded={kids && !olQ ? open : undefined}
-                  onClick={() => { const v = target(); if (v) goPos(v, h.pos); }}
+                  onClick={() => { const v = target(); if (v) goPos(v, headPos(i)); }}
                   onDoubleClick={() => { if (kids) olToggle(key, open); }}
                   onKeyDown={(e) => {
                     if (!kids || olQ) return;

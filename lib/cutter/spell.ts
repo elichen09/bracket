@@ -2,6 +2,7 @@ import { Plugin, PluginKey } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { Node as PMNode } from "prosemirror-model";
 import { schema } from "../evidence/docSchema";
+import { touchesHeadings } from "./touches";
 
 /**
  * Spelling, by the browser's own checker: the red underline, right-click for
@@ -45,7 +46,9 @@ export function spellPlugin(start: SpellMode) {
         const m = tr.getMeta(spellKey) as SpellMode | undefined;
         const mode = m || prev.mode;
         if (mode !== "writing") return mode === prev.mode && prev.deco === DecorationSet.empty ? prev : { mode, deco: DecorationSet.empty };
-        if (mode !== prev.mode || tr.docChanged) return { mode, deco: cardText(state.doc) };
+        if (mode !== prev.mode) return { mode, deco: cardText(state.doc) };
+        // which paragraphs are a card's changes only when a heading does, or a paragraph comes or goes
+        if (tr.docChanged) return { mode, deco: touchesHeadings(tr) ? cardText(state.doc) : prev.deco.map(tr.mapping, tr.doc) };
         return prev;
       },
     },

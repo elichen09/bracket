@@ -2,6 +2,7 @@ import { Plugin, PluginKey, TextSelection, type EditorState } from "prosemirror-
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
 import { schema } from "../evidence/docSchema";
 import { sections, moveSection } from "./commands";
+import { touchesHeadings } from "./touches";
 
 /**
  * A handle beside every heading, to drag the card (or block, or hat) and
@@ -28,7 +29,7 @@ function grips(state: EditorState, lift: Grips["lift"]): DecorationSet {
   state.doc.forEach((n, pos) => {
     if (n.type !== schema.nodes.heading || !n.textContent.trim()) return;
     decos.push(Decoration.widget(pos + 1, (view, getPos) => handle(view, getPos), {
-      side: -1, key: "grip:" + pos + ":" + n.attrs.level, ignoreSelection: true, stopEvent: () => true,
+      side: -1, key: "grip:" + n.attrs.level, ignoreSelection: true, stopEvent: () => true,
     }));
   });
   return DecorationSet.create(state.doc, decos);
@@ -149,6 +150,8 @@ export function gripPlugin() {
       apply(tr, prev, _old, state) {
         const m = tr.getMeta(gripKey);
         if (m === undefined && !tr.docChanged) return prev;
+        // typing in a card: the handles only move with it
+        if (m === undefined && !prev.lift && !touchesHeadings(tr)) return { set: prev.set.map(tr.mapping, tr.doc), lift: null };
         const lift = m === undefined ? prev.lift : m;
         return { set: grips(state, lift), lift };
       },
