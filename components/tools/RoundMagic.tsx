@@ -1178,14 +1178,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     await keepDoc(owner, d);
     void refreshTheirs();
     loaded.current.delete(THEIRS + d.id);
+    // just their doc, in whatever view you had — the speech doc opens only when you open it (SPLIT)
     await open(THEIRS + d.id, (v) => { v.focus(); v.dispatch(v.state.tr.setSelection(TextSelection.atStart(v.state.doc))); });
-    // their doc: the speech doc goes beside it
-    if (d.kind !== "pdf" && modeRef.current !== "split") {
-      modeRef.current = "split"; setModeState("split"); inSpeech.current = false;
-      requestAnimationFrame(() => (window as any).EV?.renderDoc?.());
-      toast("Their doc beside your speech doc");
-    }
-  }, [owner, refreshTheirs, open, toast]);
+  }, [owner, refreshTheirs, open]);
 
   const forgetTheirs = useCallback(async (m: ViewMeta) => {
     const fid = THEIRS + m.id;
