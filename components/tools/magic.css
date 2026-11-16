@@ -1311,3 +1311,8 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 /* the Round tab scrolls: SpeechDrop, the partner's flow and every doc of theirs, however many */
 .rm-tabpane.tp-round { overflow-y: auto; scrollbar-color: var(--well-b) transparent; }
 .rm-tabpane.tp-round > .rm-rsec { flex-shrink: 0; }
+
+/* a pocket in the search is a file: its name opens it, its arrow (a bigger target than it looks) folds it */
+.rm-side .evi.rm-evsearch .node.lv1 > .chev::after { content: ""; position: absolute; inset: -8px -6px -8px -8px; }
+.rm-side .evi.rm-evsearch .node.lv1 > .nlabel { cursor: pointer; }
+.rm-side .evi.rm-evsearch .node.lv1:not([data-grp="Uncategorised"]):hover > .nlabel { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
