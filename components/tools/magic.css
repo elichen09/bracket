@@ -1325,6 +1325,9 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm-slash-row.card { padding-left: 24px; }
 .rm-slash-row.all b { font-weight: 700; }
 .rm-slash-open { display: inline-block; width: 12px; color: var(--mut); font-weight: 400; }
+.rm-slash-tick { display: inline-block; width: 11px; height: 11px; margin: 0 8px -1px 0; border: 1px solid var(--mut); vertical-align: baseline; cursor: pointer; position: relative; }
+.rm-slash-tick::after { content: ""; position: absolute; inset: -6px -8px -6px -6px; }
+.rm-slash-tick.on { background: var(--acc); border-color: var(--acc); box-shadow: inset 0 0 0 2px var(--pop); }
 .rm-slash-row.card b { font-weight: 400; font-size: 12.5px; }
 .rm-slash-row.on { background: var(--pop-h); box-shadow: inset 2px 0 0 var(--acc); }
 .rm-slash-note { padding: 8px 9px; font-size: 12.5px; color: var(--mut); }

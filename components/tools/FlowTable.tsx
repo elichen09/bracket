@@ -411,7 +411,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                           setArg(v);
                           // an argument of yours from the library: the card's tag (a block: its name)
                           slashCheck(e.target, v, "a:" + s.k + ":" + r.added, (p) => {
-                            const a = p.ai === null ? p.title : p.tags[0];
+                            const a = p.ai === null || p.tags.length > 1 ? p.title : p.tags[0];
                             setArg(a);
                             toSpeech(p);
                             link(linkKey(s.k, "+", a), cardsOf(p));

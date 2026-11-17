@@ -6,7 +6,8 @@ import type { SlashAt } from "@/lib/cutter/slash";
 /**
  * The "/" menu, shared by the speech doc and the flow's cells. It lists blocks first; Enter on a block
  * opens it to its cards (its tags, the heading 4s), Enter on a card takes that card, and Shift+Enter
- * takes the whole block, from either list. Esc in a block's cards goes back to the blocks.
+ * takes the whole block, from either list. In a block's cards, Space ticks several and Enter takes them
+ * all. Esc in a block's cards goes back to the blocks.
  */
 
 /** One block the words found. */
@@ -14,8 +15,9 @@ export interface SlashBlock { id: string; title: string; where: string; args: st
 
 /** One line of the menu: a block (to open), the whole block, or one card of it. */
 export interface SlashRow {
-  kind: "block" | "all" | "card";
-  id: string; ai: number | null; title: string; sub: string;
+  kind: "block" | "all" | "card" | "some";
+  /** which card: one, several (ticked), or null for the whole block */
+  id: string; ai: number | number[] | null; title: string; sub: string;
   /** the card tags it is: one, or all of a block's */
   tags: string[];
   /** which card of the block each tag is */
@@ -25,7 +27,7 @@ export interface SlashRow {
 }
 
 /** The menu as it stands: what was found, the block opened (if one is), the line marked. */
-export interface SlashMenu { blocks: SlashBlock[] | null; open: string | null; i: number }
+export interface SlashMenu { blocks: SlashBlock[] | null; open: string | null; i: number; ticked?: number[] }
 
 const tag = (a: string) => a.replace(/\s+/g, " ").trim();
 
@@ -63,19 +65,44 @@ export function slashFor(q: string, was: { q: string; menu: SlashMenu } | null):
   return { blocks: slashFind(q), open: null, i: 0 };
 }
 
+/** The ticked cards of the open block, as one pick — in the block's order. */
+function someOf(b: SlashBlock, ticked: number[]): SlashRow {
+  const ais = [...ticked].filter((ai) => ai < b.args.length).sort((x, y) => x - y);
+  const tags = ais.map((ai) => tag(b.args[ai]));
+  return { kind: "some", id: b.id, ai: ais, title: b.title || "Untitled block", sub: "", tags, ais, block: b.title };
+}
+/** A card of the open block ticked, or unticked (the whole-block line: all of them, or none). */
+export function slashTick(m: SlashMenu, i: number): SlashMenu {
+  const rows = slashRows(m);
+  const r = rows?.[i];
+  const b = m.blocks?.find((x) => x.id === m.open);
+  if (!r || !b) return m;
+  const now = new Set(m.ticked || []);
+  if (r.kind === "all") return { ...m, i, ticked: now.size === b.args.length ? [] : b.args.map((_, ai) => ai) };
+  if (r.kind !== "card" || typeof r.ai !== "number") return m;
+  if (now.has(r.ai)) now.delete(r.ai); else now.add(r.ai);
+  return { ...m, i, ticked: [...now] };
+}
+
 type Step = { menu?: SlashMenu; pick?: SlashRow };
 
 /** A row chosen (Enter, or a click): a block opens to its cards; a card, or the whole, is taken. Shift: the whole block. */
-export function slashChoose(m: SlashMenu, i: number, whole: boolean): Step {
+export function slashChoose(m: SlashMenu, i: number, whole: boolean, withThis = false): Step {
   const rows = slashRows(m);
   const r = rows?.[Math.min(i, (rows?.length || 1) - 1)];
   if (!r || !m.blocks) return {};
   const b = m.blocks.find((x) => x.id === r.id);
   if (whole) return { pick: b ? wholeOf(b, "all") : r };
+  // cards ticked: those (a click on a card adds it to them)
+  if (b && m.open && m.ticked?.length && r.kind !== "all") {
+    const t = new Set(m.ticked);
+    if (withThis && r.kind === "card" && typeof r.ai === "number") t.add(r.ai);
+    return { pick: someOf(b, [...t]) };
+  }
   if (r.kind !== "block") return { pick: r };
   if (!b || !b.args.length) return { pick: r };
   // its cards, the first one the words found marked
-  return { menu: { ...m, open: b.id, i: 1 + (b.hits.find((h) => h < b.args.length) ?? 0) } };
+  return { menu: { ...m, open: b.id, ticked: [], i: 1 + (b.hits.find((h) => h < b.args.length) ?? 0) } };
 }
 
 /** A key while the menu is up: what it does, or null when the menu doesn't take it. */
@@ -84,9 +111,11 @@ export function slashStep(m: SlashMenu, e: { key: string; shiftKey: boolean; ctr
   if (e.key === "Escape" && m.open) {
     // back to the blocks, on the one that was open
     const at = (m.blocks || []).findIndex((x) => x.id === m.open);
-    return { menu: { ...m, open: null, i: Math.max(0, at) } };
+    return { menu: { ...m, open: null, ticked: [], i: Math.max(0, at) } };
   }
   if (!rows?.length) return null;
+  // Space in a block's cards: tick the marked one (several go in together)
+  if (e.key === " " && m.open && !e.ctrlKey && !e.altKey && !e.metaKey) return { menu: slashTick(m, m.i) };
   if (e.key === "ArrowDown" || e.key === "ArrowUp") return { menu: { ...m, i: (m.i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length } };
   if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.altKey && !e.metaKey) return slashChoose(m, m.i, e.shiftKey);
   return null;
@@ -114,8 +143,10 @@ export default function SlashFind({ at, menu, onMenu, onPick, width = 400, verb 
   const note = rows === null ? "The library is still loading"
     : !at.q.trim() ? "Type to find a block in your library"
     : !rows.length ? `Nothing in your library for “${at.q.trim().slice(0, 40)}”` : "";
+  const ticked = new Set(menu.ticked || []);
+  const nTicked = ticked.size;
   const click = (i: number, shift: boolean) => {
-    const s = slashChoose(menu, i, shift);
+    const s = slashChoose(menu, i, shift, true);
     if (s.pick) onPick(s.pick); else if (s.menu) onMenu(s.menu);
   };
   return (
@@ -124,13 +155,22 @@ export default function SlashFind({ at, menu, onMenu, onPick, width = 400, verb 
       {note ? <div className="rm-slash-note">{note}</div> : rows!.map((r, i) => (
         <button key={r.kind + ":" + r.id + ":" + r.ai} type="button" role="option" aria-selected={i === menu.i}
           className={"rm-slash-row " + r.kind + (i === menu.i ? " on" : "")}
-          onMouseEnter={() => { if (menu.i !== i) onMenu({ ...menu, i }); }} onClick={(e) => click(i, e.shiftKey)}>
-          <b>{r.kind === "block" && <span className="rm-slash-open" aria-hidden="true">›</span>}{r.title}</b>
+          onMouseEnter={() => { if (menu.i !== i) onMenu({ ...menu, i }); }}
+          onClick={(e) => { if ((e.target as HTMLElement).closest(".rm-slash-tick")) onMenu(slashTick(menu, i)); else click(i, e.shiftKey); }}>
+          <b>
+            {r.kind === "block" && <span className="rm-slash-open" aria-hidden="true">›</span>}
+            {(r.kind === "card" || r.kind === "all") && (
+              <span className={"rm-slash-tick" + ((r.kind === "card" ? ticked.has(r.ai as number) : nTicked > 0 && nTicked === (menu.blocks?.find((x) => x.id === menu.open)?.args.length || -1)) ? " on" : "")}
+                role="checkbox" aria-checked={r.kind === "card" ? ticked.has(r.ai as number) : false} title="Tick it (Space) — Enter adds every ticked card" />
+            )}
+            {r.title}
+          </b>
           {r.sub && <small>{r.sub}</small>}
         </button>
       ))}
       <div className="rm-slash-keys">{menu.open
-        ? `↑ ↓ choose · Enter ${verb} the card · Shift+Enter the whole block · Esc back`
+        ? (nTicked ? `Space ticks · Enter ${verb} the ${nTicked} ticked · Shift+Enter the whole block · Esc back`
+          : `↑ ↓ choose · Space ticks several · Enter ${verb} the card · Shift+Enter the whole block · Esc back`)
         : `↑ ↓ choose · Enter shows its cards · Shift+Enter ${verb} the whole block · Esc closes`}</div>
     </div>
   );
