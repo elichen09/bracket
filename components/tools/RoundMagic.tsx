@@ -24,13 +24,13 @@ import { textToHtml } from "@/lib/viewer/draw";
 import { listDocs, getDoc, keepDoc, dropDoc, newDocId, type ViewDoc, type ViewMeta, type DocKind } from "@/lib/viewer/store";
 import { verbatimPlugin, verbKey, readWords, countIn, isVerbatim } from "@/lib/cutter/verbatim";
 import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter/spell";
-import { placePlugin, placeCard, placeKey } from "@/lib/cutter/place";
+import { placePlugin, placeCard, placeKey, removeCards } from "@/lib/cutter/place";
 import { slashPlugin, type SlashAt } from "@/lib/cutter/slash";
 import { gripPlugin } from "@/lib/cutter/grips";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { RM_PALETTE_KEY } from "@/lib/toolTheme";
 import { parseFlow, gdocId, type FlowItem } from "@/lib/gflow";
-import FlowTable, { type SectionWrite } from "./FlowTable";
+import FlowTable, { type SectionWrite, type FlowedCard } from "./FlowTable";
 import { parseSections, type FlowSection } from "@/lib/gflowTable";
 import { readFlow, writeRows, isStale, getToken, hasToken, wasConnected, warmUp, signOut, SignInExpired, type ApiFlow, type ApiRow, type RowWrite } from "@/lib/gdocsApi";
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
@@ -2232,6 +2232,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const sv = speechView.current;
     if (sv) sv.dispatch(sv.state.tr.setMeta(spellKey, spell).setMeta("addToHistory", false));
   }, [spell]);
+  /** Flow cells deleted that had put cards in the speech doc: those cards out of it. */
+  const unflow = useCallback((cards: FlowedCard[]) => {
+    const s = speechView.current;
+    if (!s) return 0;
+    const r = removeCards(s.state, cards);
+    if (!r) return 0;
+    s.dispatch(r.tr);
+    return r.n;
+  }, []);
   // ---- "/" in the speech doc: the library, searched where you are, a card put in from a menu ----
   const [slash, setSlash] = useState<{ at: SlashAt; rows: SlashRow[] | null; i: number } | null>(null);
   const slashRef = useRef(slash);
@@ -3177,7 +3186,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
           <div className="rm-gfbody">
             {!gf && <p className="rm-gferr" style={{ color: "#777" }}>Reading the Doc…</p>}
-            {(flowSections.length > 0 || (gf && !gf.err)) && <FlowTable compact sections={flowSections} docKey={gdocId(gfLink) + (gfTab ? ":" + gfTab : "")} owner={owner} onLook={lookFor} toast={toast} writer={gConn ? gWrite : undefined} />}
+            {(flowSections.length > 0 || (gf && !gf.err)) && <FlowTable compact sections={flowSections} docKey={gdocId(gfLink) + (gfTab ? ":" + gfTab : "")} owner={owner} onLook={lookFor} toast={toast} writer={gConn ? gWrite : undefined} onUnflow={unflow} />}
           </div>
           <div className="rm-gfsize" onPointerDown={gfResize} aria-hidden="true" />
         </div>

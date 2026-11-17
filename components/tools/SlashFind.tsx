@@ -8,6 +8,10 @@ export interface SlashRow {
   id: string; ai: number | null; title: string; sub: string;
   /** the card tags it is: one, or all of a block's */
   tags: string[];
+  /** which card of the block each tag is */
+  ais: number[];
+  /** the block's name */
+  block: string;
 }
 
 /** What "/words" finds in the library: each block, then the cards in it the words found (a few). */
@@ -18,10 +22,11 @@ export function slashRows(q: string): SlashRow[] | null {
   for (const r of EV.quickFind(q, 8) as { id: string; title: string; where: string; args: string[]; hits: number[] }[]) {
     const n = r.args.length;
     const tag = (a: string) => a.replace(/\s+/g, " ").trim();
-    rows.push({ id: r.id, ai: null, title: r.title || "Untitled block", sub: [r.where, n === 1 ? "1 card" : n + " cards"].filter(Boolean).join(" · "), tags: r.args.map(tag).filter(Boolean) });
+    const all = r.args.map((a, ai) => ({ t: tag(a), ai })).filter((x) => x.t);
+    rows.push({ id: r.id, ai: null, title: r.title || "Untitled block", sub: [r.where, n === 1 ? "1 card" : n + " cards"].filter(Boolean).join(" · "), tags: all.map((x) => x.t), ais: all.map((x) => x.ai), block: r.title });
     for (const ai of r.hits.slice(0, 3)) {
       if (r.args[ai] === undefined) continue;
-      rows.push({ id: r.id, ai, title: r.args[ai] || "Card " + (ai + 1), sub: "", tags: [tag(r.args[ai])].filter(Boolean) });
+      rows.push({ id: r.id, ai, title: r.args[ai] || "Card " + (ai + 1), sub: "", tags: [tag(r.args[ai])].filter(Boolean), ais: [ai], block: r.title });
     }
   }
   return rows;

@@ -68,6 +68,8 @@ export function spotFor(state: EditorState, whole = false): Spot {
  * take it (an empty card).
  */
 export function placeCard(state: EditorState, nodes: PMNode[], whole: boolean): { tr: Transaction; where: string } | null {
+  const merged = intoBlockThere(state, nodes, whole);
+  if (merged) return merged;
   const spot = spotFor(state, whole);
   let list = nodes;
   // one card into a block: its tag and its text, not a second block heading
@@ -80,6 +82,83 @@ export function placeCard(state: EditorState, nodes: PMNode[], whole: boolean): 
   tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, Math.min(after, tr.doc.content.size))), -1));
   tr.setMeta(placeKey, { aimed: true });
   return { tr, where: spot.where };
+}
+
+const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+
+/** The block (h1–h3) in the document with this heading's words, if there is one. */
+function blockNamed(doc: PMNode, name: string) {
+  const want = norm(name);
+  if (!want) return null;
+  return sections(doc).find((s) => s.level < 4 && norm(doc.nodeAt(s.pos)!.textContent) === want) || null;
+}
+/** The cards (a tag and what's under it) in a run of nodes, by the tag's words. */
+function cardsOf(nodes: PMNode[]) {
+  const out: { tag: string; nodes: PMNode[] }[] = [];
+  for (const n of nodes) {
+    if (n.type === H && n.attrs.level === 4) out.push({ tag: norm(n.textContent), nodes: [n] });
+    else if (n.type === H && n.attrs.level < 4) break;
+    else if (out.length) out[out.length - 1].nodes.push(n);
+  }
+  return out;
+}
+
+/**
+ * A card (or block) coming with its block's heading, when that block is already in the speech doc:
+ * not a second heading — the cards go into the block that's there, at its end (or where the cursor
+ * is, if it's in that block), and a card already in it isn't put in again.
+ */
+function intoBlockThere(state: EditorState, nodes: PMNode[], whole: boolean): { tr: Transaction; where: string } | null {
+  const lead = nodes.find((n) => !isEmptyLine(n));
+  if (!lead || lead.type !== H || lead.attrs.level >= 4) return null;
+  const doc = state.doc;
+  const sec = blockNamed(doc, lead.textContent);
+  if (!sec) return null;
+  const name = doc.nodeAt(sec.pos)!.textContent.trim().slice(0, 40);
+  const have = new Set<string>();
+  doc.nodesBetween(sec.pos, sec.end, (n) => { if (n.type === H && n.attrs.level === 4) have.add(norm(n.textContent)); return false; });
+  const fresh = cardsOf(nodes.slice(nodes.indexOf(lead) + 1)).filter((c) => !have.has(c.tag));
+  const tr = state.tr.setMeta(placeKey, { aimed: true });
+  if (!fresh.length) return { tr, where: `already in “${name}”` };
+  let list = fresh.flatMap((c) => c.nodes);
+  while (list.length && isEmptyLine(list[list.length - 1])) list = list.slice(0, -1);
+  // the cursor in that block: there (after the card it's in); otherwise the block's end
+  const spot = spotFor(state, false);
+  const inIt = spot.from > sec.pos && spot.from <= sec.end;
+  const from = inIt ? spot.from : sec.end, to = inIt ? spot.to : sec.end;
+  const frag = Fragment.from(list);
+  tr.replaceWith(from, to, frag);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, Math.min(from + frag.size, tr.doc.content.size))), -1));
+  void whole;
+  return { tr, where: `in “${name}”` };
+}
+
+/**
+ * Cards taken back out (a flow cell they were flowed from, deleted): each card by its block and its
+ * tag. A block left with no cards goes too. Null when none of them is in the document.
+ */
+export function removeCards(state: EditorState, cards: { block: string; tag: string }[]): { tr: Transaction; n: number } | null {
+  const tr = state.tr;
+  let n = 0;
+  for (const c of cards) {
+    const doc = tr.doc, want = norm(c.tag);
+    const blk = blockNamed(doc, c.block);
+    const from = blk ? blk.pos : 0, to = blk ? blk.end : doc.content.size;
+    const card = sections(doc).find((s) => s.level === 4 && s.pos >= from && s.pos < to && norm(doc.nodeAt(s.pos)!.textContent) === want);
+    if (!card) continue;
+    tr.delete(card.pos, Math.min(card.end, to));
+    n++;
+    if (!blk) continue;
+    // the block, if that was its last card: only its heading (and blank lines, or what came before its cards) left
+    const after = blockNamed(tr.doc, c.block);
+    if (!after) continue;
+    let cardsLeft = false;
+    tr.doc.nodesBetween(after.pos, after.end, (x) => { if (x.type === H && x.attrs.level > after.level) cardsLeft = true; return false; });
+    if (!cardsLeft) tr.delete(after.pos, after.end);
+  }
+  if (!n) return null;
+  if (!tr.doc.childCount) tr.insert(0, P.create());
+  return { tr, n };
 }
 
 function line(where: string) {

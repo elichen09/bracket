@@ -34,8 +34,13 @@ const linesOf = (v: string) => v.split("\n");
 /** What has changed in one part, to be written into the Doc. */
 export interface SectionWrite { si: number; rows: { arg: string; responses: string[] }[]; added: { arg: string; responses: string[] }[] }
 
-export default function FlowTable({ sections, docKey, owner, onLook, toast, writer, compact }: {
+/** A card put in the speech doc from a cell of the flow ("/"): enough to find it there again, or send it again. */
+export interface FlowedCard { id: string; ai: number; block: string; tag: string }
+
+export default function FlowTable({ sections, docKey, owner, onLook, toast, writer, compact, onUnflow }: {
   sections: FlowSection[]; compact?: boolean; docKey: string; owner?: string | null; onLook: (text: string) => void; toast: (s: string) => void;
+  /** cells deleted that had flowed cards into the speech doc: those cards out of it too */
+  onUnflow?: (cards: FlowedCard[]) => number;
   /** connected to Google: what you write goes into the Doc by itself */
   writer?: (w: SectionWrite[]) => Promise<void>;
 }) {
@@ -72,6 +77,29 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
       return changed ? next : all;
     });
   }, [sections]);
+
+  // ---- which cells put which cards in the speech doc: by part, row and what the cell says
+  const linkStore = store + ":sent";
+  const links = useRef<Record<string, FlowedCard[]>>({});
+  useEffect(() => { try { links.current = JSON.parse(localStorage.getItem(linkStore) || "{}") || {}; } catch { links.current = {}; } }, [linkStore]);
+  const saveLinks = () => { try { localStorage.setItem(linkStore, JSON.stringify(links.current)); } catch { /* private browsing */ } };
+  const linkKey = (k: string, row: string, cell: string) => k + SEP + row + SEP + cell.replace(/\s+/g, " ").trim();
+  /** Cards no other cell still points at: only those come out of the speech doc. */
+  const unused = (cards: FlowedCard[]) => {
+    const n = (x: string) => x.replace(/\s+/g, " ").trim().toLowerCase();
+    const live = new Set(Object.values(links.current).flat().map((c) => n(c.block) + SEP + n(c.tag)));
+    return cards.filter((c) => !live.has(n(c.block) + SEP + n(c.tag)));
+  };
+  const link = (key: string, cards: FlowedCard[]) => { links.current[key] = cards; saveLinks(); };
+  /** A linked cell's words changed: the link follows them — and a cell emptied takes its cards out. */
+  const relink = (from: string, to: string | null) => {
+    const c = links.current[from];
+    if (!c || from === to) return;
+    delete links.current[from];
+    if (to && !to.endsWith(SEP)) links.current[to] = c;
+    else onUnflow?.(unused(c));
+    saveLinks();
+  };
 
   const edit = (k: string, f: (e: Edits) => Edits) => setEdits((all) => ({ ...all, [k]: f(all[k] || { rows: {}, added: [] }) }));
 
@@ -180,6 +208,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
   };
   /** What was flowed from the library goes in the speech doc too: the real card (or block), its block's heading on it. */
   const toSpeech = (p: SlashRow) => { void (window as any).EV?.quickSend?.(p.id, p.ai, { head: true, from: "from the flow" }); };
+  const cardsOf = (p: SlashRow): FlowedCard[] => p.tags.map((tag, i) => ({ id: p.id, ai: p.ais[i], block: p.block, tag }));
   const pickSlash = (r: SlashRow | undefined) => {
     const s = slRef.current;
     setSl(null);
@@ -205,7 +234,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
   const cellSelRef = useRef(cellSel);
   cellSelRef.current = cellSel;
   const dragFrom = useRef<string | null>(null);
-  const lastDel = useRef<All | null>(null);
+  const lastDel = useRef<{ edits: All; links: Record<string, FlowedCard[]> } | null>(null);
   const cids = () => cells().map((t) => t.getAttribute("data-cid") || "");
   const selected = (): string[] => {
     const s = cellSelRef.current;
@@ -237,6 +266,8 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     }
     let n = 0;
     const next: All = { ...edits };
+    const gone: Record<string, FlowedCard[]> = {};
+    const unlink = (key: string) => { const c = links.current[key]; if (c) { gone[key] = c; delete links.current[key]; } };
     for (const s of mergedRef.current) {
       const rm = resp.get(s.k), am = args.get(s.k);
       if (!rm && !am) continue;
@@ -246,18 +277,21 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
       rm?.forEach((lis, ri) => {
         const r = s.rows[ri];
         if (!r) return;
-        const keep = r.responses.filter((x, li) => { const go = lis.has(li); if (go && x.trim()) n++; return !go; });
+        const keep = r.responses.filter((x, li) => { const go = lis.has(li); if (go && x.trim()) { n++; unlink(linkKey(s.k, r.arg, x)); } return !go; });
         if (r.added >= 0) { if (added[r.added]) added[r.added].responses = keep; }
         else rows[r.arg] = keep;
       });
-      am?.forEach((j) => { if (added[j]?.arg.trim()) { n++; added[j].arg = ""; } });
+      am?.forEach((j) => { if (added[j]?.arg.trim()) { n++; unlink(linkKey(s.k, "+", added[j].arg)); added[j].arg = ""; } });
       next[s.k] = { rows, added: added.filter((a) => a.arg.trim() || a.responses.some((x) => x.trim())) };
     }
     if (!n) { setCellSel(null); return; }
-    lastDel.current = edits;
+    lastDel.current = { edits, links: gone };
     setEdits(next);
     setCellSel(null);
-    toast(`Deleted ${n === 1 ? "a cell" : n + " cells"} — Ctrl+Z puts ${n === 1 ? "it" : "them"} back`);
+    const cards = unused(Object.values(gone).flat());
+    const out = cards.length && onUnflow ? onUnflow(cards) : 0;
+    if (Object.keys(gone).length) saveLinks();
+    toast(`Deleted ${n === 1 ? "a cell" : n + " cells"}${out ? ` and ${out === 1 ? "its card" : out + " cards"} in the speech doc` : ""} — Ctrl+Z puts ${n === 1 && !out ? "it" : "them"} back`);
   };
   const boxKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const t = e.target as HTMLTextAreaElement;
@@ -267,7 +301,14 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     // Ctrl+Z straight after a delete: the cells back
     if (mod && !e.shiftKey && e.key.toLowerCase() === "z" && lastDel.current) {
       e.preventDefault(); e.stopPropagation();
-      setEdits(lastDel.current); lastDel.current = null;
+      const d = lastDel.current;
+      setEdits(d.edits); lastDel.current = null;
+      // the cards too, sent again: into their block, if it's still there
+      for (const [k, cs] of Object.entries(d.links)) {
+        links.current[k] = cs;
+        for (const c of cs) void (window as any).EV?.quickSend?.(c.id, c.ai, { head: true, from: "from the flow" });
+      }
+      saveLinks();
       return;
     }
     if (e.key !== "Shift" && e.key !== "Control" && e.key !== "Alt" && e.key !== "Meta" && !(mod && e.key.toLowerCase() === "c")) lastDel.current = null;
@@ -363,6 +404,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                         onKeyDown={(e) => { if (!slashKey(e, "a:" + s.k + ":" + r.added)) keys(e); }}
                         onChange={(e) => {
                           const v = e.target.value.replace(/\n/g, " ");
+                          relink(linkKey(s.k, "+", r.arg), linkKey(s.k, "+", v));
                           const setArg = (a: string) => edit(s.k, (x) => ({ ...x, added: x.added.map((y, j) => (j === r.added ? { ...y, arg: a } : y)) }));
                           setArg(v);
                           // an argument of yours from the library: the card's tag (a block: its name)
@@ -370,6 +412,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                             const a = p.ai === null ? p.title : p.tags[0];
                             setArg(a);
                             toSpeech(p);
+                            link(linkKey(s.k, "+", a), cardsOf(p));
                             requestAnimationFrame(() => {
                               const t = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-added="${CSS.escape(s.k + ":" + r.added)}"]`);
                               if (t) { t.focus(); t.setSelectionRange(a.length, a.length); }
@@ -426,6 +469,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                           }}
                           onChange={(e) => {
                             const v = e.target.value.replace(/\n/g, " ");
+                            if (!extra) relink(linkKey(s.k, r.arg, line), linkKey(s.k, r.arg, v));
                             const cur = [...r.responses];
                             if (extra) { if (!v) return; cur.push(v); } else cur[li] = v;
                             set(cur);
@@ -437,6 +481,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                               next.splice(li, extra ? 0 : 1, ...p.tags);
                               set(next);
                               toSpeech(p);
+                              cardsOf(p).forEach((c) => link(linkKey(s.k, r.arg, c.tag), [c]));
                               const last = li + p.tags.length - 1, end = p.tags[p.tags.length - 1].length;
                               requestAnimationFrame(() => {
                                 const n = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-resp="${CSS.escape(s.k + ":" + ri + ":" + last)}"]`);
