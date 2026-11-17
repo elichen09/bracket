@@ -636,7 +636,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (!v || !base) continue;
         const doc = v.state.doc;
         try {
-          if (isTemp(fid)) { loaded.current.set(fid, { ...base, doc: doc.toJSON(), html: toHtml(doc), updated: Date.now() }); continue; }
+          if (isTemp(fid)) {
+            // library blocks opened as a page: what's on it is what those blocks are now
+            const html = toHtml(doc);
+            loaded.current.set(fid, { ...base, doc: doc.toJSON(), html, updated: Date.now() });
+            const t = tempOf.current.get(fid);
+            if (t) await (window as any).EV?.updatePocket?.(t.name, html, t.hatPocket);
+            continue;
+          }
           if (isTheirs(fid)) {
             // a doc of theirs is kept where the viewer keeps it — rehighlighted, but never in your library
             const meta = theirMeta.current.get(fid);
@@ -1462,16 +1469,19 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return () => el.removeEventListener("evi:open", on);
   }, [openCard]);
 
+  /** Which library pocket each page of library blocks is, so its edits go back to those blocks. */
+  const tempOf = useRef(new Map<string, { name: string; hatPocket: boolean }>());
   // ---- a pocket in the search, clicked: its file — the one it came from, or one of yours by its name.
   // Imported blocks that were never a file open as a page of their own, kept nowhere: not in your files,
   // not in their docs. Edits stay while it's open; Keep as mine makes it a file.
-  const openPocketFile = useCallback(async (d: { name: string; file?: string; html?: string; none?: () => void }) => {
+  const openPocketFile = useCallback(async (d: { name: string; file?: string; html?: string; hatPocket?: boolean; none?: () => void }) => {
     const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
     const have = (d.file && filesRef.current.find((f) => f.id === d.file)) || filesRef.current.find((f) => norm(f.name) === norm(d.name));
     if (!have && !d.html) { d.none?.(); return; }
     if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
     if (have) { await open(have.id, (v) => v.focus()); return; }
     const id = TEMP + norm(d.name);
+    tempOf.current.set(id, { name: d.name, hatPocket: !!d.hatPocket });
     if (!loaded.current.has(id)) loaded.current.set(id, { id, name: d.name, doc: null, html: d.html!, cards: [], words: 0, created: Date.now(), updated: Date.now() });
     await open(id, (v) => { v.focus(); v.dispatch(v.state.tr.setSelection(TextSelection.atStart(v.state.doc))); });
   }, [open]);
@@ -2452,7 +2462,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-trow">
             {mode === "speech" && <span className="rm-title rm-titlefix" title="The speech doc — SPLIT or EDIT for your files">Speech doc</span>}
             {curTheirs && mode !== "speech" && (isTemp(cur!.id)
-              ? <span className="rm-badge" title="Library blocks, opened as a page — not kept in your files. Keep as mine makes it a file">NOT KEPT</span>
+              ? <span className="rm-badge" title="Library blocks, opened as a page: edits save to those blocks in the library search, not to your files. Keep as mine makes it a file">LIBRARY</span>
               : <span className="rm-badge" title="A doc of theirs — kept apart from your library">THEIRS</span>)}
             <input className="rm-title" hidden={mode === "speech"} value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
               onBlur={(e) => void rename(e.target.value)}
@@ -2761,9 +2771,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                         <select className="rm-psel" value={p.fileId} onChange={(e) => void setPaneFile(p.key, e.target.value)} aria-label="What this page shows">
                           <optgroup label="Your files">{files.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
                           {!!theirs.length && <optgroup label="Their docs">{theirs.map((m) => <option key={m.id} value={THEIRS + m.id}>{m.name}</option>)}</optgroup>}
-                          {tempHere && <optgroup label="Not kept"><option value={p.fileId}>{loaded.current.get(p.fileId)?.name || "Library blocks"}</option></optgroup>}
+                          {tempHere && <optgroup label="Library"><option value={p.fileId}>{loaded.current.get(p.fileId)?.name || "Library blocks"}</option></optgroup>}
                         </select>
-                        {tempHere && <span className="rm-pmeta" title="Library blocks, opened as a page. It isn't kept in your files — Keep as mine makes it one">NOT KEPT</span>}
+                        {tempHere && <span className="rm-pmeta" title="Edits save to these blocks in the library search — not to your files. Keep as mine makes it a file">SAVES TO THE LIBRARY</span>}
                         {meta && <span className="rm-pmeta">{(SOURCE[meta.source] || meta.source).toUpperCase()}{meta.by ? " · " + meta.by.toUpperCase() : ""}</span>}
                         {live && (
                           <span className="rm-mates" title={live.mates.length ? "In it with you: " + live.mates.map((m) => m.name).join(", ") : live.status === "error" ? "Not connected — your edits are kept and go when it is" : "Shared — nobody else is in it right now"}>
