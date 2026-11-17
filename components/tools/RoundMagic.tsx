@@ -947,14 +947,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [setPanes, toast]);
 
   // ---- files ------------------------------------------------------------------
-  const newFile = useCallback(async (fileName: string, html = "<h4></h4><p></p>", share?: string, before?: (id: string) => void) => {
+  const newFile = useCallback(async (fileName: string, html = "<h4></h4><p></p>", share?: string) => {
     const doc = fromHtml(html);
     const f: CutFile = {
       id: newFileId(), name: fileName, doc: doc.toJSON(), html: toHtml(doc),
       cards: C.briefs(doc), words: countWords(doc), created: Date.now(), updated: Date.now(),
       ...(share ? { share } : {}),
     };
-    before?.(f.id);
     await putFile(owner, f);
     loaded.current.set(f.id, f);
     setFiles((l) => [stripDoc(f), ...l]);
@@ -969,8 +968,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     await setPaneFile(key, id, then);
   }, [setPaneFile]);
 
-  const create = useCallback(async (fileName: string, html?: string, before?: (id: string) => void) => {
-    const f = await newFile(fileName, html, undefined, before);
+  const create = useCallback(async (fileName: string, html?: string) => {
+    const f = await newFile(fileName, html);
     const key = activeRef.current || panesRef.current[0]?.key;
     if (key && isRead(key)) setPaneRead(key, false);
     await open(f.id, (v) => { v.focus(); v.dispatch(v.state.tr.setSelection(TextSelection.atStart(v.state.doc))); });
@@ -1459,16 +1458,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return () => el.removeEventListener("evi:open", on);
   }, [openCard]);
 
-  // ---- a pocket in the search, clicked: its file — the one it came from, one by its name, or a new one ----
-  const openPocketFile = useCallback(async (d: { name: string; file?: string; html?: string; adopt?: (id: string) => void }) => {
-    if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+  // ---- a pocket in the search, clicked: its file — the one it came from, or one of yours by its name.
+  // Imported blocks that were never a file just fold: no file is made for them.
+  const openPocketFile = useCallback(async (d: { name: string; file?: string; none?: () => void }) => {
     const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
     const have = (d.file && filesRef.current.find((f) => f.id === d.file)) || filesRef.current.find((f) => norm(f.name) === norm(d.name));
-    if (have) { await open(have.id, (v) => v.focus()); return; }
-    if (!d.html) { toast("That file isn't here any more"); return; }
-    await create(d.name, d.html, d.adopt);
-    toast(`“${d.name.slice(0, 50)}” is a file now — its blocks are in it`);
-  }, [open, create, toast]);
+    if (!have) { d.none?.(); return; }
+    if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+    await open(have.id, (v) => v.focus());
+  }, [open]);
   useEffect(() => {
     const el = root.current;
     if (!el) return;
