@@ -25,6 +25,8 @@ interface Edits { rows: Record<string, string[]>; added: { arg: string; response
 type All = Record<string, Edits>;
 
 const secKey = (s: FlowSection, i: number) => (s.title || "") + "#" + i;
+/** between the parts of a cell's id (a part's title can hold almost anything but a tab) */
+const SEP = "\t";
 const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 // kept as typed — a line just started with Enter is still there; blank lines are dropped only on the way out
 const linesOf = (v: string) => v.split("\n");
@@ -176,6 +178,8 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     const same = !!was && was.cell === cell && was.q === q;
     setSl({ cell, q, left: b.left, top: b.top, bottom: b.bottom, rows: same ? was!.rows : slashRows(q), i: same ? was!.i : 0, apply });
   };
+  /** What was flowed from the library goes in the speech doc too: the real card (or block), its block's heading on it. */
+  const toSpeech = (p: SlashRow) => { void (window as any).EV?.quickSend?.(p.id, p.ai, { head: true, from: "from the flow" }); };
   const pickSlash = (r: SlashRow | undefined) => {
     const s = slRef.current;
     setSl(null);
@@ -195,10 +199,144 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     return false;
   };
 
+  // ---- several cells at once: Shift+click, a drag across them, or Shift+↑ ↓ off a cell's edge;
+  // Delete clears them (Ctrl+Z, straight after, puts them back), Ctrl+C / Ctrl+X copy or cut them
+  const [cellSel, setCellSel] = useState<{ a: string; b: string } | null>(null);
+  const cellSelRef = useRef(cellSel);
+  cellSelRef.current = cellSel;
+  const dragFrom = useRef<string | null>(null);
+  const lastDel = useRef<All | null>(null);
+  const cids = () => cells().map((t) => t.getAttribute("data-cid") || "");
+  const selected = (): string[] => {
+    const s = cellSelRef.current;
+    if (!s) return [];
+    const all = cids(), i = all.indexOf(s.a), j = all.indexOf(s.b);
+    if (i < 0 || j < 0) return [];
+    return all.slice(Math.min(i, j), Math.max(i, j) + 1);
+  };
+  const selSet = new Set(cellSel ? selected() : []);
+  const cellText = (ids: string[]) => {
+    const els = cells().filter((t) => ids.includes(t.getAttribute("data-cid") || ""));
+    return els.map((t) => t.value.trim()).filter(Boolean).join("\n");
+  };
+  const deleteCells = (ids: string[]) => {
+    const resp = new Map<string, Map<number, Set<number>>>(), args = new Map<string, Set<number>>();
+    for (const id of ids) {
+      const p = id.split(SEP);
+      if (p[0] === "r") {
+        const k = p.slice(1, -2).join(SEP), ri = +p[p.length - 2], li = +p[p.length - 1];
+        if (!resp.has(k)) resp.set(k, new Map());
+        const m = resp.get(k)!;
+        if (!m.has(ri)) m.set(ri, new Set());
+        m.get(ri)!.add(li);
+      } else if (p[0] === "a") {
+        const k = p.slice(1, -1).join(SEP);
+        if (!args.has(k)) args.set(k, new Set());
+        args.get(k)!.add(+p[p.length - 1]);
+      }
+    }
+    let n = 0;
+    const next: All = { ...edits };
+    for (const s of mergedRef.current) {
+      const rm = resp.get(s.k), am = args.get(s.k);
+      if (!rm && !am) continue;
+      const e = next[s.k] || { rows: {}, added: [] };
+      const rows = { ...e.rows };
+      const added = e.added.map((a) => ({ ...a, responses: [...a.responses] }));
+      rm?.forEach((lis, ri) => {
+        const r = s.rows[ri];
+        if (!r) return;
+        const keep = r.responses.filter((x, li) => { const go = lis.has(li); if (go && x.trim()) n++; return !go; });
+        if (r.added >= 0) { if (added[r.added]) added[r.added].responses = keep; }
+        else rows[r.arg] = keep;
+      });
+      am?.forEach((j) => { if (added[j]?.arg.trim()) { n++; added[j].arg = ""; } });
+      next[s.k] = { rows, added: added.filter((a) => a.arg.trim() || a.responses.some((x) => x.trim())) };
+    }
+    if (!n) { setCellSel(null); return; }
+    lastDel.current = edits;
+    setEdits(next);
+    setCellSel(null);
+    toast(`Deleted ${n === 1 ? "a cell" : n + " cells"} — Ctrl+Z puts ${n === 1 ? "it" : "them"} back`);
+  };
+  const boxKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLTextAreaElement;
+    const cid = t.getAttribute?.("data-cid");
+    if (!cid) return;
+    const mod = e.ctrlKey || e.metaKey;
+    // Ctrl+Z straight after a delete: the cells back
+    if (mod && !e.shiftKey && e.key.toLowerCase() === "z" && lastDel.current) {
+      e.preventDefault(); e.stopPropagation();
+      setEdits(lastDel.current); lastDel.current = null;
+      return;
+    }
+    if (e.key !== "Shift" && e.key !== "Control" && e.key !== "Alt" && e.key !== "Meta" && !(mod && e.key.toLowerCase() === "c")) lastDel.current = null;
+    const s = cellSelRef.current;
+    if (e.shiftKey && !mod && (e.key === "ArrowUp" || e.key === "ArrowDown") && !slRef.current) {
+      const up = e.key === "ArrowUp";
+      const all = cids();
+      if (!s) {
+        // off the edge of the cell's text: a selection of cells starts
+        const atEdge = up ? t.selectionStart === 0 && t.selectionEnd === 0 : t.selectionStart === t.value.length && t.selectionEnd === t.value.length;
+        if (!atEdge) return;
+      }
+      const from = s ? s.a : cid, at = all.indexOf(s ? s.b : cid);
+      const to = all[at + (up ? -1 : 1)];
+      if (!to) return;
+      e.preventDefault(); e.stopPropagation();
+      setCellSel({ a: from, b: to });
+      return;
+    }
+    if (!s) return;
+    if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); e.stopPropagation(); deleteCells(selected()); return; }
+    if (mod && (e.key.toLowerCase() === "c" || e.key.toLowerCase() === "x")) {
+      e.preventDefault(); e.stopPropagation();
+      const ids = selected(), text = cellText(ids);
+      void navigator.clipboard?.writeText(text).catch(() => toast("The browser would not copy — allow the clipboard for this site"));
+      if (e.key.toLowerCase() === "x") deleteCells(ids); else toast("Copied");
+      return;
+    }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setCellSel(null); return; }
+    if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") return;
+    setCellSel(null);
+  };
+  const boxDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const t = (e.target as HTMLElement).closest?.("textarea[data-cid]") as HTMLTextAreaElement | null;
+    if (!t) { setCellSel(null); return; }
+    const cid = t.getAttribute("data-cid")!;
+    if (e.shiftKey) {
+      const here = (document.activeElement as HTMLElement | null)?.getAttribute?.("data-cid");
+      const a = cellSelRef.current?.a || here || cid;
+      e.preventDefault();
+      setCellSel({ a, b: cid });
+      return;
+    }
+    setCellSel(null);
+    dragFrom.current = cid;
+  };
+  const boxOver = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragFrom.current || !(e.buttons & 1)) { dragFrom.current = null; return; }
+    const t = (e.target as HTMLElement).closest?.("textarea[data-cid]");
+    const cid = t?.getAttribute("data-cid");
+    if (!cid || (cid === dragFrom.current && !cellSelRef.current)) return;
+    if (cellSelRef.current?.b === cid) return;
+    // dragging out of one cell into another: cells, not the words in the first
+    const src = document.activeElement as HTMLTextAreaElement | null;
+    if (src?.setSelectionRange) src.setSelectionRange(src.selectionEnd, src.selectionEnd);
+    setCellSel({ a: dragFrom.current, b: cid });
+  };
+  useEffect(() => {
+    const up = () => { dragFrom.current = null; };
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
+  }, []);
+  const sc = (cid: string) => (selSet.has(cid) ? " csel" : "");
+
   if (!sections.length) return <p className="rm-gferr">No numbered lists in the flow tab yet.</p>;
 
   return (
-    <div className={"rm-ft" + (compact ? " compact" : "")} ref={box} onBlur={() => { later(250); if (slRef.current) setSl(null); }}>
+    <div className={"rm-ft" + (compact ? " compact" : "")} ref={box} onKeyDownCapture={boxKey} onMouseDownCapture={boxDown} onPointerOver={boxOver}
+      onBlur={(e) => { later(250); if (slRef.current) setSl(null); if (!box.current?.contains(e.relatedTarget as Node)) setCellSel(null); }}>
       {sl && <SlashFind at={sl} rows={sl.rows} sel={sl.i} width={340} hint="Enter flows its tags" onPick={pickSlash} onSel={(i) => setSl((x) => x && { ...x, i })} />}
       <div className="rm-ftbar">
         <span className={saving === "error" ? "bad" : ""}>{writer
@@ -221,7 +359,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                   <td className="n">{r.n}</td>
                   <td className="a">
                     {r.added >= 0 ? (
-                      <textarea data-cell data-added={s.k + ":" + r.added} value={r.arg} rows={1} spellCheck={false} placeholder="Argument" style={{ color: r.color || undefined }}
+                      <textarea data-cell data-cid={"a" + SEP + s.k + SEP + r.added} className={sc("a" + SEP + s.k + SEP + r.added)} data-added={s.k + ":" + r.added} value={r.arg} rows={1} spellCheck={false} placeholder="Argument" style={{ color: r.color || undefined }}
                         onKeyDown={(e) => { if (!slashKey(e, "a:" + s.k + ":" + r.added)) keys(e); }}
                         onChange={(e) => {
                           const v = e.target.value.replace(/\n/g, " ");
@@ -231,6 +369,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                           slashCheck(e.target, v, "a:" + s.k + ":" + r.added, (p) => {
                             const a = p.ai === null ? p.title : p.tags[0];
                             setArg(a);
+                            toSpeech(p);
                             requestAnimationFrame(() => {
                               const t = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-added="${CSS.escape(s.k + ":" + r.added)}"]`);
                               if (t) { t.focus(); t.setSelectionRange(a.length, a.length); }
@@ -252,7 +391,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                       };
                       const key = s.k + ":" + ri + ":" + li;
                       return (
-                        <textarea key={li} data-cell data-resp={key} value={line} rows={1} spellCheck={false} className={"resp" + (extra ? " more" : "")}
+                        <textarea key={li} data-cell data-cid={"r" + SEP + s.k + SEP + ri + SEP + li} data-resp={key} value={line} rows={1} spellCheck={false} className={"resp" + (extra ? " more" : "") + sc("r" + SEP + s.k + SEP + ri + SEP + li)}
                           style={{ color: RESPONSE_COLOUR }} placeholder={extra ? (r.responses.length ? "+ another response" : r.added >= 0 ? "" : "Respond…") : ""}
                           onKeyDown={(e) => {
                             if (slashKey(e, key)) return;
@@ -297,6 +436,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                               const next = [...was];
                               next.splice(li, extra ? 0 : 1, ...p.tags);
                               set(next);
+                              toSpeech(p);
                               const last = li + p.tags.length - 1, end = p.tags[p.tags.length - 1].length;
                               requestAnimationFrame(() => {
                                 const n = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-resp="${CSS.escape(s.k + ":" + ri + ":" + last)}"]`);
@@ -312,7 +452,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
               {/* the blank row: an argument of your own, the next number */}
               <tr className="new">
                 <td className="n">{s.next}</td>
-                <td className="a"><textarea data-cell value="" rows={1} spellCheck={false} placeholder="+ Add an argument" onKeyDown={keys}
+                <td className="a"><textarea data-cell data-cid={"n" + SEP + s.k} className={sc("n" + SEP + s.k)} value="" rows={1} spellCheck={false} placeholder="+ Add an argument" onKeyDown={keys}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\n/g, " ");
                     if (!v) return;
