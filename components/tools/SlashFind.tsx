@@ -4,7 +4,11 @@ import { useEffect, useRef } from "react";
 import type { SlashAt } from "@/lib/cutter/slash";
 
 /** One line of the menu: a whole block (ai null) or one card of it. */
-export interface SlashRow { id: string; ai: number | null; title: string; sub: string }
+export interface SlashRow {
+  id: string; ai: number | null; title: string; sub: string;
+  /** the card tags it is: one, or all of a block's */
+  tags: string[];
+}
 
 /** What "/words" finds in the library: each block, then the cards in it the words found (a few). */
 export function slashRows(q: string): SlashRow[] | null {
@@ -13,25 +17,27 @@ export function slashRows(q: string): SlashRow[] | null {
   const rows: SlashRow[] = [];
   for (const r of EV.quickFind(q, 8) as { id: string; title: string; where: string; args: string[]; hits: number[] }[]) {
     const n = r.args.length;
-    rows.push({ id: r.id, ai: null, title: r.title || "Untitled block", sub: [r.where, n === 1 ? "1 card" : n + " cards"].filter(Boolean).join(" · ") });
+    const tag = (a: string) => a.replace(/\s+/g, " ").trim();
+    rows.push({ id: r.id, ai: null, title: r.title || "Untitled block", sub: [r.where, n === 1 ? "1 card" : n + " cards"].filter(Boolean).join(" · "), tags: r.args.map(tag).filter(Boolean) });
     for (const ai of r.hits.slice(0, 3)) {
       if (r.args[ai] === undefined) continue;
-      rows.push({ id: r.id, ai, title: r.args[ai] || "Card " + (ai + 1), sub: "" });
+      rows.push({ id: r.id, ai, title: r.args[ai] || "Card " + (ai + 1), sub: "", tags: [tag(r.args[ai])].filter(Boolean) });
     }
   }
   return rows;
 }
 
 /** The menu under the "/words" line: fixed to the window, above the line when the line is low. */
-export default function SlashFind({ at, rows, sel, onPick, onSel }: {
-  at: SlashAt; rows: SlashRow[] | null; sel: number;
+export default function SlashFind({ at, rows, sel, onPick, onSel, width = 400, hint = "Enter puts it in" }: {
+  at: Pick<SlashAt, "q" | "left" | "top" | "bottom">; rows: SlashRow[] | null; sel: number;
   onPick: (r: SlashRow) => void; onSel: (i: number) => void;
+  width?: number; hint?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     (box.current?.querySelector(".on") as HTMLElement | null)?.scrollIntoView({ block: "nearest" });
   }, [sel, rows]);
-  const W = 400, H = 340;
+  const W = width, H = 340;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const left = Math.max(8, Math.min(at.left - 10, vw - W - 8));
@@ -53,7 +59,7 @@ export default function SlashFind({ at, rows, sel, onPick, onSel }: {
           {r.sub && <small>{r.sub}</small>}
         </button>
       ))}
-      <div className="rm-slash-keys">↑ ↓ choose · Enter puts it in · Esc closes</div>
+      <div className="rm-slash-keys">↑ ↓ choose · {hint} · Esc closes</div>
     </div>
   );
 }

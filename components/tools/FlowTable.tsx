@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toDocsHtml, type FlowSection } from "@/lib/gflowTable";
 import { RESPONSE_COLOUR } from "@/lib/gdocsApi";
 import { scoped } from "@/lib/owner";
+import SlashFind, { slashRows, type SlashRow } from "./SlashFind";
 
 /**
  * Your partner's flow tab, as tables you write in.
@@ -159,10 +160,46 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     if (e.key === "Escape") t.blur();
   };
 
+  // ---- "/" in a cell: the library, searched there; a card chosen flows as its tag (a block, as its tags)
+  type Slash = { cell: string; q: string; left: number; top: number; bottom: number; rows: SlashRow[] | null; i: number; apply: (r: SlashRow) => void };
+  const [sl, setSl] = useState<Slash | null>(null);
+  const slRef = useRef(sl);
+  slRef.current = sl;
+  const shut = useRef("");
+  /** What was just typed in a cell: a "/words" cell opens the menu under it; anything else shuts it. */
+  const slashCheck = (t: HTMLTextAreaElement, v: string, cell: string, apply: (r: SlashRow) => void) => {
+    const id = cell + "|" + v;
+    if (shut.current && shut.current !== id) shut.current = "";
+    const on = v.startsWith("/") && !v.startsWith("//") && v.length <= 80 && t.selectionStart === v.length && shut.current !== id;
+    if (!on) { if (slRef.current) setSl(null); return; }
+    const q = v.slice(1), was = slRef.current, b = t.getBoundingClientRect();
+    const same = !!was && was.cell === cell && was.q === q;
+    setSl({ cell, q, left: b.left, top: b.top, bottom: b.bottom, rows: same ? was!.rows : slashRows(q), i: same ? was!.i : 0, apply });
+  };
+  const pickSlash = (r: SlashRow | undefined) => {
+    const s = slRef.current;
+    setSl(null);
+    if (!s || !r) return;
+    if (!r.tags.length && r.ai !== null) { toast("That card has no tag to flow"); return; }
+    s.apply(r);
+  };
+  /** A key in a cell while its menu is up: true when the menu took it. */
+  const slashKey = (e: React.KeyboardEvent<HTMLTextAreaElement>, cell: string) => {
+    const s = slRef.current;
+    if (!s || s.cell !== cell) return false;
+    if (e.key === "Escape") { e.preventDefault(); shut.current = cell + "|" + e.currentTarget.value; setSl(null); return true; }
+    const rows = s.rows;
+    if (!rows?.length) return false;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setSl({ ...s, i: (s.i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length }); return true; }
+    if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); pickSlash(rows[Math.min(s.i, rows.length - 1)]); return true; }
+    return false;
+  };
+
   if (!sections.length) return <p className="rm-gferr">No numbered lists in the flow tab yet.</p>;
 
   return (
-    <div className={"rm-ft" + (compact ? " compact" : "")} ref={box} onBlur={() => later(250)}>
+    <div className={"rm-ft" + (compact ? " compact" : "")} ref={box} onBlur={() => { later(250); if (slRef.current) setSl(null); }}>
+      {sl && <SlashFind at={sl} rows={sl.rows} sel={sl.i} width={340} hint="Enter flows its tags" onPick={pickSlash} onSel={(i) => setSl((x) => x && { ...x, i })} />}
       <div className="rm-ftbar">
         <span className={saving === "error" ? "bad" : ""}>{writer
           ? (saving === "saving" ? "Writing into the Doc…" : saving === "error" ? "Couldn't write it — it'll try again"
@@ -184,8 +221,22 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                   <td className="n">{r.n}</td>
                   <td className="a">
                     {r.added >= 0 ? (
-                      <textarea data-cell data-added={s.k + ":" + r.added} value={r.arg} rows={1} spellCheck={false} placeholder="Argument" style={{ color: r.color || undefined }} onKeyDown={keys}
-                        onChange={(e) => { const v = e.target.value.replace(/\n/g, " "); edit(s.k, (x) => ({ ...x, added: x.added.map((a, j) => (j === r.added ? { ...a, arg: v } : a)) })); }} />
+                      <textarea data-cell data-added={s.k + ":" + r.added} value={r.arg} rows={1} spellCheck={false} placeholder="Argument" style={{ color: r.color || undefined }}
+                        onKeyDown={(e) => { if (!slashKey(e, "a:" + s.k + ":" + r.added)) keys(e); }}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\n/g, " ");
+                          const setArg = (a: string) => edit(s.k, (x) => ({ ...x, added: x.added.map((y, j) => (j === r.added ? { ...y, arg: a } : y)) }));
+                          setArg(v);
+                          // an argument of yours from the library: the card's tag (a block: its name)
+                          slashCheck(e.target, v, "a:" + s.k + ":" + r.added, (p) => {
+                            const a = p.ai === null ? p.title : p.tags[0];
+                            setArg(a);
+                            requestAnimationFrame(() => {
+                              const t = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-added="${CSS.escape(s.k + ":" + r.added)}"]`);
+                              if (t) { t.focus(); t.setSelectionRange(a.length, a.length); }
+                            });
+                          });
+                        }} />
                     ) : (
                       <button type="button" className="arg" style={{ color: r.color || undefined }} onClick={() => onLook(r.arg)} title="Look for this in the library">{r.arg}</button>
                     )}
@@ -204,6 +255,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                         <textarea key={li} data-cell data-resp={key} value={line} rows={1} spellCheck={false} className={"resp" + (extra ? " more" : "")}
                           style={{ color: RESPONSE_COLOUR }} placeholder={extra ? (r.responses.length ? "+ another response" : r.added >= 0 ? "" : "Respond…") : ""}
                           onKeyDown={(e) => {
+                            if (slashKey(e, key)) return;
                             const t = e.currentTarget;
                             // Enter: a new cell under this one (what was after the cursor goes with it)
                             if (e.key === "Enter" && !e.shiftKey) {
@@ -238,6 +290,19 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
                             const cur = [...r.responses];
                             if (extra) { if (!v) return; cur.push(v); } else cur[li] = v;
                             set(cur);
+                            // a response from the library: the card's tag goes in this cell (a block: its tags, one a cell)
+                            const was = [...r.responses];
+                            slashCheck(e.target, v, key, (p) => {
+                              if (!p.tags.length) { toast("That block has no tags to flow"); return; }
+                              const next = [...was];
+                              next.splice(li, extra ? 0 : 1, ...p.tags);
+                              set(next);
+                              const last = li + p.tags.length - 1, end = p.tags[p.tags.length - 1].length;
+                              requestAnimationFrame(() => {
+                                const n = box.current?.querySelector<HTMLTextAreaElement>(`textarea[data-resp="${CSS.escape(s.k + ":" + ri + ":" + last)}"]`);
+                                if (n) { n.focus(); n.setSelectionRange(end, end); }
+                              });
+                            });
                           }} />
                       );
                     })}
