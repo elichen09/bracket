@@ -1323,6 +1323,8 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm-slash-row b { font-size: 13px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-slash-row small { font: 10.5px var(--rm-mono); letter-spacing: .03em; color: var(--mut); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-slash-row.card { padding-left: 24px; }
+.rm-slash-row.all b { font-weight: 700; }
+.rm-slash-open { display: inline-block; width: 12px; color: var(--mut); font-weight: 400; }
 .rm-slash-row.card b { font-weight: 400; font-size: 12.5px; }
 .rm-slash-row.on { background: var(--pop-h); box-shadow: inset 2px 0 0 var(--acc); }
 .rm-slash-note { padding: 8px 9px; font-size: 12.5px; color: var(--mut); }

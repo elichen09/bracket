@@ -40,7 +40,7 @@ import { useFullscreen } from "./FullBtn";
 import { popOut } from "./PopBtn";
 import DocEditor, { type DocApi } from "./DocEditor";
 import MagicRead, { clock } from "./MagicRead";
-import SlashFind, { slashRows, type SlashRow } from "./SlashFind";
+import SlashFind, { slashFor, slashStep, type SlashRow, type SlashMenu } from "./SlashFind";
 import "./evidence.css";
 import "./finish.css";
 import "./magic.css";
@@ -2242,7 +2242,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return r.n;
   }, []);
   // ---- "/" in the speech doc: the library, searched where you are, a card put in from a menu ----
-  const [slash, setSlash] = useState<{ at: SlashAt; rows: SlashRow[] | null; i: number } | null>(null);
+  const [slash, setSlash] = useState<{ at: SlashAt; menu: SlashMenu } | null>(null);
   const slashRef = useRef(slash);
   slashRef.current = slash;
   const pickSlash = useCallback(async (r: SlashRow) => {
@@ -2261,23 +2261,16 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     onChange: (at: SlashAt | null) => {
       if (!at) { if (slashRef.current) setSlash(null); return; }
       const was = slashRef.current;
-      const rows = was && was.at.q === at.q && was.rows ? was.rows : slashRows(at.q);
-      setSlash({ at, rows, i: was && was.at.q === at.q ? was.i : 0 });
+      setSlash({ at, menu: slashFor(at.q, was && { q: was.at.q, menu: was.menu }) });
     },
     onKey: (e: KeyboardEvent) => {
       const s = slashRef.current;
-      const rows = s?.rows;
-      if (!s || !rows?.length) return false;
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        setSlash({ ...s, i: (s.i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length });
-        return true;
-      }
-      if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        const r = rows[Math.min(s.i, rows.length - 1)];
-        if (r) void pickSlash(r);
-        return true;
-      }
-      return false;
+      if (!s) return false;
+      const step = slashStep(s.menu, e);
+      if (!step) return false;
+      if (step.pick) void pickSlash(step.pick);
+      else if (step.menu) setSlash({ ...s, menu: step.menu });
+      return true;
     },
   }), [pickSlash]);
   const slashHooksRef = useRef(slashHooks);
@@ -3191,7 +3184,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-gfsize" onPointerDown={gfResize} aria-hidden="true" />
         </div>
       )}
-      {slash && <SlashFind at={slash.at} rows={slash.rows} sel={slash.i} onPick={(r) => void pickSlash(r)} onSel={(i) => setSlash((s) => s && { ...s, i })} />}
+      {slash && <SlashFind at={slash.at} menu={slash.menu} onPick={(r) => void pickSlash(r)} onMenu={(m) => setSlash((s) => s && { ...s, menu: m })} />}
       {toastMsg && <div className="rm-toast" key={toastMsg.n} role="status">{toastMsg.t}</div>}
 
       {/* the library's own dialogs, its toast, and where it builds what it copies */}

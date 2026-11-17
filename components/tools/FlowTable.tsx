@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toDocsHtml, type FlowSection } from "@/lib/gflowTable";
 import { RESPONSE_COLOUR } from "@/lib/gdocsApi";
 import { scoped } from "@/lib/owner";
-import SlashFind, { slashRows, type SlashRow } from "./SlashFind";
+import SlashFind, { slashFor, slashStep, type SlashRow, type SlashMenu } from "./SlashFind";
 
 /**
  * Your partner's flow tab, as tables you write in.
@@ -191,7 +191,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
   };
 
   // ---- "/" in a cell: the library, searched there; a card chosen flows as its tag (a block, as its tags)
-  type Slash = { cell: string; q: string; left: number; top: number; bottom: number; rows: SlashRow[] | null; i: number; apply: (r: SlashRow) => void };
+  type Slash = { cell: string; q: string; left: number; top: number; bottom: number; menu: SlashMenu; apply: (r: SlashRow) => void };
   const [sl, setSl] = useState<Slash | null>(null);
   const slRef = useRef(sl);
   slRef.current = sl;
@@ -203,8 +203,8 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     const on = v.startsWith("/") && !v.startsWith("//") && v.length <= 80 && t.selectionStart === v.length && shut.current !== id;
     if (!on) { if (slRef.current) setSl(null); return; }
     const q = v.slice(1), was = slRef.current, b = t.getBoundingClientRect();
-    const same = !!was && was.cell === cell && was.q === q;
-    setSl({ cell, q, left: b.left, top: b.top, bottom: b.bottom, rows: same ? was!.rows : slashRows(q), i: same ? was!.i : 0, apply });
+    const menu = slashFor(q, was && was.cell === cell ? { q: was.q, menu: was.menu } : null);
+    setSl({ cell, q, left: b.left, top: b.top, bottom: b.bottom, menu, apply });
   };
   /** What was flowed from the library goes in the speech doc too: the real card (or block), its block's heading on it. */
   const toSpeech = (p: SlashRow) => { void (window as any).EV?.quickSend?.(p.id, p.ai, { head: true, from: "from the flow" }); };
@@ -220,11 +220,13 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
   const slashKey = (e: React.KeyboardEvent<HTMLTextAreaElement>, cell: string) => {
     const s = slRef.current;
     if (!s || s.cell !== cell) return false;
+    const step = slashStep(s.menu, e);
+    if (step) {
+      e.preventDefault();
+      if (step.pick) pickSlash(step.pick); else if (step.menu) setSl({ ...s, menu: step.menu });
+      return true;
+    }
     if (e.key === "Escape") { e.preventDefault(); shut.current = cell + "|" + e.currentTarget.value; setSl(null); return true; }
-    const rows = s.rows;
-    if (!rows?.length) return false;
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setSl({ ...s, i: (s.i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length }); return true; }
-    if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); pickSlash(rows[Math.min(s.i, rows.length - 1)]); return true; }
     return false;
   };
 
@@ -378,7 +380,7 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
   return (
     <div className={"rm-ft" + (compact ? " compact" : "")} ref={box} onKeyDownCapture={boxKey} onMouseDownCapture={boxDown} onPointerOver={boxOver}
       onBlur={(e) => { later(250); if (slRef.current) setSl(null); if (!box.current?.contains(e.relatedTarget as Node)) setCellSel(null); }}>
-      {sl && <SlashFind at={sl} rows={sl.rows} sel={sl.i} width={340} hint="Enter flows its tags" onPick={pickSlash} onSel={(i) => setSl((x) => x && { ...x, i })} />}
+      {sl && <SlashFind at={sl} menu={sl.menu} width={340} verb="flows" onPick={pickSlash} onMenu={(m) => setSl((x) => x && { ...x, menu: m })} />}
       <div className="rm-ftbar">
         <span className={saving === "error" ? "bad" : ""}>{writer
           ? (saving === "saving" ? "Writing into the Doc…" : saving === "error" ? "Couldn't write it — it'll try again"

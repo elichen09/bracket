@@ -48,7 +48,8 @@ export function slashPlugin(h: SlashHooks) {
     props: {
       handleKeyDown(v, e) {
         if (!open) return false;
-        if (e.key === "Escape") { const r = read(v); shut = r ? r.from + ":" + r.text : null; close(v); return true; }
+        // Esc: the menu's first (a block's cards, back to the blocks); otherwise the menu shuts
+        if (e.key === "Escape") { if (h.onKey(e, v)) return true; const r = read(v); shut = r ? r.from + ":" + r.text : null; close(v); return true; }
         return h.onKey(e, v);
       },
       handleDOMEvents: {
