@@ -1316,3 +1316,14 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 .rm-side .evi.rm-evsearch .node.lv1 > .chev::after { content: ""; position: absolute; inset: -8px -6px -8px -8px; }
 .rm-side .evi.rm-evsearch .node.lv1 > .nlabel { cursor: pointer; }
 .rm-side .evi.rm-evsearch .node.lv1:not([data-grp="Uncategorised"]):hover > .nlabel { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+/* "/" in the speech doc: cards from the library, in a menu under the line */
+.rm-slash { position: fixed; z-index: 72; display: flex; flex-direction: column; gap: 1px; padding: 5px; overflow-y: auto; overscroll-behavior: contain; background: var(--pop); color: var(--txt); border: 1px solid var(--btnb); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); animation: rmIn .12s ease-out both; scrollbar-width: thin; }
+.rm-slash-row { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 6px 9px; cursor: pointer; }
+.rm-slash-row b { font-size: 13px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-slash-row small { font: 10.5px var(--rm-mono); letter-spacing: .03em; color: var(--mut); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-slash-row.card { padding-left: 24px; }
+.rm-slash-row.card b { font-weight: 400; font-size: 12.5px; }
+.rm-slash-row.on { background: var(--pop-h); box-shadow: inset 2px 0 0 var(--acc); }
+.rm-slash-note { padding: 8px 9px; font-size: 12.5px; color: var(--mut); }
+.rm-slash-keys { flex-shrink: 0; margin-top: 3px; padding: 5px 9px 2px; border-top: 1px solid var(--btnb); font: 10px var(--rm-mono); letter-spacing: .06em; color: var(--mut); }

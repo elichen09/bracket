@@ -24,7 +24,8 @@ import { textToHtml } from "@/lib/viewer/draw";
 import { listDocs, getDoc, keepDoc, dropDoc, newDocId, type ViewDoc, type ViewMeta, type DocKind } from "@/lib/viewer/store";
 import { verbatimPlugin, verbKey, readWords, countIn, isVerbatim } from "@/lib/cutter/verbatim";
 import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter/spell";
-import { placePlugin, placeCard } from "@/lib/cutter/place";
+import { placePlugin, placeCard, placeKey } from "@/lib/cutter/place";
+import { slashPlugin, type SlashAt } from "@/lib/cutter/slash";
 import { gripPlugin } from "@/lib/cutter/grips";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { RM_PALETTE_KEY } from "@/lib/toolTheme";
@@ -39,6 +40,7 @@ import { useFullscreen } from "./FullBtn";
 import { popOut } from "./PopBtn";
 import DocEditor, { type DocApi } from "./DocEditor";
 import MagicRead, { clock } from "./MagicRead";
+import SlashFind, { slashRows, type SlashRow } from "./SlashFind";
 import "./evidence.css";
 import "./finish.css";
 import "./magic.css";
@@ -2230,8 +2232,51 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const sv = speechView.current;
     if (sv) sv.dispatch(sv.state.tr.setMeta(spellKey, spell).setMeta("addToHistory", false));
   }, [spell]);
-  /** What makes the speech doc edit as a page does: a page's Enter, a page's spelling. */
+  // ---- "/" in the speech doc: the library, searched where you are, a card put in from a menu ----
+  const [slash, setSlash] = useState<{ at: SlashAt; rows: SlashRow[] | null; i: number } | null>(null);
+  const slashRef = useRef(slash);
+  slashRef.current = slash;
+  const pickSlash = useCallback(async (r: SlashRow) => {
+    const v = speechView.current;
+    if (!v) return;
+    // the "/words" go; the card takes the empty line they were on
+    const $f = v.state.selection.$from;
+    if ($f.depth === 1 && $f.parent.textContent.startsWith("/")) v.dispatch(v.state.tr.delete($f.start(), $f.end()).setMeta(placeKey, { aimed: true }));
+    setSlash(null);
+    const EV = (window as any).EV;
+    if (!EV?.quickSend) { toast("The library is still loading"); return; }
+    await EV.quickSend(r.id, r.ai);
+    v.focus();
+  }, [toast]);
+  const slashHooks = useMemo(() => ({
+    onChange: (at: SlashAt | null) => {
+      if (!at) { if (slashRef.current) setSlash(null); return; }
+      const was = slashRef.current;
+      const rows = was && was.at.q === at.q && was.rows ? was.rows : slashRows(at.q);
+      setSlash({ at, rows, i: was && was.at.q === at.q ? was.i : 0 });
+    },
+    onKey: (e: KeyboardEvent) => {
+      const s = slashRef.current;
+      const rows = s?.rows;
+      if (!s || !rows?.length) return false;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        setSlash({ ...s, i: (s.i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length });
+        return true;
+      }
+      if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const r = rows[Math.min(s.i, rows.length - 1)];
+        if (r) void pickSlash(r);
+        return true;
+      }
+      return false;
+    },
+  }), [pickSlash]);
+  const slashHooksRef = useRef(slashHooks);
+  slashHooksRef.current = slashHooks;
+
+  /** What makes the speech doc edit as a page does: a page's Enter, a page's spelling, "/" to find a card. */
   const speechPlugins = useCallback(() => [
+    slashPlugin({ onChange: (at) => slashHooksRef.current.onChange(at), onKey: (e) => slashHooksRef.current.onKey(e) }),
     keymap({ Enter: X.enterKeepingAnalytics }),
     spellPlugin(spellRef.current),
     placePlugin(),
@@ -3137,6 +3182,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-gfsize" onPointerDown={gfResize} aria-hidden="true" />
         </div>
       )}
+      {slash && <SlashFind at={slash.at} rows={slash.rows} sel={slash.i} onPick={(r) => void pickSlash(r)} onSel={(i) => setSlash((s) => s && { ...s, i })} />}
       {toastMsg && <div className="rm-toast" key={toastMsg.n} role="status">{toastMsg.t}</div>}
 
       {/* the library's own dialogs, its toast, and where it builds what it copies */}
