@@ -136,6 +136,9 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 /** A doc of theirs, in a page: its id in the Doc viewer's store, marked so it is never mistaken for a file of yours. */
 const THEIRS = "v:";
 const isTheirs = (id: string) => id.startsWith(THEIRS);
+/** A page made on the spot from library blocks that were never a file: open while you want it, kept nowhere. */
+const TEMP = "t:";
+const isTemp = (id: string) => id.startsWith(TEMP);
 const SOURCE: Record<string, string> = { room: "Partner", speechdrop: "SpeechDrop", file: "Opened", paste: "Pasted", library: "From your library", caselist: "Off the caselist" };
 const kindOf = (name: string, type = ""): DocKind => {
   const n = name.toLowerCase();
@@ -633,6 +636,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (!v || !base) continue;
         const doc = v.state.doc;
         try {
+          if (isTemp(fid)) { loaded.current.set(fid, { ...base, doc: doc.toJSON(), html: toHtml(doc), updated: Date.now() }); continue; }
           if (isTheirs(fid)) {
             // a doc of theirs is kept where the viewer keeps it — rehighlighted, but never in your library
             const meta = theirMeta.current.get(fid);
@@ -831,7 +835,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     let rec = loaded.current.get(fid);
     let brightened = false;
     if (!doc || !rec) {
-      const f = isTheirs(fid) ? await theirRecord(fid) : await getFile(owner, fid);
+      const f = isTheirs(fid) ? await theirRecord(fid) : isTemp(fid) ? rec || null : await getFile(owner, fid);
       if (!f) { toast("That one is gone"); return; }
       if (!rec) { rec = f; loaded.current.set(fid, f); }
       if (!doc) {
@@ -850,7 +854,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (brightened) markDirty(fid);                           // the dark green, put right, is saved
     if (key === activeRef.current) {
       syncActive();
-      try { localStorage.setItem(scoped("cutter.last", owner), fid); } catch { /* private */ }
+      if (!isTemp(fid)) try { localStorage.setItem(scoped("cutter.last", owner), fid); } catch { /* private */ }
     }
     setTick((n) => n + 1);
     if (then) requestAnimationFrame(() => then(v));
@@ -1011,7 +1015,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     try {
       localStorage.setItem(LAYOUT_KEY, JSON.stringify({
         // a doc of theirs is not part of the layout kept for next time: their doc from round 3 isn't round 5's
-        panes: panes.filter((p) => !isTheirs(p.fileId)).map((p) => ({ fileId: p.fileId, read: p.read, follow: p.follow })),
+        panes: panes.filter((p) => !isTheirs(p.fileId) && !isTemp(p.fileId)).map((p) => ({ fileId: p.fileId, read: p.read, follow: p.follow })),
         widths, side, active: Math.max(0, panes.findIndex((p) => p.key === activeKey)),
       }));
     } catch { /* private */ }
@@ -1107,7 +1111,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const k = keyShowing(fid);
     const v = k ? views.current.get(k) : null;
     const base = loaded.current.get(fid);
-    if (!v || !base || isTheirs(fid)) return;
+    if (!v || !base || isTheirs(fid) || isTemp(fid)) return;
     if (base.share) { void copyLink(base.share); return; }
     setBusy(true);
     try {
@@ -1459,13 +1463,17 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [openCard]);
 
   // ---- a pocket in the search, clicked: its file — the one it came from, or one of yours by its name.
-  // Imported blocks that were never a file just fold: no file is made for them.
-  const openPocketFile = useCallback(async (d: { name: string; file?: string; none?: () => void }) => {
+  // Imported blocks that were never a file open as a page of their own, kept nowhere: not in your files,
+  // not in their docs. Edits stay while it's open; Keep as mine makes it a file.
+  const openPocketFile = useCallback(async (d: { name: string; file?: string; html?: string; none?: () => void }) => {
     const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
     const have = (d.file && filesRef.current.find((f) => f.id === d.file)) || filesRef.current.find((f) => norm(f.name) === norm(d.name));
-    if (!have) { d.none?.(); return; }
+    if (!have && !d.html) { d.none?.(); return; }
     if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
-    await open(have.id, (v) => v.focus());
+    if (have) { await open(have.id, (v) => v.focus()); return; }
+    const id = TEMP + norm(d.name);
+    if (!loaded.current.has(id)) loaded.current.set(id, { id, name: d.name, doc: null, html: d.html!, cards: [], words: 0, created: Date.now(), updated: Date.now() });
+    await open(id, (v) => { v.focus(); v.dispatch(v.state.tr.setSelection(TextSelection.atStart(v.state.doc))); });
   }, [open]);
   useEffect(() => {
     const el = root.current;
@@ -2271,7 +2279,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const activePane = panes.find((p) => p.key === activeKey) || null;
   const activeRead = !!activePane?.read;
   const many = panes.length > 1;
-  const curTheirs = !!cur && isTheirs(cur.id);
+  // a temporary page shares, downloads and pops out like a doc of theirs: not until it is kept as yours
+  const curTheirs = !!cur && (isTheirs(cur.id) || isTemp(cur.id));
   const curShare = cur?.share && !curTheirs ? shares.current.get(cur.id) || null : null;
   const theirFor = (fid: string) => theirMeta.current.get(fid);
   // The outline as a tree. Each heading knows whether it has anything under it (a fold mark) and whether
@@ -2335,7 +2344,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     { id: "file", name: "File", sub: "open, new, download, keys", cols: "c2", body: <>
       <button type="button" className="rm-b rm-i" data-tip="Open a .docx, web page or text as a file of yours" aria-label="Open a file" onClick={() => fileIn.current?.click()} disabled={busy}>{I.folder}</button>
       <B id="new-file" cls="rm-i" label="New file">{I.newfile}</B>
-      <button type="button" className="rm-b rm-i" data-tip="Download this file as a .docx" aria-label="Download as .docx" onClick={() => { const fid = viewFile.current.get(activeRef.current); if (fid && !isTheirs(fid)) void download(fid); else toast("Their docs download from where they came from — or keep it as yours first"); }}>{I.down}</button>
+      <button type="button" className="rm-b rm-i" data-tip="Download this file as a .docx" aria-label="Download as .docx" onClick={() => { const fid = viewFile.current.get(activeRef.current); if (fid && !isTheirs(fid) && !isTemp(fid)) void download(fid); else toast(fid && isTemp(fid) ? "Keep as mine first — then it downloads" : "Their docs download from where they came from — or keep it as yours first"); }}>{I.down}</button>
       <button type="button" className={"rm-b rm-i" + (keysOpen ? " on" : "")} data-tip="Keys, and the cite format" aria-label="Keys" onClick={() => { setMenu(null); setKeysOpen((o) => !o); setKeyNote(""); }}>{I.keys}</button>
     </>,
     mini: <>
@@ -2442,7 +2451,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         <div className="rm-titlebox">
           <div className="rm-trow">
             {mode === "speech" && <span className="rm-title rm-titlefix" title="The speech doc — SPLIT or EDIT for your files">Speech doc</span>}
-            {curTheirs && mode !== "speech" && <span className="rm-badge" title="A doc of theirs — kept apart from your library">THEIRS</span>}
+            {curTheirs && mode !== "speech" && (isTemp(cur!.id)
+              ? <span className="rm-badge" title="Library blocks, opened as a page — not kept in your files. Keep as mine makes it a file">NOT KEPT</span>
+              : <span className="rm-badge" title="A doc of theirs — kept apart from your library">THEIRS</span>)}
             <input className="rm-title" hidden={mode === "speech"} value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
               onBlur={(e) => void rename(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); view.current?.focus(); } if (e.key === "Escape") { setName(cur?.name || ""); view.current?.focus(); } }} />
@@ -2731,8 +2742,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               {panes.map((p, i) => {
                 const v = views.current.get(p.key);
                 const words = p.read && v ? readWords(v.state.doc) : 0;
-                const theirsHere = isTheirs(p.fileId);
-                const meta = theirsHere ? theirFor(p.fileId) : null;
+                const tempHere = isTemp(p.fileId);
+                const theirsHere = isTheirs(p.fileId) || tempHere;
+                const meta = theirsHere && !tempHere ? theirFor(p.fileId) : null;
                 const live = shares.current.get(p.fileId) || null;
                 const showHead = many || p.read || theirsHere || mode === "split" || !!live;
                 const pdf = pdfs[p.fileId];
@@ -2745,11 +2757,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                     onPointerDown={() => { if (!p.read) activate(p.key); }}>
                     {showHead && (
                       <div className="rm-phead">
-                        <span className={theirsHere ? "rm-acc2" : "rm-acc"}>{theirsHere ? (meta?.source === "library" || meta?.source === "caselist" ? "CARD" : "THEIRS") : p.read ? "READ" : "FILE"}</span>
+                        <span className={theirsHere ? "rm-acc2" : "rm-acc"}>{tempHere ? "LIBRARY" : theirsHere ? (meta?.source === "library" || meta?.source === "caselist" ? "CARD" : "THEIRS") : p.read ? "READ" : "FILE"}</span>
                         <select className="rm-psel" value={p.fileId} onChange={(e) => void setPaneFile(p.key, e.target.value)} aria-label="What this page shows">
                           <optgroup label="Your files">{files.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
                           {!!theirs.length && <optgroup label="Their docs">{theirs.map((m) => <option key={m.id} value={THEIRS + m.id}>{m.name}</option>)}</optgroup>}
+                          {tempHere && <optgroup label="Not kept"><option value={p.fileId}>{loaded.current.get(p.fileId)?.name || "Library blocks"}</option></optgroup>}
                         </select>
+                        {tempHere && <span className="rm-pmeta" title="Library blocks, opened as a page. It isn't kept in your files — Keep as mine makes it one">NOT KEPT</span>}
                         {meta && <span className="rm-pmeta">{(SOURCE[meta.source] || meta.source).toUpperCase()}{meta.by ? " · " + meta.by.toUpperCase() : ""}</span>}
                         {live && (
                           <span className="rm-mates" title={live.mates.length ? "In it with you: " + live.mates.map((m) => m.name).join(", ") : live.status === "error" ? "Not connected — your edits are kept and go when it is" : "Shared — nobody else is in it right now"}>
@@ -3014,7 +3028,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-sep" />
           <h4>POP OUT — A WINDOW THAT STAYS ON TOP</h4>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); }}>The speech doc</button>
-          {curTheirs && cur && <button type="button" className="rm-mb" onClick={() => { setMenu(null); void flush().then(() => { if (!popOut("doc", { doc: cur.id.slice(THEIRS.length) })) toast("The browser blocked the window — allow pop-ups for this site"); }); }}>Their doc, “{cur.name}”</button>}
+          {curTheirs && cur && !isTemp(cur.id) && <button type="button" className="rm-mb" onClick={() => { setMenu(null); void flush().then(() => { if (!popOut("doc", { doc: cur.id.slice(THEIRS.length) })) toast("The browser blocked the window — allow pop-ups for this site"); }); }}>Their doc, “{cur.name}”</button>}
           <div className="rm-sep" />
           <h4>SPELLING{K("spelling") ? " · " + K("spelling") : ""}</h4>
           {SPELL_MODES.map((m) => (

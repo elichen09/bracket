@@ -1315,4 +1315,4 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 /* a pocket in the search is a file: its name opens it, its arrow (a bigger target than it looks) folds it */
 .rm-side .evi.rm-evsearch .node.lv1 > .chev::after { content: ""; position: absolute; inset: -8px -6px -8px -8px; }
 .rm-side .evi.rm-evsearch .node.lv1 > .nlabel { cursor: pointer; }
-.rm-side .evi.rm-evsearch .node.lv1.file:hover > .nlabel { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.rm-side .evi.rm-evsearch .node.lv1:not([data-grp="Uncategorised"]):hover > .nlabel { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
