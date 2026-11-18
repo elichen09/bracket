@@ -981,6 +981,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     await setPaneFile(key, id, then);
   }, [setPaneFile]);
 
+  /** A doc of theirs opened from Round: just that doc, never the speech doc beside it. */
+  const openSolo = useCallback(async (id: string, then?: (v: EditorView) => void) => {
+    if (modeRef.current === "speech" || modeRef.current === "split") { modeRef.current = "edit"; setModeState("edit"); inSpeech.current = false; }
+    await open(id, then);
+  }, [open]);
+
   const create = useCallback(async (fileName: string, html?: string) => {
     const f = await newFile(fileName, html);
     const key = activeRef.current || panesRef.current[0]?.key;
@@ -1191,9 +1197,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     await keepDoc(owner, d);
     void refreshTheirs();
     loaded.current.delete(THEIRS + d.id);
-    // just their doc, in whatever view you had — the speech doc opens only when you open it (SPLIT)
-    await open(THEIRS + d.id, (v) => { v.focus(); v.dispatch(v.state.tr.setSelection(TextSelection.atStart(v.state.doc))); });
-  }, [owner, refreshTheirs, open]);
+    // just their doc — the speech doc opens only when you open it (SPLIT)
+    await openSolo(THEIRS + d.id, (v) => { v.focus(); v.dispatch(v.state.tr.setSelection(TextSelection.atStart(v.state.doc))); });
+  }, [owner, refreshTheirs, openSolo]);
 
   const forgetTheirs = useCallback(async (m: ViewMeta) => {
     const fid = THEIRS + m.id;
@@ -2752,7 +2758,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               <div className="rm-slist flat">
                 {theirs.map((m) => (
                   <div key={m.id} className="rm-frow" aria-current={cur?.id === THEIRS + m.id}>
-                    <button type="button" className="rm-fopen" onClick={() => void open(THEIRS + m.id, (v) => v.focus())}>
+                    <button type="button" className="rm-fopen" onClick={() => void openSolo(THEIRS + m.id, (v) => v.focus())}>
                       <b>{m.name}</b>
                       <small>{(SOURCE[m.source] || m.source).toUpperCase()}{m.by ? " · " + m.by.toUpperCase() : ""} · {when(m.at).toUpperCase()}</small>
                     </button>
