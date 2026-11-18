@@ -1428,7 +1428,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     // one of your own files' cards, opened: the file itself, at the card
     if (d.how === "page" && d.file && filesRef.current.some((f) => f.id === d.file)) {
       const want = (d.whole ? d.block : d.title).replace(/\s+/g, " ").trim().toLowerCase();
-      await open(d.file, (v) => {
+      await openSolo(d.file, (v) => {
         let pos = -1;
         v.state.doc.forEach((n, p) => { if (pos < 0 && n.type === schema.nodes.heading && n.textContent.replace(/\s+/g, " ").trim().toLowerCase() === want) pos = p; });
         if (pos >= 0) goPos(v, pos); else v.focus();
@@ -1441,7 +1441,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       const rec: ViewDoc = { id: newDocId(), name: d.title.slice(0, 80) || "Card", kind: "html", source: d.from === "caselist" ? "caselist" : "library", by: d.by, at: Date.now(), html: d.html };
       await keepDoc(owner, rec);
       void refreshTheirs();
-      if (modeRef.current === "read" || modeRef.current === "speech") { const m = modeRef.current === "speech" ? "split" : "edit"; modeRef.current = m; setModeState(m); inSpeech.current = false; }
+      // just the page, never the speech doc beside it
+      if (modeRef.current !== "edit") { modeRef.current = "edit"; setModeState("edit"); inSpeech.current = false; }
       const fid = THEIRS + rec.id;
       const key = panesRef.current.length < MAX_PANES ? addPane({ fileId: fid, read: false, follow: true }) : null;
       if (key) requestAnimationFrame(() => requestAnimationFrame(() => { activate(key); views.current.get(key)?.focus(); }));
@@ -1468,7 +1469,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     v.dispatch(tr.scrollIntoView());
     requestAnimationFrame(() => goPos(v, at));
     toast(`In ${v === speechView.current ? "the speech doc" : "the file"}: ${d.title.slice(0, 60)}`);
-  }, [owner, open, addPane, activate, goPos, refreshTheirs, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [owner, open, openSolo, addPane, activate, goPos, refreshTheirs, toast]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = root.current;
     if (!el) return;
