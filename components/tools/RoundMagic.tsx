@@ -2276,7 +2276,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       const step = slashStep(s.menu, e);
       if (!step) return false;
       if (step.pick) void pickSlash(step.pick);
-      else if (step.menu) setSlash({ ...s, menu: step.menu });
+      // straight into the ref too: a key held down comes faster than React draws
+      else if (step.menu) { const next = { ...s, menu: step.menu }; slashRef.current = next; setSlash(next); }
       return true;
     },
   }), [pickSlash]);

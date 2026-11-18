@@ -129,6 +129,15 @@ export default function SlashFind({ at, menu, onMenu, onPick, width = 400, verb 
 }) {
   const box = useRef<HTMLDivElement>(null);
   const rows = slashRows(menu);
+  // where the mouse last really was: a list scrolled under a still mouse makes Chrome send it
+  // over another row without it moving, and that must not take the marked line away from the keys
+  const mouse = useRef<{ x: number; y: number } | null>(null);
+  const hover = (e: React.MouseEvent, i: number) => {
+    const m = mouse.current;
+    if (m && m.x === e.clientX && m.y === e.clientY) return;
+    mouse.current = { x: e.clientX, y: e.clientY };
+    if (menu.i !== i) onMenu({ ...menu, i });
+  };
   useEffect(() => {
     (box.current?.querySelector(".on") as HTMLElement | null)?.scrollIntoView({ block: "nearest" });
   }, [menu]);
@@ -155,7 +164,7 @@ export default function SlashFind({ at, menu, onMenu, onPick, width = 400, verb 
       {note ? <div className="rm-slash-note">{note}</div> : rows!.map((r, i) => (
         <button key={r.kind + ":" + r.id + ":" + r.ai} type="button" role="option" aria-selected={i === menu.i}
           className={"rm-slash-row " + r.kind + (i === menu.i ? " on" : "")}
-          onMouseEnter={() => { if (menu.i !== i) onMenu({ ...menu, i }); }}
+          onMouseMove={(e) => hover(e, i)}
           onClick={(e) => { if ((e.target as HTMLElement).closest(".rm-slash-tick")) onMenu(slashTick(menu, i)); else click(i, e.shiftKey); }}>
           <b>
             {r.kind === "block" && <span className="rm-slash-open" aria-hidden="true">›</span>}

@@ -223,7 +223,8 @@ export default function FlowTable({ sections, docKey, owner, onLook, toast, writ
     const step = slashStep(s.menu, e);
     if (step) {
       e.preventDefault();
-      if (step.pick) pickSlash(step.pick); else if (step.menu) setSl({ ...s, menu: step.menu });
+      // straight into the ref too: a key held down comes faster than React draws
+      if (step.pick) pickSlash(step.pick); else if (step.menu) { const next = { ...s, menu: step.menu }; slRef.current = next; setSl(next); }
       return true;
     }
     if (e.key === "Escape") { e.preventDefault(); shut.current = cell + "|" + e.currentTarget.value; setSl(null); return true; }
