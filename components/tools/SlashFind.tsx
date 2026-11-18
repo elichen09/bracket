@@ -6,7 +6,7 @@ import type { SlashAt } from "@/lib/cutter/slash";
 /**
  * The "/" menu, shared by the speech doc and the flow's cells. It lists blocks first; Enter on a block
  * opens it to its cards (its tags, the heading 4s), Enter on a card takes that card, and Shift+Enter
- * takes the whole block, from either list. In a block's cards, Space ticks several and Enter takes them
+ * takes the whole block, from either list. In a block's cards, Space (or →) ticks several and Enter takes them
  * all. Esc in a block's cards goes back to the blocks.
  */
 
@@ -114,8 +114,8 @@ export function slashStep(m: SlashMenu, e: { key: string; shiftKey: boolean; ctr
     return { menu: { ...m, open: null, ticked: [], i: Math.max(0, at) } };
   }
   if (!rows?.length) return null;
-  // Space in a block's cards: tick the marked one (several go in together)
-  if (e.key === " " && m.open && !e.ctrlKey && !e.altKey && !e.metaKey) return { menu: slashTick(m, m.i) };
+  // Space or → in a block's cards: tick the marked one (several go in together)
+  if ((e.key === " " || e.key === "ArrowRight") && m.open && !e.ctrlKey && !e.altKey && !e.metaKey) return { menu: slashTick(m, m.i) };
   if (e.key === "ArrowDown" || e.key === "ArrowUp") return { menu: { ...m, i: (m.i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length } };
   if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.altKey && !e.metaKey) return slashChoose(m, m.i, e.shiftKey);
   return null;
@@ -161,7 +161,7 @@ export default function SlashFind({ at, menu, onMenu, onPick, width = 400, verb 
             {r.kind === "block" && <span className="rm-slash-open" aria-hidden="true">›</span>}
             {(r.kind === "card" || r.kind === "all") && (
               <span className={"rm-slash-tick" + ((r.kind === "card" ? ticked.has(r.ai as number) : nTicked > 0 && nTicked === (menu.blocks?.find((x) => x.id === menu.open)?.args.length || -1)) ? " on" : "")}
-                role="checkbox" aria-checked={r.kind === "card" ? ticked.has(r.ai as number) : false} title="Tick it (Space) — Enter adds every ticked card" />
+                role="checkbox" aria-checked={r.kind === "card" ? ticked.has(r.ai as number) : false} title="Tick it (Space or →) — Enter adds every ticked card" />
             )}
             {r.title}
           </b>
@@ -169,8 +169,8 @@ export default function SlashFind({ at, menu, onMenu, onPick, width = 400, verb 
         </button>
       ))}
       <div className="rm-slash-keys">{menu.open
-        ? (nTicked ? `Space ticks · Enter ${verb} the ${nTicked} ticked · Shift+Enter the whole block · Esc back`
-          : `↑ ↓ choose · Space ticks several · Enter ${verb} the card · Shift+Enter the whole block · Esc back`)
+        ? (nTicked ? `Space or → ticks · Enter ${verb} the ${nTicked} ticked · Shift+Enter the whole block · Esc back`
+          : `↑ ↓ choose · Space or → ticks several · Enter ${verb} the card · Shift+Enter the whole block · Esc back`)
         : `↑ ↓ choose · Enter shows its cards · Shift+Enter ${verb} the whole block · Esc closes`}</div>
     </div>
   );
