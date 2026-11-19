@@ -13,7 +13,8 @@
  *   - headings: Heading1–4 (Pocket, Hat, Block, Tag)
  *   - a card's cite: the character style Style13ptBold ("Cite")
  *   - underlined card text: StyleUnderline ("Underline")
- *   - underlined and bold (or boxed) card text: Emphasis
+ *   - underlined and boxed card text: Emphasis, box and all (bold and underlined
+ *     without a box stays that: Underline, bold)
  *   - highlighting: Word's own highlighter where the colour is one of its
  *     colours, shading otherwise
  *
@@ -71,7 +72,7 @@ ${head(4, "Tag", '<w:spacing w:before="200"/>', "")}
 <w:style w:type="character" w:customStyle="1" w:styleId="StyleUnderline"><w:name w:val="Style Underline"/><w:aliases w:val="Underline"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="7"/><w:qFormat/>
 <w:rPr><w:sz w:val="22"/><w:u w:val="single"/></w:rPr></w:style>
 <w:style w:type="character" w:styleId="Emphasis"><w:name w:val="Emphasis"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="8"/><w:qFormat/>
-<w:rPr><w:b/><w:bCs/><w:i w:val="0"/><w:sz w:val="22"/><w:u w:val="single"/></w:rPr></w:style>
+<w:rPr><w:b/><w:bCs/><w:i w:val="0"/><w:sz w:val="22"/><w:u w:val="single"/><w:bdr w:val="single" w:sz="8" w:space="0" w:color="auto"/></w:rPr></w:style>
 <w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:basedOn w:val="DefaultParagraphFont"/><w:uiPriority w:val="99"/><w:unhideWhenUsed/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
 </w:styles>`;
 }
@@ -91,7 +92,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
 
   /** The style a run of card text wears. In the cite line, bold is the cite. */
   const styleOf = (r: Run, citeLine: boolean): CharStyle => {
-    if (r.u && (r.b || r.bx)) return "Emphasis";
+    if (r.u && r.bx) return "Emphasis";
     if (r.u) return "StyleUnderline";
     if (citeLine && r.b) return "Style13ptBold";
     return "Normal";
@@ -106,7 +107,7 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
       text: r.t,
       style: st && st !== "Normal" ? st : undefined,
       // what the style doesn't already give it
-      bold: !l && st === "Normal" && r.b ? true : undefined,
+      bold: !l && r.b && st !== "Emphasis" && st !== "Style13ptBold" ? true : undefined,
       italics: r.i ? true : undefined,
       strike: r.s ? true : undefined,
       size: r.fs && r.fs !== own ? r.fs * PT : undefined,
@@ -114,7 +115,8 @@ export async function buildDocx(elements: Elem[], name: string): Promise<{ blob:
       color: fg && fg !== "000000" ? fg : undefined,
       highlight: bg && HIGHLIGHT[bg] ? (HIGHLIGHT[bg] as any) : undefined,
       shading: bg && !HIGHLIGHT[bg] ? { type: ShadingType.CLEAR, color: "auto", fill: bg } : undefined,
-      border: r.bx && st !== "Emphasis" ? { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 0 } : undefined,
+      // on the run as well as in the style: Word draws it either way, and a reader that skips style borders still does
+      border: r.bx ? { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 0 } : undefined,
       // a hat's and a block's rule come with their style; a word underlined in a tag or pocket doesn't
       underline: (l === 4 || l === 1) && r.u ? { type: UnderlineType.SINGLE } : undefined,
     });
