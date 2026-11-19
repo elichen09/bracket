@@ -6,7 +6,7 @@ import { isAdmin } from "@/lib/admin";
 import { currentUser, displayName } from "@/lib/auth";
 import "../tools.css";
 
-export const metadata = { title: "Round Magic · The Break" };
+export const metadata = { title: "Round Magic · coda" };
 export const dynamic = "force-dynamic";
 
 const FONTS = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap";

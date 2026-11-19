@@ -4,9 +4,8 @@
 .gate { padding-top: 12vh; max-width: 46ch; }
 .gate .mono { color: var(--muted); }
 .gate h1 {
-  margin: 8px 0 0; font-family: var(--display); font-weight: 800;
-  font-size: clamp(56px, 12vw, 128px); letter-spacing: -.045em; line-height: .9;
-  text-transform: uppercase;
+  margin: 8px 0 0; font-family: var(--brand); font-weight: 500;
+  font-size: clamp(48px, 9vw, 104px); letter-spacing: -.045em; line-height: 1;
 }
 .gate .prose { color: var(--muted); margin: 16px 0 24px; font-size: 14px; line-height: 1.6; }
 .gate form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }

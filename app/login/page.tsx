@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import Nav from "@/components/Nav";
 import AuthForm from "@/components/AuthForm";
-import Strata from "@/components/Strata";
+import Grain from "@/components/Grain";
 
-export const metadata = { title: "Sign in · The Break" };
+export const metadata = { title: "Sign in · coda" };
 
 export default function LoginPage() {
   return (
@@ -12,8 +12,8 @@ export default function LoginPage() {
       <main>
         <section className="view enter auth-view">
           <div className="auth-art" aria-hidden="true">
-            <Strata palette="reef" />
-            <div className="grain" />
+            <Grain />
+            <span className="word">coda</span>
           </div>
           <div className="auth-side">
             <div className="auth-copy">

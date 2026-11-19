@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   try {
     const res = await fetch(`https://docs.google.com/document/d/${id}/export?format=html${tab ? "&tab=" + tab : ""}`, {
       redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(15_000),
-      headers: { "user-agent": "Mozilla/5.0 (compatible; TheBreak/1.0)" },
+      headers: { "user-agent": "Mozilla/5.0 (compatible; coda/1.0)" },
     });
     if (res.status === 404) return NextResponse.json({ error: "There's no Google Doc at that link" }, { status: 404 });
     if ((res.status >= 300 && res.status < 400) || res.status === 401 || res.status === 403) {

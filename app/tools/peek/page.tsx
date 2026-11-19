@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/auth";
 import "../tools.css";
 import "@/components/tools/peek.css";
 
-export const metadata = { title: "Pop-out · The Break" };
+export const metadata = { title: "Pop-out · coda" };
 export const dynamic = "force-dynamic";
 
 const VIEWS: PeekView[] = ["doc", "send", "flow", "docflow"];

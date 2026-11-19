@@ -35,7 +35,7 @@
 
   --hl: var(--rm-hl, #00ff00);
   --rm-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
-  --rm-sans: Inter, system-ui, "Segoe UI", sans-serif;
+  --rm-sans: "Hanken Grotesk", Inter, system-ui, "Segoe UI", sans-serif;
   /* the suite's theme tokens, in this palette's accent: what the library's own styles use for 'selected' and 'live' */
   --t-acc: var(--acc); --t-acc-rgb: var(--acc-rgb); --t-deep: var(--acc-soft); --t-deep-ink: var(--hi);
   /* the accent, resolved here, for the .evi wrappers below that keep an --acc of their own */
@@ -130,6 +130,19 @@
   --acc: #D4FF3A; --accD: #55750A; --acc-soft: #2C3A0A; --acc-ink: #E9FF9A; --acc-rgb: 212, 255, 58; --ana: #7DE3FF;
   --on-acc: #141A00;
   --chrome-glow: radial-gradient(50% 220% at 0% 0%, rgba(212, 255, 58, .10), transparent 60%);
+}
+/* Ink — coda's own, the default: near-black, ivory, and the accent is the ivory itself (dark text on it, as on Volt's lime) */
+.rm[data-palette="ink"] {
+  --chrome: #0B0B0C; --chrome-line: #1F1F23; --chrome-edge: #000;
+  --btn: #151517; --btn-h: #1D1D21; --btn-a: #26262B; --btnb: #2A2A30; --btnb-h: #4A4A52;
+  --txt: #EDEDEF; --mut: #8E8E96; --hi: #fff;
+  --side: #0F0F11; --side-h: #18181B; --side-on: #1F1F23; --side-line: #1F1F23;
+  --side-txt: #E4E4E7; --side-mut: #8A8A92; --well: #080809; --well-b: #2A2A30;
+  --pop: #131315; --pop-h: #1D1D21;
+  --acc: #EDEDEF; --accD: #1E1E22; --acc-soft: #2A2A30; --acc-ink: #FFFFFF; --acc-rgb: 237, 237, 239; --ana: #B9C6FF;
+  --mode-on: #EDEDEF; --mode-on-ink: #0B0B0C;
+  --on-acc: #0B0B0C;
+  --chrome-glow: none;
 }
 .rm[data-palette="dusk"] {
   --chrome: #1F1424; --chrome-line: #3A2742; --chrome-edge: #120B16;
@@ -818,7 +831,8 @@ body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select:
 .rm-sfoot1 { padding: 6px 12px; font-size: 11px; line-height: 1.4; }
 
 /* On the white page a neon is a whisper: there the louder palettes' accent is their dark one, carrying white. */
-.rm:is([data-palette="midnight"], [data-palette="aurora"], [data-palette="volt"], [data-palette="dusk"]) :is(.ct-sheet, .rm-dropbar) { --acc: var(--accD); --on-acc: #fff; --acc-rgb: var(--accD-rgb); }
+.rm:is([data-palette="ink"], [data-palette="midnight"], [data-palette="aurora"], [data-palette="volt"], [data-palette="dusk"]) :is(.ct-sheet, .rm-dropbar) { --acc: var(--accD); --on-acc: #fff; --acc-rgb: var(--accD-rgb); }
+.rm[data-palette="ink"] { --accD-rgb: 30, 30, 34; }
 .rm[data-palette="midnight"] { --accD-rgb: 14, 116, 144; }
 .rm[data-palette="aurora"] { --accD-rgb: 10, 127, 87; }
 .rm[data-palette="volt"] { --accD-rgb: 85, 117, 10; }
@@ -828,9 +842,10 @@ body.rm-dragging, body.rm-dragging * { cursor: grabbing !important; user-select:
    One window: the strip above the ribbon is the palette's chrome, not the
    site's cream. <html data-rm-palette> is set before the page paints. */
 html:has(.rm) .nav {
-  --nav-bg: #1b1b1b; --ink: #ececec; --muted: #a8a8a8; --line: #333; --line-soft: #333; --ground: var(--nav-bg);
+  --nav-bg: #0B0B0C; --ink: #EDEDEF; --muted: #8E8E96; --line: #1F1F23; --line-soft: #1F1F23; --ground: var(--nav-bg);
   background: var(--nav-bg); color: var(--ink); backdrop-filter: none; border-bottom-color: var(--line);
 }
+html[data-rm-palette="graphite"]:has(.rm) .nav, html[data-rm-palette="ember"]:has(.rm) .nav { --nav-bg: #1b1b1b; --ink: #ececec; --muted: #a8a8a8; --line: #333; --line-soft: #333; }
 html[data-rm-palette="forest"]:has(.rm) .nav { --nav-bg: #1F2C24; --ink: #F1EBDD; --muted: #B3B7A5; --line: #33453A; --line-soft: #33453A; }
 html[data-rm-palette="navy"]:has(.rm) .nav { --nav-bg: #121A2A; --ink: #E8EEF8; --muted: #9FB0C8; --line: #26334A; --line-soft: #26334A; }
 html[data-rm-palette="oxblood"]:has(.rm) .nav { --nav-bg: #221416; --ink: #F3E6E2; --muted: #C2A5A0; --line: #3b2427; --line-soft: #3b2427; }

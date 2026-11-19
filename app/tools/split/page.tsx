@@ -4,7 +4,7 @@ import Split from "@/components/tools/Split";
 import { isAdmin } from "@/lib/admin";
 import "../tools.css";
 
-export const metadata = { title: "Split screen · The Break" };
+export const metadata = { title: "Split screen · coda" };
 export const dynamic = "force-dynamic";
 
 /** Any two tools side by side, each whole, in one window. `?a=flow` puts that one on the left, `&b=evidence` that one on the right. */

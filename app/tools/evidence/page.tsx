@@ -7,7 +7,7 @@ import { isAdmin } from "@/lib/admin";
 import { currentUser, displayName } from "@/lib/auth";
 import "../tools.css";
 
-export const metadata = { title: "Evidence · The Break" };
+export const metadata = { title: "Evidence · coda" };
 export const dynamic = "force-dynamic";
 
 /**

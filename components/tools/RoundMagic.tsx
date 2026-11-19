@@ -184,6 +184,7 @@ const CLOCKS = [
 
 /** The colour palettes: the chrome round the page, and the accent. The page itself stays white. */
 const PALETTES = [
+  { id: "ink", name: "Ink", sub: "coda: near-black, ivory", chrome: "#0B0B0C", side: "#0F0F11", acc: "#EDEDEF" },
   { id: "graphite", name: "Graphite", sub: "Charcoal, violet", chrome: "#1b1b1b", side: "#1e1e1e", acc: "#8b7cf0" },
   { id: "ember", name: "Ember", sub: "Charcoal, orange", chrome: "#1b1b1b", side: "#1e1e1e", acc: "#E97A3E" },
   { id: "forest", name: "Forest", sub: "The suite's green, terracotta", chrome: "#1F2C24", side: "#22302A", acc: "#D9694B" },
@@ -203,6 +204,8 @@ const PALETTES = [
   { id: "lilac", name: "Lilac", sub: "Lavender haze, violet", chrome: "#F1EDFB", side: "#F6F3FD", acc: "#7C4DDB" },
   { id: "citrus", name: "Citrus", sub: "Cream, tangerine, hard black lines", chrome: "#FFF8E6", side: "#FFFBEF", acc: "#F26B1D" },
 ] as const;
+/** Set once Graphite, the default before coda, has been moved to Ink. */
+const INK_MOVED_KEY = "rm.inkMoved";
 /** The palettes with light chrome, listed apart in the menu. */
 const LIGHT_PALETTES = new Set(["paper", "glacier", "blueprint", "sakura", "matcha", "library", "lilac", "citrus"]);
 /** The light six each read in a face of their own (the page you cut on stays Calibri): fetched the first time one is picked. */
@@ -366,7 +369,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // the dock is the folded ribbon, laid out another way
   const ribSmall = ribMin || focusLayout || layoutMode === "dock";
   const [folded, setFolded] = useState<string[]>([]);
-  const [palette, setPalette] = useState<PaletteId>("graphite");
+  const [palette, setPalette] = useState<PaletteId>("ink");
   const [sideW, setSideW] = useState(SIDE_W);
   // spelling: what the browser's checker looks at (lib/cutter/spell.ts)
   // tags only, in the speech doc: kept, so the doc opens the way it was left
@@ -477,7 +480,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (typeof u.ribMin === "boolean") setRibMin(u.ribMin);
         if (LAYOUT_MODES.some((l) => l.id === u.layout)) setLayoutMode(u.layout);
         if (Array.isArray(u.folded)) setFolded(u.folded.filter((x: unknown) => typeof x === "string"));
-        if (PALETTES.some((p) => p.id === u.palette)) setPalette(u.palette);
+        // coda moved everyone on Graphite, the old default, to Ink — once; Graphite is still in the menu
+        let movedToInk = false;
+        try { movedToInk = !!localStorage.getItem(INK_MOVED_KEY); localStorage.setItem(INK_MOVED_KEY, "1"); } catch { /* private */ }
+        if (u.palette === "graphite" && !movedToInk) setPalette("ink");
+        else if (PALETTES.some((p) => p.id === u.palette)) setPalette(u.palette);
         if (typeof u.sideW === "number") setSideW(Math.min(760, Math.max(220, u.sideW)));
         if (SPELL_MODES.some((m) => m.id === u.spell)) setSpell(u.spell);
         if (typeof u.speechTags === "boolean") setSpeechTags(u.speechTags);
@@ -1814,7 +1821,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         setGf({ items: parseFlow(j.html), html: j.html, at: Date.now(), err: "", fresh: new Set() });
       } catch (e) {
         if (e instanceof SignInExpired) { setGConn(false); setGExpired(true); toast(e.message); return; }
-        if (!stop) setGf((g) => ({ items: g?.items || [], html: g?.html || "", at: g?.at || 0, err: gConn ? (e as Error).message : "Couldn't reach The Break — trying again", fresh: new Set() }));
+        if (!stop) setGf((g) => ({ items: g?.items || [], html: g?.html || "", at: g?.at || 0, err: gConn ? (e as Error).message : "Couldn't reach coda — trying again", fresh: new Set() }));
       } finally { busy = false; }
     };
     void pull();

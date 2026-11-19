@@ -1,14 +1,15 @@
-/* The Break — global styles (ported from the design draft) */
+/* coda — global styles. Ink: ivory on near-black, Hanken Grotesk for the
+   name, the titles and everything read and pressed; mono labels. */
 :root {
-    /* dark-first — the page commits to an ink-on-black editorial ground */
-    --ground:#0D0D0E;
-    --surface:#151517;
-    --surface-2:#1B1B1E;
-    --line:#2A2A2E;
-    --line-soft:#202023;
-    --ink:#F1EEE7;
-    --muted:#8E8C86;
-    --dim:#5C5B57;
+    /* dark-first — the page commits to an ink-on-black ground */
+    --ground:#0B0B0C;
+    --surface:#121214;
+    --surface-2:#18181B;
+    --line:#26262B;
+    --line-soft:#1C1C20;
+    --ink:#EDEDEF;
+    --muted:#8E8E96;
+    --dim:#5E5E66;
     --good:#63C48F;
     --good-soft:#132B1E;
     --good-ink:#9EE2BC;
@@ -16,12 +17,14 @@
     --bad-soft:#2F1712;
     --gold:#D8AB4C;
     --gold-soft:#2A2213;
-    --pick:#F1EEE7;
+    --pick:#EDEDEF;
 
-    --display:"Bricolage Grotesque","Archivo Black","Helvetica Neue",Arial,sans-serif;
-    --serif:"Instrument Serif",Georgia,"Times New Roman",serif;
-    --ui:"Barlow","Helvetica Neue",Arial,sans-serif;
-    --cond:"Barlow Semi Condensed","Barlow","Helvetica Neue",Arial,sans-serif;
+    /* the name and the titles */
+    --brand:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;
+    --serif:var(--brand);
+    --display:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;
+    --ui:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;
+    --cond:var(--ui);
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 
     --gutter: clamp(16px, 4vw, 56px);
@@ -30,23 +33,23 @@
   }
   @media (prefers-color-scheme: light) {
     :root:not([data-theme="dark"]) {
-      --ground:#F2F0EB; --surface:#FFFFFF; --surface-2:#F8F7F3;
-      --line:#D6D3CB; --line-soft:#E6E3DC;
-      --ink:#111111; --muted:#6B6A66; --dim:#A6A49E;
+      --ground:#F5F5F3; --surface:#FFFFFF; --surface-2:#FAFAF9;
+      --line:#DCDCD8; --line-soft:#EAEAE7;
+      --ink:#0B0B0C; --muted:#5E5E66; --dim:#9A9AA2;
       --good:#1F7A4B; --good-soft:#DCEFE4; --good-ink:#145A36;
       --bad:#B4402C; --bad-soft:#F6E1DC;
       --gold:#9A7020; --gold-soft:#F1E7CC;
-      --pick:#111111;
+      --pick:#0B0B0C;
     }
   }
   :root[data-theme="light"] {
-    --ground:#F2F0EB; --surface:#FFFFFF; --surface-2:#F8F7F3;
-    --line:#D6D3CB; --line-soft:#E6E3DC;
-    --ink:#111111; --muted:#6B6A66; --dim:#A6A49E;
+    --ground:#F5F5F3; --surface:#FFFFFF; --surface-2:#FAFAF9;
+    --line:#DCDCD8; --line-soft:#EAEAE7;
+    --ink:#0B0B0C; --muted:#5E5E66; --dim:#9A9AA2;
     --good:#1F7A4B; --good-soft:#DCEFE4; --good-ink:#145A36;
     --bad:#B4402C; --bad-soft:#F6E1DC;
     --gold:#9A7020; --gold-soft:#F1E7CC;
-    --pick:#111111;
+    --pick:#0B0B0C;
   }
 
   * { box-sizing: border-box; }
@@ -87,7 +90,7 @@
     transition: border-color .3s var(--ease);
   }
   .nav.scrolled { border-bottom-color: var(--line-soft); }
-  .nav .brand { font-family: var(--display); font-weight: 800; font-size: 15px; letter-spacing: -.02em; white-space: nowrap; }
+  .nav .brand { font-family: var(--brand); font-weight: 500; font-size: 21px; line-height: 1; letter-spacing: -.03em; white-space: nowrap; }
   .nav .links { display: flex; gap: 22px; margin-left: auto; }
   .nav .links a { position: relative; color: var(--muted); transition: color .2s var(--ease); padding: 4px 0; white-space: nowrap; }
   .nav .links a::after {
@@ -140,7 +143,7 @@
   }
   .index .row:hover { padding-left: 10px; }
   .index .row .n { color: var(--dim); font-family: var(--mono); font-size: 12px; }
-  .index .row .t { font-family: var(--display); font-weight: 700; font-size: clamp(22px, 3.4vw, 40px); letter-spacing: -.03em; line-height: 1.05; }
+  .index .row .t { font-family: var(--brand); font-weight: 500; font-size: clamp(24px, 3.4vw, 40px); letter-spacing: -.03em; line-height: 1.05; }
   .index .row .t small { display: block; font-family: var(--ui); font-weight: 400; font-size: 13px; color: var(--muted); letter-spacing: 0; margin-top: 6px; }
   .index .row .s { text-align: right; color: var(--muted); white-space: nowrap; }
   .index .row .s b { display: block; color: var(--ink); font-weight: 500; font-size: 14px; letter-spacing: 0; text-transform: none; font-family: var(--ui); }
@@ -175,8 +178,8 @@
   .thead .crumb { color: var(--muted); }
   .thead .crumb a:hover { color: var(--ink); }
   .thead h1 {
-    margin: 0; font-family: var(--display); font-weight: 800; letter-spacing: -.04em; line-height: .92;
-    font-size: clamp(40px, 8.5vw, 118px); text-wrap: balance;
+    margin: 0; font-family: var(--brand); font-weight: 500; letter-spacing: -.045em; line-height: 1;
+    font-size: clamp(40px, 7vw, 96px); text-wrap: balance;
   }
   .thead .sub { display: flex; flex-wrap: wrap; gap: 8px 26px; color: var(--muted); margin-top: 6px; }
   .thead .sub .live { color: var(--good); }

@@ -5,7 +5,8 @@ import Presence from "./Presence";
 import { COZY_FONT, SHAPE_KEY, THEME_KEY } from "@/lib/toolTheme";
 
 /**
- * The tools' colour scheme — one button in every tool's banner. Five quiet
+ * The tools' colour scheme — one button in every tool's banner. Ink, coda's
+ * own and the default, then five quiet
  * ones, and six louder: a near-black banner lit in one neon.
  *
  * A scheme is a set of colours and nothing else (finish.css holds them); the
@@ -21,6 +22,7 @@ import { COZY_FONT, SHAPE_KEY, THEME_KEY } from "@/lib/toolTheme";
  */
 
 const THEMES = [
+  { id: "ink", name: "Ink", note: "coda: black banner, white paper, ivory", sw: ["#0B0B0C", "#1F5E8C", "#B64F1E", "#EDEDEF", "#FFFFFF"] },
   { id: "forest", name: "Forest", note: "Green banner, cream paper, terracotta", sw: ["#1F2C24", "#22493A", "#AE6044", "#C4553A", "#FFFCF6"] },
   { id: "paper", name: "Paper", note: "Light banner, blue and garnet, red", sw: ["#FFFFFF", "#2E5FAE", "#A93650", "#CF2A22", "#F6F3EC"] },
   { id: "navy", name: "Navy", note: "Night blue, cool paper, coral", sw: ["#1B2437", "#284C80", "#A8603A", "#B9502F", "#FFFEFB"] },
@@ -41,8 +43,8 @@ const THEMES = [
 ] as const;
 
 export function applyTheme(id: string) {
-  const t = THEMES.some((x) => x.id === id) ? id : "forest";
-  if (t === "forest") document.documentElement.removeAttribute("data-tool-theme");
+  const t = THEMES.some((x) => x.id === id) ? id : "ink";
+  if (t === "ink") document.documentElement.removeAttribute("data-tool-theme");
   else document.documentElement.setAttribute("data-tool-theme", t);
 }
 
@@ -59,7 +61,7 @@ export function applyShape(id: string) {
 
 export default function ThemePicker() {
   const [open, setOpen] = useState(false);
-  const [cur, setCur] = useState("forest");
+  const [cur, setCur] = useState("ink");
   const [shape, setShape] = useState("sharp");
   // chosen in another tab, or the other half of the split view: follow it
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function ThemePicker() {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try { setCur(localStorage.getItem(THEME_KEY) || "forest"); setShape(localStorage.getItem(SHAPE_KEY) || "sharp"); } catch { /* private browsing */ }
+    try { setCur(localStorage.getItem(THEME_KEY) || "ink"); setShape(localStorage.getItem(SHAPE_KEY) || "sharp"); } catch { /* private browsing */ }
   }, []);
   // Pinned to the window under its button, not to the toolbar: a toolbar that
   // scrolls sideways would clip anything hanging out of it.

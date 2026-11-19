@@ -20,7 +20,7 @@ export default function Nav() {
   const at = (p: string) => (path === p || path.startsWith(p + "/") ? "on" : "");
   return (
     <nav className={"nav" + (scrolled ? " scrolled" : "")}>
-      <Link className="brand" href="/">THE BREAK</Link>
+      <Link className="brand" href="/">coda</Link>
       <div className="links mono">
         <Link href="/tools/magic" className={at("/tools/magic")}>Round Magic</Link>
         <Link href="/tools/flow" className={"opt " + at("/tools/flow")}>Flow</Link>

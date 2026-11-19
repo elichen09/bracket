@@ -23,7 +23,24 @@
   --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .15  0 0 0 0 .08  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   --grain-light: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 .92  0 0 0 .08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 
-  /* ---- Forest: the Flow it look (the default) ---- */
+  /* ---- Ink: coda's own (the default). A near-black banner in ivory, white
+     paper, and no colour but the sides: the accent is ink itself, so what is
+     live is told by weight and fill, not hue. Pro and Con are Graphite's
+     pair, already checked. ---- */
+  --t-ground: #ECECEA; --t-panel: #F3F3F1; --t-surface: #FFFFFF; --t-surface-2: #F6F6F4; --t-paper: #FFFFFF;
+  --t-line: #C6C6C2; --t-line-soft: #E1E1DD; --t-ink: #0B0B0C; --t-muted: #55555C; --t-dim: #7E7E86;
+  --bn: #0B0B0C; --bn-top: #111113; --bn-bot: #08080A; --bn-glow: #1C1C20; --bn-edge: #000000;
+  --bn-ink: #EDEDEF; --bn-rgb: 237, 237, 239; --bn-well: rgba(255, 255, 255, .06); --bn-grain: var(--grain-light);
+  --bn-main: #EDEDEF; --bn-main-ink: #0B0B0C;
+  --t-acc: #1E1E22; --t-acc-hi: #3A3A41; --t-acc-rgb: 30, 30, 34;
+  --t-deep: #0B0B0C; --t-deep-2: #1C1C20; --t-deep-ink: #EDEDEF;
+  --t-pro: #1F5E8C; --t-pro-ink: #184B70; --t-pro-head: #E6EEF5; --t-pro-bg: #F6F9FB; --t-pro-rgb: 31, 94, 140;
+  --t-con: #B64F1E; --t-con-ink: #93400F; --t-con-head: #FBECE3; --t-con-bg: #FDF7F2; --t-con-rgb: 182, 79, 30;
+  --t-vision: #0E7490; --t-live: #ECECEF;
+}
+
+/* ---- Forest: the Flow it look (the default before coda) ---- */
+html[data-tool-theme="forest"] .toolpage {
   --t-ground: #ECE5D8; --t-panel: #F0EADF; --t-surface: #FBF8F2; --t-surface-2: #F4EEE3; --t-paper: #FFFCF6;
   --t-line: #C8BDAB; --t-line-soft: #E0D6C5; --t-ink: #1D1B17; --t-muted: #5A554B; --t-dim: #857E71;
   --bn: #1F2C24; --bn-top: #243329; --bn-bot: #1C271F; --bn-glow: #2B3D31; --bn-edge: #16201A;
@@ -186,6 +203,12 @@ html[data-tool-theme="glacier"] .toolpage {
 /* In the louder six the site's nav, over the banner, is the banner's colour: one dark head, not cream on black.
    (Round Magic dresses the nav itself, from its own palette.) */
 html:is([data-tool-theme="midnight"], [data-tool-theme="synthwave"], [data-tool-theme="aurora"], [data-tool-theme="volt"], [data-tool-theme="dusk"], [data-tool-theme="glacier"]):has(.toolpage):not(:has(.rm)) .nav {
+  --ground: var(--nav-bg); --line-soft: var(--line);
+  background: var(--nav-bg); color: var(--ink); backdrop-filter: none; border-bottom-color: var(--line);
+}
+/* Ink (no attribute) is one dark head too */
+html:not([data-tool-theme]):has(.toolpage):not(:has(.rm)) .nav {
+  --nav-bg: #0B0B0C; --ink: #EDEDEF; --muted: #8E8E96; --line: #1F1F23;
   --ground: var(--nav-bg); --line-soft: var(--line);
   background: var(--nav-bg); color: var(--ink); backdrop-filter: none; border-bottom-color: var(--line);
 }

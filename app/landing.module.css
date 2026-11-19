@@ -1,15 +1,9 @@
-/* The front page, "coda · Ink": the mark draws itself over static. */
+/* The front page, "coda · Ink": the name over static. */
 
 @font-face {
   font-family: "CodaGrot";
   src: url("/fonts/coda-grot.woff2") format("woff2");
   font-weight: 100 900;
-  font-display: block;
-}
-@font-face {
-  font-family: "CodaMark";
-  src: url("/fonts/coda-mark.woff2") format("woff2");
-  font-weight: 400 900;
   font-display: block;
 }
 
@@ -51,56 +45,32 @@
   color: #ededef;
 }
 
-.center {
+/* The name, alone, in the grotesk: it comes out of the static wide and soft
+   and settles to its own spacing. */
+.word {
   position: absolute;
   left: 50%;
   top: 46%;
   transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 26px;
-}
-
-.mark {
-  display: block;
-  overflow: visible;
-  filter: drop-shadow(0 0 24px rgba(237, 237, 239, 0.16));
-}
-
-.letter {
-  font-family: "CodaMark", serif;
-  font-size: 210px;
-  font-weight: 500;
-  font-variation-settings: "opsz" 96;
-  stroke-dasharray: 900;
-  stroke-dashoffset: 900;
-  fill-opacity: 0;
-  animation: draw 2.6s cubic-bezier(0.65, 0, 0.35, 1) 0.3s forwards, fill 1.4s ease 2.2s forwards;
-}
-@keyframes draw {
-  to { stroke-dashoffset: 0; }
-}
-@keyframes fill {
-  to { fill-opacity: 1; stroke-opacity: 0; }
-}
-
-.word {
   margin: 0;
+  font-family: "CodaGrot", "Hanken Grotesk", sans-serif;
   font-weight: 500;
-  font-size: 30px;
-  letter-spacing: -0.02em;
+  font-size: clamp(76px, 11vw, 160px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+  filter: drop-shadow(0 0 28px rgba(237, 237, 239, 0.14));
   opacity: 0;
-  animation: word 1.8s cubic-bezier(0.16, 1, 0.3, 1) 1.8s forwards;
+  animation: word 2s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
 }
 @keyframes word {
-  from { opacity: 0; letter-spacing: 0.3em; }
-  to { opacity: 1; letter-spacing: -0.02em; }
+  from { opacity: 0; letter-spacing: 0.22em; filter: blur(10px) drop-shadow(0 0 28px rgba(237, 237, 239, 0)); }
+  to { opacity: 1; letter-spacing: -0.045em; filter: blur(0) drop-shadow(0 0 28px rgba(237, 237, 239, 0.14)); }
 }
 
 .fade {
   opacity: 0;
-  animation: fade 1.2s ease 2.6s forwards;
+  animation: fade 1s ease 1.4s forwards;
 }
 @keyframes fade {
   to { opacity: 1; }
@@ -161,6 +131,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .letter { animation: none; stroke-dashoffset: 0; fill-opacity: 1; stroke-opacity: 0; }
   .word, .fade { animation: none; opacity: 1; }
 }

@@ -6,7 +6,7 @@ import { isAdmin } from "@/lib/admin";
 import { currentUser, displayName } from "@/lib/auth";
 import "../tools.css";
 
-export const metadata = { title: "Flow · The Break" };
+export const metadata = { title: "Flow · coda" };
 export const dynamic = "force-dynamic";
 
 /**

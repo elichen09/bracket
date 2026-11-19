@@ -7,7 +7,7 @@ import { isAdmin } from "@/lib/admin";
 import { currentUser } from "@/lib/auth";
 import "../tools.css";
 
-export const metadata = { title: "Card cutter · The Break" };
+export const metadata = { title: "Card cutter · coda" };
 export const dynamic = "force-dynamic";
 
 /** Cutting cards into files of your own, by key; every file is in Evidence's search too. */

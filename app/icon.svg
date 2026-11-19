@@ -1,11 +1,2 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- The Break: the landing page's strata in miniature. Near-black ground,
-       flat hard-edged bands from the dusk palette, each stepping down at the
-       same angular kink — the bracket's turn, where the field breaks. Few,
-       broad bands, so it still reads at sixteen pixels in a tab. -->
-  <rect width="64" height="64" fill="#0D0D0E"/>
-  <path d="M0 12H21L37 28H64V64H0Z" fill="#2E3153"/>
-  <path d="M0 22H21L37 38H64V64H0Z" fill="#F6E0CD"/>
-  <path d="M0 32H21L37 48H64V64H0Z" fill="#E9925A"/>
-  <path d="M0 42H21L37 58H64V64H0Z" fill="#C95B2E"/>
-</svg>
+<!-- coda: the lowercase c of Hanken Grotesk (wght 600, the cut that holds at tab size), ivory on ink. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0B0B0C"/><path fill="#EDEDEF" d="M33.68 48.64Q29.9 48.64 27 47.3Q24.11 45.97 22.18 43.59Q20.26 41.22 19.29 38.22Q18.31 35.22 18.31 31.97Q18.31 28.71 19.29 25.72Q20.26 22.72 22.18 20.37Q24.11 18.03 27 16.7Q29.9 15.36 33.68 15.36Q38.43 15.36 41.98 17.64Q45.53 19.92 47.23 24.67L40.84 27.15Q40.06 24.67 38.3 23.14Q36.55 21.61 33.68 21.61Q30.81 21.61 29.02 23.11Q27.23 24.61 26.39 26.95Q25.54 29.3 25.54 31.97Q25.54 34.64 26.39 37.01Q27.23 39.39 29.02 40.86Q30.81 42.32 33.68 42.32Q36.55 42.32 38.3 40.82Q40.06 39.33 40.84 36.85L47.23 39.33Q45.53 44.02 41.98 46.33Q38.43 48.64 33.68 48.64Z"/></svg>

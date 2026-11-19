@@ -422,7 +422,7 @@ export default function Tutorial() {
         <div className="tu-main" ref={body}>
           <div className="tu-col">
             <div className="tu-hero">
-              <p className="mono">The Break · Tools</p>
+              <p className="mono">coda · Tools</p>
               <h1>How every tool works</h1>
               <p className="tu-lead">What each tool is for, a first go at it step by step, its keys, and the things worth knowing. Every section has a <b>Try it</b> panel: a small working copy of the tool to have a go in. Nothing you do there touches your real flows or cards.</p>
             </div>

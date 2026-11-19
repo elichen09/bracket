@@ -6,9 +6,9 @@ import s from "./landing.module.css";
 export const dynamic = "force-dynamic";      // who is signed in is read from a cookie
 
 /**
- * The front page — "coda · Ink": the C draws itself over static, the name
- * settles under it, and the way in fades up. Signed in, the way in is Round
- * Magic; signed out, it is an account.
+ * The front page — "coda · Ink": the name settles out of the
+ * static, and the way in fades up. Signed in, the way in is Round Magic;
+ * signed out, it is an account.
  */
 export default async function Home() {
   const user = await currentUser();
@@ -22,12 +22,7 @@ export default async function Home() {
           : <Link href="/login" className={s.link}>Sign in</Link>}
       </header>
 
-      <div className={s.center}>
-        <svg className={s.mark} role="img" aria-label="coda" width="190" height="190" viewBox="0 0 200 200">
-          <text className={s.letter} x="100" y="172" textAnchor="middle" fill="#EDEDEF" stroke="#EDEDEF" strokeWidth="0.9">C</text>
-        </svg>
-        <h1 className={s.word}>coda</h1>
-      </div>
+      <h1 className={s.word}>coda</h1>
 
       <div className={`${s.ctas} ${s.fade}`}>
         {user ? (

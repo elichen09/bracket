@@ -6,7 +6,7 @@ import { isAdmin } from "@/lib/admin";
 import { TOOLS } from "@/lib/tools";
 import "./tools.css";
 
-export const metadata = { title: "Tools · The Break" };
+export const metadata = { title: "Tools · coda" };
 export const dynamic = "force-dynamic";      // the gate is read from a cookie
 
 export default function Tools() {
@@ -19,7 +19,7 @@ export default function Tools() {
           {!admin ? <AdminGate what="the tools" /> : (
             <>
               <div className="thead">
-                <p className="crumb mono reveal"><Link href="/">← The Break</Link></p>
+                <p className="crumb mono reveal"><Link href="/">← coda</Link></p>
                 <h1 className="reveal">Tools</h1>
                 <p className="hint reveal" style={{ marginTop: 0 }}>
                   Each is a workbench of its own and keeps its own data in this browser. Start with the tutorial, or go straight to Round Magic.

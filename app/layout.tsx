@@ -4,11 +4,11 @@ import "./theme.css";
 import { Analytics } from "@vercel/analytics/react";
 
 export const metadata: Metadata = {
-  title: "The Break",
+  title: "coda",
   description: "Tools for a debate round, in one window — cut cards, search your library and the caselist, build the speech doc with your partner, flow.",
 };
 
-const FONTS = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Serif:ital@1&family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap";
+const FONTS = "https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,300..800;1,300..800&family=IBM+Plex+Mono:wght@400;500&display=swap";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

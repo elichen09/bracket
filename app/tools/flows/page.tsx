@@ -5,7 +5,7 @@ import { isAdmin } from "@/lib/admin";
 import { currentUser } from "@/lib/auth";
 import "../tools.css";
 
-export const metadata = { title: "Past flows · The Break" };
+export const metadata = { title: "Past flows · coda" };
 export const dynamic = "force-dynamic";
 
 /** Every round this account has flowed, in either tool. */
