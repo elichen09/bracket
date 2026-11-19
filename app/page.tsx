@@ -1,78 +1,51 @@
 import Link from "next/link";
-import Nav from "@/components/Nav";
-import Strata from "@/components/Strata";
-import { TOOLS } from "@/lib/tools";
+import Grain from "@/components/Grain";
 import { currentUser } from "@/lib/auth";
+import s from "./landing.module.css";
 
 export const dynamic = "force-dynamic";      // who is signed in is read from a cookie
 
 /**
- * The front page: what The Break is now — the tools a debater works a round
- * in — and the way into each. Round Magic is the one most rounds are spent
- * in, so it is the way in.
+ * The front page — "coda · Ink": the C draws itself over static, the name
+ * settles under it, and the way in fades up. Signed in, the way in is Round
+ * Magic; signed out, it is an account.
  */
 export default async function Home() {
   const user = await currentUser();
   return (
-    <>
-      <Nav />
-      <main className="landing">
-        <section className="hero2">
-          <div className="hero-copy">
-            <div className="hero-top mono">
-              <span>Tools for the round</span>
-              <span className="dotline" />
-              <span>{TOOLS.length} tools · one window</span>
-            </div>
-            <h1 className="giant" aria-label="The Break">
-              <span className="w"><span>THE</span></span>
-              <span className="w"><span><em>Break</em></span></span>
-            </h1>
-            <div className="hero-foot">
-              <p className="lede2">
-                Cut cards by key. Search your library and the caselist as fast as you type. Build the speech doc
-                with your partner in the same file. Read the other team&apos;s doc, and flow the round —
-                without leaving the window.
-              </p>
-              <div className="cta-row">
-                {user ? (
-                  <>
-                    <Link className="btn-big" href="/tools/magic">Open Round Magic <i>→</i></Link>
-                    <Link className="btn-ghost" href="/tools/tutorial">The tutorial</Link>
-                  </>
-                ) : (
-                  <>
-                    <Link className="btn-big" href="/login?mode=up">Create account <i>→</i></Link>
-                    <Link className="btn-ghost" href="/login">Sign in</Link>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="hero-art" aria-hidden="true">
-            <Strata palette="dusk" />
-            <div className="grain" />
-            <span className="art-tag mono">Fig. 01 — the break</span>
-          </div>
-        </section>
+    <main className={s.page}>
+      <Grain className={s.grain} />
 
-        <section className="toolsec" id="tools">
-          <div className="index">
-            {TOOLS.map((t, i) => (
-              <Link key={t.slug} href={`/tools/${t.slug}`} className="row toolrow">
-                <span className="n">{String(i + 1).padStart(2, "0")}</span>
-                <span className="t">{t.name}<small>{t.blurb}</small></span>
-                <span className="s mono">{t.storage.split("—")[0].trim()}</span>
-                <span className="a">→</span>
-              </Link>
-            ))}
-          </div>
-          <p className="hint" style={{ marginTop: 28 }}>
-            Everything you make is kept in your own browser, apart per account. Nothing is uploaded unless you share it:
-            a file you share with a partner, or a room for the speech doc.
-          </p>
-        </section>
-      </main>
-    </>
+      <header className={`${s.top} ${s.fade}`}>
+        {user
+          ? <Link href="/tools" className={s.link}>Tools</Link>
+          : <Link href="/login" className={s.link}>Sign in</Link>}
+      </header>
+
+      <div className={s.center}>
+        <svg className={s.mark} role="img" aria-label="coda" width="190" height="190" viewBox="0 0 200 200">
+          <text className={s.letter} x="100" y="172" textAnchor="middle" fill="#EDEDEF" stroke="#EDEDEF" strokeWidth="0.9">C</text>
+        </svg>
+        <h1 className={s.word}>coda</h1>
+      </div>
+
+      <div className={`${s.ctas} ${s.fade}`}>
+        {user ? (
+          <>
+            <Link href="/tools/magic" className={`${s.btn} ${s.primary}`}>Open Round Magic</Link>
+            <Link href="/tools/tutorial" className={`${s.btn} ${s.ghost}`}>Tutorial</Link>
+          </>
+        ) : (
+          <>
+            <Link href="/login?mode=up" className={`${s.btn} ${s.primary}`}>Get started</Link>
+            <Link href="/login" className={`${s.btn} ${s.ghost}`}>Sign in</Link>
+          </>
+        )}
+      </div>
+
+      <footer className={`${s.foot} ${s.fade}`}>
+        <span>© 2026</span><span>Tools for the round</span>
+      </footer>
+    </main>
   );
 }
