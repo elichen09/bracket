@@ -62,6 +62,7 @@ export const ACTIONS: Action[] = [
   { id: "timer", group: "Round", label: "Speech timer", key: "alt+T", hint: "A clock for the speech, prep or cross-ex" },
   { id: "ai-cite", group: "AI", label: "Cite from link", key: "alt+shift+L", hint: "Paste an article's link: Claude reads the page and writes the cite in your cite format — author, credentials, title, date, link" },
   { id: "ai-reformat", group: "AI", label: "Reformat with AI", key: "alt+shift+F", hint: "The card you're in, or every card selected, in the house format: underlining around what's read, emphasis on what matters, the rest small, the cite rewritten — no word or highlight changed" },
+  { id: "ai-indict", group: "AI", label: "Rehighlight for indicts", key: "alt+shift+I", hint: "Their card, or every card selected: Claude finds where the author undercuts the tag, and the card is rehighlighted in cyan to read those words instead" },
   { id: "ai-blocks", group: "AI", label: "Find blocks", key: "alt+shift+A", hint: "The best blocks in your library for their card or a claim — and the caselist when your library has nothing" },
 ];
 export const ACTION = new Map(ACTIONS.map((a) => [a.id, a]));

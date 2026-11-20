@@ -59,9 +59,9 @@ export interface ReformatReport {
 /* ------------------------------------------------------------------ the card, as text */
 
 /** A card's body as text: s, its highlight colour per character, and each character's place in the document (-1 at a paragraph break). */
-interface Body { s: string; hl: (string | null)[]; at: number[] }
+export interface Body { s: string; hl: (string | null)[]; at: number[] }
 
-function readBody(doc: PMNode, from: number, to: number): Body {
+export function readBody(doc: PMNode, from: number, to: number): Body {
   let s = "";
   const hl: (string | null)[] = [], at: number[] = [];
   let firstPara = true;
@@ -85,7 +85,7 @@ function readBody(doc: PMNode, from: number, to: number): Body {
 const slice = (b: Body, x: number, z: number): Body => ({ s: b.s.slice(x, z), hl: b.hl.slice(x, z), at: b.at.slice(x, z) });
 
 /** Highlighted runs marked [[like this]]; paragraphs apart by a blank line. */
-function marked(b: { s: string; hl: (string | null)[] }): string {
+export function marked(b: { s: string; hl: (string | null)[] }): string {
   let out = "", on = false;
   for (let i = 0; i < b.s.length; i++) {
     const ch = b.s[i], h = !!b.hl[i] && ch !== "\n";
@@ -155,7 +155,7 @@ function cutEnds(b: Body): { a: number; z: number; top: number; bottom: number }
 /* ------------------------------------------------------------------ what Claude says, found in the card */
 
 /** Phrases found in order (case, quotes, dashes and spacing aside) → [start, end) ranges; the rest counted as missed. */
-function find(b: { s: string }, phrases: string[]): { ranges: [number, number][]; miss: number } {
+export function find(b: { s: string }, phrases: string[]): { ranges: [number, number][]; miss: number } {
   const norm = (x: string) => x.replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").toLowerCase();
   let ns = "";
   const map: number[] = [];
@@ -318,7 +318,7 @@ function citeParts(c: z.infer<typeof FormatShape>["cite"]): CiteParts | null {
 /* ------------------------------------------------------------------ the run */
 
 /** The tags in the selection — or the card the cursor is in — as their order among the document's tags. */
-function cardsToDo(state: EditorState): number[] {
+export function cardsToDo(state: EditorState): number[] {
   const tags: number[] = [];
   state.doc.forEach((n, pos) => { if (n.type === schema.nodes.heading && n.attrs.level === 4) tags.push(pos); });
   const { from, to, empty } = state.selection;
@@ -332,7 +332,7 @@ function cardsToDo(state: EditorState): number[] {
 }
 
 /** The card that is the k-th tag's, as it is now. */
-function cardAt(state: EditorState, k: number) {
+export function cardAt(state: EditorState, k: number) {
   let n = -1, at = -1;
   state.doc.forEach((node, pos) => { if (at < 0 && node.type === schema.nodes.heading && node.attrs.level === 4 && ++n === k) at = pos; });
   return at < 0 ? null : cardAround(state, at + 1);

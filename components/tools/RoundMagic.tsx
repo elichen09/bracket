@@ -22,6 +22,7 @@ import { DEFAULT_CITE_FORMAT, writeCite } from "@/lib/cutter/cites";
 import { aiKey, setAiKey, checkKey, AI_MODEL } from "@/lib/ai/claude";
 import { citeFromLink } from "@/lib/ai/cite";
 import { aiReformat } from "@/lib/ai/reformat";
+import { aiIndict } from "@/lib/ai/indict";
 import { findBlocks, type Found, type Sources } from "@/lib/ai/blocks";
 import { spotPlugin, holdSpot, takeSpot } from "@/lib/ai/spot";
 import { caselistClient, familyOf } from "@/lib/caselist/client";
@@ -417,7 +418,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const keysRef = useRef(keys);
   keysRef.current = keys;
   const [keysOpen, setKeysOpen] = useState(false);
-  const aiOpenRef = useRef<(what: "cite" | "reformat" | "blocks" | "settings") => void>(() => {});
+  const aiOpenRef = useRef<(what: "cite" | "reformat" | "indict" | "blocks" | "settings") => void>(() => {});
   // the command menu: one box for every command, every file, and both searches
   const [pal, setPal] = useState<null | { q: string; sel: number }>(null);
   const palIn = useRef<HTMLInputElement>(null);
@@ -1596,6 +1597,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (id === "ai-cite") { aiOpenRef.current("cite"); return; }
     if (id === "ai-reformat") { aiOpenRef.current("reformat"); return; }
     if (id === "ai-blocks") { aiOpenRef.current("blocks"); return; }
+    if (id === "ai-indict") { aiOpenRef.current("indict"); return; }
     if (id === "command") {
       // the search, with every command after a >
       focusLibrary();
@@ -1848,11 +1850,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [aiK, setAiK] = useState("");
   useEffect(() => { setAiK(aiKey(owner)); }, [owner]);
   const AI_OPTS = scoped("coda.ai.opts", owner);
-  const [aiOpts, setAiOptsState] = useState({ trim: false, cutEnds: true, condense: true });
+  const [aiOpts, setAiOptsState] = useState({ trim: false, cutEnds: true, condense: true, retag: true });
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem(AI_OPTS) || "null"); if (v) setAiOptsState((o) => ({ ...o, ...v })); } catch { /* first time */ } }, [AI_OPTS]);
   const setAiOpts = (p: Partial<typeof aiOpts>) => setAiOptsState((o) => { const n = { ...o, ...p }; try { localStorage.setItem(AI_OPTS, JSON.stringify(n)); } catch { /* private */ } return n; });
   type AiPanel =
-    | { kind: "settings"; draft: string; busy: boolean; msg: string; bad: boolean; then?: "cite" | "reformat" | "blocks" }
+    | { kind: "settings"; draft: string; busy: boolean; msg: string; bad: boolean; then?: "cite" | "reformat" | "indict" | "blocks" }
     | { kind: "cite"; url: string; err: string }
     | { kind: "blocks"; want: string; err: string };
   const [aiPanel, setAiPanel] = useState<AiPanel | null>(null);
@@ -1880,7 +1882,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return v.state.selection.$from.parent.textContent.slice(0, 2000);
   };
   /** A feature asked for: its panel — or with no key yet, AI settings first, and then it. */
-  const aiOpen = (what: "cite" | "reformat" | "blocks" | "settings") => {
+  const aiOpen = (what: "cite" | "reformat" | "indict" | "blocks" | "settings") => {
     setMenu(null);
     if (what === "settings" || !aiKey(owner)) {
       setAiPanel({ kind: "settings", draft: "", busy: false, bad: false, msg: aiKey(owner) ? "" : "Paste your Anthropic API key to use AI in coda.", then: what === "settings" ? undefined : what });
@@ -1888,6 +1890,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     }
     if (what === "cite") setAiPanel({ kind: "cite", url: "", err: "" });
     else if (what === "blocks") setAiPanel({ kind: "blocks", want: wantFromHere() || aiWant.current, err: "" });
+    else if (what === "indict") void aiIndictNow();
     else void aiReformatNow();
   };
   aiOpenRef.current = aiOpen;
@@ -1904,6 +1907,27 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       if (then) requestAnimationFrame(() => aiOpenRef.current(then));
     } catch (e) {
       setAiPanel((p) => p && p.kind === "settings" ? { ...p, busy: false, bad: true, msg: (e as Error).message } : p);
+    }
+  };
+  const aiIndictNow = async () => {
+    const v = target();
+    if (!v) { toast("Open a file first"); return; }
+    if (aiBusy()) return;
+    const ctl = new AbortController(); aiStop.current = ctl;
+    setAiRun({ label: "Finding indicts" });
+    try {
+      const r = await aiIndict(v, aiKey(owner), { retag: aiOpts.retag }, ctl.signal, (done, of) => setAiRun({ label: "Finding indicts", done, of }));
+      const n = (x: number, w: string) => x + " " + w + (x === 1 ? "" : "s");
+      const bits: string[] = [];
+      if (r.done) bits.push(`Rehighlighted ${n(r.indicts, "indict")}${r.cards > 1 ? " in " + n(r.done, "card") : ""}: ${r.says.slice(0, 2).join("; ")}`);
+      if (r.skipped.length) bits.push((r.done ? "left alone: " : "Nothing rehighlighted: ") + r.skipped.join("; "));
+      if (r.failed.length) bits.push("failed: " + r.failed[0]);
+      if (r.done) bits.push("Ctrl+Z puts theirs back");
+      toast(bits.join(" · "));
+    } catch (e) {
+      toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
+    } finally {
+      aiStop.current = null; setAiRun(null);
     }
   };
   const aiReformatNow = async () => {
@@ -2874,7 +2898,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             <button type="button" className="rm-b rm-room web-only" data-act="room" data-tip="Room — share the speech doc with your partner">
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
-            <button type="button" className={"rm-b rm-i rm-menubtn rm-aibtn" + (menu?.id === "ai" || aiRun ? " on" : "")} data-tip={aiK ? "AI — cite from link, reformat, find blocks" : "AI — add your Anthropic key to use it"} aria-label="AI" aria-expanded={menu?.id === "ai"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("ai", e)}>{I.spark}</button>
+            <button type="button" className={"rm-b rm-i rm-menubtn rm-aibtn" + (menu?.id === "ai" || aiRun ? " on" : "")} data-tip={aiK ? "AI — cite from link, reformat, rehighlight for indicts, find blocks" : "AI — add your Anthropic key to use it"} aria-label="AI" aria-expanded={menu?.id === "ai"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("ai", e)}>{I.spark}</button>
             <button type="button" className={"rm-b rm-i" + (timer.open ? " on" : "")} data-tip={tip("timer", "Speech timer")} aria-label="Speech timer" aria-pressed={timer.open} onClick={() => run("timer")}>{I.timer}</button>
             <button type="button" className={"rm-b rm-i rm-menubtn rm-palbtn" + (menu?.id === "palette" ? " on" : "")} data-tip={"Colours and layout" + (K("layout") ? " · " + K("layout") + " next layout" : "")} aria-label="Colours and layout" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
               {I.theme}
@@ -3471,6 +3495,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <h4>AI · CLAUDE HAIKU</h4>
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("cite")}>Cite from link…<span className="k">{K("ai-cite")}</span></button>
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("reformat")}>Reformat with AI<span className="k">{K("ai-reformat")}</span></button>
+          <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("indict")}>Rehighlight for indicts<span className="k">{K("ai-indict")}</span></button>
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("blocks")}>Find blocks…<span className="k">{K("ai-blocks")}</span></button>
           <div className="rm-sep" />
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("settings")}>AI settings…<span className="k">{aiK ? "key added" : "no key yet"}</span></button>
@@ -3630,6 +3655,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   <label><input type="checkbox" checked={aiOpts.cutEnds} onChange={(e) => setAiOpts({ cutEnds: e.target.checked })} /> Cut a long unread stretch (35+ words) at the top or bottom of a card</label>
                   <label><input type="checkbox" checked={aiOpts.condense} onChange={(e) => setAiOpts({ condense: e.target.checked })} /> Condense unread paragraphs in the middle, none omitted</label>
                   <label><input type="checkbox" checked={aiOpts.trim} onChange={(e) => setAiOpts({ trim: e.target.checked })} /> Tighten highlighting for efficiency — every warrant kept</label>
+                  <b>Rehighlight for indicts</b>
+                  <label><input type="checkbox" checked={aiOpts.retag} onChange={(e) => setAiOpts({ retag: e.target.checked })} /> Rewrite the tag to say what the indicts prove</label>
                   <small>Cites are written in your cite format, under Keys. Model: {AI_MODEL}.</small>
                 </div>
               </form>
