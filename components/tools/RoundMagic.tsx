@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut as signOutOfCoda } from "@/lib/account";
-import { isDesktop } from "@/lib/desktop";
+import { isDesktop, apiBase, CODA_WEB, caselistLogin, setCaselistLogin, type CaselistLogin } from "@/lib/desktop";
 import { EditorState, TextSelection, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { DOMParser as PMParser, DOMSerializer, Fragment as PMFragment, type Node as PMNode } from "prosemirror-model";
@@ -1260,7 +1260,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (!code) return;
     setSdState({ code, files: null, err: "", loading: true });
     try {
-      const r = await fetch(`/api/tools/speechdrop?room=${encodeURIComponent(code)}`, { cache: "no-store" });
+      const r = await fetch(`${apiBase()}/api/tools/speechdrop?room=${encodeURIComponent(code)}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || `SpeechDrop said ${r.status}`);
       setSdState({ code, files: (j.files as SdFile[]).slice().reverse(), err: "", loading: false });
@@ -1273,7 +1273,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (!sdState) return;
     setBusy(true);
     try {
-      const r = await fetch(`/api/tools/speechdrop?room=${encodeURIComponent(sdState.code)}&i=${f.i}`, { cache: "no-store" });
+      const r = await fetch(`${apiBase()}/api/tools/speechdrop?room=${encodeURIComponent(sdState.code)}&i=${f.i}`, { cache: "no-store" });
       if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `SpeechDrop said ${r.status}`); }
       const blob = await r.blob();
       const kind = kindOf(f.name, blob.type);
@@ -1793,6 +1793,44 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // partner's flow is read from its shared link there, and nothing asks for Google
   const [desktop, setDesktop] = useState(false);
   useEffect(() => { setDesktop(isDesktop()); }, []);
+  // the caselist in the app: the user's own openCaselist (Tabroom) sign-in, asked for when Caselist is first pressed
+  const [clLogin, setClLoginState] = useState<CaselistLogin | null>(null);
+  const [clAsk, setClAsk] = useState<null | { user: string; pass: string; busy: boolean; err: string }>(null);
+  useEffect(() => {
+    if (!isDesktop()) return;
+    setClLoginState(caselistLogin());
+    const out = () => { setClLoginState(null); setClAsk({ user: "", pass: "", busy: false, err: "Your openCaselist sign-in ran out — sign in again." }); setTab("search"); };
+    window.addEventListener("coda:caselist-login", out);
+    // Caselist pressed with no sign-in: the sign-in, not a failed search
+    const el = root.current;
+    const gate = (e: MouseEvent) => {
+      if (!(e.target as Element).closest?.('#srcsw [data-src="cl"]') || caselistLogin()) return;
+      e.preventDefault(); e.stopPropagation();
+      setClAsk((a) => a || { user: "", pass: "", busy: false, err: "" });
+    };
+    el?.addEventListener("click", gate, true);
+    return () => { window.removeEventListener("coda:caselist-login", out); el?.removeEventListener("click", gate, true); };
+  }, [setTab]);
+  const clSignIn = async () => {
+    if (!clAsk || clAsk.busy) return;
+    const user = clAsk.user.trim();
+    if (!user || !clAsk.pass) { setClAsk({ ...clAsk, err: "Your Tabroom email and password." }); return; }
+    setClAsk({ ...clAsk, busy: true, err: "" });
+    try {
+      const r = await fetch(CODA_WEB + "/api/tools/caselist?op=login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: user, password: clAsk.pass }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.token) throw new Error(j.error || "openCaselist didn't answer (" + r.status + ")");
+      const l = { token: String(j.token), until: Number(j.until) || Date.now() + 13 * 864e5, user };
+      setCaselistLogin(l); setClLoginState(l); setClAsk(null);
+      toast("Signed into openCaselist as " + user);
+      // on into the caselist, now that it will answer
+      requestAnimationFrame(() => (root.current?.querySelector('#srcsw [data-src="cl"]') as HTMLElement | null)?.click());
+    } catch (e) {
+      const m = (e as Error).message;
+      setClAsk((a) => a && { ...a, busy: false, err: /fetch|network/i.test(m) ? "coda can't reach openCaselist — the caselist needs the internet." : m });
+    }
+  };
+  const clSignOut = () => { setCaselistLogin(null); setClLoginState(null); (root.current?.querySelector('#srcsw [data-src="lib"]') as HTMLElement | null)?.click(); toast("Signed out of openCaselist"); };
   const [apiFlow, setApiFlow] = useState<ApiFlow | null>(null);
   const gfTab = (gfLink.match(/[?&#]tab=(t\.[A-Za-z0-9_-]+)/) || [])[1] || "";
   // signed in here before: back in without a pop-up (Google hands a token over while you're signed into it)
@@ -2531,7 +2569,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const press = (sel: string) => (root.current?.querySelector(sel) as HTMLElement | null)?.click();
   type PalItem = { id: string; label: string; sub: string; key?: string; icon: React.ReactNode; go: () => void };
   /** What the command menu offers that needs the web: left out of the app. */
-  const WEB_ONLY = new Set(["x:share", "x:room", "x:speechdrop", "x:popsend", "x:tutorial", "x:signout", "x:desktop"]);
+  const WEB_ONLY = new Set(["x:share", "x:room", "x:popsend", "x:tutorial", "x:signout", "x:desktop"]);
   const palItems: PalItem[] = (() => {
     if (!pal) return [];
     const q = pal.q.trim();
@@ -2556,6 +2594,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       { id: "x:popsend", label: "Pop out the speech doc", sub: "A window that stays on top", icon: I.full, go: () => { if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); } },
       { id: "x:tutorial", label: "Open the tutorial", sub: "How coda works", icon: I.bolt, go: () => window.open("/tools/tutorial", "_blank") },
       ...(desktop ? [] : [{ id: "x:desktop", label: "Get the desktop app", sub: "Windows and Mac — every key is yours", icon: I.down, go: () => window.open("/download", "_blank") }]),
+      ...(desktop && clLogin ? [{ id: "x:clout", label: "Sign out of openCaselist", sub: "Signed in as " + clLogin.user, icon: I.x, go: clSignOut }] : []),
+      ...(desktop && !clLogin ? [{ id: "x:clin", label: "Sign into openCaselist", sub: "Your Tabroom account — for the caselist", icon: I.search, go: () => { setTab("search"); setClAsk({ user: "", pass: "", busy: false, err: "" }); } }] : []),
       { id: "x:signout", label: "Sign out", sub: "Account", icon: I.x, go: async () => { await flush(true); await signOutOfCoda(); window.location.assign("/"); } },
     ];
     const cmds: PalItem[] = (desktop ? (xs: PalItem[]) => xs.filter((c) => !WEB_ONLY.has(c.id)) : (xs: PalItem[]) => xs)([
@@ -2614,7 +2654,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             {curTheirs && mode !== "speech" && (isTemp(cur!.id)
               ? <span className="rm-badge" title="Library blocks, opened as a page: edits save to those blocks in the library search, not to your files. Keep as mine makes it a file">Library</span>
               : <span className="rm-badge" title="A doc of theirs — kept apart from your library">Theirs</span>)}
-            <input className="rm-fname" hidden={mode === "speech"} value={name} style={{ width: `${Math.min(Math.max(name.length, 6), 34) + 2}ch` }} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
+            <input className="rm-fname" hidden={mode === "speech"} value={name} style={{ width: `${Math.min(Math.max(name.length, 6), 90) + 1}ch` }} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
               onBlur={(e) => void rename(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); view.current?.focus(); } if (e.key === "Escape") { setName(cur?.name || ""); view.current?.focus(); } }} />
             <span className={"rm-state " + state}>{state === "saved" ? "Saved" : state === "saving" ? "Saving…" : "Editing"}<i>·</i>{docStat.cards} card{docStat.cards === 1 ? "" : "s"}</span>
@@ -2818,6 +2858,21 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the library: Evidence's search, drawn by its engine */}
           <div className={"rm-tabpane tp-search" + (cmdMode ? " cmdmode" : "")} hidden={tab !== "search"} onKeyDownCapture={onCmdKey}>
+            {clAsk && (
+              <form className="rm-cllogin" onSubmit={(e) => { e.preventDefault(); void clSignIn(); }}>
+                <b>Sign into openCaselist</b>
+                <p>The caselist is searched as you, with your own openCaselist account — your Tabroom email and password. coda keeps the sign-in on this computer for two weeks; your password isn&apos;t kept.</p>
+                <input type="email" autoComplete="username" placeholder="Tabroom email" value={clAsk.user} autoFocus spellCheck={false} aria-label="Tabroom email"
+                  onChange={(e) => setClAsk({ ...clAsk, user: e.target.value })} />
+                <input type="password" autoComplete="current-password" placeholder="Password" value={clAsk.pass} aria-label="Tabroom password"
+                  onChange={(e) => setClAsk({ ...clAsk, pass: e.target.value })} onKeyDown={(e) => { if (e.key === "Escape") setClAsk(null); }} />
+                {clAsk.err && <p className="bad">{clAsk.err}</p>}
+                <div className="row">
+                  <button type="submit" className="pri" disabled={clAsk.busy}>{clAsk.busy ? "Signing in…" : "Sign in"}</button>
+                  <button type="button" onClick={() => setClAsk(null)}>Not now</button>
+                </div>
+              </form>
+            )}
             <div className="evi rm-evsearch">
               <div className="srcsw mono" id="srcsw" role="group" aria-label="Search in">
                 <button type="button" data-src="lib" className="on" aria-pressed="true">Library</button>
@@ -2849,7 +2904,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the round: their docs, SpeechDrop, your partner */}
           <div className="rm-tabpane tp-round" hidden={tab !== "round"}>
-            {desktop && <p className="rm-sempty rm-webnote">Here: their docs, opened from a file or pasted. The caselist, SpeechDrop, rooms, shared files and your partner&apos;s Google Doc need the internet and an account — they&apos;re in coda on the web.</p>}
+            {desktop && <p className="rm-sempty rm-webnote">SpeechDrop and the caselist need the internet; the rest of coda doesn&apos;t. Rooms, shared files and your partner&apos;s Google Doc are in coda on the web.</p>}
             <div className="rm-rsec web-only">
               <div className="rm-cap">PARTNER&apos;S FLOW · GOOGLE DOC</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); gfWatch(); }}>
@@ -2874,7 +2929,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 ? <>Paste any link to the Doc — its tab called <b>flow</b> is found by itself. You need to be able to edit it (your partner shares it with you).</>
                 : <><b>Connect Google</b> and the table writes into the Doc as you type, and finds the <b>flow</b> tab by itself. Without it: the flow tab&apos;s link (it ends <b>?tab=t.…</b>), shared <b>Anyone with the link</b>, read only — <b>COPY FOR DOCS</b> to paste it back.</>}</p>}
             </div>
-            <div className="rm-rsec web-only">
+            <div className="rm-rsec">
               <div className="rm-cap">SPEECHDROP</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); void listSd(sdCode); }}>
                 <input value={sdCode} onChange={(e) => setSdCode(e.target.value)} placeholder="Room code or link" spellCheck={false} aria-label="SpeechDrop room" />
@@ -3190,7 +3245,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" data-act="format" onClick={() => setMenu(null)} title="Title it, drop the analytics, renumber, take out the white space">Format for sending…</button>
           <button type="button" className="rm-mb" data-act="copySend" onClick={() => setMenu(null)}>Copy it</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.saveDocx(); }}>Download as .docx</button>
-          <button type="button" className="rm-mb web-only" onClick={() => { setMenu(null); speechApi.current?.speechDrop(); }}>Send to SpeechDrop…</button>
+          <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.speechDrop(); }}>Send to SpeechDrop…</button>
           {!desktop && (
           <button type="button" className="rm-mb" disabled={gSending} onClick={() => { setMenu(null); void sendToGoogle(); }}
             title="Into your partner's Google Doc: a “speech doc” tab, and inside it “(rhetoric speech doc)” verbatimised — each send replaces them">

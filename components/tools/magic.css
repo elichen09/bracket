@@ -1381,7 +1381,8 @@ html[data-rm-palette="citrus"]:has(.rm) .nav { --nav-bg: #FFF8E6; --ink: #1A1A1A
 
 .rm-tbox { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 auto; }
 .rm-fname {
-  min-width: 60px; max-width: 300px; width: 22ch; flex: 0 1 auto; padding: 4px 6px; margin-left: -6px;
+  /* as long as the name, until the room runs out: then it gives way, before the search box does */
+  min-width: 60px; max-width: min(44vw, 720px); width: 22ch; flex: 0 1 auto; padding: 4px 6px; margin-left: -6px;
   background: transparent; border: 1px solid transparent; color: var(--hi); outline: none;
   font: 600 14px var(--rm-sans); letter-spacing: -.01em; text-overflow: ellipsis;
   transition: border-color .12s, background .12s;
@@ -1539,5 +1540,17 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 
 /* the app (desktop/): what needs a server or an account is coda on the web's — the room, sharing, you, the
    caselist, SpeechDrop, a partner's Google Doc, pop-outs */
-.rm.desktop .web-only, .rm.desktop .rm-evsearch .srcsw { display: none !important; }
+.rm.desktop .web-only { display: none !important; }
 .rm-webnote { padding: 8px 14px 4px; }
+
+/* the app's openCaselist sign-in, at the top of the search: asked for the first time Caselist is pressed */
+.rm-cllogin { display: grid; gap: 8px; margin: 0 10px 12px; padding: 14px; background: var(--well); border: 1px solid var(--well-b); font-size: 12.5px; color: var(--side-mut); }
+.rm-cllogin b { font: 600 14px var(--rm-sans); color: var(--hi); }
+.rm-cllogin p { margin: 0; line-height: 1.5; }
+.rm-cllogin p.bad { color: #ff8a7a; }
+.rm-cllogin input { height: 32px; padding: 0 9px; background: var(--side); border: 1px solid var(--well-b); color: var(--hi); font: 13px var(--rm-sans); outline: none; }
+.rm-cllogin input:focus { border-color: var(--acc); }
+.rm-cllogin .row { display: flex; gap: 6px; }
+.rm-cllogin button { height: 30px; padding: 0 12px; border: 1px solid var(--well-b); background: transparent; color: var(--side-txt); font: 500 12.5px var(--rm-sans); cursor: pointer; }
+.rm-cllogin button.pri { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
+.rm-cllogin button:disabled { opacity: .6; cursor: default; }

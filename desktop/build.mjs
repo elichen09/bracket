@@ -14,7 +14,8 @@ mkdirSync(out, { recursive: true });
 
 await build({
   absWorkingDir: root,
-  entryPoints: { app: join(here, "main.tsx") },
+  // the app, and the caselist's search worker (lib/caselist/client.js starts it from beside app.js)
+  entryPoints: { app: join(here, "main.tsx"), worker: join(root, "lib/caselist/worker.js") },
   outdir: out,
   bundle: true,
   format: "esm",

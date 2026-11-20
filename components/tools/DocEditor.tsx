@@ -9,6 +9,7 @@ import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark, setBlockType } from "prosemirror-commands";
 import { schema, LEVELS } from "@/lib/evidence/docSchema";
 import { scoped, adoptLocal } from "@/lib/owner";
+import { apiBase } from "@/lib/desktop";
 import { ySyncPlugin, yCursorPlugin, yUndoPlugin, undoCommand, redoCommand, initProseMirrorDoc } from "y-prosemirror";
 
 /** The room's send doc, when there is one: the editor binds to it instead of holding its own. */
@@ -333,7 +334,7 @@ export default function DocEditor({ host, width, owner, onView, onChange, compac
       const body = new FormData();
       body.append("room", code);
       body.append("file", made.blob, made.filename);
-      const res = await fetch("/api/tools/speechdrop", { method: "POST", body });
+      const res = await fetch(apiBase() + "/api/tools/speechdrop", { method: "POST", body });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "that didn't work");
       setDrop(`In room ${j.room} — ${j.files} file${j.files === 1 ? "" : "s"} there now.`);

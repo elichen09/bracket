@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin";
 import { currentUser } from "@/lib/auth";
+import { fromApp, withCors, preflight } from "@/lib/appRequests";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,8 +57,13 @@ async function ticket(room: string) {
   };
 }
 
-export async function POST(req: Request) {
-  if (!isAdmin()) return NextResponse.json({ error: "the tools are locked" }, { status: 403 });
+/** The desktop app (lib/appRequests.ts) uses this relay with no coda account, as anyone signed in here does. */
+export function OPTIONS(req: Request) { return preflight(req); }
+export async function POST(req: Request) { return withCors(req, await post(req)); }
+export async function GET(req: Request) { return withCors(req, await get(req)); }
+
+async function post(req: Request): Promise<NextResponse> {
+  if (!fromApp(req) && !isAdmin()) return NextResponse.json({ error: "the tools are locked" }, { status: 403 });
 
   let form: FormData;
   try { form = await req.formData(); } catch { return NextResponse.json({ error: "bad form" }, { status: 400 }); }
@@ -128,8 +134,8 @@ export async function POST(req: Request) {
  * Anyone signed in may read: a partner reading the other team's doc is not
  * an administrator.
  */
-export async function GET(req: Request) {
-  if (!(await currentUser())) return NextResponse.json({ error: "sign in first" }, { status: 401 });
+async function get(req: Request): Promise<NextResponse> {
+  if (!fromApp(req) && !(await currentUser())) return NextResponse.json({ error: "sign in first" }, { status: 401 });
   const url = new URL(req.url);
   const room = String(url.searchParams.get("room") || "").trim().replace(/^https?:\/\/[^/]+\//i, "").replace(/\/.*$/, "");
   if (!ROOM.test(room)) return NextResponse.json({ error: `"${room}" is not a room code` }, { status: 400 });

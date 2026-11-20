@@ -106,8 +106,11 @@ export default async function Download() {
           <li><b>Every key works.</b> Ctrl+K, Ctrl+N and the rest reach coda — nothing in a browser or an extension takes them first.</li>
           <li><b>Cutting, the library and the speech doc are all there</b> — searching, sending, Read mode, their docs from a .docx,
             PDF or paste, export and import.</li>
-          <li><b>What needs the internet and an account stays on the web:</b> the caselist, SpeechDrop, rooms with your partner,
-            sharing a file by link, and your partner&apos;s Google Doc. Use coda here for those.</li>
+          <li><b>With the internet, SpeechDrop and the caselist work too.</b> SpeechDrop needs nothing more. The caselist asks you,
+            the first time, to sign into openCaselist with your own Tabroom email and password — it searches as you, and keeps the
+            sign-in on your computer for two weeks.</li>
+          <li><b>Rooms with your partner, sharing a file by link, and your partner&apos;s Google Doc stay on the web</b> — they need a
+            coda account. Use coda here for those.</li>
           <li><b>A new version is a new download</b> from this page; install it over the old one and your files stay.</li>
           <li><b>On a Mac it runs on Safari&apos;s engine</b>, so it may differ from Chrome in small ways.</li>
         </ul>

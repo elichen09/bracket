@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { APP_ORIGINS } from "@/lib/desktop";
 
 /**
  * Keeps the auth session fresh on every request and gates the app: everything
@@ -7,6 +8,8 @@ import { createServerClient } from "@supabase/ssr";
  * (keyed by its own secret) needs an account.
  */
 const PUBLIC = [/^\/$/, /^\/login$/, /^\/download$/,/^\/api\/tools\/caselist\/index$/, /^\/api\/auth\//];
+/** What the desktop app may ask for with no account (lib/appRequests.ts). */
+const APP_ROUTES = /^\/api\/tools\/(caselist|speechdrop)$/;
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: { headers: req.headers } });
@@ -33,8 +36,11 @@ export async function middleware(req: NextRequest) {
   const { data: { user } } = await sb.auth.getUser();
   const path = req.nextUrl.pathname;
   const isPublic = PUBLIC.some((re) => re.test(path));
+  // the desktop app has no coda account: its SpeechDrop and caselist requests go on to their routes,
+  // which answer it themselves (lib/appRequests.ts) — the caselist only for an openCaselist sign-in
+  const appCall = APP_ROUTES.test(path) && (req.method === "OPTIONS" || APP_ORIGINS.includes(req.headers.get("origin") || ""));
 
-  if (!user && !isPublic) {
+  if (!user && !isPublic && !appCall) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "sign in required" }, { status: 401 });
     }

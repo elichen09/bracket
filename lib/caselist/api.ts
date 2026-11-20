@@ -35,12 +35,23 @@ export class CaselistError extends Error {
 async function login(): Promise<{ token: string; until: number }> {
   const username = process.env.TABROOM_USERNAME, password = process.env.TABROOM_PASSWORD;
   if (!username || !password) throw new CaselistError("TABROOM_USERNAME / TABROOM_PASSWORD are not set", 500);
+  return loginAs(username, password);
+}
+
+/**
+ * Sign into openCaselist as someone — coda's own account above, or, for the
+ * desktop app, the person using it, with their own Tabroom email and password
+ * (lib/appRequests.ts). The password goes to openCaselist and nowhere else;
+ * only the token comes back.
+ */
+export async function loginAs(username: string, password: string): Promise<{ token: string; until: number }> {
   const r = await fetch(API + "/login", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ username, password, remember: true }),
     signal: AbortSignal.timeout(20_000),
   });
   const set = r.headers.getSetCookie().find((c) => c.startsWith("caselist_token="));
+  if (r.status === 401 || r.status === 403) throw new CaselistError("openCaselist didn't take that email and password — they're your Tabroom ones", 401);
   if (!r.ok || !set) throw new CaselistError("openCaselist would not sign in with the Tabroom account (" + r.status + ")", 502);
   const token = set.split(";")[0].slice("caselist_token=".length);
   const exp = set.match(/expires=([^;]+)/i)?.[1];

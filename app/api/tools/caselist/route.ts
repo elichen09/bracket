@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { isAdmin } from "@/lib/admin";
 import { currentUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { token, forget, call, CaselistError, TOKEN_COOKIE } from "@/lib/caselist/api";
+import { token, forget, call, loginAs, CaselistError, TOKEN_COOKIE } from "@/lib/caselist/api";
+import { fromApp, withCors, preflight, appCaselistToken } from "@/lib/appRequests";
 import { standings } from "@/lib/caselist/rank";
 import { BUCKET, readMeta } from "@/lib/caselist/store";
 import { unpack, spanOf } from "@/lib/caselist/zipdir.mjs";
@@ -31,6 +32,12 @@ export const maxDuration = 30;
  *                                    asked instead), then the card read from its
  *                                    XML — a few kilobytes, not a document
  *   POST ?op=ranks  { wiki, teams }  where each team stands in this site's ratings
+ *
+ * The desktop app (lib/appRequests.ts) has no coda account: it signs into
+ * openCaselist with the user's own Tabroom account —
+ *   POST ?op=login  { username, password }   → { token, until }
+ * — and sends that token with every request after; a document fetched from
+ * openCaselist for it is fetched as that account.
  */
 
 const ZIP_HOST = /^https:\/\/caselist-files\.s3\.[a-z0-9-]+\.backblazeb2\.com\/weekly\/[a-z]+\d{2}\/[\w.-]+\.zip$/;
@@ -38,14 +45,29 @@ const WIKI = /^[a-z]+\d{2}$/;
 const FAMILIES = ["hspf", "hsld", "hspolicy", "ndtceda"];
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
-async function gate() {
-  if (!(await currentUser())) return bad("sign in required", 401);
-  if (!isAdmin()) return bad("the caselist search is for the site owner", 403);
-  return null;
+/** Who may ask: the site owner, signed in here — or the desktop app, as whoever it signed into openCaselist. */
+async function gate(req: Request): Promise<{ no: NextResponse | null; app: string | null }> {
+  if (fromApp(req)) {
+    const t = await appCaselistToken(req);
+    return t ? { no: null, app: t } : { no: bad("sign in to openCaselist", 401), app: null };
+  }
+  if (!(await currentUser())) return { no: bad("sign in required", 401), app: null };
+  if (!isAdmin()) return { no: bad("the caselist search is for the site owner", 403), app: null };
+  return { no: null, app: null };
 }
 
+export function OPTIONS(req: Request) { return preflight(req); }
+
 /** A document through the caselist API — ten a minute — for when the archive has moved on. */
-async function viaApi(path: string) {
+async function viaApi(path: string, app: string | null) {
+  if (app) {
+    // the app's own account, and its own ten a minute
+    const r = await call("/download?path=" + encodeURIComponent(path), app);
+    if (r.status === 401) throw new CaselistError("sign in to openCaselist", 401);
+    if (r.status === 429) throw new CaselistError("openCaselist allows ten downloads a minute — try that card again shortly", 429);
+    if (!r.ok) throw new CaselistError("openCaselist said " + r.status + " for that file", r.status === 404 ? 404 : 502);
+    return { body: await r.arrayBuffer(), set: null };
+  }
   const jar = { tok: cookies().get(TOKEN_COOKIE)?.value };
   let t = await token(jar.tok);
   let r = await call("/download?path=" + encodeURIComponent(path), t.token);
@@ -55,8 +77,11 @@ async function viaApi(path: string) {
   return { body: await r.arrayBuffer(), set: t.fresh ? t.token + "|" + t.until : null };
 }
 
-export async function GET(req: Request) {
-  const no = await gate();
+export async function GET(req: Request) { return withCors(req, await get(req)); }
+export async function POST(req: Request) { return withCors(req, await post(req)); }
+
+async function get(req: Request): Promise<NextResponse> {
+  const { no, app } = await gate(req);
   if (no) return no;
   const u = new URL(req.url).searchParams;
   const op = u.get("op");
@@ -104,7 +129,7 @@ export async function GET(req: Request) {
           if (docx) return answer(docx);
         }
       }
-      const { body, set } = await viaApi(path);
+      const { body, set } = await viaApi(path, app);
       return answer(Buffer.from(body), set);
     }
 
@@ -114,13 +139,25 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
-  const no = await gate();
-  if (no) return no;
+async function post(req: Request): Promise<NextResponse> {
   const op = new URL(req.url).searchParams.get("op");
-  if (op !== "ranks") return bad("unknown op");
   let body: any;
   try { body = await req.json(); } catch { return bad("bad json"); }
+  // the desktop app signing into openCaselist: the password goes on to openCaselist, only its token comes back
+  if (op === "login") {
+    if (!fromApp(req)) return bad("only the desktop app signs in here", 403);
+    const username = String(body?.username || "").trim(), password = String(body?.password || "");
+    if (!username || !password) return bad("your Tabroom email and password");
+    try {
+      const t = await loginAs(username, password);
+      return NextResponse.json({ token: t.token, until: t.until });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: e instanceof CaselistError ? e.status : 502 });
+    }
+  }
+  const { no } = await gate(req);
+  if (no) return no;
+  if (op !== "ranks") return bad("unknown op");
   const wiki = String(body?.wiki || "");
   if (!WIKI.test(wiki) || !Array.isArray(body?.teams)) return bad("which wiki and teams?");
   const teams = (body.teams as unknown[]).slice(0, 20000).map((t) => {
