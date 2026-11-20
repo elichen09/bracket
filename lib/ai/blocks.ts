@@ -28,10 +28,11 @@ import { stem, STOP } from "../caselist/search";
 
 export interface LibCard { tag: string; cite: string; read: string }
 export interface LibBlock { id: string; title: string; where: string; cards: LibCard[] }
-export interface ClHit { tag: string; cite: string; block: string; team: string }
+/** A caselist card: its tag, cite, block and team, and the caselist's own record of it (to fetch the whole card). */
+export interface ClHit { tag: string; cite: string; block: string; team: string; raw?: unknown }
 
 export interface LibPick { id: string; title: string; where: string; card: number | null; cardTag: string; how: string; why: string; fit: number }
-export interface ClPick { tag: string; cite: string; team: string; how: string; why: string; fit: number }
+export interface ClPick { tag: string; cite: string; team: string; how: string; why: string; fit: number; raw?: unknown }
 export interface Part { kind: string; says: string; picks: LibPick[]; caselist: ClPick[] }
 /** One of the answers to read: from the library (a LibPick) or the caselist (a ClPick), with the part of their argument it answers. */
 export type Best = ((LibPick & { from: "library" }) | (ClPick & { from: "caselist" })) & { kind: string; says: string; quote?: string };
@@ -210,6 +211,8 @@ const clamp = (x: number) => Math.max(0, Math.min(10, Math.round(x)));
 export async function findBlocks(
   key: string, arg: string, src: Sources, signal?: AbortSignal,
   onStage?: (s: string) => void,
+  /** analytics: write them even when cards answer it (they always come when nothing does) */
+  opts: { analytics?: boolean } = {},
 ): Promise<Found> {
   if (!arg.trim()) throw new AiError("Select their argument, or paste it in, first.");
   onStage?.("Breaking down their argument…");
@@ -255,8 +258,8 @@ export async function findBlocks(
   out.best = res.picks;
   const got = new Set(res.ok.map((x) => x.kind));
   out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => !got.has(k) && a.indexOf(k) === i);
-  // no card answers it: analytics instead
-  if (!out.best.length) {
+  // analytics: when no card answers it, or when asked for alongside the cards
+  if (!out.best.length || opts.analytics) {
     onStage?.("Writing analytics…");
     try { out.analytics = await writeAnalytics(key, br, arg, signal); }
     catch (e) { if (signal?.aborted) throw e; out.analytics = []; }
@@ -380,9 +383,9 @@ Check each candidate the way a good judge would, on logic rather than wording:
 
 const Analytics = z.object({ analytics: z.array(z.object({ part: z.number(), how: z.string(), text: z.string(), searches: z.array(z.string()) })) });
 
-/** Nothing in the library or the caselist answers it: the arguments a debater can make without a card. */
+/** Arguments a debater can make without a card: when nothing answers it, or when asked for alongside the cards. */
 async function writeAnalytics(key: string, br: Broken, arg: string, signal?: AbortSignal): Promise<Analytic[]> {
-  const r = await askJson(key, `A policy debater has to answer the other team's argument, and neither their own evidence nor the caselist has a card that answers it. Write analytics: arguments they can make out loud without a card.
+  const r = await askJson(key, `A policy debater has to answer the other team's argument. Write analytics: arguments they can make out loud without a card.
 
 Their argument: ${br.claim}
 Its context: ${br.about}
@@ -395,7 +398,11 @@ What they read (their tags and cards):
 ${arg.slice(0, 12000)}
 """
 
-Write 3 to 5 analytics, strongest first. Attack the logic, not the wording: each one should break the assumption a step rests on. Look for a missing or weak internal link, an assumption they never warrant, a leap from correlation to cause, a threshold where they claim a scalar effect, a timeframe that doesn't fit, an alternate cause, or a way their own mechanism runs the other way. Name the step you're breaking, and point to what their evidence fails to warrant where it helps. Never build an analytic on their author hedging ("may", "could", "potential"): every card hedges, and it takes nothing away from the argument. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on their own evidence's words, and on well-known facts.
+Write 3 to 5 analytics, strongest first. Each one argues that the logic of their claim is wrong, and why: a reason about how the world works, not a complaint about their evidence. Never say "their evidence doesn't say", "their card only says", "no warrant", "their author admits" or "they don't prove": that's a judge's note, not an argument. Give the reason the claim fails.
+
+For example, against "bioweapons cause extinction", don't say "their evidence doesn't say extinction is guaranteed". Say: "A bioweapon can't cause extinction. Either it's lethal enough to kill everyone, and it kills its hosts too fast to spread, or it spreads widely, and it isn't lethal enough to kill everyone."
+
+Ways to break a step: a dilemma (either way the claim fails), a mechanism that doesn't work the way they need it to, a counter-mechanism that stops it, a threshold where they need a scalar effect, a timeframe that doesn't fit, an alternate cause that swamps theirs, their own mechanism running the other way (a turn), or the actors' incentives pointing elsewhere. Name the step you're breaking. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on how the world works, and on well-known facts.
 
 "analytics": for each:
 - "part": the P number of the part it answers.

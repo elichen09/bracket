@@ -1850,7 +1850,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [aiK, setAiK] = useState("");
   useEffect(() => { setAiK(aiKey(owner)); }, [owner]);
   const AI_OPTS = scoped("coda.ai.opts", owner);
-  const [aiOpts, setAiOptsState] = useState({ trim: false, cutEnds: true, condense: true, retag: true });
+  const [aiOpts, setAiOptsState] = useState({ trim: false, cutEnds: true, condense: true, retag: true, analytics: false });
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem(AI_OPTS) || "null"); if (v) setAiOptsState((o) => ({ ...o, ...v })); } catch { /* first time */ } }, [AI_OPTS]);
   const setAiOpts = (p: Partial<typeof aiOpts>) => setAiOptsState((o) => { const n = { ...o, ...p }; try { localStorage.setItem(AI_OPTS, JSON.stringify(n)); } catch { /* private */ } return n; });
   type AiPanel =
@@ -1956,6 +1956,44 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return sent;
   };
   /** Analytics, to the speech doc as tags with no card under them. */
+  /** Caselist cards, fetched whole and kept: one fetch each, started as soon as the answers come, so Send is instant. */
+  const clReady = useRef(new Map<string, Promise<any>>());
+  const readyCl = (raw: any): Promise<any> => {
+    const id = String(raw?.id || raw?.tag || "");
+    let p = clReady.current.get(id);
+    if (!p) {
+      const cl = caselistClient(owner, scoped) as any;
+      p = Promise.resolve(cl.cardHtml(raw)).then((html: string) => {
+        const EV = (window as any).EV;
+        const b = EV?.parseHtml?.(html, {})?.blocks?.find((x: any) => (x.args || []).length);
+        if (!b) throw new Error("it came back empty");
+        return b;
+      });
+      p.catch(() => clReady.current.delete(id));
+      clReady.current.set(id, p);
+    }
+    return p;
+  };
+  /** A caselist card into the speech doc, as the caselist search sends one: under its block's heading. */
+  const sendCl = async (raw: any, team: string) => {
+    const EV = (window as any).EV;
+    if (!raw || !EV?.sendParsed) { toast("The speech doc is still starting — a moment"); return false; }
+    try {
+      const b = await readyCl(raw);
+      await EV.sendParsed({ ...b, id: "cl_" + String(raw.path || raw.id || "") + "#" + String(b.title || ""), pre: [], args: [b.args[0]] }, 0, "from " + team);
+      setSentPulse((x) => x + 1);
+      return true;
+    } catch (e) {
+      toast("That caselist card wouldn't come: " + (e as Error).message);
+      return false;
+    }
+  };
+  // the caselist picks, fetched the moment the answers are up
+  useEffect(() => {
+    if (!aiFound) return;
+    const raws = [...aiFound.best.map((p) => (p.from === "caselist" ? p.raw : null)), ...(aiFound.analytics || []).map((a) => (a.card && a.card.from === "caselist" ? a.card.raw : null))];
+    for (const r of raws) if (r) readyCl(r).catch(() => { /* Send says so, if it's asked for */ });
+  }, [aiFound]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Analytics, to the speech doc as tags, each with the card from your library that proves it right under it. */
   const sendAnalytics = async (items: Analytic[]) => {
     const EV = (window as any).EV;
@@ -1967,6 +2005,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         await EV.sendParsed({ ...b, id: `rm:analytic:${Date.now()}:${k}` }, 0, "analytic");
       }
       if (a.card && a.card.from === "library" && EV.quickSend) { await EV.quickSend(a.card.id, a.card.card === null ? undefined : a.card.card); cards++; }
+      else if (a.card && a.card.from === "caselist" && a.card.raw) { if (await sendCl(a.card.raw, a.card.team)) cards++; }
     }
     setSentPulse((x) => x + 1);
     const n = items.length;
@@ -2085,7 +2124,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         const metas = ((await cl.metas()) || []) as { wiki: string }[];
         for (const m of metas) if (fams.includes(familyOf(m.wiki))) { try { await cl.loadIndex(m.wiki); } catch { /* that wiki not now */ } }
         const r = await cl.find(q, fams, { answer });
-        return ((r && r.groups) || []).flatMap((g: any) => g.cards.slice(0, 3).map((c: any) => ({ tag: String(c.tag || ""), cite: String(c.cite || ""), block: String(c.block || ""), team: String(g.name || "") }))).slice(0, 12);
+        return ((r && r.groups) || []).flatMap((g: any) => g.cards.slice(0, 3).map((c: any) => ({ tag: String(c.tag || ""), cite: String(c.cite || ""), block: String(c.block || ""), team: String(g.name || ""), raw: c }))).slice(0, 12);
       } : null,
     };
     const want = aiPanel.want;
@@ -2094,7 +2133,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setAiPanel(null); setAiFound(null); target()?.focus();
     setAiRun({ label: "Finding answers" });
     try {
-      const found = await findBlocks(aiKey(owner), want, src, ctl.signal, (stage) => setAiRun({ label: stage.replace(/…$/, "") }));
+      const found = await findBlocks(aiKey(owner), want, src, ctl.signal, (stage) => setAiRun({ label: stage.replace(/…$/, "") }), { analytics: aiOpts.analytics });
       const from = aiWantFrom.current;
       aiWantFrom.current = null;
       let rehi: Rehighlight[] = [], rehiSays: string[] = [];
@@ -3674,7 +3713,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                     <span className={"how" + (/turn/i.test(p.how) ? " turn" : "")}>{p.how}</span>
                     {p.from === "library"
                       ? <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const EV = (window as any).EV; await EV?.quickSend?.(p.id, p.card === null ? undefined : p.card); toast("Sent: " + (p.cardTag || p.title)); }}>{p.card === null ? "Send block" : "Send"}</button>
-                      : <button type="button" className="send" onClick={() => showInCaselist(p.tag)}>Find it</button>}
+                      : <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={async () => { if (!p.raw) { showInCaselist(p.tag); return; } if (await sendCl(p.raw, p.team)) toast("Sent: " + p.tag); }}>Send</button>}
                   </div>
                   <b className="ttl">{p.from === "library" ? p.cardTag || p.title : p.tag}</b>
                   {p.quote && <q className="quote">{p.quote}</q>}
@@ -3695,12 +3734,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   <small className="src">A copy, their highlighting greyed and the indicts in cyan. Your file stays as it is.</small>
                 </li>
               )}
-              {!aiFound.best.length && (aiFound.analytics || []).map((a, k) => (
+              {aiFound.best.length > 0 && (aiFound.analytics || []).length > 0 && <li className="rm-aians-head">Analytics</li>}
+              {(aiFound.analytics || []).map((a, k) => (
                 <li key={"an" + k} className="rm-aians-i">
                   <div className="top">
                     {a.kind && <span className="part">{a.kind}</span>}
                     <span className={"how" + (/turn/i.test(a.how) ? " turn" : "")}>{a.how || "Analytic"}</span>
-                    <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics([a])}>{a.card && a.card.from === "library" ? "Send with card" : "Send"}</button>
+                    <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics([a])}>{a.card && (a.card.from === "library" || a.card.raw) ? "Send with card" : "Send"}</button>
                   </div>
                   <b className="ttl">{a.text}</b>
                   {a.card ? (
@@ -3709,13 +3749,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                       <b>{a.card.from === "library" ? a.card.cardTag || a.card.title : a.card.tag}</b>
                       {a.card.quote && <q className="quote">{a.card.quote}</q>}
                       <small className="src">{a.card.from === "library" ? [a.card.cardTag ? a.card.title : "", ...a.card.where.split(" › ")].filter(Boolean).join(" › ") : `Caselist › ${a.card.team} › ${a.card.cite}`}</small>
-                      {a.card.from === "caselist" && <button type="button" className="send" onClick={() => showInCaselist((a.card as any).tag)}>Find it</button>}
+                      {a.card.from === "caselist" && <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const c = a.card as any; if (!c.raw) { showInCaselist(c.tag); return; } if (await sendCl(c.raw, c.team)) toast("Sent: " + c.tag); }}>Send card</button>}
                     </div>
                   ) : <small className="src">Analytic: no card proves it</small>}
                 </li>
               ))}
-              {!aiFound.best.length && (aiFound.analytics || []).length > 1 && (
-                <li className="rm-aians-all"><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics(aiFound.analytics || [])}>Send all {(aiFound.analytics || []).length} analytics{(aiFound.analytics || []).some((a) => a.card && a.card.from === "library") ? " with their cards" : ""}</button></li>
+              {(aiFound.analytics || []).length > 1 && (
+                <li className="rm-aians-all"><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics(aiFound.analytics || [])}>Send all {(aiFound.analytics || []).length} analytics{(aiFound.analytics || []).some((a) => a.card && (a.card.from === "library" || a.card.raw)) ? " with their cards" : ""}</button></li>
               )}
             </ol>
             {aiFound.best.length > 0 && aiFound.unanswered.length > 0 && <p className="rm-aiopen">Nothing answers their {aiFound.unanswered.join(" or ")}.</p>}
@@ -3771,8 +3811,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   onChange={(e) => setAiPanel({ ...aiPanel, want: e.target.value, err: "" })}
                   onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void aiBlocksNow(); } }} />
                 {aiPanel.err && <p className="rm-aimsg bad">{aiPanel.err}</p>}
+                <label className="rm-aicheck"><input type="checkbox" checked={aiOpts.analytics} onChange={(e) => setAiOpts({ analytics: e.target.checked })} /> Also write analytics, each with a card behind it where one proves it</label>
                 <div className="rm-aifoot">
-                  <span>Answers to its uniqueness, link and impact, from your cards</span>
+                  <span>Answers to its uniqueness, link and impact, from your cards and the caselist</span>
                   <button type="submit" className="pri">Find answers <kbd>Ctrl+Enter</kbd></button>
                 </div>
               </form>
