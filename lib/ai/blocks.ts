@@ -19,6 +19,7 @@
  */
 import { z } from "zod";
 import { askJson, AiError } from "./claude";
+import { find } from "./reformat";
 import { stem, STOP } from "../caselist/search";
 
 export interface LibCard { tag: string; cite: string; read: string }
@@ -29,7 +30,7 @@ export interface LibPick { id: string; title: string; where: string; card: numbe
 export interface ClPick { tag: string; cite: string; team: string; how: string; why: string; fit: number }
 export interface Part { kind: string; says: string; picks: LibPick[]; caselist: ClPick[] }
 /** One of the answers to read: from the library (a LibPick) or the caselist (a ClPick), with the part of their argument it answers. */
-export type Best = ((LibPick & { from: "library" }) | (ClPick & { from: "caselist" })) & { kind: string; says: string };
+export type Best = ((LibPick & { from: "library" }) | (ClPick & { from: "caselist" })) & { kind: string; says: string; quote?: string };
 export interface Found { claim: string; parts: Part[]; best: Best[]; unanswered: string[]; read: number; of: number }
 
 export interface Sources {
@@ -42,6 +43,7 @@ export interface Sources {
 const KINDS = ["uniqueness", "link", "internal link", "impact", "solvency", "framework", "other"] as const;
 const Breakdown = z.object({
   claim: z.string(),
+  about: z.string(),
   parts: z.array(z.object({
     kind: z.enum(KINDS),
     says: z.string(),
@@ -55,7 +57,7 @@ const Answers = z.object({
 });
 
 const GOOD = 6;              // an answer at least this good means the library has it
-const PER_PART = 4;          // answers shown for each part
+const PER_PART = 6;          // candidates kept for each part, for the careful check
 const BATCH_CHARS = 200_000; // one read of the library: about 60K tokens, under Haiku's cheaper 100K-token price tier
 const BATCHES = 3;           // at most this many reads, side by side
 const CARDS_SHOWN = 14;      // a block's cards Claude sees
@@ -76,7 +78,8 @@ For each part:
 - "answers": 2 to 4 lines, each one an answer a card could make, labeled the way debaters label them ("No link: the plan doesn't touch X", "Link turn: the plan increases Y", "Non-unique: Z is already happening", "No impact: ...", "Impact turn: ...", "Alt cause: ...").
 - "words": 6 to 12 words or short phrases a card answering it would use: the argument's nouns, with their synonyms and opposites.
 
-"claim": the whole argument in one line.`;
+"claim": the whole argument in one line.
+"about": exactly what it's about, so a card about something else that shares its words isn't taken for an answer: who does what, which policy or program, where ("France extending its nuclear umbrella to Greece, 2026", not "nuclear deterrence").`;
 }
 
 function blockText(b: LibBlock, n: number): string {
@@ -93,6 +96,7 @@ function partsText(br: Broken): string {
 
 function judgePrompt(br: Broken, blocks: string): string {
   return `A policy debater has to answer this argument: ${br.claim}
+What it is about, exactly: ${br.about}
 
 Its parts:
 ${partsText(br)}
@@ -101,9 +105,9 @@ Below are blocks from the debater's own library: each block's title, then its ca
 
 ${blocks}
 
-Read the cards' words, not only the tags. A card answers a part only if what it says, read out in the round, answers that claim: it denies it, turns it, shows it's non-unique, mitigates or outweighs the impact, gives an alternate cause, and so on. A card that is only on the same topic doesn't count. A card that makes the same claim as the other team never counts.
+This is a first pass: every candidate gets checked again closely, so list the cards that plausibly answer a part. Read the cards' words, not only the tags. A card answers a part only if what it says, read out in the round, answers that claim: it denies it, turns it, shows it's non-unique, mitigates or outweighs the impact, gives an alternate cause, and so on. It must be about the same thing their argument is about; a card that only shares its words (a different country, program or law) doesn't count. A card that is only on the same topic doesn't count. A card that makes the same claim as the other team never counts.
 
-"answers": every card here that answers a part, best first. Give at most ${PER_PART} for each part, and none for a part when nothing here answers it. For each one:
+"answers": the cards here that may answer a part, best first. Give at most ${PER_PART} for each part, and none for a part when nothing here answers it. For each one:
 - "part": the part's P number.
 - "block": the block's B number.
 - "card": the card's number in that block. Use 0 only when the block as a whole is the answer (a block of answers to exactly this).
@@ -198,7 +202,7 @@ export async function findBlocks(
   if (!arg.trim()) throw new AiError("Select their argument, or paste it in, first.");
   onStage?.("Breaking down their argument…");
   const libP = src.library();
-  const br = await askJson(key, breakPrompt(arg), Breakdown, signal);
+  const br = await askJson(key, breakPrompt(arg), Breakdown, signal, "medium");
   if (!br.parts.length) throw new AiError("Claude couldn't find an argument in that. Select their cards, or say what you need answered.");
   const all = await libP;
   const out: Found = { claim: br.claim, parts: br.parts.map((p) => ({ kind: p.kind, says: p.says, picks: [], caselist: [] })), best: [], unanswered: [], read: 0, of: all.length };
@@ -254,43 +258,78 @@ export async function findBlocks(
     }
   }
 
-  // of everything found, the few to read: the best 3, a 4th only when it's key
-  const found: Best[] = out.parts.flatMap((p) => [
+  // every candidate checked, with its whole card in front of Claude, and the best few chosen
+  const cands: Best[] = out.parts.flatMap((p) => [
     ...p.picks.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "library" as const })),
     ...p.caselist.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "caselist" as const })),
-  ]);
-  out.unanswered = out.parts.filter((p) => !p.picks.length && !p.caselist.length).map((p) => p.kind);
-  if (found.length <= 3) { out.best = found.sort((a, b) => b.fit - a.fit); return out; }
-  onStage?.("Choosing the best answers…");
-  try {
-    const r = await askJson(key, choosePrompt(br, found), Choice, signal);
+  ]).sort((a, b) => b.fit - a.fit).slice(0, VERIFY_MAX);
+  if (cands.length) {
+    onStage?.(`Checking ${cands.length} answer${cands.length === 1 ? "" : "s"} against the cards…`);
+    const texts = cands.map((c) => candidateText(c, all));
+    const r = await askJson(key, verifyPrompt(br, cands, texts), Verified, signal, "medium");
+    const ok = new Map<number, Best>();
+    for (const v of r.checks) {
+      const i = Math.round(v.n) - 1, c = cands[i];
+      if (!c || !v.answers || !v.quote.trim()) continue;
+      // the quote has to be in the card, word for word: an answer Claude can't point to isn't one
+      if (!find({ s: texts[i] }, [v.quote]).ranges.length) continue;
+      const part = br.parts[Math.round(v.part) - 1];
+      ok.set(i, { ...c, kind: part ? part.kind : c.kind, says: part ? part.says : c.says, how: v.how || c.how, why: v.why || c.why, quote: v.quote.trim(), fit: clamp(v.fit) });
+    }
     const seen = new Set<number>();
-    out.best = r.picks.map((n) => Math.round(n) - 1).filter((i) => found[i] && !seen.has(i) && (seen.add(i), true)).slice(0, 4).map((i) => found[i]);
-  } catch (e) {
-    if (signal?.aborted) throw e;
-    out.best = [];
-  }
-  // Claude chose none, or couldn't be asked: the strongest, one per part first
-  if (!out.best.length) {
-    const byFit = [...found].sort((a, b) => b.fit - a.fit), kinds = new Set<string>();
-    for (const x of byFit) if (!kinds.has(x.kind) && out.best.length < 3) { kinds.add(x.kind); out.best.push(x); }
-    for (const x of byFit) if (out.best.length < 3 && !out.best.includes(x)) out.best.push(x);
+    out.best = r.picks.map((n) => Math.round(n) - 1).filter((i) => ok.has(i) && !seen.has(i) && (seen.add(i), true)).slice(0, 4).map((i) => ok.get(i)!);
+    if (!out.best.length) out.best = [...ok.values()].sort((a, b) => b.fit - a.fit).slice(0, 3);
+    const answered = new Set([...ok.values()].map((x) => x.kind));
+    out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => !answered.has(k) && a.indexOf(k) === i);
+  } else {
+    out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => a.indexOf(k) === i);
   }
   return out;
 }
 
-const Choice = z.object({ picks: z.array(z.number()) });
+const VERIFY_MAX = 20;         // candidates checked closely
+const VERIFY_READ = 1400;      // a candidate card's read words, in full or nearly
 
-function choosePrompt(br: Broken, found: Best[]): string {
-  return `A policy debater has to answer this argument: ${br.claim}
+const Verified = z.object({
+  checks: z.array(z.object({ n: z.number(), answers: z.boolean(), part: z.number(), how: z.string(), quote: z.string(), why: z.string(), fit: z.number() })),
+  picks: z.array(z.number()),
+});
+
+/** A candidate's text as Claude checks it: the block, the card's tag and cite, and its read words (or, for a whole block, its cards' tags). */
+function candidateText(c: Best, all: LibBlock[]): string {
+  if (c.from === "caselist") return `${c.tag}\n[${c.cite}] (caselist, ${c.team})`;
+  const b = all.find((x) => x.id === c.id);
+  if (!b) return c.cardTag || c.title;
+  if (c.card === null) return `Block "${b.title}":\n` + b.cards.slice(0, 12).map((x) => "- " + x.tag).join("\n");
+  const card = b.cards[c.card];
+  const read = card.read.length > VERIFY_READ ? card.read.slice(0, VERIFY_READ) + "…" : card.read;
+  return `${card.tag}\n[${card.cite.slice(0, 160)}]\n${read}`;
+}
+
+function verifyPrompt(br: Broken, cands: Best[], texts: string[]): string {
+  return `A policy debater has to answer the other team's argument. Their argument: ${br.claim}
+What it is about, exactly: ${br.about}
 
 Its parts:
 ${partsText(br)}
 
-These answers were found in their evidence, numbered:
-${found.map((a, i) => `${i + 1}. [${a.kind}] ${a.how}: "${(a.from === "library" ? a.cardTag || a.title : a.tag).slice(0, 180)}" (${a.why}; fit ${a.fit}/10${a.from === "caselist" ? "; from the caselist" : ""})`).join("\n")}
+A first, quick pass through the debater's evidence found these candidate answers. Many will be wrong. Each has a number, the block it's filed in, the card's tag, its cite, and the words of the card that get read:
 
-Choose what they should actually read: the best 3, as a set. Pick the strongest answers. Prefer a set that does more together: offense (a turn) alongside defense, or answers to different parts, over two answers that make the same point. Choose a 4th only if it's a key answer the set would be clearly weaker without. Otherwise choose exactly 3.
+${cands.map((c, i) => `C${i + 1}.${c.from === "library" ? ` (block: "${c.title.slice(0, 100)}"${c.where ? `, ${c.where}` : ""})` : ""}\n${texts[i]}`).join("\n\n")}
 
-"picks": their numbers, best first.`;
+Check each candidate strictly, the way a good debater or judge would:
+- It must be about the same thing as their argument: the same actors, policy, place and mechanism. Shared words are not enough. A US bill called the "Forward Deterrence Act" is not France's forward deterrence; NATO in general is not French extended deterrence.
+- What the card says must answer a part of their argument when read in the round: deny it, turn it, prove it non-unique, mitigate or outweigh the impact, or give an alternate cause. A card that agrees with them, makes their argument, or only describes the topic does not answer it.
+- Judge by what the card's words actually say, not by its tag alone.
+
+"checks": one for every candidate:
+- "n": its C number.
+- "answers": true only if it really answers a part.
+- "part": the part's P number it answers (0 if none).
+- "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause").
+- "quote": the words in the card that do the answering, copied exactly from the text above as one unbroken stretch of 5 to 40 words. Use "" if it doesn't answer.
+- "why": one short line: how those words answer their claim.
+- "fit": 0 to 10.
+
+"picks": of the candidates that answer, the C numbers of the 3 the debater should actually read, as a set, best first. Prefer a set that does more together (offense with defense, or different parts) over two that make the same point. Add a 4th only if the set would be clearly weaker without it. Pick fewer if fewer answer.`;
 }

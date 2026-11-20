@@ -61,14 +61,15 @@ function said(e: unknown): Error {
  * One question, answered as JSON in the given shape. Throws an AiError with a
  * sentence for the user when it can't be answered.
  */
-export async function askJson<S extends z.ZodType>(key: string, prompt: string, shape: S, signal?: AbortSignal): Promise<z.infer<S>> {
+/** effort: "low" for quick, shallow work (the default); "medium" where Claude has to judge carefully. */
+export async function askJson<S extends z.ZodType>(key: string, prompt: string, shape: S, signal?: AbortSignal, effort: "low" | "medium" = "low"): Promise<z.infer<S>> {
   if (!key) throw new AiError("Add your Anthropic API key in AI settings first.");
   try {
     const res = await client(key).messages.parse(
       {
         model: AI_MODEL,
         max_tokens: 16000,
-        output_config: { effort: "low", format: zodOutputFormat(shape) },
+        output_config: { effort, format: zodOutputFormat(shape) },
         messages: [{ role: "user", content: prompt }],
       },
       { signal },

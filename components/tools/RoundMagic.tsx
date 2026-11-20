@@ -3609,6 +3609,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                       : <button type="button" className="send" onClick={() => showInCaselist(p.tag)}>Find it</button>}
                   </div>
                   <b className="ttl">{p.from === "library" ? p.cardTag || p.title : p.tag}</b>
+                  {p.quote && <q className="quote">{p.quote}</q>}
                   <p className="why">{p.why}</p>
                   <small className="src">{p.from === "library" ? [p.cardTag ? p.title : "", ...p.where.split(" › ")].filter(Boolean).join(" › ") : `Caselist › ${p.team} › ${p.cite}`}</small>
                 </li>
