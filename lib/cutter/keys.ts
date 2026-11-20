@@ -60,6 +60,9 @@ export const ACTIONS: Action[] = [
   { id: "mode-read", group: "Round", label: "Read mode", key: "alt+shift+R", hint: "The speech doc or this file as you'll read it, with the time it takes (again, or Esc: back)" },
   { id: "library", group: "Round", label: "Search the library", key: "alt+/", hint: "Every card in your library and the caselist — Enter sends it to the speech doc. / does it too when you're not typing" },
   { id: "timer", group: "Round", label: "Speech timer", key: "alt+T", hint: "A clock for the speech, prep or cross-ex" },
+  { id: "ai-cite", group: "AI", label: "Cite from link", key: "alt+shift+L", hint: "Paste an article's link: Claude reads the page and writes the cite in your cite format — author, credentials, title, date, link" },
+  { id: "ai-reformat", group: "AI", label: "Reformat with AI", key: "alt+shift+F", hint: "The card you're in, or every card selected, in the house format: underlining around what's read, emphasis on what matters, the rest small, the cite rewritten — no word or highlight changed" },
+  { id: "ai-blocks", group: "AI", label: "Find blocks", key: "alt+shift+A", hint: "The best blocks in your library for their card or a claim — and the caselist when your library has nothing" },
 ];
 export const ACTION = new Map(ACTIONS.map((a) => [a.id, a]));
 

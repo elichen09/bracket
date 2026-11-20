@@ -1554,3 +1554,57 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm-cllogin button { height: 30px; padding: 0 12px; border: 1px solid var(--well-b); background: transparent; color: var(--side-txt); font: 500 12.5px var(--rm-sans); cursor: pointer; }
 .rm-cllogin button.pri { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
 .rm-cllogin button:disabled { opacity: .6; cursor: default; }
+
+/* ------------------------------------------------------------ AI (lib/ai): its button, its panels, and a run in progress */
+.rm .rm-rib.v2 .rm-acts .rm-aibtn svg { color: var(--txt); }
+.rm .rm-rib.v2 .rm-acts .rm-aibtn.on svg { color: var(--hi); }
+.rm-aipanel { width: min(620px, calc(100% - 32px)); padding-bottom: 6px; }
+.rm-aipanel form, .rm-aipanel > div { display: grid; }
+.rm-aihead { display: flex; align-items: center; gap: 9px; padding: 14px 16px 10px; color: var(--hi); }
+.rm-aihead b { font: 600 15px var(--rm-sans); }
+.rm-aihead span { margin-left: auto; font: 500 11px var(--rm-mono); color: var(--mut); }
+.rm-ainote { margin: 0; padding: 8px 16px; font-size: 12px; line-height: 1.5; color: var(--mut); }
+.rm-ainote a { color: var(--txt); }
+.rm-aimsg { margin: 0; padding: 8px 16px; font-size: 13px; color: var(--txt); }
+.rm-aimsg.bad { color: #ff8a7a; }
+.rm-aifield { display: grid; gap: 6px; padding: 6px 16px; font-size: 12px; color: var(--mut); }
+.rm-aifield input, .rm-aiwant textarea {
+  width: 100%; padding: 9px 10px; background: var(--well); border: 1px solid var(--btnb); color: var(--hi);
+  font: 13px var(--rm-sans); outline: none; resize: vertical;
+}
+.rm-aifield input:focus, .rm-aiwant textarea:focus { border-color: var(--acc); }
+.rm-aiwant { padding: 0 16px; gap: 8px; }
+.rm-airow { display: flex; align-items: center; gap: 8px; padding: 8px 16px; }
+.rm-aiwant .rm-airow { padding: 0 0 6px; }
+.rm-airow button { height: 30px; padding: 0 12px; border: 1px solid var(--btnb); background: transparent; color: var(--txt); font: 500 12.5px var(--rm-sans); cursor: pointer; }
+.rm-airow button:hover { border-color: var(--btnb-h); }
+.rm-airow button.pri, .rm-aipick button.pri { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
+.rm-airow button:disabled { opacity: .6; cursor: default; }
+.rm-aiwant .rm-ainote { padding: 0; }
+.rm-aiopts { display: grid; gap: 7px; margin: 6px 16px 8px; padding: 12px; border: 1px solid var(--chrome-line); font-size: 12.5px; color: var(--txt); }
+.rm-aiopts b { font: 600 12px var(--rm-sans); color: var(--hi); }
+.rm-aiopts label { display: flex; gap: 8px; align-items: flex-start; line-height: 1.4; cursor: pointer; }
+.rm-aiopts input { margin-top: 2px; accent-color: var(--acc); }
+.rm-aiopts small { color: var(--mut); font-size: 11.5px; }
+.rm-aifound { display: grid; gap: 2px; padding: 4px 8px 4px; max-height: min(52vh, 460px); overflow-y: auto; }
+.rm-aifound h4 { margin: 10px 8px 4px; font: 500 10.5px var(--rm-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mut); }
+.rm-aineed { margin: 4px 8px 6px; font-size: 12.5px; color: var(--mut); }
+.rm-aipick { display: flex; align-items: center; gap: 12px; padding: 9px 8px; border-top: 1px solid var(--chrome-line); }
+.rm-aipick .lt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.rm-aipick b { font-weight: 600; font-size: 13.5px; color: var(--hi); }
+.rm-aipick small { font-size: 11.5px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-aipick .card { font-size: 12.5px; color: var(--txt); }
+.rm-aipick .why { font-size: 12px; color: var(--mut); font-style: italic; }
+.rm-aipick .fit { flex: none; width: 44px; height: 4px; background: var(--btnb); }
+.rm-aipick .fit i { display: block; height: 100%; background: var(--acc); }
+.rm-aipick button { flex: none; height: 28px; padding: 0 10px; border: 1px solid var(--btnb); background: transparent; color: var(--txt); font: 500 12px var(--rm-sans); cursor: pointer; white-space: nowrap; }
+.rm-aibusy {
+  position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 95;
+  display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px;
+  background: var(--pop); color: var(--hi); border: 1px solid var(--chrome-line); box-shadow: 0 18px 40px -20px rgba(0, 0, 0, .7);
+  font: 500 13px var(--rm-sans); animation: rmPalIn .16s cubic-bezier(.2, .8, .2, 1) both;
+}
+.rm-aibusy svg { animation: rmAiSpin 1.6s linear infinite; }
+@keyframes rmAiSpin { to { transform: rotate(360deg); } }
+.rm-aibusy button { height: 26px; padding: 0 10px; border: 1px solid var(--btnb); background: transparent; color: var(--txt); font: inherit; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .rm-aibusy svg { animation: none; } }
