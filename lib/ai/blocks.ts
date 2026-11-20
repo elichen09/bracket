@@ -56,6 +56,7 @@ const KINDS = ["uniqueness", "link", "internal link", "impact", "solvency", "fra
 const Breakdown = z.object({
   claim: z.string(),
   about: z.string(),
+  searches: z.array(z.string()),
   parts: z.array(z.object({
     kind: z.enum(KINDS),
     says: z.string(),
@@ -94,7 +95,8 @@ For each step:
 - "words": 6 to 12 words or short phrases a card making those answers would use: the concepts of the answers (with synonyms), not only the nouns of their card.
 
 "claim": the whole argument in one line.
-"about": its context in one short line (who, which policy, where). This is context, not a filter: an answer from another context counts when its reasoning applies here.`;
+"about": its context in one short line (who, which policy, where). This is context, not a filter: an answer from another context counts when its reasoning applies here.
+"searches": 6 to 10 short searches, 2 or 3 words each, that a debater would type into the open caselist to find cards answering it, in the words debaters tag with, from specific to broad ("quantum sensing fails", "can't detect subs", "oceans opaque", "SSBNs survivable", "quantum hype", "quantum impossible"). Every search states an answer, the opposite of their claim: never just the topic ("quantum sensing deterrence" finds cards making their argument). Include broad ones: a card against the whole technology, policy or theory answers a claim about one use of it.`;
 }
 
 function blockText(b: LibBlock, n: number): string {
@@ -142,6 +144,7 @@ function rank(blocks: LibBlock[], br: Broken): number[][] {
     const w = new Map<string, number>();
     for (const x of wordsOf(p.says + " " + p.answers.join(" "))) w.set(x, Math.max(w.get(x) || 0, 1));
     for (const x of wordsOf(p.words.join(" "))) w.set(x, 1.5);
+    for (const x of wordsOf(br.searches.join(" "))) if (!w.has(x)) w.set(x, 1);
     return w;
   });
   const asked = new Set(parts.flatMap((m) => [...m.keys()]));
@@ -246,17 +249,32 @@ export async function findBlocks(
     if (!src.caselist) out.caselist = "off";
     else {
       onStage?.("Looking in the caselist…");
-      const seen = new Set<string>(), cards: ClHit[] = [];
-      const add = (list: ClHit[]) => { for (const c of list) { const k = c.tag + "|" + c.cite; if (!seen.has(k)) { seen.add(k); cards.push(c); } } };
+      // the searches a debater would type, each one an answer (specific to broad); then each open answer as Claude put it;
+      // then the caselist's own Answer search on each open claim
+      const lists: ClHit[][] = [];
+      for (const q of br.searches.slice(0, 10)) if (q.trim()) lists.push(await src.caselist(q.trim(), false));
       for (const i of open) {
-        const p = br.parts[i];
-        // the caselist's own Answer search (cards that argue against the claim), then the words an answer would use
-        add(await src.caselist(p.says, true));
-        for (const q of [p.words.slice(0, 3).join(" "), p.answers[0]?.replace(/^[^:]{1,20}:\s*/, "").split(/\s+/).slice(0, 5).join(" ")]) if (q?.trim()) add(await src.caselist(q, false));
+        const q = br.parts[i].answers[0]?.replace(/^[^:]{1,20}:\s*/, "").split(/\s+/).slice(0, 5).join(" ");
+        if (q?.trim()) lists.push(await src.caselist(q, false));
+      }
+      for (const i of open) lists.push(await src.caselist(br.parts[i].says, true));
+      // a turn for every search, so the broad ones get their share; the same card from several teams once
+      const seen = new Set<string>(), cards: ClHit[] = [];
+      const same = (c: ClHit) => c.tag.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+      for (let k = 0, more = true; more && cards.length < CASELIST_MAX; k++) {
+        more = false;
+        for (const l of lists) {
+          if (k >= l.length) continue;
+          more = true;
+          const key = same(l[k]);
+          if (!key || seen.has(key)) continue;
+          seen.add(key); cards.push(l[k]);
+          if (cards.length >= CASELIST_MAX) break;
+        }
       }
       out.caselist = cards.length ? "searched" : "nothing";
       if (cards.length) {
-        const fromCl: Best[] = cards.slice(0, VERIFY_MAX).map((c) => ({ ...c, how: "", why: "", fit: 5, kind: br.parts[open[0]].kind, says: br.parts[open[0]].says, from: "caselist" as const }));
+        const fromCl: Best[] = cards.slice(0, CASELIST_MAX).map((c) => ({ ...c, how: "", why: "", fit: 5, kind: br.parts[open[0]].kind, says: br.parts[open[0]].says, from: "caselist" as const }));
         const cl = await check(fromCl);
         lib.ok.push(...cl.ok);
         for (const x of cl.picks) if (out.best.length < 3) out.best.push(x);
@@ -294,7 +312,8 @@ export async function findBlocks(
   }
 }
 
-const VERIFY_MAX = 20;         // candidates checked closely
+const VERIFY_MAX = 20;         // library candidates checked closely
+const CASELIST_MAX = 40;       // caselist cards checked closely (tags only, so more fit)
 const VERIFY_READ = 1400;      // a candidate card's read words, in full or nearly
 
 const Verified = z.object({
@@ -326,7 +345,7 @@ ${cands.map((c, i) => `C${i + 1}.${c.from === "library" ? ` (block: "${c.title.s
 
 Check each candidate the way a good judge would, on logic rather than wording:
 - Which step of their argument does the card's reasoning break, and does that break the assumption the step rests on? An answer to their wording that leaves their logic standing isn't an answer.
-- Does the card's reasoning carry over to their case? A card from another context counts when its reasoning applies here (a general "growth isn't scalar" card answers a claim that India's growth is scalar). It doesn't count when its reasoning depends on facts that only hold elsewhere, or when it only shares words with their argument (a US bill called the "Forward Deterrence Act" says nothing about France's deterrence).
+- Does the card's reasoning carry over to their case? A card from another context counts when its reasoning applies here (a general "growth isn't scalar" card answers a claim that India's growth is scalar). So does a broader card: one against the whole technology, policy or theory answers a claim about one use of it (a card that quantum technology is overhyped or won't work answers a claim that quantum sensing arrives by 2027), with a lower fit when it's indirect. A card about a closely related technology or case counts as an indirect answer when its reasoning plausibly reaches theirs (quantum computing being impossible, read against quantum sensing): mark it as answering, give it a low fit, and say in "why" what it assumes. It doesn't count when its reasoning depends on facts that only hold elsewhere, or when it only shares words with their argument (a US bill called the "Forward Deterrence Act" says nothing about France's deterrence).
 - A card that agrees with them, makes their argument, or only describes the topic doesn't answer it.
 - Judge by what the card's words argue, not by its tag alone.
 
@@ -335,7 +354,7 @@ Check each candidate the way a good judge would, on logic rather than wording:
 - "answers": true only if its reasoning really breaks a step.
 - "part": the step's P number it answers (0 if none).
 - "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause").
-- "quote": the card's warrant, the words that carry its reasoning, copied exactly from the text above as one unbroken stretch of 5 to 40 words. Use "" if it doesn't answer.
+- "quote": the card's warrant, the words that carry its reasoning, copied exactly from the text above as one unbroken stretch of 5 to 40 words. For a caselist card, which shows only its tag, quote the tag (or the part of it that answers); a short tag is fine. Use "" if it doesn't answer.
 - "why": one short line: which assumption of theirs it breaks, and how.
 - "fit": 0 to 10, weighing how directly it breaks the step and how well its reasoning carries over.
 
@@ -359,7 +378,7 @@ What they read (their tags and cards):
 ${arg.slice(0, 6000)}
 """
 
-Write 3 to 5 analytics, strongest first. Attack the logic, not the wording: each one should break the assumption a step rests on. Look for a missing or weak internal link, an assumption they never warrant, a leap from correlation to cause, a threshold where they claim a scalar effect, a timeframe that doesn't fit, an alternate cause, or a way their own mechanism runs the other way. Name the step you're breaking, and point to what their evidence fails to warrant where it helps. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on their own evidence's words, and on well-known facts.
+Write 3 to 5 analytics, strongest first. Attack the logic, not the wording: each one should break the assumption a step rests on. Look for a missing or weak internal link, an assumption they never warrant, a leap from correlation to cause, a threshold where they claim a scalar effect, a timeframe that doesn't fit, an alternate cause, or a way their own mechanism runs the other way. Name the step you're breaking, and point to what their evidence fails to warrant where it helps. Never build an analytic on their author hedging ("may", "could", "potential"): every card hedges, and it takes nothing away from the argument. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on their own evidence's words, and on well-known facts.
 
 "analytics": for each:
 - "part": the P number of the part it answers.
