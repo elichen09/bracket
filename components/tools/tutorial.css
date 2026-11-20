@@ -362,3 +362,142 @@
 .toolpage .tut .tu-ct .txt .h.sel { background: #7ad8ff; }
 .toolpage .tut .tu-ct .txt.small > span > span:not(.u) { font-size: 10.5px; }
 .toolpage .tut .tu-ct .txt .e { outline: 1px solid #000; outline-offset: 0; }
+
+/* =====================================================================
+   coda's tutorial: an ink hero over static, chapters with big numerals
+   that rise into place as they are reached, the keys as a cheat sheet of
+   keycaps, and an ending that knows how much was tried.
+   ===================================================================== */
+.toolpage .tut :is(.tu-idea, .tu-sec h3, .tu-steps, .tu-tips, .tu-demo) { margin-left: 0; }
+
+/* the hero: ink, static, the name */
+.toolpage .tut .tu-hero2 {
+  position: relative; overflow: hidden; min-height: 340px; display: grid; place-items: center;
+  background: radial-gradient(ellipse 70% 80% at 50% 40%, #1a1a1e 0%, #0b0b0c 72%); color: #EDEDEF;
+  border-bottom: 1px solid #000;
+}
+.toolpage .tut .tu-hero2 > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.toolpage .tut .tu-hero2in { position: relative; text-align: center; padding: 56px 24px 50px; max-width: 760px; animation: tuRise .7s cubic-bezier(.2, .8, .2, 1) both; }
+.toolpage .tut .tu-kick { margin: 0 0 14px; font: 500 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: #8E8E96; }
+.toolpage .tut .tu-hero2 h1 { margin: 0; font: 500 clamp(56px, 8vw, 104px)/1 var(--brand); letter-spacing: -.05em; filter: drop-shadow(0 0 30px rgba(237, 237, 239, .12)); }
+.toolpage .tut .tu-hero2 h1 span { color: #8E8E96; }
+.toolpage .tut .tu-lead2 { margin: 18px auto 0; max-width: 46ch; font-size: 17px; line-height: 1.55; color: #B4B4BC; }
+.toolpage .tut .tu-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 22px; }
+.toolpage .tut .tu-chips > span { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid #2A2A30; background: rgba(255, 255, 255, .03); font-size: 13px; color: #B4B4BC; }
+.toolpage .tut .tu-chips b { color: #EDEDEF; font-weight: 600; }
+.toolpage .tut .tu-chips kbd, .toolpage .tut .tu-end2 kbd { background: #18181B; border-color: #34343A; color: #EDEDEF; }
+.toolpage .tut .tu-begin {
+  display: inline-flex; align-items: center; gap: 10px; margin-top: 26px; padding: 12px 22px; border: 0; cursor: pointer; text-decoration: none;
+  background: #EDEDEF; color: #0B0B0C; font: 600 15px var(--ui); border-radius: 999px; transition: background .15s, transform .15s;
+}
+.toolpage .tut .tu-begin:hover { background: #fff; transform: translateY(-1px); }
+.toolpage .tut .tu-begin span { display: inline-block; transition: transform .2s; }
+.toolpage .tut .tu-begin:hover span { transform: translateY(2px); }
+.toolpage .tut a.tu-begin:hover span { transform: translateX(3px); }
+@keyframes tuRise { from { opacity: 0; transform: translateY(14px); } }
+
+/* chapters: a big hairline numeral, and they rise as they are reached */
+.toolpage .tut .tu-sec { padding: 64px 0 44px; }
+.toolpage .tut .tu-sec:not(.in) { opacity: 0; transform: translateY(18px); }
+.toolpage .tut .tu-sec.in { opacity: 1; transform: none; transition: opacity .6s ease, transform .6s cubic-bezier(.2, .8, .2, 1); }
+.toolpage .tut .tu-sech2 { display: flex; align-items: flex-end; gap: 18px; }
+.toolpage .tut .tu-big {
+  flex: none; font: 300 84px/.8 var(--brand); letter-spacing: -.06em;
+  color: transparent; -webkit-text-stroke: 1px var(--line); transition: -webkit-text-stroke-color .4s;
+}
+.toolpage .tut .tu-sec.in .tu-big { -webkit-text-stroke-color: var(--t-acc); }
+.toolpage .tut .tu-sech2 h2 { margin: 0 0 6px; font: 600 34px/1.05 var(--brand); letter-spacing: -.035em; }
+.toolpage .tut .tu-sech2 .tu-line { font-size: 16px; }
+.toolpage .tut .tu-idea { margin-top: 24px; font-size: 16px; }
+
+/* keys as a cheat sheet */
+.toolpage .tut .tu-kgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.toolpage .tut .tu-kcard {
+  display: grid; gap: 8px; align-content: start; padding: 12px 13px; background: var(--t-surface); border: 1px solid var(--line-soft);
+  font-size: 13.5px; line-height: 1.4; color: var(--muted); transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+.toolpage .tut .tu-kcard:hover { border-color: var(--line); transform: translateY(-2px); box-shadow: 0 12px 24px -18px rgba(0, 0, 0, .45); color: var(--ink); }
+.toolpage .tut .tu-readmark { display: block; height: 1px; }
+
+/* contents: a ring for how much is tried */
+.toolpage .tut .tu-ring { display: flex; align-items: center; gap: 12px; padding: 2px 10px 18px; margin-bottom: 8px; border-bottom: 1px solid var(--line-soft); }
+.toolpage .tut .tu-ring svg { flex: none; transform: rotate(-90deg); }
+.toolpage .tut .tu-ring circle { fill: none; stroke-width: 3; }
+.toolpage .tut .tu-ring .bg { stroke: var(--line-soft); }
+.toolpage .tut .tu-ring .fg { stroke: var(--t-acc); stroke-linecap: round; transition: stroke-dashoffset .6s cubic-bezier(.2, .8, .2, 1); }
+.toolpage .tut .tu-ring div { display: grid; }
+.toolpage .tut .tu-ring b { font-size: 14px; font-weight: 600; color: var(--ink); }
+.toolpage .tut .tu-ring span { font-size: 12px; color: var(--muted); }
+.toolpage .tut .tu-ring.all .fg { stroke: var(--t-pro); }
+.toolpage .tut .tu-tick.on { animation: tuPop .35s cubic-bezier(.22, 1.4, .36, 1) both; }
+
+/* the end */
+.toolpage .tut .tu-end2 { position: relative; overflow: hidden; margin-top: 56px; background: #0B0B0C; color: #EDEDEF; text-align: center; }
+.toolpage .tut .tu-end2 > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.toolpage .tut .tu-end2in { position: relative; padding: 54px 24px; }
+.toolpage .tut .tu-end2 h2 { margin: 0 0 10px; font: 500 clamp(40px, 5vw, 60px)/1 var(--brand); letter-spacing: -.045em; }
+.toolpage .tut .tu-end2 p { margin: 0; color: #B4B4BC; font-size: 16px; }
+.toolpage .tut .tu-end2:not(.in) .tu-end2in { opacity: 0; transform: translateY(12px); }
+.toolpage .tut .tu-end2.in .tu-end2in { transition: opacity .6s ease, transform .6s cubic-bezier(.2, .8, .2, 1); }
+.toolpage .tut .tu-end2.all h2 { animation: tuGlow 2.4s ease-in-out 1; }
+@keyframes tuGlow { 50% { text-shadow: 0 0 28px rgba(237, 237, 239, .45); } }
+
+/* the window, toured */
+.toolpage .tut .tu-win { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.toolpage .tut .tu-winframe { display: grid; grid-template-rows: auto auto 1fr auto; height: 270px; background: #0B0B0C; border: 1px solid #000; box-shadow: 0 20px 40px -26px rgba(0, 0, 0, .7); }
+.toolpage .tut .tu-wpart { position: relative; border: 0; padding: 0; margin: 0; cursor: pointer; background: none; color: #EDEDEF; font: inherit; transition: background .15s, box-shadow .15s, opacity .15s; }
+.toolpage .tut .tu-winframe:hover .tu-wpart:not(.on), .toolpage .tut .tu-winframe:focus-within .tu-wpart:not(.on) { opacity: .55; }
+.toolpage .tut .tu-wpart.on { box-shadow: inset 0 0 0 2px #EDEDEF; z-index: 1; }
+.toolpage .tut .tu-wpart.seen::after { content: "✓"; position: absolute; top: 3px; right: 5px; font-size: 10px; color: #7FD1A6; }
+.toolpage .tut .w-bar { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 10px; border-bottom: 1px solid #1F1F23; font-size: 11px; }
+.toolpage .tut .w-bar b { font-weight: 600; }
+.toolpage .tut .w-file { color: #B4B4BC; }
+.toolpage .tut .w-box { margin: 0 auto; padding: 3px 10px; border: 1px solid #2A2A30; color: #8E8E96; font-size: 10px; }
+.toolpage .tut .w-modes { display: flex; gap: 2px; }
+.toolpage .tut .w-modes i { width: 16px; height: 10px; background: #26262B; }
+.toolpage .tut .w-modes i.on { background: #EDEDEF; }
+.toolpage .tut .w-fmt { display: flex; justify-content: center; gap: 6px; padding: 5px 0 7px; font-size: 9.5px; }
+.toolpage .tut .w-pill { padding: 3px 8px; background: #131315; border: 1px solid #1F1F23; color: #D4D4DA; }
+.toolpage .tut .w-pill.send { background: #EDEDEF; color: #0B0B0C; font-weight: 600; }
+.toolpage .tut .w-body { display: grid; grid-template-columns: 30% 1fr; min-height: 0; }
+.toolpage .tut .w-side { display: grid; align-content: start; gap: 7px; padding: 10px; background: #0F0F11; border-right: 1px solid #1F1F23; }
+.toolpage .tut .w-side i { height: 6px; background: #26262B; }
+.toolpage .tut .w-side i:nth-child(3n) { width: 70%; }
+.toolpage .tut .w-page { display: grid; align-content: start; gap: 6px; padding: 12px 16px; background: #fff; }
+.toolpage .tut .w-page i { height: 5px; background: #D6D6D2; }
+.toolpage .tut .w-page i.t { height: 7px; width: 60%; background: #222; }
+.toolpage .tut .w-page i.c { width: 30%; background: #555; }
+.toolpage .tut .w-page i.h { background: linear-gradient(90deg, #D6D6D2 20%, #22e06a 20%, #22e06a 70%, #D6D6D2 70%); }
+.toolpage .tut .w-status { display: flex; justify-content: space-between; padding: 4px 10px; background: #f6f6f5; color: #55555C; font-size: 9.5px; }
+.toolpage .tut .tu-winsay { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 16px; background: var(--t-surface); border: 1px solid var(--line-soft); }
+.toolpage .tut .tu-winsay b { font: 600 20px var(--brand); letter-spacing: -.02em; }
+.toolpage .tut .tu-winsay p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--muted); }
+.toolpage .tut .tu-wdots { display: flex; gap: 6px; margin-top: 8px; }
+.toolpage .tut .tu-wdots i { width: 7px; height: 7px; border-radius: 50% !important; background: var(--line); transition: background .3s, transform .3s; }
+.toolpage .tut .tu-wdots i.on { background: var(--t-acc); transform: scale(1.15); }
+@media (max-width: 900px) { .toolpage .tut .tu-win { grid-template-columns: 1fr; } }
+
+/* the command menu, in miniature */
+.toolpage .tut .tu-paldesk { position: relative; min-height: 250px; background: #0B0B0C; color: #EDEDEF; outline: none; }
+.toolpage .tut .tu-paldesk:focus-visible { box-shadow: inset 0 0 0 2px var(--t-acc); }
+.toolpage .tut .tu-palbar { display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 14px; border-bottom: 1px solid #1F1F23; }
+.toolpage .tut .tu-palbox { flex: 0 1 340px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 30px; padding: 0 6px 0 11px; background: #131315; border: 1px solid #2A2A30; color: #8E8E96; font: 13px var(--ui); cursor: text; }
+.toolpage .tut .tu-palbox:hover { border-color: #4A4A52; color: #EDEDEF; }
+.toolpage .tut .tu-paldesk kbd { background: #18181B; border-color: #34343A; color: #D4D4DA; }
+.toolpage .tut .tu-paldesk .tu-hint { color: #8E8E96; text-align: center; padding: 70px 20px 0; margin: 0; }
+.toolpage .tut .tu-palran { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 0; padding: 72px 24px 0; font-size: 15px; animation: tuRise .35s cubic-bezier(.2, .8, .2, 1) both; }
+.toolpage .tut .tu-palran i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50% !important; background: #EDEDEF; color: #0B0B0C; font-style: normal; font-size: 12px; }
+.toolpage .tut .tu-pal { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: min(460px, calc(100% - 28px)); background: #131315; border: 1px solid #2A2A30; box-shadow: 0 30px 60px -24px rgba(0, 0, 0, .8); animation: tuPalIn .16s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes tuPalIn { from { opacity: 0; transform: translate(-50%, -6px) scale(.98); } }
+.toolpage .tut .tu-pal input { width: 100%; height: 44px; padding: 0 14px; background: transparent; border: 0; border-bottom: 1px solid #26262B; outline: none; color: #EDEDEF; font: 15px var(--ui); }
+.toolpage .tut .tu-pal ul { list-style: none; margin: 0; padding: 5px; max-height: 170px; overflow-y: auto; }
+.toolpage .tut .tu-pal li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; font-size: 13.5px; color: #D4D4DA; cursor: pointer; }
+.toolpage .tut .tu-pal li.on { background: #26262C; color: #fff; box-shadow: inset 2px 0 0 #EDEDEF; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toolpage .tut .tu-sec:not(.in), .toolpage .tut .tu-end2:not(.in) .tu-end2in { opacity: 1; transform: none; }
+  .toolpage .tut :is(.tu-hero2in, .tu-pal, .tu-palran, .tu-end2 h2) { animation: none; }
+}
+
+/* the tutorial has its own banner (back to coda, colours): the site nav steps aside, as it does in the app */
+html:has(.toolpage .tut) .nav { display: none; }
