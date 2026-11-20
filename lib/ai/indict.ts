@@ -121,8 +121,9 @@ function runs(b: Body, a: number, z: number): [number, number][] {
   return out;
 }
 
-export async function aiIndict(view: EditorView, key: string, o: IndictOptions, signal?: AbortSignal, onProgress?: (done: number, of: number) => void): Promise<IndictReport> {
-  const todo = cardsToDo(view.state);
+export async function aiIndict(view: EditorView, key: string, o: IndictOptions, signal?: AbortSignal, onProgress?: (done: number, of: number) => void, only?: number[]): Promise<IndictReport> {
+  // the cards asked for (their order among the tags), else the ones selected or the cursor is in
+  const todo = only && only.length ? only : cardsToDo(view.state);
   if (!todo.length) throw new AiError("Put the cursor in their card, or select several, to rehighlight.");
   const rep: IndictReport = { cards: todo.length, done: [], indicts: 0, says: [], skipped: [], failed: [] };
   const made = new Map<number, Rehighlight>();

@@ -21,10 +21,10 @@ import { reformat } from "@/lib/cutter/reformat";
 import { DEFAULT_CITE_FORMAT, writeCite } from "@/lib/cutter/cites";
 import { aiKey, setAiKey, checkKey, AI_MODEL } from "@/lib/ai/claude";
 import { citeFromLink } from "@/lib/ai/cite";
-import { aiReformat } from "@/lib/ai/reformat";
-import { aiIndict } from "@/lib/ai/indict";
+import { aiReformat, cardsToDo } from "@/lib/ai/reformat";
+import { aiIndict, type Rehighlight } from "@/lib/ai/indict";
 import { findBlocks, type Found, type Sources } from "@/lib/ai/blocks";
-import { spotPlugin, holdSpot, takeSpot } from "@/lib/ai/spot";
+import { spotPlugin, holdSpot, takeSpot, type Spot } from "@/lib/ai/spot";
 import { caselistClient, familyOf } from "@/lib/caselist/client";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
@@ -1862,7 +1862,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   /** AI at work, in the background: what it's doing, for the chip in the corner. */
   const [aiRun, setAiRun] = useState<null | { label: string; done?: number; of?: number }>(null);
   /** Find blocks' answers, docked in the corner: the doc stays yours while they're up. */
-  const [aiFound, setAiFound] = useState<Found | null>(null);
+  const [aiFound, setAiFound] = useState<(Found & { rehi?: Rehighlight[]; rehiSays?: string[] }) | null>(null);
+  /** Find blocks' argument, when it came from their cards in the doc: those cards, held, to rehighlight if nothing answers them. */
+  const aiWantFrom = useRef<null | { text: string; view: EditorView; spots: (Spot | null)[] }>(null);
   const aiWant = useRef("");
   const aiBusy = () => { if (aiStop.current) { toast("AI is still working on the last one — Stop it first"); return true; } return false; };
   /** What the block finder starts from: the selection, else the card you're in (its tag and what's read), else the line. */
@@ -1888,7 +1890,19 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       return;
     }
     if (what === "cite") setAiPanel({ kind: "cite", url: "", err: "" });
-    else if (what === "blocks") setAiPanel({ kind: "blocks", want: wantFromHere() || aiWant.current, err: "" });
+    else if (what === "blocks") {
+      const here = wantFromHere();
+      for (const sp of aiWantFrom.current?.spots || []) { const v0 = aiWantFrom.current!.view; if (!v0.isDestroyed) takeSpot(v0.state, sp); }
+      aiWantFrom.current = null;
+      const v = target();
+      if (here && v) {
+        const tags: number[] = [];
+        v.state.doc.forEach((n, pos) => { if (n.type === schema.nodes.heading && n.attrs.level === 4) tags.push(pos); });
+        const spots = cardsToDo(v.state).slice(0, 4).map((k) => (tags[k] === undefined ? null : holdSpot(v.state, tags[k])));
+        if (spots.some(Boolean)) aiWantFrom.current = { text: here, view: v, spots };
+      }
+      setAiPanel({ kind: "blocks", want: here || aiWant.current, err: "" });
+    }
     else if (what === "indict") void aiIndictNow();
     else void aiReformatNow();
   };
@@ -1908,6 +1922,34 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       setAiPanel((p) => p && p.kind === "settings" ? { ...p, busy: false, bad: true, msg: (e as Error).message } : p);
     }
   };
+  /** Rehighlighted copies, to the speech doc where its cursor is, as a sent card goes. Returns how many went. */
+  const sendRehighlights = async (list: Rehighlight[]) => {
+    const EV = (window as any).EV;
+    const fid = viewFile.current.get(activeRef.current) || "";
+    const fileName = loaded.current.get(fid)?.name || "their card";
+    let sent = 0;
+    if (!list.length || !EV?.parseHtml || !EV?.sendParsed) return 0;
+    for (const c of list) {
+      const parsed = EV.parseHtml(`<h3>${esc(c.block || fileName)}</h3>` + toHtml(c.doc), {});
+      for (const b of (parsed.blocks || []).filter((x: any) => (x.args || []).length)) {
+        await EV.sendParsed({ ...b, id: `rm:rehi:${Date.now()}:${sent}` }, 0, "rehighlighted, from " + fileName);
+        sent++;
+      }
+    }
+    if (sent) setSentPulse((x) => x + 1);
+    return sent;
+  };
+  /** Analytics, to the speech doc as tags with no card under them. */
+  const sendAnalytics = async (texts: string[]) => {
+    const EV = (window as any).EV;
+    if (!texts.length || !EV?.parseHtml || !EV?.sendParsed) { toast("The speech doc is still starting — a moment"); return; }
+    const parsed = EV.parseHtml("<h3>Analytics</h3>" + texts.map((t) => `<h4>${esc(t)}</h4>`).join(""), {});
+    for (const b of (parsed.blocks || []).filter((x: any) => (x.args || []).length)) {
+      await EV.sendParsed({ ...b, id: `rm:analytic:${Date.now()}` }, texts.length === 1 ? 0 : null, "analytics");
+    }
+    setSentPulse((x) => x + 1);
+    toast(texts.length === 1 ? "Sent the analytic" : `Sent ${texts.length} analytics`);
+  };
   const aiIndictNow = async () => {
     const v = target();
     if (!v) { toast("Open a file first"); return; }
@@ -1916,21 +1958,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setAiRun({ label: "Finding indicts" });
     try {
       const r = await aiIndict(v, aiKey(owner), { retag: aiOpts.retag }, ctl.signal, (done, of) => setAiRun({ label: "Finding indicts", done, of }));
-      // the rehighlighted copies, to the speech doc where its cursor is, as a sent card goes; the file is as it was
-      const EV = (window as any).EV;
-      const fid = viewFile.current.get(activeRef.current) || "";
-      const fileName = loaded.current.get(fid)?.name || "their card";
-      let sent = 0;
-      if (r.done.length && EV?.parseHtml && EV?.sendParsed) {
-        for (const c of r.done) {
-          const parsed = EV.parseHtml(`<h3>${esc(c.block || fileName)}</h3>` + toHtml(c.doc), {});
-          for (const b of (parsed.blocks || []).filter((x: any) => (x.args || []).length)) {
-            await EV.sendParsed({ ...b, id: `rm:rehi:${Date.now()}:${sent}` }, 0, "rehighlighted, from " + fileName);
-            sent++;
-          }
-        }
-        if (sent) setSentPulse((x) => x + 1);
-      }
+      // the rehighlighted copies, to the speech doc; the file is as it was
+      const sent = await sendRehighlights(r.done);
       const n = (x: number, w: string) => x + " " + w + (x === 1 ? "" : "s");
       const bits: string[] = [];
       if (sent) bits.push(`Sent ${r.done.length > 1 ? n(sent, "rehighlight") : "the rehighlight"} to the speech doc, ${n(r.indicts, "indict")}: ${r.says.slice(0, 2).join("; ")}`);
@@ -2044,7 +2073,23 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setAiRun({ label: "Finding answers" });
     try {
       const found = await findBlocks(aiKey(owner), want, src, ctl.signal, (stage) => setAiRun({ label: stage.replace(/…$/, "") }));
-      setAiFound(found);
+      const from = aiWantFrom.current;
+      aiWantFrom.current = null;
+      let rehi: Rehighlight[] = [], rehiSays: string[] = [];
+      if (from) {
+        // their cards, where they are now (and only if the argument is still the one taken from them)
+        const tags: number[] = [];
+        if (!from.view.isDestroyed) from.view.state.doc.forEach((n, pos) => { if (n.type === schema.nodes.heading && n.attrs.level === 4) tags.push(pos); });
+        const idx = from.spots.map((sp) => (from.view.isDestroyed ? null : takeSpot(from.view.state, sp))).map((p) => (p && !p.lost ? tags.indexOf(p.pos) : -1)).filter((i) => i >= 0);
+        if (!found.best.length && from.text === want && idx.length) {
+          setAiRun({ label: "Rehighlighting their cards" });
+          try {
+            const r = await aiIndict(from.view, aiKey(owner), { retag: aiOpts.retag }, ctl.signal, (done, of) => setAiRun({ label: "Rehighlighting their cards", done, of }), idx);
+            rehi = r.done; rehiSays = r.says;
+          } catch (e) { if (ctl.signal.aborted) throw e; /* the analytics still stand */ }
+        }
+      }
+      setAiFound({ ...found, rehi, rehiSays });
     } catch (e) {
       toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
     } finally {
@@ -3615,7 +3660,33 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   <small className="src">{p.from === "library" ? [p.cardTag ? p.title : "", ...p.where.split(" › ")].filter(Boolean).join(" › ") : `Caselist › ${p.team} › ${p.cite}`}</small>
                 </li>
               ))}
-              {!aiFound.best.length && <li className="rm-aians-none">{aiFound.caselist === "off" ? "Nothing in your library answers this, and the caselist isn't on: sign in to openCaselist (Search › Caselist) to look there too." : aiFound.caselist ? "Nothing in your library or the caselist answers this." : "Nothing in your library answers this."}</li>}
+              {!aiFound.best.length && <li className="rm-aians-none">{(aiFound.caselist === "off" ? "No card in your library answers this, and the caselist isn't on: sign in to openCaselist (Search › Caselist) to look there too." : aiFound.caselist ? "No card in your library or the caselist answers this." : "No card in your library answers this.") + ((aiFound.analytics || []).length || aiFound.rehi?.length ? " Instead:" : "")}</li>}
+              {!aiFound.best.length && !!aiFound.rehi?.length && (
+                <li className="rm-aians-i">
+                  <div className="top">
+                    <span className="part">their cards</span>
+                    <span className="how turn">Rehighlight</span>
+                    <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const n = await sendRehighlights(aiFound.rehi || []); toast(n ? (n === 1 ? "Sent the rehighlight" : `Sent ${n} rehighlights`) : "The speech doc is still starting — a moment"); }}>Send</button>
+                  </div>
+                  <b className="ttl">{aiFound.rehi.map((r) => r.tag).join(" · ")}</b>
+                  {(aiFound.rehiSays || []).map((x, k) => <p key={k} className="why">{x}</p>)}
+                  <small className="src">A copy, their highlighting greyed and the indicts in cyan. Your file stays as it is.</small>
+                </li>
+              )}
+              {!aiFound.best.length && (aiFound.analytics || []).map((a, k) => (
+                <li key={"an" + k} className="rm-aians-i">
+                  <div className="top">
+                    {a.kind && <span className="part">{a.kind}</span>}
+                    <span className={"how" + (/turn/i.test(a.how) ? " turn" : "")}>{a.how || "Analytic"}</span>
+                    <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics([a.text])}>Send</button>
+                  </div>
+                  <b className="ttl">{a.text}</b>
+                  <small className="src">Analytic: no card</small>
+                </li>
+              ))}
+              {!aiFound.best.length && (aiFound.analytics || []).length > 1 && (
+                <li className="rm-aians-all"><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics((aiFound.analytics || []).map((a) => a.text))}>Send all {(aiFound.analytics || []).length} analytics</button></li>
+              )}
             </ol>
             {aiFound.best.length > 0 && aiFound.unanswered.length > 0 && <p className="rm-aiopen">Nothing answers their {aiFound.unanswered.join(" or ")}.</p>}
             <p className="rm-ainote">{aiFound.of ? `Read ${aiFound.read === aiFound.of ? "every block" : aiFound.read + " of " + aiFound.of + " blocks, the ones that use its words"} across all your bins. Send puts it where your cursor is.` : "Your library is empty: import blocks to search them."}</p>

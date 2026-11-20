@@ -16,6 +16,8 @@
  *      answer, and coda checks the quote is in the card.
  *   5. Whatever the library can't answer, coda looks for in the caselist
  *      (the wikis chosen in its search), checked the same way.
+ *   6. Nothing answers it at all: Claude writes analytics, and coda
+ *      rehighlights their cards for indicts when they're in the doc.
  *
  * Nothing leaves the browser except to Claude, on your own key.
  */
@@ -37,7 +39,11 @@ export interface Found {
   claim: string; parts: Part[]; best: Best[]; unanswered: string[]; read: number; of: number;
   /** the caselist, when the library fell short: looked through, looked through with nothing found, or not there (not signed in) */
   caselist?: "searched" | "nothing" | "off";
+  /** when nothing answers it: arguments to make without a card */
+  analytics?: Analytic[];
 }
+/** An argument to make without a card: the part of theirs it answers, how, and what to say. */
+export interface Analytic { kind: string; how: string; text: string }
 
 export interface Sources {
   /** every block in use, with its cards' words: EV.libraryText */
@@ -255,6 +261,12 @@ export async function findBlocks(
   }
   const got = new Set(lib.ok.map((x) => x.kind));
   out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => !got.has(k) && a.indexOf(k) === i);
+  // no card answers it: analytics instead
+  if (!out.best.length) {
+    onStage?.("Writing analytics…");
+    try { out.analytics = await writeAnalytics(key, br, arg, signal); }
+    catch (e) { if (signal?.aborted) throw e; out.analytics = []; }
+  }
   return out;
 
   /** Candidates checked closely against their cards: the ones whose quoted words are really there, and the best few to read. */
@@ -323,4 +335,33 @@ Check each candidate strictly, the way a good debater or judge would:
 - "fit": 0 to 10.
 
 "picks": of the candidates that answer, the C numbers of the 3 the debater should actually read, as a set, best first. Prefer a set that does more together (offense with defense, or different parts) over two that make the same point. Add a 4th only if the set would be clearly weaker without it. Pick fewer if fewer answer.`;
+}
+
+const Analytics = z.object({ analytics: z.array(z.object({ part: z.number(), how: z.string(), text: z.string() })) });
+
+/** Nothing in the library or the caselist answers it: the arguments a debater can make without a card. */
+async function writeAnalytics(key: string, br: Broken, arg: string, signal?: AbortSignal): Promise<Analytic[]> {
+  const r = await askJson(key, `A policy debater has to answer the other team's argument, and neither their own evidence nor the caselist has a card that answers it. Write analytics: arguments they can make out loud without a card.
+
+Their argument: ${br.claim}
+What it is about, exactly: ${br.about}
+
+Its parts:
+${partsText(br)}
+
+What they read (their tags and cards):
+"""
+${arg.slice(0, 6000)}
+"""
+
+Write 3 to 5 analytics, strongest first. Each must be specific to this argument: name the warrant it attacks and say what's wrong with it. Point to what their own evidence says or fails to say where you can. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on their own evidence's words, and on well-known facts.
+
+"analytics": for each:
+- "part": the P number of the part it answers.
+- "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause", "Indict", "Defense").
+- "text": the analytic as the debater would say it in the round: one or two sentences, under 35 words. No filler and no "they say".`, Analytics, signal, "medium");
+  return r.analytics.filter((a) => a.text.trim()).slice(0, 5).map((a) => {
+    const p = br.parts[Math.round(a.part) - 1];
+    return { kind: p ? p.kind : "", how: a.how.trim(), text: a.text.trim() };
+  });
 }
