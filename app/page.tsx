@@ -39,7 +39,7 @@ export default async function Home() {
       </div>
 
       <footer className={`${s.foot} ${s.fade}`}>
-        <span>© 2026</span><Link href="/download" className={s.link}>coda for Windows</Link>
+        <span>© 2026</span><Link href="/download" className={s.link}>Desktop app</Link>
       </footer>
     </main>
   );

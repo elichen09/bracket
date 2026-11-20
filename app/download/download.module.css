@@ -48,3 +48,12 @@
 .back a:hover { color: #EDEDEF; }
 
 @media (prefers-reduced-motion: reduce) { .heroIn { animation: none; } }
+.ctaRow { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.ctaGhost {
+  display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 999px;
+  box-shadow: inset 0 0 0 1px #34343A; color: #EDEDEF; font-weight: 600; font-size: 16px; text-decoration: none;
+  transition: box-shadow .15s, transform .15s;
+}
+.ctaGhost:hover { box-shadow: inset 0 0 0 1px #8E8E96; transform: translateY(-1px); }
+.ctaGhost:focus-visible { outline: 2px solid #EDEDEF; outline-offset: 3px; }
+.block { display: block; margin-top: 10px; padding: 10px 12px !important; overflow-x: auto; white-space: nowrap; user-select: all; }

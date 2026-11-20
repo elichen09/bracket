@@ -2553,7 +2553,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       { id: "x:speechdrop", label: "Send the speech doc to SpeechDrop…", sub: "Speech doc", icon: I.send, go: () => speechApi.current?.speechDrop() },
       { id: "x:popsend", label: "Pop out the speech doc", sub: "A window that stays on top", icon: I.full, go: () => { if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); } },
       { id: "x:tutorial", label: "Open the tutorial", sub: "How coda works", icon: I.bolt, go: () => window.open("/tools/tutorial", "_blank") },
-      ...(desktop ? [] : [{ id: "x:desktop", label: "Get coda for Windows", sub: "The desktop app — every key is yours", icon: I.down, go: () => window.open("/download", "_blank") }]),
+      ...(desktop ? [] : [{ id: "x:desktop", label: "Get the desktop app", sub: "Windows and Mac — every key is yours", icon: I.down, go: () => window.open("/download", "_blank") }]),
       { id: "x:signout", label: "Sign out", sub: "Account", icon: I.x, go: async () => { await flush(true); await signOutOfCoda(); window.location.assign("/"); } },
     ];
     const cmds: PalItem[] = [
@@ -3203,7 +3203,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <a className="rm-mb" role="menuitem" href="/">Home</a>
           <a className="rm-mb" role="menuitem" href="/tools/tutorial" target="_blank" rel="noopener">The tutorial</a>
           <button type="button" className="rm-mb" role="menuitem" onClick={() => { setMenu(null); setKeysOpen(true); setKeyNote(""); }}>Keys and cite format</button>
-          {!desktop && <a className="rm-mb" role="menuitem" href="/download" target="_blank" rel="noopener">Get coda for Windows</a>}
+          {!desktop && <a className="rm-mb" role="menuitem" href="/download" target="_blank" rel="noopener">Get the desktop app</a>}
           <div className="rm-sep" />
           <button type="button" className="rm-mb" role="menuitem" onClick={async () => { setMenu(null); await flush(true); await signOutOfCoda(); window.location.assign("/"); }}>Sign out</button>
         </div>

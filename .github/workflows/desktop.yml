@@ -1,8 +1,8 @@
-name: coda for Windows
+name: coda desktop
 
-# Builds the desktop app (src-tauri/) into a Windows installer and publishes it
-# as a GitHub Release, which /download links to. Runs when a tag like
-# desktop-v1.0.0 is pushed, or by hand against such a tag. The app opens the
+# Builds the desktop app (src-tauri/) for Windows and for the Mac and publishes
+# both as one GitHub Release, which /download links to. Runs when a tag like
+# desktop-v1.0.1 is pushed, or by hand against such a tag. The app opens the
 # live site, so the site's own changes never need a new build — only changes
 # to the shell (its icon, its window) do.
 on:
@@ -47,8 +47,44 @@ jobs:
         with:
           # the site's own npm packages are not needed: the app is only the window
           tauriScript: npx --yes @tauri-apps/cli@2
+          args: --bundles nsis
           tagName: ${{ github.ref_name }}
-          releaseName: "coda for Windows ${{ github.ref_name }}"
-          releaseBody: "Download the `-setup.exe` below and run it. Windows may say it protected your PC — click More info, then Run anyway. Full instructions: https://bracket-ashy.vercel.app/download"
+          releaseName: "coda desktop ${{ github.ref_name }}"
+          releaseBody: "Windows: download the `-setup.exe`. Mac: download the `.dmg`. Full instructions, including the first-open warnings: https://bracket-ashy.vercel.app/download"
+          releaseDraft: false
+          prerelease: false
+
+  # after Windows, so the release exists and the Mac build is added to it
+  mac:
+    needs: windows
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # one app for Apple Silicon and Intel Macs both
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: npx --yes @tauri-apps/cli@2
+          args: --target universal-apple-darwin --bundles dmg
+          tagName: ${{ github.ref_name }}
+          releaseName: "coda desktop ${{ github.ref_name }}"
+          releaseBody: "Windows: download the `-setup.exe`. Mac: download the `.dmg`. Full instructions, including the first-open warnings: https://bracket-ashy.vercel.app/download"
           releaseDraft: false
           prerelease: false
