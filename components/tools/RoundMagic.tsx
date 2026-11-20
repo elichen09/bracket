@@ -1014,6 +1014,20 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return f;
   }, [newFile, open, setPaneRead]);
 
+  // a library import that brought your files back (engine.js restoreFiles): the Files tab reads them again
+  useEffect(() => {
+    const on = () => {
+      void listFiles(owner).then((l) => {
+        setFiles(l);
+        // the empty file a fresh install starts in may have gone: open one that is there
+        const here = curRef.current?.id;
+        if (l.length && here && !isTheirs(here) && !isTemp(here) && !l.some((f) => f.id === here)) void open(l[0].id);
+      });
+    };
+    window.addEventListener("coda:files-changed", on);
+    return () => window.removeEventListener("coda:files-changed", on);
+  }, [owner, setFiles, open]);
+
   const LAYOUT_KEY = scoped("cutter.layout", owner);
   useEffect(() => {
     let gone = false;
