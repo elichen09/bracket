@@ -221,9 +221,23 @@ export async function findBlocks(
   if (!br.parts.length) throw new AiError("Claude couldn't find an argument in that. Select their cards, or say what you need answered.");
   const all = await libP;
   const out: Found = { claim: br.claim, parts: br.parts.map((p) => ({ kind: p.kind, says: p.says, picks: [], caselist: [] })), best: [], unanswered: [], read: 0, of: all.length };
+  // the caselist answers one search at a time (one that's overtaken comes back empty), so every search here waits its turn
+  let clTurn: Promise<unknown> = Promise.resolve();
+  const clOne = src.caselist;
+  const caselist = clOne ? (q: string, answer: boolean) => { const p = clTurn.then(() => clOne(q, answer)); clTurn = p.catch(() => undefined); return p; } : null;
+  const srcQ: Sources = { ...src, caselist };
+  // the analytics, and the cards behind them, when asked for: started now, alongside the cards' search and check
+  const makeAnalytics = async (): Promise<Analytic[]> => {
+    let list: Analytic[] = [];
+    try { list = await writeAnalytics(key, br, arg, signal); } catch (e) { if (signal?.aborted) throw e; return []; }
+    if (list.length) { try { await backAnalytics(key, list, all, srcQ, signal); } catch (e) { if (signal?.aborted) throw e; /* they stand without cards */ } }
+    return list;
+  };
+  const early = opts.analytics ? makeAnalytics() : null;
+  early?.catch(() => { /* awaited below */ });
 
   // the library read and the caselist searched, side by side: the best answers can be in either
-  const caselistP: Promise<ClHit[] | null> = src.caselist ? searchCaselist(src.caselist).catch((e) => { if (signal?.aborted) throw e; return []; }) : Promise.resolve(null);
+  const caselistP: Promise<ClHit[] | null> = caselist ? searchCaselist(caselist).catch((e) => { if (signal?.aborted) throw e; return []; }) : Promise.resolve(null);
   if (all.length) {
     const list = batches(shortlist(all, br));
     out.read = list.reduce((n, b) => n + b.length, 0);
@@ -260,15 +274,9 @@ export async function findBlocks(
   out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => !got.has(k) && a.indexOf(k) === i);
   // analytics: when no card answers it, or when asked for alongside the cards
   if (!out.best.length || opts.analytics) {
-    onStage?.("Writing analytics…");
-    try { out.analytics = await writeAnalytics(key, br, arg, signal); }
-    catch (e) { if (signal?.aborted) throw e; out.analytics = []; }
-    // each analytic stands on its own, and gets a card behind it where one proves it
-    if (out.analytics.length) {
-      onStage?.("Finding cards for the analytics…");
-      try { await backAnalytics(key, out.analytics, all, src, signal); }
-      catch (e) { if (signal?.aborted) throw e; /* the analytics stand without cards */ }
-    }
+    // started early when asked for; otherwise (no card answers it) written now, each with a card behind it where one proves it
+    onStage?.(early ? "Finishing the analytics…" : "Writing analytics…");
+    out.analytics = await (early || makeAnalytics());
     // an analytic with a card that proves it is just that card: it joins the answers, the analytic as its reason.
     // Only the analytics no card proves stay analytics.
     const same = (a: Best, b: Best) => a.from === "library" && b.from === "library" ? a.id === b.id && a.card === b.card
@@ -317,29 +325,42 @@ export async function findBlocks(
   async function check(cands: Best[]): Promise<{ ok: Best[]; picks: Best[] }> {
     onStage?.(`Checking ${cands.length} answer${cands.length === 1 ? "" : "s"} against the cards…`);
     const texts = cands.map((c) => candidateText(c, all));
-    const r = await askJson(key, verifyPrompt(br, cands, texts), Verified, signal, "medium");
+    // in up to three groups checked side by side: each candidate judged just as closely, in a third of the time
+    const size = Math.max(CHECK_GROUP_MIN, Math.ceil(cands.length / CHECK_GROUPS));
+    const groups: number[][] = [];
+    for (let a = 0; a < cands.length; a += size) groups.push(cands.map((_, i) => i).slice(a, a + size));
+    const runs = await Promise.allSettled(groups.map((g) =>
+      askJson(key, verifyPrompt(br, g.map((i) => cands[i]), g.map((i) => texts[i])), Verified, signal, "medium").then((r) => ({ g, r }))));
+    if (signal?.aborted) throw new AiError("Stopped.");
+    const done = runs.filter((x): x is PromiseFulfilledResult<{ g: number[]; r: z.infer<typeof Verified> }> => x.status === "fulfilled");
+    if (!done.length) throw (runs[0] as PromiseRejectedResult).reason;
     const ok = new Map<number, Best>();
-    for (const v of r.checks) {
-      const i = Math.round(v.n) - 1, c = cands[i];
-      if (!c || !v.answers || !v.quote.trim()) continue;
-      // the quote has to be in the card, word for word: an answer Claude can't point to isn't one
-      if (!find({ s: texts[i] }, [v.quote]).ranges.length) continue;
-      const part = br.parts[Math.round(v.part) - 1];
-      ok.set(i, { ...c, kind: part ? part.kind : c.kind, says: part ? part.says : c.says, how: v.how || c.how, why: v.why || c.why, quote: v.quote.trim(), fit: clamp(v.fit) });
+    for (const { value: { g, r } } of done) {
+      for (const v of r.checks) {
+        const i = g[Math.round(v.n) - 1], c = i === undefined ? undefined : cands[i];
+        if (i === undefined || !c || !v.answers || !v.quote.trim()) continue;
+        // the quote has to be in the card, word for word: an answer Claude can't point to isn't one
+        if (!find({ s: texts[i] }, [v.quote]).ranges.length) continue;
+        const part = br.parts[Math.round(v.part) - 1];
+        ok.set(i, { ...c, kind: part ? part.kind : c.kind, says: part ? part.says : c.says, how: v.how || c.how, why: v.why || c.why, quote: v.quote.trim(), fit: clamp(v.fit) });
+      }
     }
-    const seen = new Set<number>();
-    // Claude's picks, at most two for any one step, so no step crowds out the rest
-    const perStep = new Map<string, number>();
-    let picks = r.picks.map((n) => Math.round(n) - 1).filter((i) => ok.has(i) && !seen.has(i) && (seen.add(i), true)).map((i) => ok.get(i)!)
-      .filter((x) => { const n = perStep.get(x.kind) || 0; if (n >= 2) return false; perStep.set(x.kind, n + 1); return true; })
-      .slice(0, PICKS_MAX);
-    // every step with an answer gets one, even if the picks left it out
+    // the picks: the best answer to every step first, then the strongest of the rest, at most two a step;
+    // a card disclosed by several teams once
     const byFit = [...ok.values()].sort((a, b) => b.fit - a.fit);
-    for (const x of byFit) if (picks.length < PICKS_MAX && !picks.some((p) => p.kind === x.kind)) picks.push(x);
-    // and in the order of their argument: uniqueness, link, internal link, impact
+    const sameTag = (x: Best) => (x.from === "library" ? x.cardTag || x.title : x.tag).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+    const picks: Best[] = [], tags = new Set<string>(), perStep = new Map<string, number>();
+    const take = (x: Best) => {
+      const t = sameTag(x), n = perStep.get(x.kind) || 0;
+      if (picks.length >= PICKS_MAX || n >= 2 || tags.has(t) || picks.includes(x)) return;
+      picks.push(x); tags.add(t); perStep.set(x.kind, n + 1);
+    };
+    for (const x of byFit) if (!perStep.has(x.kind)) take(x);
+    for (const x of byFit) take(x);
+    // in the order of their argument: uniqueness, link, internal link, impact; strongest first within a step
     const order: string[] = br.parts.map((p) => p.kind);
     const rank = (k: string) => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
-    picks = picks.map((x, i) => ({ x, i })).sort((a, b) => rank(a.x.kind) - rank(b.x.kind) || a.i - b.i).map((p) => p.x);
+    picks.sort((a, b) => rank(a.kind) - rank(b.kind) || b.fit - a.fit);
     return { ok: [...ok.values()], picks };
   }
 }
@@ -349,9 +370,11 @@ const CASELIST_MAX = 40;       // caselist cards checked closely (tags only, so 
 const PICKS_MAX = 8;           // answers shown: one or two for every step of their argument
 const VERIFY_READ = 1400;      // a candidate card's read words, in full or nearly
 
+const CHECK_GROUPS = 3;        // the careful check, split this many ways and run side by side
+const CHECK_GROUP_MIN = 10;    // but never into groups smaller than this
+
 const Verified = z.object({
   checks: z.array(z.object({ n: z.number(), answers: z.boolean(), part: z.number(), how: z.string(), quote: z.string(), why: z.string(), fit: z.number() })),
-  picks: z.array(z.number()),
 });
 
 /** A candidate's text as Claude checks it: the block, the card's tag and cite, and its read words (or, for a whole block, its cards' tags). */
@@ -383,16 +406,14 @@ Check each candidate the way a good judge would, on logic rather than wording:
 - Judge by what the card's words argue, not by its tag alone.
 - Specific beats generic. A card about their actual subject (here: ${br.about}) beats a general theory card that would answer any argument with the same impact ("preventive war is wrong", "nuclear stability causes conflict", "cascades are empirically false"). A general card can still answer, but give it a fit of 5 at most.
 
-"checks": one for every candidate:
+"checks": one for each candidate that answers. Leave out the ones that don't; there's no need to explain them.
 - "n": its C number.
-- "answers": true only if its reasoning really breaks a step.
+- "answers": true (it really breaks a step).
 - "part": the step's P number it answers (0 if none).
 - "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause").
 - "quote": the card's warrant, the words that carry its reasoning, copied exactly from the text above as one unbroken stretch of 5 to 40 words. For a caselist card, which shows only its tag, quote the tag (or the part of it that answers); a short tag is fine. Use "" if it doesn't answer.
 - "why": one short line: which assumption of theirs it breaks, and how.
-- "fit": 0 to 10, weighing how directly it breaks the step and how well its reasoning carries over.
-
-"picks": of the candidates that answer, the C numbers the debater should read: a full answer to the whole argument, not just one step. Cover every step that has an answer here: the uniqueness (cards saying it isn't coming, or isn't new, such as "no quantum" or "quantum is decades away"), each link, the internal link and the impact. Take the best one or two for each step, 5 to 8 in all when that many answer. Within a step, prefer answers about their specific subject, offense alongside defense, and two that make different points over two that make the same one. Pick a general theory card only when the specific answers for that step are missing or clearly weaker. Pick fewer if fewer answer.`;
+- "fit": 0 to 10, weighing how directly it breaks the step, how specific it is to their subject, and how well its reasoning carries over. Look for answers to every step, the uniqueness included (cards saying it isn't coming or isn't new, such as "no quantum" or "quantum is decades away").`;
 }
 
 const Analytics = z.object({ analytics: z.array(z.object({ part: z.number(), how: z.string(), text: z.string(), searches: z.array(z.string()) })) });

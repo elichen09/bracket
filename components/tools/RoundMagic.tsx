@@ -3490,6 +3490,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       <footer className="rm-status">
         <span className="rm-crumb">{headsOf === "speech" ? "Speech doc" : cur?.name || ""}{crumb ? " › " + crumb : ""}</span>
         <span className="rm-grow" />
+        {/* AI at work: here in the status line, where it covers nothing */}
+        {aiRun && (
+          <span className="rm-aibusy" role="status">
+            {I.spark}<span>{aiRun.label}{aiRun.of ? ` · ${aiRun.done} of ${aiRun.of}` : "…"}</span>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => aiStop.current?.abort()}>Stop</button>
+          </span>
+        )}
         {docStat.cards > 0 && <span>Card {Math.max(cardNo, 0)} of {docStat.cards}</span>}
         <span>{docStat.read.toLocaleString()} words to read · <b className="rm-accent">{clock((docStat.read / Math.max(60, wpm)) * 60)}</b> at {wpm} wpm</span>
         <span className="evi rm-libstat" title="Your library"><span className="stat" id="stat" /></span>
@@ -3694,12 +3701,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
 
-      {aiRun && (
-        <div className="rm-aibusy" role="status">
-          {I.spark}<span>{aiRun.label}{aiRun.of ? ` · ${aiRun.done} of ${aiRun.of}` : "…"}</span>
-          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => aiStop.current?.abort()}>Stop</button>
-        </div>
-      )}
       {aiFound && (
         <aside className={"rm-aidock" + (aiDockMin ? " min" : "")} aria-label="Answers to their argument">
           <div className="rm-aihead" role="button" tabIndex={0} aria-expanded={!aiDockMin} title={aiDockMin ? "Show the answers" : "Fold the answers away"}

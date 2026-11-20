@@ -1705,3 +1705,18 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm-aidock.min { width: auto; min-width: 200px; }
 .rm-aidock.min .rm-aiclaim, .rm-aidock.min .rm-aifound { display: none; }
 .rm-aidock.min .rm-aihead { padding: 8px 6px 8px 12px; }
+/* AI at work, in the status line: inline, covering nothing */
+.rm-status .rm-aibusy {
+  position: static; transform: none; left: auto; right: auto; bottom: auto; z-index: auto;
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 2px 0 8px; height: 22px; margin-right: 8px;
+  background: transparent; border: 1px solid var(--btnb); box-shadow: none; color: var(--txt); font: 500 11.5px var(--rm-sans);
+  animation: none;
+}
+.rm-status .rm-aibusy svg { width: 11px; height: 11px; }
+.rm-status .rm-aibusy button { height: 18px; padding: 0 6px; font-size: 11px; }
+.rm-aibusy ~ .rm-aidock { bottom: 40px; }
+/* the status line's own colours, light or dark */
+.rm-status .rm-aibusy { color: inherit; border-color: color-mix(in srgb, currentColor 28%, transparent); }
+.rm-status .rm-aibusy svg { color: inherit; opacity: .7; }
+.rm-status .rm-aibusy button { color: inherit; background: transparent; border: 1px solid color-mix(in srgb, currentColor 28%, transparent); }
+.rm-status .rm-aibusy button:hover { border-color: currentColor; }
