@@ -59,6 +59,7 @@ const Breakdown = z.object({
   parts: z.array(z.object({
     kind: z.enum(KINDS),
     says: z.string(),
+    needs: z.string(),
     answers: z.array(z.string()),
     words: z.array(z.string()),
   })),
@@ -81,16 +82,19 @@ function breakPrompt(arg: string): string {
 ${arg.slice(0, 8000)}
 """
 
-Break it into its parts, the way a debater flows it: the uniqueness, each link, any internal link, and the impact (or solvency or framework, if that's what it is). List only the parts it actually makes. A single link card is one part. Don't invent the rest. If the debater asked for something specific ("a link turn to their econ impact"), the part is what they want answered.
+Map its logic, the way a good debater flows it: the chain of claims that leads from the uniqueness, through each link and internal link, to the impact (or solvency or framework, if that's what it is). List only the steps it actually makes. A single link card is one step. Don't invent the rest. If the debater asked for something specific ("a link turn to their econ impact"), the step is what they want answered.
 
-For each part:
-- "kind": what the part is.
+Answering an argument means breaking its logic, not disputing its wording. So for each step, find the reasoning it rests on: the assumption that has to be true for that step to hold. That is what a good answer attacks, and often a general argument breaks it whatever the specifics are.
+
+For each step:
+- "kind": what the step is.
 - "says": the claim it makes, in one short line.
-- "answers": 2 to 4 lines, each one an answer a card could make, labeled the way debaters label them ("No link: the plan doesn't touch X", "Link turn: the plan increases Y", "Non-unique: Z is already happening", "No impact: ...", "Impact turn: ...", "Alt cause: ...").
-- "words": 6 to 12 words or short phrases a card answering it would use: the argument's nouns, with their synonyms and opposites.
+- "needs": the assumption it rests on, in one short line: what must be true for this step to work. For "defence exports to Europe grow India's economy", that's "export revenue is big enough to move India's growth rate". For "growth is scalar", it's "each bit of growth changes the outcome, with no threshold".
+- "answers": 2 to 4 answers that break that assumption, labeled the way debaters label them ("No link: ...", "Link turn: ...", "Non-unique: ...", "No impact: ...", "Impact turn: ...", "Alt cause: ..."). Include the general answers that apply whatever the specifics ("No impact: growth isn't scalar, marginal growth changes nothing").
+- "words": 6 to 12 words or short phrases a card making those answers would use: the concepts of the answers (with synonyms), not only the nouns of their card.
 
 "claim": the whole argument in one line.
-"about": exactly what it's about, so a card about something else that shares its words isn't taken for an answer: who does what, which policy or program, where ("France extending its nuclear umbrella to Greece, 2026", not "nuclear deterrence").`;
+"about": its context in one short line (who, which policy, where). This is context, not a filter: an answer from another context counts when its reasoning applies here.`;
 }
 
 function blockText(b: LibBlock, n: number): string {
@@ -102,28 +106,28 @@ function blockText(b: LibBlock, n: number): string {
 }
 
 function partsText(br: Broken): string {
-  return br.parts.map((p, i) => `P${i + 1} (${p.kind}): ${p.says}\n   An answer would say: ${p.answers.join(" / ")}`).join("\n");
+  return br.parts.map((p, i) => `P${i + 1} (${p.kind}): ${p.says}\n   It rests on: ${p.needs}\n   Answers that break it: ${p.answers.join(" / ")}`).join("\n");
 }
 
 function judgePrompt(br: Broken, blocks: string): string {
   return `A policy debater has to answer this argument: ${br.claim}
-What it is about, exactly: ${br.about}
+Its context: ${br.about}
 
-Its parts:
+Its logic, step by step:
 ${partsText(br)}
 
 Below are blocks from the debater's own library: each block's title, then its cards, numbered from 1, each with its tag, its cite, and the words of it that get read.
 
 ${blocks}
 
-This is a first pass: every candidate gets checked again closely, so list the cards that plausibly answer a part. Read the cards' words, not only the tags. A card answers a part only if what it says, read out in the round, answers that claim: it denies it, turns it, shows it's non-unique, mitigates or outweighs the impact, gives an alternate cause, and so on. It must be about the same thing their argument is about; a card that only shares its words (a different country, program or law) doesn't count. A card that is only on the same topic doesn't count. A card that makes the same claim as the other team never counts.
+This is a first pass: every candidate gets checked again closely, so list the cards that plausibly answer a step. Think about logic, not wording. A card answers a step when its reasoning breaks what that step rests on: it denies the assumption, turns the mechanism, shows it's non-unique, shows the impact has a threshold or doesn't follow, gives an alternate cause, and so on. Cards from other contexts count when their reasoning carries over: a card that says growth isn't scalar answers "India's growth is scalar"; a card that says arms exports are too small to drive growth answers it for India too, unless something makes India different. A card doesn't count when its reasoning rests on facts that only hold for another case, when it merely shares words or a topic with their argument, or when it agrees with them.
 
-"answers": the cards here that may answer a part, best first. Give at most ${PER_PART} for each part, and none for a part when nothing here answers it. For each one:
+"answers": the cards here that may answer a step, best first. Give at most ${PER_PART} for each part, and none for a part when nothing here answers it. For each one:
 - "part": the part's P number.
 - "block": the block's B number.
 - "card": the card's number in that block. Use 0 only when the block as a whole is the answer (a block of answers to exactly this).
 - "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause", "Defense").
-- "why": one short line on what the card says that answers it.
+- "why": one short line: which assumption of theirs the card's reasoning breaks.
 - "fit": 0 to 10, how well it answers.`;
 }
 
@@ -311,28 +315,29 @@ function candidateText(c: Best, all: LibBlock[]): string {
 
 function verifyPrompt(br: Broken, cands: Best[], texts: string[]): string {
   return `A policy debater has to answer the other team's argument. Their argument: ${br.claim}
-What it is about, exactly: ${br.about}
+Its context: ${br.about}
 
-Its parts:
+Its logic, step by step:
 ${partsText(br)}
 
 A first, quick pass through the debater's evidence found these candidate answers. Many will be wrong. Each has a number, the block it's filed in, the card's tag, its cite, and the words of the card that get read:
 
 ${cands.map((c, i) => `C${i + 1}.${c.from === "library" ? ` (block: "${c.title.slice(0, 100)}"${c.where ? `, ${c.where}` : ""})` : ""}\n${texts[i]}`).join("\n\n")}
 
-Check each candidate strictly, the way a good debater or judge would:
-- It must be about the same thing as their argument: the same actors, policy, place and mechanism. Shared words are not enough. A US bill called the "Forward Deterrence Act" is not France's forward deterrence; NATO in general is not French extended deterrence.
-- What the card says must answer a part of their argument when read in the round: deny it, turn it, prove it non-unique, mitigate or outweigh the impact, or give an alternate cause. A card that agrees with them, makes their argument, or only describes the topic does not answer it.
-- Judge by what the card's words actually say, not by its tag alone.
+Check each candidate the way a good judge would, on logic rather than wording:
+- Which step of their argument does the card's reasoning break, and does that break the assumption the step rests on? An answer to their wording that leaves their logic standing isn't an answer.
+- Does the card's reasoning carry over to their case? A card from another context counts when its reasoning applies here (a general "growth isn't scalar" card answers a claim that India's growth is scalar). It doesn't count when its reasoning depends on facts that only hold elsewhere, or when it only shares words with their argument (a US bill called the "Forward Deterrence Act" says nothing about France's deterrence).
+- A card that agrees with them, makes their argument, or only describes the topic doesn't answer it.
+- Judge by what the card's words argue, not by its tag alone.
 
 "checks": one for every candidate:
 - "n": its C number.
-- "answers": true only if it really answers a part.
-- "part": the part's P number it answers (0 if none).
+- "answers": true only if its reasoning really breaks a step.
+- "part": the step's P number it answers (0 if none).
 - "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause").
-- "quote": the words in the card that do the answering, copied exactly from the text above as one unbroken stretch of 5 to 40 words. Use "" if it doesn't answer.
-- "why": one short line: how those words answer their claim.
-- "fit": 0 to 10.
+- "quote": the card's warrant, the words that carry its reasoning, copied exactly from the text above as one unbroken stretch of 5 to 40 words. Use "" if it doesn't answer.
+- "why": one short line: which assumption of theirs it breaks, and how.
+- "fit": 0 to 10, weighing how directly it breaks the step and how well its reasoning carries over.
 
 "picks": of the candidates that answer, the C numbers of the 3 the debater should actually read, as a set, best first. Prefer a set that does more together (offense with defense, or different parts) over two that make the same point. Add a 4th only if the set would be clearly weaker without it. Pick fewer if fewer answer.`;
 }
@@ -344,9 +349,9 @@ async function writeAnalytics(key: string, br: Broken, arg: string, signal?: Abo
   const r = await askJson(key, `A policy debater has to answer the other team's argument, and neither their own evidence nor the caselist has a card that answers it. Write analytics: arguments they can make out loud without a card.
 
 Their argument: ${br.claim}
-What it is about, exactly: ${br.about}
+Its context: ${br.about}
 
-Its parts:
+Its logic, step by step:
 ${partsText(br)}
 
 What they read (their tags and cards):
@@ -354,7 +359,7 @@ What they read (their tags and cards):
 ${arg.slice(0, 6000)}
 """
 
-Write 3 to 5 analytics, strongest first. Each must be specific to this argument: name the warrant it attacks and say what's wrong with it. Point to what their own evidence says or fails to say where you can. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on their own evidence's words, and on well-known facts.
+Write 3 to 5 analytics, strongest first. Attack the logic, not the wording: each one should break the assumption a step rests on. Look for a missing or weak internal link, an assumption they never warrant, a leap from correlation to cause, a threshold where they claim a scalar effect, a timeframe that doesn't fit, an alternate cause, or a way their own mechanism runs the other way. Name the step you're breaking, and point to what their evidence fails to warrant where it helps. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on their own evidence's words, and on well-known facts.
 
 "analytics": for each:
 - "part": the P number of the part it answers.
