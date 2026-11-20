@@ -1861,6 +1861,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [aiRun, setAiRun] = useState<null | { label: string; done?: number; of?: number }>(null);
   /** Find blocks' answers, docked in the corner: the doc stays yours while they're up. */
   const [aiFound, setAiFound] = useState<Found | null>(null);
+  const [aiShut, setAiShut] = useState<Set<number>>(new Set());
   const aiWant = useRef("");
   const aiBusy = () => { if (aiStop.current) { toast("AI is still working on the last one — Stop it first"); return true; } return false; };
   /** What the block finder starts from: the selection, else the card you're in (its tag and what's read), else the line. */
@@ -2000,7 +2001,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const want = aiPanel.want;
     aiWant.current = want;
     const ctl = new AbortController(); aiStop.current = ctl;
-    setAiPanel(null); setAiFound(null); target()?.focus();
+    setAiPanel(null); setAiFound(null); setAiShut(new Set()); target()?.focus();
     setAiRun({ label: "Finding answers" });
     try {
       const found = await findBlocks(aiKey(owner), want, src, ctl.signal, (stage) => setAiRun({ label: stage.replace(/…$/, "") }));
@@ -3556,28 +3557,52 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-aihead">{I.spark}<b>Answers</b>
             <button type="button" className="rm-aix" aria-label="Close" onMouseDown={(e) => e.preventDefault()} onClick={() => setAiFound(null)}>{I.x}</button>
           </div>
+          <p className="rm-aiclaim" title={aiFound.claim}>{aiFound.claim}</p>
           <div className="rm-aifound">
-            <p className="rm-aineed">{aiFound.claim}</p>
-            {aiFound.parts.map((pt, pi) => (
-              <section key={pi} className="rm-aipart">
-                <h4><span>{pt.kind}</span>{pt.says}</h4>
-                {pt.picks.map((p) => (
-                  <div key={p.id + ":" + p.card} className="rm-aipick">
-                    <div className="lt"><b>{p.cardTag || p.title}</b><small>{p.cardTag ? p.title + (p.where ? " · " + p.where : "") : p.where}</small><span className="why"><em>{p.how}</em>{p.why}</span></div>
-                    <span className="fit" title={"How well it answers: " + p.fit + " of 10"}><i style={{ width: p.fit * 10 + "%" }} /></span>
-                    <button type="button" className="pri" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const EV = (window as any).EV; await EV?.quickSend?.(p.id, p.card === null ? undefined : p.card); toast("Sent: " + (p.cardTag || p.title)); }}>Send{p.card === null ? " block" : ""}</button>
-                  </div>
-                ))}
-                {pt.caselist.map((c, i) => (
-                  <div key={"cl" + i} className="rm-aipick">
-                    <div className="lt"><b>{c.tag}</b><small>Caselist · {c.cite} · {c.team}</small><span className="why"><em>{c.how}</em>{c.why}</span></div>
-                    <span className="fit" title={"How well it answers: " + c.fit + " of 10"}><i style={{ width: c.fit * 10 + "%" }} /></span>
-                    <button type="button" onClick={() => showInCaselist(c.tag)}>Find it</button>
-                  </div>
-                ))}
-                {!pt.picks.length && !pt.caselist.length && <p className="rm-ainote">Nothing in your library answers this.</p>}
-              </section>
-            ))}
+            {aiFound.parts.map((pt, pi) => {
+              const shut = aiShut.has(pi), n = pt.picks.length + pt.caselist.length;
+              const src = (p: { title: string; where: string; cardTag: string }) => [p.cardTag ? p.title : "", ...p.where.split(" › ")].filter(Boolean).join(" › ");
+              return (
+                <section key={pi} className={"rm-aipart" + (shut ? " shut" : "")}>
+                  <button type="button" className="rm-aiparth" aria-expanded={!shut} onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setAiShut((s) => { const t = new Set(s); if (t.has(pi)) t.delete(pi); else t.add(pi); return t; })}>
+                    <span className="k">{pt.kind}</span>
+                    <span className="n">{n ? n + (n === 1 ? " answer" : " answers") : "no answer"}</span>
+                    <svg className="car" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+                    <span className="says">{pt.says}</span>
+                  </button>
+                  {!shut && (
+                    <ol className="rm-aians">
+                      {pt.picks.map((p) => (
+                        <li key={p.id + ":" + p.card} className="rm-aians-i">
+                          <div className="top">
+                            <span className={"how" + (/turn/i.test(p.how) ? " turn" : "")}>{p.how}</span>
+                            <span className="fit" title="How well it answers">{p.fit}/10</span>
+                            <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const EV = (window as any).EV; await EV?.quickSend?.(p.id, p.card === null ? undefined : p.card); toast("Sent: " + (p.cardTag || p.title)); }}>{p.card === null ? "Send block" : "Send"}</button>
+                          </div>
+                          <b className="ttl">{p.cardTag || p.title}</b>
+                          <p className="why">{p.why}</p>
+                          {src(p) && <small className="src">{src(p)}</small>}
+                        </li>
+                      ))}
+                      {pt.caselist.map((c, i) => (
+                        <li key={"cl" + i} className="rm-aians-i">
+                          <div className="top">
+                            <span className={"how" + (/turn/i.test(c.how) ? " turn" : "")}>{c.how}</span>
+                            <span className="fit" title="How well it answers">{c.fit}/10</span>
+                            <button type="button" className="send" onClick={() => showInCaselist(c.tag)}>Find it</button>
+                          </div>
+                          <b className="ttl">{c.tag}</b>
+                          <p className="why">{c.why}</p>
+                          <small className="src">Caselist › {c.team} › {c.cite}</small>
+                        </li>
+                      ))}
+                      {!n && <li className="rm-aians-none">Nothing in your library answers this.</li>}
+                    </ol>
+                  )}
+                </section>
+              );
+            })}
             <p className="rm-ainote">{aiFound.of ? `Read ${aiFound.read === aiFound.of ? "every block" : aiFound.read + " of " + aiFound.of + " blocks, the ones that use its words"} across all your bins. Send puts it where your cursor is.` : "Your library is empty: import blocks to search them."}</p>
           </div>
         </aside>
@@ -3624,13 +3649,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             {aiPanel.kind === "blocks" && (
               <form className="rm-aiwant" onSubmit={(e) => { e.preventDefault(); void aiBlocksNow(); }}>
                 <div className="rm-aihead">{I.spark}<b>Find blocks</b><span>{K("ai-blocks")}</span></div>
-                <textarea value={aiPanel.want} rows={4} autoFocus spellCheck={false} placeholder="Their argument: select their cards in the doc, or paste them in" aria-label="Their argument"
+                <textarea value={aiPanel.want} rows={6} autoFocus spellCheck={false} placeholder="Their argument: select their cards in the doc first, or paste them in" aria-label="Their argument"
                   onChange={(e) => setAiPanel({ ...aiPanel, want: e.target.value, err: "" })}
                   onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void aiBlocksNow(); } }} />
                 {aiPanel.err && <p className="rm-aimsg bad">{aiPanel.err}</p>}
-                <div className="rm-airow">
-                  <button type="submit" className="pri">Find answers</button>
-                  <span className="rm-ainote">Ctrl+Enter · Claude breaks it into uniqueness, link and impact, then reads your cards for answers to each. Keep working meanwhile.</span>
+                <div className="rm-aifoot">
+                  <span>Answers to its uniqueness, link and impact, from your cards</span>
+                  <button type="submit" className="pri">Find answers <kbd>Ctrl+Enter</kbd></button>
                 </div>
               </form>
             )}

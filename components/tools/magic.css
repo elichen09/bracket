@@ -1639,3 +1639,40 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm-aiwant .rm-aihead { padding-left: 0; padding-right: 0; }
 .rm-aiwant { padding-bottom: 4px; }
 @media (prefers-reduced-motion: reduce) { .rm-aibusy, .rm-aidock { animation: none; } }
+/* Find blocks: its box, and its answers — one card per answer, grouped under the part of their argument it answers */
+.rm-aiwant textarea { min-height: 120px; max-height: 40vh; padding: 10px 12px; line-height: 1.5; font-size: 13px; scrollbar-width: thin; scrollbar-color: var(--btnb) transparent; }
+.rm-aifoot { display: flex; align-items: center; gap: 12px; padding: 2px 0 10px; }
+.rm-aifoot > span { flex: 1; min-width: 0; font-size: 12px; color: var(--mut); }
+.rm-aifoot button { flex: none; display: inline-flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px 0 14px; white-space: nowrap; border: 1px solid var(--acc); background: var(--acc); color: var(--on-acc); font: 600 12.5px var(--rm-sans); cursor: pointer; }
+.rm-aifoot kbd { font: 500 10.5px var(--rm-mono); padding: 2px 5px; border: 1px solid color-mix(in srgb, var(--on-acc) 25%, transparent); color: color-mix(in srgb, var(--on-acc) 70%, transparent); background: transparent; }
+
+.rm-aidock { width: min(460px, calc(100vw - 32px)); }
+.rm-aidock .rm-aifound { padding: 0 0 6px; gap: 0; scrollbar-width: thin; scrollbar-color: var(--btnb) transparent; }
+.rm-aiclaim { flex: none; margin: 0; padding: 0 16px 12px; font-size: 12.5px; line-height: 1.5; color: var(--mut); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.rm-aidock .rm-aipart { padding: 0; border-top: 1px solid var(--chrome-line); }
+.rm-aiparth {
+  position: sticky; top: 0; z-index: 1; width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 10px;
+  padding: 10px 16px; background: var(--pop); border: 0; text-align: left; color: var(--hi); cursor: pointer; font: inherit;
+}
+.rm-aiparth:hover { background: color-mix(in srgb, var(--hi) 4%, var(--pop)); }
+.rm-aiparth .k { font: 600 10.5px var(--rm-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--hi); }
+.rm-aiparth .n { font: 500 11px var(--rm-mono); color: var(--mut); }
+.rm-aiparth .car { color: var(--mut); transition: transform .12s ease; }
+.rm-aipart.shut .rm-aiparth .car { transform: rotate(-90deg); }
+.rm-aiparth .says { grid-column: 1 / -1; font-size: 12.5px; line-height: 1.45; color: var(--txt); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rm-aipart.shut .rm-aiparth .says { -webkit-line-clamp: 1; }
+.rm-aians { list-style: none; margin: 0; padding: 0 12px 12px; display: grid; gap: 6px; }
+.rm-aians-i { display: grid; gap: 4px; padding: 10px 12px; background: var(--well); border: 1px solid var(--chrome-line); }
+.rm-aians-i:hover { border-color: var(--btnb); }
+.rm-aians-i .top { display: flex; align-items: center; gap: 8px; }
+.rm-aians-i .how { padding: 2px 7px; font: 600 10.5px var(--rm-sans); letter-spacing: .02em; border: 1px solid var(--btnb-h); color: var(--hi); }
+.rm-aians-i .how.turn { background: var(--hi); border-color: var(--hi); color: var(--pop); }
+.rm-aians-i .fit { font: 500 10.5px var(--rm-mono); color: var(--mut); }
+.rm-aians-i .send { margin-left: auto; height: 24px; padding: 0 10px; border: 1px solid var(--btnb); background: transparent; color: var(--txt); font: 500 11.5px var(--rm-sans); cursor: pointer; opacity: .75; }
+.rm-aians-i:hover .send, .rm-aians-i .send:focus-visible { opacity: 1; border-color: var(--acc); background: var(--acc); color: var(--on-acc); }
+.rm-aians-i .ttl { font-size: 13.5px; line-height: 1.35; font-weight: 600; color: var(--hi); }
+.rm-aians-i .why { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--txt); }
+.rm-aians-i .src { font-size: 11px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-aians-none { padding: 2px 4px 4px; font-size: 12px; color: var(--mut); }
+.rm-aidock .rm-aifound > .rm-ainote { padding: 10px 16px 4px; border-top: 1px solid var(--chrome-line); font-size: 11.5px; }
+@media (prefers-reduced-motion: reduce) { .rm-aiparth .car { transition: none; } }
