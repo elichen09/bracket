@@ -21,7 +21,7 @@ import { reformat } from "@/lib/cutter/reformat";
 import { DEFAULT_CITE_FORMAT, writeCite } from "@/lib/cutter/cites";
 import { aiKey, setAiKey, checkKey, AI_MODEL } from "@/lib/ai/claude";
 import { citeFromLink } from "@/lib/ai/cite";
-import { aiReformat, cardsToDo } from "@/lib/ai/reformat";
+import { aiReformat, cardsToDo, cardAt } from "@/lib/ai/reformat";
 import { aiIndict, type Rehighlight } from "@/lib/ai/indict";
 import { findBlocks, type Found, type Sources, type Analytic } from "@/lib/ai/blocks";
 import { spotPlugin, holdSpot, takeSpot, type Spot } from "@/lib/ai/spot";
@@ -1872,7 +1872,23 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const v = target();
     if (!v) return "";
     const { from, to, empty } = v.state.selection;
-    if (!empty) return v.state.doc.textBetween(from, to, "\n").slice(0, 4000);
+    if (!empty) {
+      // every card the selection touches, whole: its tag, its cite, and what's read (else the start of its text)
+      const st = v.state, idx = cardsToDo(st);
+      if (idx.length > 1 || (idx.length === 1 && to - from > 200)) {
+        const cards = idx.map((k) => {
+          const c = cardAt(st, k);
+          if (!c || !c.tag) return "";
+          let read = "";
+          st.doc.nodesBetween(c.bodyFrom, c.bodyTo, (n) => { if (n.isText && n.marks.some((m) => m.type === schema.marks.highlight)) read += n.text + " "; });
+          read = read.replace(/\s+/g, " ").trim();
+          const body = read || st.doc.textBetween(c.bodyFrom, c.bodyTo, "\n").slice(0, 2000);
+          return [c.tag.node.textContent, c.cite?.node.textContent || "", body].filter(Boolean).join("\n");
+        }).filter(Boolean);
+        if (cards.length) return cards.join("\n\n").slice(0, 16000);
+      }
+      return st.doc.textBetween(from, to, "\n").slice(0, 16000);
+    }
     const c = C.cardAround(v.state);
     if (c && c.tag) {
       let read = "";

@@ -86,7 +86,7 @@ function breakPrompt(arg: string): string {
   return `You're helping a policy debater answer the other team's argument. Here it is (their card or cards, a claim, or a note in the debater's own words):
 
 """
-${arg.slice(0, 8000)}
+${arg.slice(0, 16000)}
 """
 
 Map its logic, the way a good debater flows it: the chain of claims that leads from the uniqueness, through each link and internal link, to the impact (or solvency or framework, if that's what it is). List only the steps it actually makes. A single link card is one step. Don't invent the rest. If the debater asked for something specific ("a link turn to their econ impact"), the step is what they want answered.
@@ -219,11 +219,12 @@ export async function findBlocks(
   const all = await libP;
   const out: Found = { claim: br.claim, parts: br.parts.map((p) => ({ kind: p.kind, says: p.says, picks: [], caselist: [] })), best: [], unanswered: [], read: 0, of: all.length };
 
-  // the library, read
+  // the library read and the caselist searched, side by side: the best answers can be in either
+  const caselistP: Promise<ClHit[] | null> = src.caselist ? searchCaselist(src.caselist).catch((e) => { if (signal?.aborted) throw e; return []; }) : Promise.resolve(null);
   if (all.length) {
     const list = batches(shortlist(all, br));
     out.read = list.reduce((n, b) => n + b.length, 0);
-    onStage?.(`Reading ${out.read === all.length ? "all " : ""}${out.read} block${out.read === 1 ? "" : "s"}${out.read < all.length ? " of " + all.length : ""}…`);
+    onStage?.(`Reading ${out.read === all.length ? "all " : ""}${out.read} block${out.read === 1 ? "" : "s"}${out.read < all.length ? " of " + all.length : ""}${src.caselist ? " and the caselist" : ""}…`);
     const runs = await Promise.allSettled(list.map((bs) =>
       askJson(key, judgePrompt(br, bs.map((b, i) => blockText(b, i + 1)).join("\n\n")), Answers, signal).then((r) => ({ bs, r }))));
     if (signal?.aborted) throw new AiError("Stopped.");
@@ -240,54 +241,19 @@ export async function findBlocks(
       }
     }
     for (const p of out.parts) p.picks = p.picks.sort((a, b) => b.fit - a.fit).slice(0, PER_PART);
-  }
+  } else onStage?.("Looking in the caselist…");
+  const clCards = await caselistP;
+  out.caselist = clCards === null ? "off" : clCards.length ? "searched" : "nothing";
 
-  // the library's candidates, each checked against its card
+  // every candidate, library and caselist, checked together against its card, and the best few chosen from all of them
   const fromLib: Best[] = out.parts.flatMap((p) => p.picks.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "library" as const })))
     .sort((a, b) => b.fit - a.fit).slice(0, VERIFY_MAX);
-  const lib = fromLib.length ? await check(fromLib) : { ok: [] as Best[], picks: [] as Best[] };
-  out.best = lib.picks;
-
-  // what the library couldn't answer — all of it, or some parts — looked for in the caselist, and checked the same way
-  const answered = new Set(lib.ok.map((x) => x.kind));
-  const open = br.parts.map((p, i) => i).filter((i) => !answered.has(br.parts[i].kind));
-  if (open.length && out.best.length < 3) {
-    if (!src.caselist) out.caselist = "off";
-    else {
-      onStage?.("Looking in the caselist…");
-      // the searches a debater would type, each one an answer (specific to broad); then each open answer as Claude put it;
-      // then the caselist's own Answer search on each open claim
-      const lists: ClHit[][] = [];
-      for (const q of br.searches.slice(0, 10)) if (q.trim()) lists.push(await src.caselist(q.trim(), false));
-      for (const i of open) {
-        const q = br.parts[i].answers[0]?.replace(/^[^:]{1,20}:\s*/, "").split(/\s+/).slice(0, 5).join(" ");
-        if (q?.trim()) lists.push(await src.caselist(q, false));
-      }
-      for (const i of open) lists.push(await src.caselist(br.parts[i].says, true));
-      // a turn for every search, so the broad ones get their share; the same card from several teams once
-      const seen = new Set<string>(), cards: ClHit[] = [];
-      const same = (c: ClHit) => c.tag.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
-      for (let k = 0, more = true; more && cards.length < CASELIST_MAX; k++) {
-        more = false;
-        for (const l of lists) {
-          if (k >= l.length) continue;
-          more = true;
-          const key = same(l[k]);
-          if (!key || seen.has(key)) continue;
-          seen.add(key); cards.push(l[k]);
-          if (cards.length >= CASELIST_MAX) break;
-        }
-      }
-      out.caselist = cards.length ? "searched" : "nothing";
-      if (cards.length) {
-        const fromCl: Best[] = cards.slice(0, CASELIST_MAX).map((c) => ({ ...c, how: "", why: "", fit: 5, kind: br.parts[open[0]].kind, says: br.parts[open[0]].says, from: "caselist" as const }));
-        const cl = await check(fromCl);
-        lib.ok.push(...cl.ok);
-        for (const x of cl.picks) if (out.best.length < 3) out.best.push(x);
-      }
-    }
-  }
-  const got = new Set(lib.ok.map((x) => x.kind));
+  const fromCl: Best[] = (clCards || []).slice(0, CASELIST_MAX)
+    .map((c) => ({ ...c, how: "", why: "", fit: 5, kind: br.parts[0].kind, says: br.parts[0].says, from: "caselist" as const }));
+  const both = [...fromLib, ...fromCl];
+  const res = both.length ? await check(both) : { ok: [] as Best[], picks: [] as Best[] };
+  out.best = res.picks;
+  const got = new Set(res.ok.map((x) => x.kind));
   out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => !got.has(k) && a.indexOf(k) === i);
   // no card answers it: analytics instead
   if (!out.best.length) {
@@ -302,6 +268,33 @@ export async function findBlocks(
     }
   }
   return out;
+
+  /** The caselist, searched for answers to every step: the searches a debater would type (each one an answer, specific to broad),
+   *  each step's first answer as Claude put it, and the caselist's own Answer search on each claim. A turn for every search,
+   *  so the broad ones get their share; the same card from several teams once. */
+  async function searchCaselist(cl: NonNullable<Sources["caselist"]>): Promise<ClHit[]> {
+    const lists: ClHit[][] = [];
+    for (const q of br.searches.slice(0, 10)) if (q.trim()) lists.push(await cl(q.trim(), false));
+    for (const p of br.parts) {
+      const q = p.answers[0]?.replace(/^[^:]{1,20}:\s*/, "").split(/\s+/).slice(0, 5).join(" ");
+      if (q?.trim()) lists.push(await cl(q, false));
+    }
+    for (const p of br.parts) lists.push(await cl(p.says, true));
+    const seen = new Set<string>(), cards: ClHit[] = [];
+    const same = (c: ClHit) => c.tag.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+    for (let k = 0, more = true; more && cards.length < CASELIST_MAX; k++) {
+      more = false;
+      for (const l of lists) {
+        if (k >= l.length) continue;
+        more = true;
+        const key = same(l[k]);
+        if (!key || seen.has(key)) continue;
+        seen.add(key); cards.push(l[k]);
+        if (cards.length >= CASELIST_MAX) break;
+      }
+    }
+    return cards;
+  }
 
   /** Candidates checked closely against their cards: the ones whose quoted words are really there, and the best few to read. */
   async function check(cands: Best[]): Promise<{ ok: Best[]; picks: Best[] }> {
@@ -360,6 +353,7 @@ Check each candidate the way a good judge would, on logic rather than wording:
 - Does the card's reasoning carry over to their case? A card from another context counts when its reasoning applies here (a general "growth isn't scalar" card answers a claim that India's growth is scalar). So does a broader card: one against the whole technology, policy or theory answers a claim about one use of it (a card that quantum technology is overhyped or won't work answers a claim that quantum sensing arrives by 2027), with a lower fit when it's indirect. A card about a closely related technology or case counts as an indirect answer when its reasoning plausibly reaches theirs (quantum computing being impossible, read against quantum sensing): mark it as answering, give it a low fit, and say in "why" what it assumes. It doesn't count when its reasoning depends on facts that only hold elsewhere, or when it only shares words with their argument (a US bill called the "Forward Deterrence Act" says nothing about France's deterrence).
 - A card that agrees with them, makes their argument, or only describes the topic doesn't answer it.
 - Judge by what the card's words argue, not by its tag alone.
+- Specific beats generic. A card about their actual subject (here: ${br.about}) beats a general theory card that would answer any argument with the same impact ("preventive war is wrong", "nuclear stability causes conflict", "cascades are empirically false"). A general card can still answer, but give it a fit of 5 at most.
 
 "checks": one for every candidate:
 - "n": its C number.
@@ -370,7 +364,7 @@ Check each candidate the way a good judge would, on logic rather than wording:
 - "why": one short line: which assumption of theirs it breaks, and how.
 - "fit": 0 to 10, weighing how directly it breaks the step and how well its reasoning carries over.
 
-"picks": of the candidates that answer, the C numbers of the 3 the debater should actually read, as a set, best first. Prefer a set that does more together (offense with defense, or different parts) over two that make the same point. Add a 4th only if the set would be clearly weaker without it. Pick fewer if fewer answer.`;
+"picks": of the candidates that answer, the C numbers of the 3 the debater should actually read, as a set, best first. Pick answers about their specific subject first; pick a general theory card only when the specific answers are missing or clearly weaker. Prefer a set that does more together (offense with defense, or different parts) over two that make the same point. Add a 4th only if the set would be clearly weaker without it. Pick fewer if fewer answer.`;
 }
 
 const Analytics = z.object({ analytics: z.array(z.object({ part: z.number(), how: z.string(), text: z.string(), searches: z.array(z.string()) })) });
@@ -387,7 +381,7 @@ ${partsText(br)}
 
 What they read (their tags and cards):
 """
-${arg.slice(0, 6000)}
+${arg.slice(0, 12000)}
 """
 
 Write 3 to 5 analytics, strongest first. Attack the logic, not the wording: each one should break the assumption a step rests on. Look for a missing or weak internal link, an assumption they never warrant, a leap from correlation to cause, a threshold where they claim a scalar effect, a timeframe that doesn't fit, an alternate cause, or a way their own mechanism runs the other way. Name the step you're breaking, and point to what their evidence fails to warrant where it helps. Never build an analytic on their author hedging ("may", "could", "potential"): every card hedges, and it takes nothing away from the argument. Assume the link where it matters: an analytic that only works if their link is false is weaker than one that holds either way. Don't state facts, numbers or events you aren't sure of; analytics rest on logic, on their own evidence's words, and on well-known facts.
