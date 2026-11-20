@@ -3661,18 +3661,85 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); setRefPick({ q: "", sel: 0 }); }}>Reference a card…<span className="k">{K("insert-reference")}</span></button>
         </div>
       )}
-      {(menu?.id === "more" || menu?.id === "all") && (
-        <div className={"rm-menu" + (menu.id === "all" ? " wide rm-allpop" : "")} style={menuAt(menu)} role="menu">
-          {menu.id === "all" && (
-            <>
-              <div className="rm-allgrid">
-                {ribbon.filter((g) => g.id !== "view").map((g) => (
-                  <section key={g.id} className="rm-allg"><h4>{g.name.toUpperCase()}</h4><div className={"rm-g " + g.cols}>{g.body}</div></section>
-                ))}
-              </div>
-              <div className="rm-sep" />
-            </>
-          )}
+      {menu?.id === "all" && (() => {
+        // every button, as one even list: a mark, the name, the key. Picking one does it and closes the panel.
+        const row = (id: string, label: string, go: (e: React.MouseEvent<HTMLElement>) => void, mark?: React.ReactNode, key?: string, extra?: Record<string, string>) => (
+          <button key={id} type="button" role="menuitem" className="rm-arow" onMouseDown={(e) => e.preventDefault()} onClick={go} {...(extra || {})}>
+            <span className="ic">{mark}</span><span className="lb">{label}</span>{key ? <kbd>{key}</kbd> : null}
+          </button>
+        );
+        const act = (id: string, mark?: React.ReactNode, label?: string) =>
+          row(id, label || ACTION.get(id)?.label || id, () => { runRef.current(id); setMenu(null); }, mark, K(id));
+        const gl = (cls: string, t: string) => <span className={"gl " + cls}>{t}</span>;
+        const dl = () => {
+          setMenu(null);
+          const fid = viewFile.current.get(activeRef.current);
+          if (fid && !isTheirs(fid) && !isTemp(fid)) void download(fid);
+          else toast(fid && isTemp(fid) ? "Keep as mine first — then it downloads" : "Their docs download from where they came from — or keep it as yours first");
+        };
+        return (
+          <div className="rm-menu rm-allpop v2" style={menuAt(menu)} role="menu" aria-label="Every button">
+            <section><h4>File</h4><div className="rm-arows">
+              {row("open", "Open a file…", () => { setMenu(null); fileIn.current?.click(); }, I.folder)}
+              {act("new-file", I.newfile)}
+              {row("download", "Download as .docx", dl, I.down)}
+              {row("keys", "Keys and cite format", () => { setMenu(null); setKeysOpen(true); setKeyNote(""); }, I.keys)}
+            </div></section>
+            <section><h4>Styles</h4><div className="rm-arows">
+              {act("pocket", gl("box", "P"))}
+              {act("hat", gl("u", "H"))}
+              {act("block", gl("bu", "B"))}
+              {act("tag", gl("b", "T"))}
+              {act("analytic", gl("ana", "A"))}
+              {act("cite", gl("b", "C"))}
+            </div></section>
+            <section><h4>Cut</h4><div className="rm-arows">
+              {act("underline", gl("u", "U"))}
+              {act("emphasis", gl("box b", "E"))}
+              {act("shrink", gl("", "Aa"))}
+              {act("highlight", <span className="rm-sw" />)}
+              {row("hl-colour", "Highlight colour…", (e) => openMenu("hl", e), <span className="rm-sw" />)}
+              {act("clear", gl("", "Tx"))}
+              {act("condense", I.condense)}
+              {act("condense-omitted", I.pilcrow, "None omitted")}
+            </div></section>
+            <section><h4>Card</h4><div className="rm-arows">
+              {act("new-card", I.plus)}
+              {act("send", I.send, "Send")}
+              {act("reference", gl("ref", "R"))}
+              {act("clean-up", gl("", "✓"))}
+              {act("reformat", gl("fmt", "F"))}
+              {act("new-extension", gl("b", "+"), "Extension")}
+            </div></section>
+            <section><h4>Move</h4><div className="rm-arows">
+              {act("move-up", I.up)}
+              {act("move-down", I.dn)}
+              {row("undo", "Undo", () => { setMenu(null); runRef.current("undo"); }, I.undo, "Ctrl+Z")}
+              {row("redo", "Redo", () => { setMenu(null); runRef.current("redo"); }, I.redo, "Ctrl+Y")}
+            </div></section>
+            <section><h4>Library</h4><div className="rm-arows">
+              {row("import", "Import an evidence file…", () => setMenu(null), I.folder, undefined, { "data-act": "import" })}
+              {row("case", "Your case…", () => setMenu(null), gl("", "◎"), undefined, { "data-act": "case" })}
+              {row("export", "Export the library", () => setMenu(null), I.down, undefined, { "data-act": "export" })}
+              {row("settings", "Library settings", () => setMenu(null), gl("", "⚙"), undefined, { "data-act": "settings" })}
+            </div></section>
+            <section className="web-only"><h4>Pop out · a window that stays on top</h4><div className="rm-arows">
+              {row("popsend", "The speech doc", () => { setMenu(null); if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); }, I.full)}
+              {curTheirs && cur && !isTemp(cur.id) && row("popdoc", "Their doc", () => { setMenu(null); void flush().then(() => { if (!popOut("doc", { doc: cur.id.slice(THEIRS.length) })) toast("The browser blocked the window — allow pop-ups for this site"); }); }, I.full)}
+            </div></section>
+            <section><h4>Spelling{K("spelling") ? " · " + K("spelling") : ""}</h4><div className="rm-arows">
+              {SPELL_MODES.map((m) => row("sp-" + m.id, m.name, () => { setSpell(m.id); setMenu(null); }, spell === m.id ? gl("on", "✓") : gl("", ""), undefined, { "aria-checked": String(spell === m.id), title: m.sub }))}
+            </div></section>
+            <section><h4>This file</h4><div className="rm-arows">
+              {row("paste", "Paste as text", () => { setMenu(null); run("paste"); }, gl("", "¶"))}
+              {act("page-break", gl("", "⤓"))}
+              {row("save", "Save now", () => { setMenu(null); void flush(true); }, gl("", "↧"), K("save"))}
+            </div></section>
+          </div>
+        );
+      })()}
+      {menu?.id === "more" && (
+        <div className="rm-menu" style={menuAt(menu)} role="menu">
           <h4>LIBRARY</h4>
           <button type="button" className="rm-mb" data-act="import" onClick={() => setMenu(null)}>Import an evidence file…</button>
           <button type="button" className="rm-mb" data-act="case" onClick={() => setMenu(null)}>Your case…</button>
