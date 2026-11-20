@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut as signOutOfCoda } from "@/lib/account";
+import { isDesktop } from "@/lib/desktop";
 import { EditorState, TextSelection, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { DOMParser as PMParser, DOMSerializer, Fragment as PMFragment, type Node as PMNode } from "prosemirror-model";
@@ -1774,17 +1775,21 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // Signed into Google: the Docs API — the tab called "flow", read and written. Not: Google's export of
   // the Doc (shared by link), read only. Either way read every few seconds while this tab is in front.
   const [gConn, setGConn] = useState(false);
+  // the desktop app (src-tauri/, lib/desktop): Google will not sign in inside it, so the
+  // partner's flow is read from its shared link there, and nothing asks for Google
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => { setDesktop(isDesktop()); }, []);
   const [apiFlow, setApiFlow] = useState<ApiFlow | null>(null);
   const gfTab = (gfLink.match(/[?&#]tab=(t\.[A-Za-z0-9_-]+)/) || [])[1] || "";
   // signed in here before: back in without a pop-up (Google hands a token over while you're signed into it)
   const [gExpired, setGExpired] = useState(false);
   useEffect(() => {
-    if (!uiReady) return;
+    if (!uiReady || isDesktop()) return;
     if (hasToken()) { setGConn(true); return; }
     // signed in before, but the hour is up: one click renews it
     if (wasConnected()) { setGExpired(true); warmUp(); }
   }, [uiReady]);
-  useEffect(() => { if (tab === "round" && !gConn) warmUp(); }, [tab, gConn]);
+  useEffect(() => { if (tab === "round" && !gConn && !desktop) warmUp(); }, [tab, gConn, desktop]);
   const gConnect = async () => {
     try {
       await getToken(true);
@@ -2534,6 +2539,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       { id: "x:speechdrop", label: "Send the speech doc to SpeechDrop…", sub: "Speech doc", icon: I.send, go: () => speechApi.current?.speechDrop() },
       { id: "x:popsend", label: "Pop out the speech doc", sub: "A window that stays on top", icon: I.full, go: () => { if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); } },
       { id: "x:tutorial", label: "Open the tutorial", sub: "How coda works", icon: I.bolt, go: () => window.open("/tools/tutorial", "_blank") },
+      ...(desktop ? [] : [{ id: "x:desktop", label: "Get coda for Windows", sub: "The desktop app — every key is yours", icon: I.down, go: () => window.open("/download", "_blank") }]),
       { id: "x:signout", label: "Sign out", sub: "Account", icon: I.x, go: async () => { await flush(true); await signOutOfCoda(); window.location.assign("/"); } },
     ];
     const cmds: PalItem[] = [
@@ -2831,7 +2837,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <input value={gfLink} onChange={(e) => { setGfLink(e.target.value); if (gfOn) setGfOn(false); }} placeholder="Link to their Google Doc" spellCheck={false} aria-label="Your partner's Google Doc" />
                 <button type="submit" disabled={!gfLink.trim()}>{gfOn ? "↻" : "OPEN"}</button>
               </form>
-              {!gConn && (
+              {!gConn && !desktop && (
                 <button type="button" className="rm-gbtn rm-gcheckbtn" onClick={() => void gConnect()} title="Sign in with Google so what you write in the flow goes into the Doc by itself">
                   <svg width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6c1.9-5.6 7.1-9.8 13.6-9.8z" /><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z" /><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.8-6z" /><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.5 0-11.7-4.2-13.6-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z" /></svg>
                   {gExpired ? "RECONNECT GOOGLE" : "CONNECT GOOGLE"}
@@ -2843,7 +2849,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   {" "}<button type="button" className="rm-linkbtn" onClick={() => setGfShow((s) => !s)}>{gfShow ? "HIDE" : "SHOW"}</button>
                   <button type="button" className="rm-linkbtn" onClick={() => { setGfOn(false); setGf(null); }}>CLOSE</button>
                 </p>
-              ) : <p className="rm-sempty">{gConn
+              ) : <p className="rm-sempty">{desktop
+                ? <>Paste the link to the flow tab (it ends <b>?tab=t.…</b>), shared <b>Anyone with the link</b>. It opens as tables, read only — <b>COPY FOR DOCS</b> puts what you write on the clipboard to paste back. (Writing straight into the Doc needs Google, which signs in only in the browser.)</>
+                : gConn
                 ? <>Paste any link to the Doc — its tab called <b>flow</b> is found by itself. You need to be able to edit it (your partner shares it with you).</>
                 : <><b>Connect Google</b> and the table writes into the Doc as you type, and finds the <b>flow</b> tab by itself. Without it: the flow tab&apos;s link (it ends <b>?tab=t.…</b>), shared <b>Anyone with the link</b>, read only — <b>COPY FOR DOCS</b> to paste it back.</>}</p>}
             </div>
@@ -3164,9 +3172,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" data-act="copySend" onClick={() => setMenu(null)}>Copy it</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.saveDocx(); }}>Download as .docx</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.speechDrop(); }}>Send to SpeechDrop…</button>
+          {!desktop && (
           <button type="button" className="rm-mb" disabled={gSending} onClick={() => { setMenu(null); void sendToGoogle(); }}
             title="Into your partner's Google Doc: a “speech doc” tab, and inside it “(rhetoric speech doc)” verbatimised — each send replaces them">
             {gSending ? "Sending to the Google Doc…" : "Send to the Google Doc"}<span className="k">{gConn ? "" : "connect first"}</span></button>
+          )}
           <div className="rm-sep" />
           <button type="button" className="rm-mb" data-act="docReset" onClick={() => setMenu(null)} title="Throw away what was written in it and build it again from the cards sent">Rebuild from the cards sent</button>
           <button type="button" className="rm-mb" data-act="clearSend" onClick={() => setMenu(null)}>Clear it</button>
@@ -3179,6 +3189,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <a className="rm-mb" role="menuitem" href="/">Home</a>
           <a className="rm-mb" role="menuitem" href="/tools/tutorial" target="_blank" rel="noopener">The tutorial</a>
           <button type="button" className="rm-mb" role="menuitem" onClick={() => { setMenu(null); setKeysOpen(true); setKeyNote(""); }}>Keys and cite format</button>
+          {!desktop && <a className="rm-mb" role="menuitem" href="/download" target="_blank" rel="noopener">Get coda for Windows</a>}
           <div className="rm-sep" />
           <button type="button" className="rm-mb" role="menuitem" onClick={async () => { setMenu(null); await flush(true); await signOutOfCoda(); window.location.assign("/"); }}>Sign out</button>
         </div>

@@ -3,10 +3,10 @@ import { createServerClient } from "@supabase/ssr";
 
 /**
  * Keeps the auth session fresh on every request and gates the app: everything
- * except the front page, the login page and the caselist's scheduled indexer
+ * except the front page, the login page, the desktop app's download page and the caselist's scheduled indexer
  * (keyed by its own secret) needs an account.
  */
-const PUBLIC = [/^\/$/, /^\/login$/, /^\/api\/tools\/caselist\/index$/, /^\/api\/auth\//];
+const PUBLIC = [/^\/$/, /^\/login$/, /^\/download$/,/^\/api\/tools\/caselist\/index$/, /^\/api\/auth\//];
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: { headers: req.headers } });

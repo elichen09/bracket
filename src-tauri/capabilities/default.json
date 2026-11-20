@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The window opens the live site, which calls nothing of the app's: no permissions beyond the core defaults.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

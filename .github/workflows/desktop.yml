@@ -1,0 +1,54 @@
+name: coda for Windows
+
+# Builds the desktop app (src-tauri/) into a Windows installer and publishes it
+# as a GitHub Release, which /download links to. Runs when a tag like
+# desktop-v1.0.0 is pushed, or by hand against such a tag. The app opens the
+# live site, so the site's own changes never need a new build — only changes
+# to the shell (its icon, its window) do.
+on:
+  push:
+    tags:
+      - "desktop-v*"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    # the release is created and the installer uploaded with this job's token
+    permissions:
+      contents: write
+    steps:
+      - name: Require a desktop tag
+        shell: bash
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/desktop-v*) ;;
+            *) echo "desktop.yml must run on a desktop-v* tag, got $GITHUB_REF" >&2; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # the site's own npm packages are not needed: the app is only the window
+          tauriScript: npx --yes @tauri-apps/cli@2
+          tagName: ${{ github.ref_name }}
+          releaseName: "coda for Windows ${{ github.ref_name }}"
+          releaseBody: "Download the `-setup.exe` below and run it. Windows may say it protected your PC — click More info, then Run anyway. Full instructions: https://bracket-ashy.vercel.app/download"
+          releaseDraft: false
+          prerelease: false

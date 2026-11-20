@@ -9,3 +9,7 @@ out
 next-env.d.ts
 
 .vercel
+
+# the desktop app's build output
+/src-tauri/target
+/src-tauri/gen
