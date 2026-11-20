@@ -269,6 +269,20 @@ export async function findBlocks(
       try { await backAnalytics(key, out.analytics, all, src, signal); }
       catch (e) { if (signal?.aborted) throw e; /* the analytics stand without cards */ }
     }
+    // an analytic with a card that proves it is just that card: it joins the answers, the analytic as its reason.
+    // Only the analytics no card proves stay analytics.
+    const same = (a: Best, b: Best) => a.from === "library" && b.from === "library" ? a.id === b.id && a.card === b.card
+      : a.from === "caselist" && b.from === "caselist" ? a.tag === b.tag : false;
+    for (const a of out.analytics.filter((x) => x.card)) {
+      const c = a.card!;
+      if (!out.best.some((b) => same(b, c))) out.best.push({ ...c, kind: a.kind || c.kind, how: a.how || c.how, why: a.text });
+    }
+    out.analytics = out.analytics.filter((x) => !x.card);
+    const order: string[] = br.parts.map((p) => p.kind);
+    const rank = (k: string) => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
+    out.best = out.best.map((x, i) => ({ x, i })).sort((p, q) => rank(p.x.kind) - rank(q.x.kind) || p.i - q.i).map((p) => p.x);
+    const now = new Set(out.best.map((x) => x.kind));
+    out.unanswered = out.unanswered.filter((k) => !now.has(k));
   }
   return out;
 

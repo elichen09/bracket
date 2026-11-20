@@ -1865,6 +1865,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [aiFound, setAiFound] = useState<(Found & { rehi?: Rehighlight[]; rehiSays?: string[] }) | null>(null);
   /** Find blocks' argument, when it came from their cards in the doc: those cards, held, to rehighlight if nothing answers them. */
   const aiWantFrom = useRef<null | { text: string; view: EditorView; spots: (Spot | null)[] }>(null);
+  /** The answers dock, folded down to a bar in the corner so the page is clear. */
+  const [aiDockMin, setAiDockMin] = useState(false);
   const aiWant = useRef("");
   const aiBusy = () => { if (aiStop.current) { toast("AI is still working on the last one — Stop it first"); return true; } return false; };
   /** What the block finder starts from: the selection, else the card you're in (its tag and what's read), else the line. */
@@ -2150,7 +2152,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           } catch (e) { if (ctl.signal.aborted) throw e; /* the analytics still stand */ }
         }
       }
-      setAiFound({ ...found, rehi, rehiSays });
+      setAiFound({ ...found, rehi, rehiSays }); setAiDockMin(false);
     } catch (e) {
       toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
     } finally {
@@ -3699,9 +3701,15 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         </div>
       )}
       {aiFound && (
-        <aside className="rm-aidock" aria-label="Answers to their argument">
-          <div className="rm-aihead">{I.spark}<b>Answers</b>
-            <button type="button" className="rm-aix" aria-label="Close" onMouseDown={(e) => e.preventDefault()} onClick={() => setAiFound(null)}>{I.x}</button>
+        <aside className={"rm-aidock" + (aiDockMin ? " min" : "")} aria-label="Answers to their argument">
+          <div className="rm-aihead" role="button" tabIndex={0} aria-expanded={!aiDockMin} title={aiDockMin ? "Show the answers" : "Fold the answers away"}
+            onMouseDown={(e) => e.preventDefault()} onClick={() => setAiDockMin((m) => !m)}>
+            {I.spark}<b>Answers</b>
+            <span className="rm-aicount">{aiFound.best.length + (aiFound.analytics || []).length + (aiFound.rehi?.length ? 1 : 0)}</span>
+            <button type="button" className="rm-aix" aria-label={aiDockMin ? "Show the answers" : "Fold away"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAiDockMin((m) => !m); }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">{aiDockMin ? <path d="M6 15l6-6 6 6" /> : <path d="M6 9l6 6 6-6" />}</svg>
+            </button>
+            <button type="button" className="rm-aix" aria-label="Close" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAiFound(null); }}>{I.x}</button>
           </div>
           <p className="rm-aiclaim" title={aiFound.claim}>{aiFound.claim}</p>
           <div className="rm-aifound">
