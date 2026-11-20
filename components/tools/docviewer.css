@@ -128,7 +128,7 @@
 .dvw .dv-paper { max-width: 900px; margin: 0 auto; background: #fff; padding: 48px 64px 80px; color: #111; transition: opacity .2s; animation: dvIn .3s var(--spring) both; }
 .dvw .dv-paper.gone { display: none; }
 .dvw .dv-paper.busy { opacity: .45; }
-.dvw .dv-doc { font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; font-size: 11pt; line-height: 1.35; overflow-wrap: anywhere; }
+.dvw .dv-doc { font-family: Calibri, "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.35; overflow-wrap: anywhere; }
 .dvw .dv-doc p { margin: 0 0 6pt; }
 /* a web page or paste gets Verbatim's scale; a .docx keeps its own */
 .dvw .dv-doc > h1, .dvw .dv-doc > h2, .dvw .dv-doc > h3, .dvw .dv-doc > h4 { font-family: inherit; font-weight: 700; line-height: 1.2; margin: 12pt 0 4pt; color: inherit; }

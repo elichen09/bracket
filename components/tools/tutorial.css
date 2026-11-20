@@ -188,7 +188,7 @@
 .toolpage .tut .tu-ev-res .none { padding: 8px 10px; color: var(--dim); font-size: 13px; }
 .toolpage .tut .tu-ev-fmt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .toolpage .tut .tu-ev-fmt .mono { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin-right: 2px; }
-.toolpage .tut .tu-paper { min-height: 220px; background: #fff; color: #1a1a1a; padding: 18px 20px; box-shadow: 0 1px 3px rgba(60, 64, 67, .18); font-family: Calibri, Carlito, Arial, sans-serif; }
+.toolpage .tut .tu-paper { min-height: 220px; background: #fff; color: #1a1a1a; padding: 18px 20px; box-shadow: 0 1px 3px rgba(60, 64, 67, .18); font-family: Calibri, "Times New Roman", Times, serif; }
 .toolpage .tut .tu-paper .tu-empty { font-family: var(--ui); }
 .toolpage .tut .tu-blk { animation: tuLand .5s cubic-bezier(.22, 1.2, .36, 1) both; margin-bottom: 12px; }
 .toolpage .tut .tu-blk h5 { margin: 0 0 4px; font-size: 15px; text-align: center; text-decoration: underline; }
@@ -242,7 +242,7 @@
 /* 04 Doc viewer: rehighlight */
 .toolpage .tut .tu-vw-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .toolpage .tut .tu-vw-n { font-size: 10px; color: var(--dim); letter-spacing: .06em; }
-.toolpage .tut .tu-vw-card { background: #fff; color: #1a1a1a; padding: 16px 20px; box-shadow: 0 1px 3px rgba(60, 64, 67, .18); font-family: Calibri, Carlito, Arial, sans-serif; user-select: none; transition: box-shadow .3s; }
+.toolpage .tut .tu-vw-card { background: #fff; color: #1a1a1a; padding: 16px 20px; box-shadow: 0 1px 3px rgba(60, 64, 67, .18); font-family: Calibri, "Times New Roman", Times, serif; user-select: none; transition: box-shadow .3s; }
 .toolpage .tut .tu-vw-card.rh { box-shadow: 0 0 0 2px rgba(0, 190, 0, .45), 0 10px 30px -18px rgba(0, 0, 0, .4); cursor: text; }
 .toolpage .tut .tu-vw-card.sent { animation: tuSend .6s cubic-bezier(.22, 1, .36, 1); }
 @keyframes tuSend { 40% { transform: translateY(-6px) scale(.985); } }
@@ -308,7 +308,7 @@
 .toolpage .tut .tu-wbar .live i { width: 6px; height: 6px; border-radius: 50%; background: #54d162; animation: tuBlink 1.2s steps(2) infinite; }
 @keyframes tuBlink { 50% { opacity: .2; } }
 .toolpage .tut .tu-wbar button { background: none; border: 0; color: var(--bn-ink); font-size: 14px; cursor: pointer; }
-.toolpage .tut .tu-popdoc { padding: 10px 12px; background: #fff; color: #1a1a1a; font-family: Calibri, Carlito, Arial, sans-serif; font-size: 12.5px; max-height: 150px; overflow: auto; }
+.toolpage .tut .tu-popdoc { padding: 10px 12px; background: #fff; color: #1a1a1a; font-family: Calibri, "Times New Roman", Times, serif; font-size: 12.5px; max-height: 150px; overflow: auto; }
 .toolpage .tut .tu-popdoc p { margin: 0 0 4px; }
 .toolpage .tut .tu-popdoc p.new { animation: tuLand .6s ease both; }
 .toolpage .tut .tu-deskhint { position: absolute; right: 26px; top: 52px; margin: 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
