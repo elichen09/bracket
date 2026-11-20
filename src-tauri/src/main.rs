@@ -1,22 +1,17 @@
-// coda for Windows: the live site in a window of its own.
+// coda's desktop app: coda itself, built into the app (desktop/ → desktop/dist),
+// so it opens with no internet and asks for no account.
 //
-// The window opens coda itself — the same address as in the browser — so the
-// app is always the newest coda and nothing here needs updating when the site
-// changes. What the window adds is a place where every key reaches coda (no
-// browser shortcuts, no extensions), and one line run before each page,
-// window.__CODA_DESKTOP__, so the site knows to leave out what needs Google
-// (lib/desktop.ts).
+// Everything is kept on this computer, as it is in the browser. The page is
+// told it is the app by one line run before it (window.__CODA_DESKTOP__), and
+// leaves out what needs a server or an account (lib/desktop.ts).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-const CODA: &str = "https://bracket-ashy.vercel.app/tools/magic";
-
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let url = CODA.parse().expect("coda's address");
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("coda")
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(900.0, 600.0)

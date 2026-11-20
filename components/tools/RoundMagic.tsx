@@ -2530,6 +2530,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   /** A menu of the bar's, opened as if its button were clicked. */
   const press = (sel: string) => (root.current?.querySelector(sel) as HTMLElement | null)?.click();
   type PalItem = { id: string; label: string; sub: string; key?: string; icon: React.ReactNode; go: () => void };
+  /** What the command menu offers that needs the web: left out of the app. */
+  const WEB_ONLY = new Set(["x:share", "x:room", "x:speechdrop", "x:popsend", "x:tutorial", "x:signout", "x:desktop"]);
   const palItems: PalItem[] = (() => {
     if (!pal) return [];
     const q = pal.q.trim();
@@ -2556,10 +2558,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       ...(desktop ? [] : [{ id: "x:desktop", label: "Get the desktop app", sub: "Windows and Mac — every key is yours", icon: I.down, go: () => window.open("/download", "_blank") }]),
       { id: "x:signout", label: "Sign out", sub: "Account", icon: I.x, go: async () => { await flush(true); await signOutOfCoda(); window.location.assign("/"); } },
     ];
-    const cmds: PalItem[] = [
+    const cmds: PalItem[] = (desktop ? (xs: PalItem[]) => xs.filter((c) => !WEB_ONLY.has(c.id)) : (xs: PalItem[]) => xs)([
       ...commands.filter((c) => c.id !== "palette" && !["mode:split", "mode:speech", "mode:read"].includes(c.id)).map((c) => ({ id: c.id, label: c.label, sub: ACTION.get(c.id)?.group || c.label.split(":")[0], key: c.key, icon: I.bolt, go: c.go })),
       ...extra,
-    ];
+    ]);
     if (!words.length) {
       // nothing typed: the few things reached for most
       const want = ["library", "find", "send", "mode-split", "mode-read", "new-file", "x:open", "timer", "x:keys", "x:colours"];
@@ -2595,7 +2597,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   useEffect(() => { (palList.current?.querySelector("li.on") as HTMLElement | null)?.scrollIntoView({ block: "nearest" }); }, [pal?.sel]);
 
   return (
-    <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
+    <div className={"rm" + (desktop ? " desktop" : "") + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
@@ -2604,7 +2606,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       <div className={"rm-rib v2" + (ribSmall ? " slim" : "")} role="toolbar" aria-label="coda">
         {/* the bar: where you are, the one box for everything, and how you are looking at it */}
         <div className="rm-bar">
-          <Link className="rm-home" href="/" title="coda — home" aria-label="coda — home">{I.coda}<span>coda</span></Link>
+          {desktop
+            ? <span className="rm-home" aria-label="coda">{I.coda}<span>coda</span></span>
+            : <Link className="rm-home" href="/" title="coda — home" aria-label="coda — home">{I.coda}<span>coda</span></Link>}
           <div className="rm-tbox">
             {mode === "speech" && <span className="rm-fname fixed" title="The speech doc — Split or Edit for your files">Speech doc</span>}
             {curTheirs && mode !== "speech" && (isTemp(cur!.id)
@@ -2625,12 +2629,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             <button type="button" aria-pressed={mode === "read"} onClick={() => setMode("read")} data-tip={tip("mode-read", "Read it, timed")}>Read</button>
           </div>
           <div className="rm-acts">
-            <button type="button" className={"rm-b rm-share rm-menubtn" + (cur?.share && !curTheirs ? " on" : "")} aria-expanded={menu?.id === "share"}
+            <button type="button" className={"rm-b rm-share rm-menubtn web-only" + (cur?.share && !curTheirs ? " on" : "")} aria-expanded={menu?.id === "share"}
               data-tip={cur?.share ? "Shared — the link, and who is in it" : "Share this file: a link your partner opens to edit it with you"} aria-label="Share this file"
               onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("share", e)}>
               {I.share}<span>{cur?.share && !curTheirs ? (curShare?.mates.length ? `Shared · ${curShare.mates.length + 1}` : "Shared") : "Share"}</span>
             </button>
-            <button type="button" className="rm-b rm-room" data-act="room" data-tip="Room — share the speech doc with your partner">
+            <button type="button" className="rm-b rm-room web-only" data-act="room" data-tip="Room — share the speech doc with your partner">
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
             <button type="button" className={"rm-b rm-i" + (timer.open ? " on" : "")} data-tip={tip("timer", "Speech timer")} aria-label="Speech timer" aria-pressed={timer.open} onClick={() => run("timer")}>{I.timer}</button>
@@ -2638,7 +2642,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               {I.theme}
             </button>
             <button type="button" className={"rm-b rm-i" + (full ? " on" : "")} data-tip={full ? "Leave full screen" : "Full screen — every key is yours"} aria-label="Full screen" onClick={toggleFull}>{I.full}</button>
-            <button type="button" className={"rm-b rm-me rm-menubtn" + (menu?.id === "me" ? " on" : "")} data-tip={me ? me + " — home, the tutorial, sign out" : "Home, the tutorial, sign out"} aria-label="You" aria-expanded={menu?.id === "me"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("me", e)}>
+            <button type="button" className={"rm-b rm-me rm-menubtn web-only" + (menu?.id === "me" ? " on" : "")} data-tip={me ? me + " — home, the tutorial, sign out" : "Home, the tutorial, sign out"} aria-label="You" aria-expanded={menu?.id === "me"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("me", e)}>
               <i aria-hidden="true">{(me?.trim()[0] || "·").toUpperCase()}</i>
             </button>
             {ribSmall && (
@@ -2845,7 +2849,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the round: their docs, SpeechDrop, your partner */}
           <div className="rm-tabpane tp-round" hidden={tab !== "round"}>
-            <div className="rm-rsec">
+            {desktop && <p className="rm-sempty rm-webnote">Here: their docs, opened from a file or pasted. The caselist, SpeechDrop, rooms, shared files and your partner&apos;s Google Doc need the internet and an account — they&apos;re in coda on the web.</p>}
+            <div className="rm-rsec web-only">
               <div className="rm-cap">PARTNER&apos;S FLOW · GOOGLE DOC</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); gfWatch(); }}>
                 <input value={gfLink} onChange={(e) => { setGfLink(e.target.value); if (gfOn) setGfOn(false); }} placeholder="Link to their Google Doc" spellCheck={false} aria-label="Your partner's Google Doc" />
@@ -2869,7 +2874,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 ? <>Paste any link to the Doc — its tab called <b>flow</b> is found by itself. You need to be able to edit it (your partner shares it with you).</>
                 : <><b>Connect Google</b> and the table writes into the Doc as you type, and finds the <b>flow</b> tab by itself. Without it: the flow tab&apos;s link (it ends <b>?tab=t.…</b>), shared <b>Anyone with the link</b>, read only — <b>COPY FOR DOCS</b> to paste it back.</>}</p>}
             </div>
-            <div className="rm-rsec">
+            <div className="rm-rsec web-only">
               <div className="rm-cap">SPEECHDROP</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); void listSd(sdCode); }}>
                 <input value={sdCode} onChange={(e) => setSdCode(e.target.value)} placeholder="Room code or link" spellCheck={false} aria-label="SpeechDrop room" />
@@ -2914,7 +2919,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 {!theirs.length && <p className="rm-sempty">Their speech docs open here — off SpeechDrop, from a .docx or PDF, or pasted. Each opens in the editor to rehighlight and send from, and never goes in your library.</p>}
               </div>
             </div>
-            <div className="rm-rsec">
+            <div className="rm-rsec web-only">
               <div className="rm-cap">YOUR PARTNER</div>
               <p className="rm-sempty">Room, top right, puts you and your partner in one speech doc: you both write it, and every card either of you sends lands in it.</p>
             </div>
@@ -3185,7 +3190,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" data-act="format" onClick={() => setMenu(null)} title="Title it, drop the analytics, renumber, take out the white space">Format for sending…</button>
           <button type="button" className="rm-mb" data-act="copySend" onClick={() => setMenu(null)}>Copy it</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.saveDocx(); }}>Download as .docx</button>
-          <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.speechDrop(); }}>Send to SpeechDrop…</button>
+          <button type="button" className="rm-mb web-only" onClick={() => { setMenu(null); speechApi.current?.speechDrop(); }}>Send to SpeechDrop…</button>
           {!desktop && (
           <button type="button" className="rm-mb" disabled={gSending} onClick={() => { setMenu(null); void sendToGoogle(); }}
             title="Into your partner's Google Doc: a “speech doc” tab, and inside it “(rhetoric speech doc)” verbatimised — each send replaces them">
@@ -3255,10 +3260,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" data-act="case" onClick={() => setMenu(null)}>Your case…</button>
           <button type="button" className="rm-mb" data-act="export" onClick={() => setMenu(null)}>Export the library</button>
           <button type="button" className="rm-mb" data-act="settings" onClick={() => setMenu(null)}>Library settings</button>
+          <div className="web-only">
           <div className="rm-sep" />
           <h4>POP OUT — A WINDOW THAT STAYS ON TOP</h4>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); }}>The speech doc</button>
           {curTheirs && cur && !isTemp(cur.id) && <button type="button" className="rm-mb" onClick={() => { setMenu(null); void flush().then(() => { if (!popOut("doc", { doc: cur.id.slice(THEIRS.length) })) toast("The browser blocked the window — allow pop-ups for this site"); }); }}>Their doc, “{cur.name}”</button>}
+          </div>
           <div className="rm-sep" />
           <h4>SPELLING{K("spelling") ? " · " + K("spelling") : ""}</h4>
           {SPELL_MODES.map((m) => (

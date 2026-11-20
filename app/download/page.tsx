@@ -48,7 +48,7 @@ export default async function Download() {
         <div className={s.heroIn}>
           <Link href="/" className={s.home}>coda</Link>
           <h1 className={s.title}>coda, on your desktop</h1>
-          <p className={s.lead}>The same coda, in a window of its own, for Windows and Mac. Every key is yours — no browser, no extension taking Ctrl+K or Ctrl+N.</p>
+          <p className={s.lead}>The same coda, in a window of its own, for Windows and Mac. It works offline, needs no account, and every key is yours.</p>
           <OsPick win={rel?.win?.browser_download_url || null} mac={rel?.mac?.browser_download_url || null} fallback={DESKTOP_RELEASES} />
           <p className={s.meta}>
             {rel ? <>Version {rel.version} · {rel.date} · </> : null}
@@ -91,26 +91,31 @@ export default async function Download() {
 
         <h2 className={s.h2}>Then, on either</h2>
         <ol className={s.steps}>
-          <li><b>Sign in</b> with the same email and password you use here.</li>
+          <li><b>There&apos;s nothing to sign in to.</b> coda opens straight to your files — it works offline and needs no account.</li>
           <li>
-            <b>Bring your library across, once.</b> The app keeps its own copy of everything, apart from this browser&apos;s. Here,
-            in coda: <b>⋯ › Export the library</b>. In the app: <b>⋯ › Import an evidence file › Load a .json export instead</b>,
-            and pick that file. Your files come back as files, the blocks you imported as blocks, each in the bin it was in.
+            <b>Bring your library across, once.</b> The app keeps its own copy of everything, on your computer, apart from this
+            browser&apos;s. Here, in coda: <b>⋯ › Export the library</b>. In the app: <b>⋯ › Import an evidence file › Load a .json
+            export instead</b>, and pick that file. Your files come back as files, the blocks you imported as blocks, each in the
+            bin it was in.
           </li>
         </ol>
 
         <h2 className={s.h2}>What&apos;s different in the app</h2>
         <ul className={s.diff}>
+          <li><b>It works offline.</b> coda is inside the app, and everything you make is on your computer — no internet, no account.</li>
           <li><b>Every key works.</b> Ctrl+K, Ctrl+N and the rest reach coda — nothing in a browser or an extension takes them first.</li>
-          <li><b>It&apos;s always up to date.</b> The app opens the live coda, so every change here is there the next time it opens.</li>
-          <li><b>No Google sign-in.</b> Google won&apos;t sign in inside apps, so your partner&apos;s Google Doc flow opens read only, from
-            the flow tab&apos;s link shared <i>Anyone with the link</i>. Writing straight into the Doc stays in the browser.</li>
-          <li><b>On a Mac it runs on Safari&apos;s engine</b>, so pop-outs open as ordinary windows rather than ones that stay on top.</li>
-          <li><b>It needs the internet</b>, as coda does in the browser.</li>
+          <li><b>Cutting, the library and the speech doc are all there</b> — searching, sending, Read mode, their docs from a .docx,
+            PDF or paste, export and import.</li>
+          <li><b>What needs the internet and an account stays on the web:</b> the caselist, SpeechDrop, rooms with your partner,
+            sharing a file by link, and your partner&apos;s Google Doc. Use coda here for those.</li>
+          <li><b>A new version is a new download</b> from this page; install it over the old one and your files stay.</li>
+          <li><b>On a Mac it runs on Safari&apos;s engine</b>, so it may differ from Chrome in small ways.</li>
         </ul>
 
         <h2 className={s.h2}>Removing it</h2>
-        <p className={s.p}>Windows: Settings › Apps › Installed apps › coda › Uninstall. Mac: drag coda from Applications to the Bin. Your files in the browser are untouched either way.</p>
+        <p className={s.p}>Windows: Settings › Apps › Installed apps › coda › Uninstall. Mac: drag coda from Applications to the Bin. Your files in
+          the app live on your computer: export the library first if you want to keep them. The uninstaller&apos;s <i>delete the
+          application data</i> box erases them; leave it unticked to keep them for a reinstall.</p>
 
         <p className={s.back}><Link href="/tools/magic">← Back to coda</Link></p>
       </section>

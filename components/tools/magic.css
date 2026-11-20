@@ -1536,3 +1536,8 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm-side .evi.rm-evsearch .clacts .btn { flex: none; white-space: nowrap; padding: 5px 10px; font: 500 12px var(--rm-sans); letter-spacing: 0; text-transform: none; }
 .rm-side .evi.rm-evsearch .clacts .btn.key { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
 .rm-side .evi.rm-evsearch .clacts .btn.key kbd { color: inherit; border-color: currentColor; opacity: .6; }
+
+/* the app (desktop/): what needs a server or an account is coda on the web's — the room, sharing, you, the
+   caselist, SpeechDrop, a partner's Google Doc, pop-outs */
+.rm.desktop .web-only, .rm.desktop .rm-evsearch .srcsw { display: none !important; }
+.rm-webnote { padding: 8px 14px 4px; }

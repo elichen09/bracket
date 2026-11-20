@@ -13,3 +13,4 @@ next-env.d.ts
 # the desktop app's build output
 /src-tauri/target
 /src-tauri/gen
+/desktop/dist
