@@ -1917,12 +1917,27 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setAiRun({ label: "Finding indicts" });
     try {
       const r = await aiIndict(v, aiKey(owner), { retag: aiOpts.retag }, ctl.signal, (done, of) => setAiRun({ label: "Finding indicts", done, of }));
+      // the rehighlighted copies, to the speech doc where its cursor is, as a sent card goes; the file is as it was
+      const EV = (window as any).EV;
+      const fid = viewFile.current.get(activeRef.current) || "";
+      const fileName = loaded.current.get(fid)?.name || "their card";
+      let sent = 0;
+      if (r.done.length && EV?.parseHtml && EV?.sendParsed) {
+        for (const c of r.done) {
+          const parsed = EV.parseHtml(`<h3>${esc(c.block || fileName)}</h3>` + toHtml(c.doc), {});
+          for (const b of (parsed.blocks || []).filter((x: any) => (x.args || []).length)) {
+            await EV.sendParsed({ ...b, id: `rm:rehi:${Date.now()}:${sent}` }, 0, "rehighlighted, from " + fileName);
+            sent++;
+          }
+        }
+        if (sent) setSentPulse((x) => x + 1);
+      }
       const n = (x: number, w: string) => x + " " + w + (x === 1 ? "" : "s");
       const bits: string[] = [];
-      if (r.done) bits.push(`Rehighlighted ${n(r.indicts, "indict")}${r.cards > 1 ? " in " + n(r.done, "card") : ""}: ${r.says.slice(0, 2).join("; ")}`);
-      if (r.skipped.length) bits.push((r.done ? "left alone: " : "Nothing rehighlighted: ") + r.skipped.join("; "));
+      if (sent) bits.push(`Sent ${r.done.length > 1 ? n(sent, "rehighlight") : "the rehighlight"} to the speech doc, ${n(r.indicts, "indict")}: ${r.says.slice(0, 2).join("; ")}`);
+      else if (r.done.length) bits.push("Rehighlighted, but the speech doc is still starting — try again in a moment");
+      if (r.skipped.length) bits.push((r.done.length ? "left alone: " : "Nothing rehighlighted: ") + r.skipped.join("; "));
       if (r.failed.length) bits.push("failed: " + r.failed[0]);
-      if (r.done) bits.push("Ctrl+Z puts theirs back");
       toast(bits.join(" · "));
     } catch (e) {
       toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
