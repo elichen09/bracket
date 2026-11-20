@@ -1521,3 +1521,18 @@ html:has(.rm-rib.v2) .nav { display: none; }
 .rm-me i { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50% !important; background: var(--btn-a); color: var(--hi); font: 600 12px var(--rm-sans); font-style: normal; }
 .rm-me:hover i, .rm-me.on i { background: var(--acc); color: var(--on-acc); }
 a.rm-mb { text-decoration: none; display: flex; align-items: center; }
+
+/* the caselist in the side: an opened card is the card as it will paste — black on a white page, whatever the
+   palette — and a matched word keeps the colour of the line it is in, on a wash of the accent (the
+   rule above, dark text for a light accent, made the words in a tag dark on a dark row) */
+.rm-side .evi.rm-evsearch .clbody { background: #fff; color: #111; border-left-color: var(--accD); box-shadow: 0 8px 22px -16px rgba(0, 0, 0, .7); scrollbar-color: #c8c8c8 transparent; }
+.rm-side .evi.rm-evsearch .clbody mark { color: inherit; }
+.rm .evi .clmain mark { color: inherit; background: rgba(var(--acc-rgb), .24); font-weight: inherit; padding: 0 2px; }
+.rm .evi .clcard.sel .clmain mark { background: rgba(var(--acc-rgb), .3); }
+.rm-side .evi.rm-evsearch .clcard.sel :is(.clcite, .clsrc, .clblock) { color: var(--hi); opacity: .7; }
+.rm-side .evi.rm-evsearch .clcard.sel .clacts .btn:not(.key) { color: var(--hi); border-color: var(--btnb-h); }
+.rm-side .evi.rm-evsearch .clcard.sel .clrounds { color: var(--hi); border-color: var(--btnb-h); }
+.rm-side .evi.rm-evsearch .clacts { flex-wrap: wrap; gap: 6px; }
+.rm-side .evi.rm-evsearch .clacts .btn { flex: none; white-space: nowrap; padding: 5px 10px; font: 500 12px var(--rm-sans); letter-spacing: 0; text-transform: none; }
+.rm-side .evi.rm-evsearch .clacts .btn.key { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
+.rm-side .evi.rm-evsearch .clacts .btn.key kbd { color: inherit; border-color: currentColor; opacity: .6; }
