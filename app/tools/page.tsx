@@ -22,7 +22,7 @@ export default function Tools() {
                 <p className="crumb mono reveal"><Link href="/">← coda</Link></p>
                 <h1 className="reveal">Tools</h1>
                 <p className="hint reveal" style={{ marginTop: 0 }}>
-                  Each is a workbench of its own and keeps its own data in this browser. Start with the tutorial, or go straight to Round Magic.
+                  Everything you make is kept in this browser. Start with the tutorial, or go straight into coda.
                 </p>
               </div>
 

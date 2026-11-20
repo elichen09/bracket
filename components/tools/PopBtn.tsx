@@ -19,9 +19,9 @@ import type { PeekView } from "./Peek";
  * From a side of the split screen, the floating window belongs to the split
  * page itself (window.top), so changing the tool on that side keeps it.
  */
-const SIZE: Record<PeekView, [number, number]> = { doc: [780, 940], send: [780, 940], docflow: [780, 940], flow: [1180, 760] };
-const WHAT: Record<PeekView, string> = { doc: "this doc", send: "the send doc", docflow: "this doc flow", flow: "the flow's grid" };
-const TITLE: Record<PeekView, string> = { doc: "Doc", send: "Send doc", docflow: "Doc flow", flow: "Flow" };
+const SIZE: Record<PeekView, [number, number]> = { doc: [780, 940], send: [780, 940] };
+const WHAT: Record<PeekView, string> = { doc: "this doc", send: "the send doc" };
+const TITLE: Record<PeekView, string> = { doc: "Doc", send: "Send doc" };
 
 interface DocPip { window: Window | null; requestWindow: (o: { width: number; height: number }) => Promise<Window> }
 

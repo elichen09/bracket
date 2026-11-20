@@ -7,15 +7,10 @@ import { drawDoc } from "@/lib/viewer/draw";
 import { listDocs, getDoc, type ViewDoc, type ViewMeta } from "@/lib/viewer/store";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
-import { sheetColumns } from "@/lib/flow/format";
-import { schema } from "@/lib/docflow/schema";
-import { toDocsHtml } from "@/lib/docflow/io";
-import { listDocs as listFlowDocs, loadDoc as loadFlowDoc, type DocMeta } from "@/lib/docflow/store";
 import ThemePicker from "./ThemePicker";
 import Ico from "./Ico";
 import { useFitBar } from "./fitBar";
 import "./docviewer.css";
-import "./flow.css";
 import "./finish.css";
 
 /**
@@ -30,22 +25,18 @@ import "./finish.css";
  *   doc      a document from the Doc viewer — following whatever the Doc
  *            viewer shows, or pinned to one of its recent docs
  *   send     Evidence's send doc, or the read doc, as it is being written
- *   flow     the flow's grid, a sheet at a time
- *   docflow  a Doc flow, as the doc it is
  *
- * The doc-like three share a pane with a search, Highlighted only, zoom and
+ * Both share a pane with a search, Highlighted only, zoom and
  * a jump to any heading.
  */
-export type PeekView = "doc" | "send" | "flow" | "docflow";
+export type PeekView = "doc" | "send";
 
 interface Src { key: string; kind: ViewDoc["kind"]; blob?: Blob; html?: string }
 
 const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-export default function Peek({ owner, view, doc, id }: { owner?: string; view: PeekView; doc?: string; id?: string }) {
-  if (view === "flow") return <FlowPeek owner={owner} />;
+export default function Peek({ owner, view, doc }: { owner?: string; view: PeekView; doc?: string }) {
   if (view === "send") return <SendPeek owner={owner} />;
-  if (view === "docflow") return <DocFlowPeek owner={owner} id={id} />;
   return <DocPeek owner={owner} first={doc} />;
 }
 
@@ -298,131 +289,6 @@ function SendPeek({ owner }: { owner?: string }) {
       {body(quiet
         ? <><h2>Evidence is not open</h2><p>Open <b>Evidence</b> in this browser — its {want} doc shows up here and keeps up as it changes.</p></>
         : <p className="pk-wait mono">Finding Evidence…</p>)}
-    </div>
-  );
-}
-
-/* ================================================================ docflow: a Doc flow, as the doc it is */
-
-function DocFlowPeek({ owner, id: first }: { owner?: string; id?: string }) {
-  const [list, setList] = useState<DocMeta[]>([]);
-  const [id, setId] = useState(first || "");
-  const [html, setHtml] = useState<{ html: string; at: number } | null>(null);
-  const read = useCallback((docId: string, again = false) => {
-    const json = loadFlowDoc(owner, docId);
-    // Doc flow can take a doc out of storage for a moment (filing it in Past
-    // flows) — so a missing doc is looked for again before it is let go of
-    if (!json) { if (!again) setTimeout(() => read(docId, true), 700); else setHtml(null); return; }
-    try { setHtml({ html: toDocsHtml(PMNode.fromJSON(schema, json)), at: Date.now() }); } catch { /* a doc mid-change: the next save */ }
-  }, [owner]);
-  useEffect(() => {
-    const l = listFlowDocs(owner);
-    setList(l);
-    if (!first && l[0]) setId(l[0].id);
-  }, [owner, first]);
-  useEffect(() => {
-    if (!id) return;
-    read(id);
-    const key = scoped("docflow.doc", owner) + ":" + id;
-    const on = (e: StorageEvent) => { if (e.key === key) read(id); if (e.key === scoped("docflow.list", owner)) setList(listFlowDocs(owner)); };
-    window.addEventListener("storage", on);
-    return () => window.removeEventListener("storage", on);
-  }, [id, owner, read]);
-  const name = list.find((d) => d.id === id)?.name;
-  const src = useMemo<Src | null>(() => (html ? { key: "docflow-" + id, kind: "html", html: html.html } : null), [html, id]);
-  const { tools, body } = useDocPane(src);
-  return (
-    <div className="dvw pk">
-      <Bar brand="Doc flow" title={name} live={html ? "Live · " + clock(html.at) : null}>
-        {list.length > 1 && (
-          <select className="pk-pick" value={id} onChange={(e) => setId(e.target.value)} aria-label="Which flow">
-            {list.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        )}
-        {tools}
-      </Bar>
-      {body(<><h2>No doc flow yet</h2><p>Start one in <b>Doc flow</b> and it shows up here as you write it.</p></>)}
-    </div>
-  );
-}
-
-/* ================================================================ flow: the grid */
-
-const TAGS = /\b(dropped|ext|turn|perm|nuq|xa|cx)\b/gi;
-const escHtml = (s: string) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]!));
-/** A cell, the way Flow writes it: its marks as chips, a leading arrow drawn. */
-const fmtCell = (t: string) => escHtml(t).replace(/^→/, '<span class="arr">→</span>').replace(TAGS, (m) => `<span class="tg ${m.toLowerCase()}">${m.toUpperCase()}</span>`);
-
-interface FlowRow { id: string; c?: string[]; h?: string; t?: string }
-interface FlowSheet { id: string; name: string; side: "pro" | "con"; rows: FlowRow[] }
-
-function FlowPeek({ owner }: { owner?: string }) {
-  const key = scoped("flow.doc", owner);
-  const [doc, setDoc] = useState<{ sheets: FlowSheet[]; meta?: { round?: string; tourn?: string } } | null>(null);
-  const [at, setAt] = useState(0);
-  const [cur, setCur] = useState(0);
-  const [written, setWritten] = useState(false);
-  const [size, setSize] = useState(13);
-  useEffect(() => {
-    const read = () => { try { const d = JSON.parse(localStorage.getItem(key) || "null"); if (d && Array.isArray(d.sheets)) { setDoc(d); setAt(Date.now()); } } catch { /* a half-written save: the next one */ } };
-    read();
-    // Flow saves as it goes; every save lands here
-    const on = (e: StorageEvent) => { if (e.key === key) read(); };
-    window.addEventListener("storage", on);
-    return () => window.removeEventListener("storage", on);
-  }, [key]);
-  useEffect(() => {
-    const on = (e: KeyboardEvent) => {
-      if (e.key === "+" || e.key === "=") setSize((s) => Math.min(22, s + 1));
-      if (e.key === "-") setSize((s) => Math.max(10, s - 1));
-    };
-    window.addEventListener("keydown", on);
-    return () => window.removeEventListener("keydown", on);
-  }, []);
-
-  const sheet = doc?.sheets[Math.min(cur, (doc?.sheets.length || 1) - 1)];
-  const cols = sheet ? sheetColumns(sheet.side) : [];
-  // with "written only", the columns nobody has spoken in yet step aside
-  const show = cols.map((_, i) => !written || !!sheet?.rows.some((r) => r.c && (r.c[i] || "").trim()));
-  const nShown = show.filter(Boolean).length || 1;
-  const title = [doc?.meta?.tourn, doc?.meta?.round].filter(Boolean).join(" · ") || undefined;
-
-  return (
-    <div className="dvw pk pk-flowv">
-      <Bar brand="Flow" title={title} live={doc ? "Live · " + clock(at) : null}>
-        {doc && (
-          <div className="dv-zoom pk-sheets" role="tablist" aria-label="Sheets">
-            {doc.sheets.map((s, i) => (
-              <button type="button" key={s.id} role="tab" aria-selected={i === cur} className={"dv-btn pk-sheet " + s.side + (i === cur ? " on" : "")} onClick={() => setCur(i)}>{s.name}</button>
-            ))}
-          </div>
-        )}
-        <button type="button" className={"dv-btn" + (written ? " on" : "")} aria-pressed={written} onClick={() => setWritten((w) => !w)} title="Only the columns with something in them">
-          <Ico n="grid" /><span className="lbl">Written only</span>
-        </button>
-        <div className="dv-zoom">
-          <button type="button" className="dv-btn" onClick={() => setSize((s) => Math.max(10, s - 1))} aria-label="Smaller" title="Smaller (−)">A−</button>
-          <button type="button" className="dv-btn" onClick={() => setSize((s) => Math.min(22, s + 1))} aria-label="Larger" title="Larger (+)">A+</button>
-        </div>
-      </Bar>
-      <div className="flw pk-flw" style={{ ["--flw-fs" as any]: size + "px", ["--flw-pad" as any]: "7px 10px" }}>
-        {!sheet ? (
-          <div className="pk-empty"><h2>No flow yet</h2><p>Flow a round in <b>Flow</b> and it shows up here as you write it.</p></div>
-        ) : (
-          <div className="pk-scroll">
-            <div className="grid pk-grid" style={{ gridTemplateColumns: `repeat(${nShown}, minmax(${Math.round(size * 11)}px, 1fr))` }}>
-              {cols.map((col, i) => show[i] && (
-                <div key={i} className={"h " + col.side}><b>{col.key.split(" ").slice(1).join(" ")}</b><span className="sd">{col.key.split(" ")[0]}</span></div>
-              ))}
-              {sheet.rows.map((row, ri) => (row.h !== undefined && !row.c)
-                ? <div key={row.id || ri} className="rh pk-rh" style={{ gridColumn: "1 / -1" }}><span className="hn">{row.h}</span>{row.t ? <em>{row.t}</em> : null}</div>
-                : <div key={row.id || ri} className="r">
-                    {(row.c || []).map((t, ci) => show[ci] && <div key={ci} className={"c " + (cols[ci]?.side || "pro")} dangerouslySetInnerHTML={{ __html: fmtCell(t) }} />)}
-                  </div>)}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

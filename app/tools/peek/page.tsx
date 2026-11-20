@@ -6,12 +6,12 @@ import "@/components/tools/peek.css";
 export const metadata = { title: "Pop-out · coda" };
 export const dynamic = "force-dynamic";
 
-const VIEWS: PeekView[] = ["doc", "send", "flow", "docflow"];
+const VIEWS: PeekView[] = ["doc", "send"];
 
 /**
  * A pop-out window (Pop out, in any tool): one thing from one tool, to look
  * at. No site nav and no admin key — it shows only what this browser already
- * holds (the Doc viewer's docs, the flow, Evidence's send doc), and changes
+ * holds (your docs and the speech doc), and changes
  * none of it.
  */
 export default async function PeekPage({ searchParams }: { searchParams?: { v?: string | string[]; doc?: string | string[]; id?: string | string[] } }) {
@@ -21,7 +21,7 @@ export default async function PeekPage({ searchParams }: { searchParams?: { v?: 
   const user = await currentUser();
   return (
     <main>
-      <div className="toolpage peekpage"><Peek owner={user?.id} view={view} doc={one(searchParams?.doc)} id={one(searchParams?.id)} /></div>
+      <div className="toolpage peekpage"><Peek owner={user?.id} view={view} doc={one(searchParams?.doc)} /></div>
     </main>
   );
 }

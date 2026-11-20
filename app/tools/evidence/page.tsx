@@ -1,50 +1,8 @@
 import { redirect } from "next/navigation";
-import Nav from "@/components/Nav";
-import AdminGate from "@/components/AdminGate";
-import Evidence from "@/components/tools/Evidence";
-import Embedded from "@/components/tools/Embedded";
-import { isAdmin } from "@/lib/admin";
-import { currentUser, displayName } from "@/lib/auth";
-import "../tools.css";
 
-export const metadata = { title: "Evidence · coda" };
-export const dynamic = "force-dynamic";
-
-/**
- * The tool gets the window. No title band, no blurb: what it is and where it
- * came from live in its own toolbar, and every pixel of the rest is the work.
- */
-/**
- * One exception to the lock, the same one Flow makes: a link carrying a room
- * code opens without the admin key. That link is how a partner is sent here
- * to build the send doc for the flow, and a partner is not an administrator.
- */
-export default async function EvidenceTool({ searchParams }: { searchParams?: { room?: string | string[]; embed?: string | string[]; only?: string | string[] } }) {
+/** Evidence is part of coda now; a partner's room link still opens the shared speech doc. */
+export default function EvidenceTool({ searchParams }: { searchParams?: { room?: string | string[] } }) {
   const raw = searchParams?.room;
   const room = (Array.isArray(raw) ? raw[0] : raw) || undefined;
-  // inside the split view: the split page has the nav, and this is half of it
-  const embed = !!searchParams?.embed;
-  // the floating search over the split screen: Evidence's search and nothing else
-  const searchOnly = (Array.isArray(searchParams?.only) ? searchParams?.only[0] : searchParams?.only) === "search";
-  // Evidence is part of Round Magic now; only Split screen's floating search still opens it on its own
-  if (!embed) redirect("/tools/magic" + (room ? `?room=${encodeURIComponent(room)}` : ""));
-  if (!isAdmin() && !room) {
-    return (
-      <>
-        <Nav />
-        <main><section className="view enter"><AdminGate what="Evidence" /></section></main>
-      </>
-    );
-  }
-  // The library is this account's alone: another person signed in on the same
-  // browser opens their own.
-  const user = await currentUser();
-  return (
-    <>
-      {embed ? <Embedded /> : <Nav />}
-      <main>
-        <div className="toolpage"><Evidence owner={user?.id} me={user ? displayName(user) : undefined} room={searchOnly ? undefined : room} searchOnly={searchOnly} /></div>
-      </main>
-    </>
-  );
+  redirect("/tools/magic" + (room ? `?room=${encodeURIComponent(room)}` : ""));
 }
