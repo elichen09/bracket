@@ -23,6 +23,7 @@ import { aiKey, setAiKey, checkKey, AI_MODEL } from "@/lib/ai/claude";
 import { citeFromLink } from "@/lib/ai/cite";
 import { aiReformat } from "@/lib/ai/reformat";
 import { findBlocks, type Found, type Sources } from "@/lib/ai/blocks";
+import { spotPlugin, holdSpot, takeSpot } from "@/lib/ai/spot";
 import { caselistClient, familyOf } from "@/lib/caselist/client";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
@@ -575,6 +576,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           spellPlugin(spellRef.current),
           gripPlugin(),
           foldPlugin(),
+          spotPlugin(),
         ],
       });
     }
@@ -588,6 +590,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         spellPlugin(spellRef.current),
         gripPlugin(),
         foldPlugin(),
+        spotPlugin(),
       ],
     });
   }, []);
@@ -1850,11 +1853,16 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const setAiOpts = (p: Partial<typeof aiOpts>) => setAiOptsState((o) => { const n = { ...o, ...p }; try { localStorage.setItem(AI_OPTS, JSON.stringify(n)); } catch { /* private */ } return n; });
   type AiPanel =
     | { kind: "settings"; draft: string; busy: boolean; msg: string; bad: boolean; then?: "cite" | "reformat" | "blocks" }
-    | { kind: "cite"; url: string; busy: boolean; err: string }
-    | { kind: "blocks"; want: string; busy: boolean; err: string; found: Found | null };
+    | { kind: "cite"; url: string; err: string }
+    | { kind: "blocks"; want: string; err: string };
   const [aiPanel, setAiPanel] = useState<AiPanel | null>(null);
   const aiStop = useRef<AbortController | null>(null);
-  const [aiRun, setAiRun] = useState<null | { done: number; of: number }>(null);
+  /** AI at work, in the background: what it's doing, for the chip in the corner. */
+  const [aiRun, setAiRun] = useState<null | { label: string; done?: number; of?: number }>(null);
+  /** Find blocks' answers, docked in the corner: the doc stays yours while they're up. */
+  const [aiFound, setAiFound] = useState<Found | null>(null);
+  const aiWant = useRef("");
+  const aiBusy = () => { if (aiStop.current) { toast("AI is still working on the last one — Stop it first"); return true; } return false; };
   /** What the block finder starts from: the selection, else the card you're in (its tag and what's read), else the line. */
   const wantFromHere = () => {
     const v = target();
@@ -1877,8 +1885,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       setAiPanel({ kind: "settings", draft: "", busy: false, bad: false, msg: aiKey(owner) ? "" : "Paste your Anthropic API key to use AI in coda.", then: what === "settings" ? undefined : what });
       return;
     }
-    if (what === "cite") setAiPanel({ kind: "cite", url: "", busy: false, err: "" });
-    else if (what === "blocks") setAiPanel({ kind: "blocks", want: wantFromHere(), busy: false, err: "", found: null });
+    if (what === "cite") setAiPanel({ kind: "cite", url: "", err: "" });
+    else if (what === "blocks") setAiPanel({ kind: "blocks", want: wantFromHere() || aiWant.current, err: "" });
     else void aiReformatNow();
   };
   aiOpenRef.current = aiOpen;
@@ -1900,11 +1908,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const aiReformatNow = async () => {
     const v = target();
     if (!v) { toast("Open a file first"); return; }
-    if (aiStop.current) { toast("AI is already working — Stop it first"); return; }
+    if (aiBusy()) return;
     const ctl = new AbortController(); aiStop.current = ctl;
-    setAiRun({ done: 0, of: 0 });
+    setAiRun({ label: "Reformatting" });
     try {
-      const r = await aiReformat(v, aiKey(owner), { ...aiOpts, citeFormat: citeRef.current }, ctl.signal, (done, of) => setAiRun({ done, of }));
+      const r = await aiReformat(v, aiKey(owner), { ...aiOpts, citeFormat: citeRef.current }, ctl.signal, (done, of) => setAiRun({ label: "Reformatting", done, of }));
       const n = (x: number, w: string) => x + " " + w + (x === 1 ? "" : "s");
       const bits = [`Reformatted ${r.done} of ${n(r.cards, "card")}`];
       if (r.done) bits.push(r.underlined + "% underlined");
@@ -1920,45 +1928,65 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       aiStop.current = null; setAiRun(null);
     }
   };
-  /** The cite where it belongs: an empty line you're on, else the card's empty cite line, else after your line. */
-  const placeCite = (v: EditorView, node: PMNode) => {
-    const st = v.state, $f = st.selection.$from, tr = st.tr;
+  /**
+   * Where the cite will go, decided when you ask for it: the empty line you're on, else the card's empty
+   * cite line, else after your line. It's held as a spot, so typing on elsewhere while Claude writes it doesn't move it.
+   */
+  const citeSpot = (v: EditorView) => {
+    const st = v.state, $f = st.selection.$from;
     const here = $f.depth >= 1 ? { pos: $f.before(1), node: st.doc.child($f.index(0)) } : null;
     const c = C.cardAround(st);
-    if (here && here.node.type === schema.nodes.paragraph && !here.node.textContent.trim()) tr.replaceWith(here.pos, here.pos + here.node.nodeSize, node);
-    else if (c?.cite && !c.cite.node.textContent.trim()) tr.replaceWith(c.cite.pos, c.cite.pos + c.cite.node.nodeSize, node);
-    else if (here) tr.insert(here.pos + here.node.nodeSize, node);
-    else tr.insert(st.doc.content.size, node);
-    v.dispatch(tr.scrollIntoView());
-    v.focus();
+    if (here && here.node.type === schema.nodes.paragraph && !here.node.textContent.trim()) return { spot: holdSpot(st, here.pos), replace: true };
+    if (c?.cite && !c.cite.node.textContent.trim()) return { spot: holdSpot(st, c.cite.pos), replace: true };
+    return { spot: holdSpot(st, here ? here.pos + here.node.nodeSize : st.doc.content.size), replace: false };
+  };
+  /** The cite, put at its spot: over the empty line if that's still empty, else just before what's there now. */
+  const putCite = (v: EditorView, at: ReturnType<typeof citeSpot>, node: PMNode) => {
+    const p = v.isDestroyed ? null : takeSpot(v.state, at.spot);
+    if (!p) return false;
+    const st = v.state, tr = st.tr;
+    const $p = st.doc.resolve(p.pos);
+    const pos = $p.depth ? $p.before(1) : p.pos;
+    const there = st.doc.nodeAt(pos);
+    if (at.replace && !p.lost && there && there.type === schema.nodes.paragraph && !there.textContent.trim()) tr.replaceWith(pos, pos + there.nodeSize, node);
+    else tr.insert(pos, node);
+    v.dispatch(tr);
+    return true;
   };
   const aiCiteNow = async () => {
-    if (!aiPanel || aiPanel.kind !== "cite" || aiPanel.busy) return;
+    if (!aiPanel || aiPanel.kind !== "cite") return;
     const url = aiPanel.url.trim();
     if (!/^https?:\/\/\S+\.\S+/i.test(url)) { setAiPanel({ ...aiPanel, err: "Paste the article's link — it starts with https://" }); return; }
     const v = target();
     if (!v) { setAiPanel({ ...aiPanel, err: "Open a file first." }); return; }
+    if (aiBusy()) return;
+    const at = citeSpot(v);
     const ctl = new AbortController(); aiStop.current = ctl;
-    setAiPanel({ ...aiPanel, busy: true, err: "" });
+    setAiPanel(null); v.focus();
+    setAiRun({ label: "Writing the cite" });
     try {
       const parts = await citeFromLink(aiKey(owner), url, ctl.signal);
-      placeCite(v, writeCite(parts, citeRef.current));
-      setAiPanel(null);
-      toast("Cite added: " + parts.short + (parts.quals ? "" : " — the page didn't say the author's credentials"));
+      const node = writeCite(parts, citeRef.current);
+      const tail = parts.quals ? "" : " — the page didn't say the author's credentials";
+      if (putCite(v, at, node)) toast("Cite added: " + parts.short + tail);
+      else { try { await navigator.clipboard.writeText(node.textContent); } catch { /* not allowed */ } toast("Cite copied — the file it was for isn't open: " + parts.short); }
     } catch (e) {
-      setAiPanel((p) => p && p.kind === "cite" ? { ...p, busy: false, err: (e as Error).message } : p);
+      takeSpot(v.state, at.spot);
+      toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
     } finally {
-      aiStop.current = null;
+      aiStop.current = null; setAiRun(null);
     }
   };
   const aiBlocksNow = async () => {
-    if (!aiPanel || aiPanel.kind !== "blocks" || aiPanel.busy) return;
+    if (!aiPanel || aiPanel.kind !== "blocks") return;
     const EV = (window as any).EV;
-    if (!EV?.quickFind) { setAiPanel({ ...aiPanel, err: "The library is still loading — try again in a moment." }); return; }
+    if (!EV?.libraryText) { setAiPanel({ ...aiPanel, err: "The library is still loading — try again in a moment." }); return; }
+    if (!aiPanel.want.trim()) { setAiPanel({ ...aiPanel, err: "Select their argument, or paste it in, first." }); return; }
+    if (aiBusy()) return;
     const clOn = desktop ? !!caselistLogin() : true;
     const cl = clOn ? (caselistClient(owner, scoped) as any) : null;
     const src: Sources = {
-      library: (q, max) => EV.quickFind(q, max),
+      library: () => EV.libraryText(),
       caselist: cl ? async (q: string) => {
         let fams: string[] = [];
         try { fams = JSON.parse(localStorage.getItem(scoped("caselist.wikis", owner)) || "[]"); } catch { /* none chosen */ }
@@ -1969,15 +1997,18 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         return ((r && r.groups) || []).flatMap((g: any) => g.cards.slice(0, 3).map((c: any) => ({ tag: String(c.tag || ""), cite: String(c.cite || ""), block: String(c.block || ""), team: String(g.name || "") }))).slice(0, 12);
       } : null,
     };
+    const want = aiPanel.want;
+    aiWant.current = want;
     const ctl = new AbortController(); aiStop.current = ctl;
-    setAiPanel({ ...aiPanel, busy: true, err: "", found: null });
+    setAiPanel(null); setAiFound(null); target()?.focus();
+    setAiRun({ label: "Finding answers" });
     try {
-      const found = await findBlocks(aiKey(owner), aiPanel.want, src, ctl.signal);
-      setAiPanel((p) => p && p.kind === "blocks" ? { ...p, busy: false, found } : p);
+      const found = await findBlocks(aiKey(owner), want, src, ctl.signal, (stage) => setAiRun({ label: stage.replace(/…$/, "") }));
+      setAiFound(found);
     } catch (e) {
-      setAiPanel((p) => p && p.kind === "blocks" ? { ...p, busy: false, err: (e as Error).message } : p);
+      toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
     } finally {
-      aiStop.current = null;
+      aiStop.current = null; setAiRun(null);
     }
   };
   /** A caselist pick, found in the caselist search: Enter sends it, Shift+Enter puts it in the file. */
@@ -1992,7 +2023,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       });
     });
   };
-  const aiClose = () => { aiStop.current?.abort(); setAiPanel(null); target()?.focus(); };
+  const aiClose = () => { setAiPanel(null); target()?.focus(); };
   const clSignOut = () => { setCaselistLogin(null); setClLoginState(null); (root.current?.querySelector('#srcsw [data-src="lib"]') as HTMLElement | null)?.click(); toast("Signed out of openCaselist"); };
   const [apiFlow, setApiFlow] = useState<ApiFlow | null>(null);
   const gfTab = (gfLink.match(/[?&#]tab=(t\.[A-Za-z0-9_-]+)/) || [])[1] || "";
@@ -2531,6 +2562,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     placePlugin(),
     gripPlugin(),
     foldPlugin(speechTagsRef.current),
+    spotPlugin(),
     verbatimPlugin(false),
   ], []);
   // a card sent from the search (or Alt+Enter in a file) goes where the speech doc's cursor is
@@ -3515,9 +3547,40 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
       {aiRun && (
         <div className="rm-aibusy" role="status">
-          {I.spark}<span>Reformatting with AI{aiRun.of ? ` · ${aiRun.done} of ${aiRun.of}` : "…"}</span>
-          <button type="button" onClick={() => aiStop.current?.abort()}>Stop</button>
+          {I.spark}<span>{aiRun.label}{aiRun.of ? ` · ${aiRun.done} of ${aiRun.of}` : "…"}</span>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => aiStop.current?.abort()}>Stop</button>
         </div>
+      )}
+      {aiFound && (
+        <aside className="rm-aidock" aria-label="Answers to their argument">
+          <div className="rm-aihead">{I.spark}<b>Answers</b>
+            <button type="button" className="rm-aix" aria-label="Close" onMouseDown={(e) => e.preventDefault()} onClick={() => setAiFound(null)}>{I.x}</button>
+          </div>
+          <div className="rm-aifound">
+            <p className="rm-aineed">{aiFound.claim}</p>
+            {aiFound.parts.map((pt, pi) => (
+              <section key={pi} className="rm-aipart">
+                <h4><span>{pt.kind}</span>{pt.says}</h4>
+                {pt.picks.map((p) => (
+                  <div key={p.id + ":" + p.card} className="rm-aipick">
+                    <div className="lt"><b>{p.cardTag || p.title}</b><small>{p.cardTag ? p.title + (p.where ? " · " + p.where : "") : p.where}</small><span className="why"><em>{p.how}</em>{p.why}</span></div>
+                    <span className="fit" title={"How well it answers: " + p.fit + " of 10"}><i style={{ width: p.fit * 10 + "%" }} /></span>
+                    <button type="button" className="pri" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const EV = (window as any).EV; await EV?.quickSend?.(p.id, p.card === null ? undefined : p.card); toast("Sent: " + (p.cardTag || p.title)); }}>Send{p.card === null ? " block" : ""}</button>
+                  </div>
+                ))}
+                {pt.caselist.map((c, i) => (
+                  <div key={"cl" + i} className="rm-aipick">
+                    <div className="lt"><b>{c.tag}</b><small>Caselist · {c.cite} · {c.team}</small><span className="why"><em>{c.how}</em>{c.why}</span></div>
+                    <span className="fit" title={"How well it answers: " + c.fit + " of 10"}><i style={{ width: c.fit * 10 + "%" }} /></span>
+                    <button type="button" onClick={() => showInCaselist(c.tag)}>Find it</button>
+                  </div>
+                ))}
+                {!pt.picks.length && !pt.caselist.length && <p className="rm-ainote">Nothing in your library answers this.</p>}
+              </section>
+            ))}
+            <p className="rm-ainote">{aiFound.of ? `Read ${aiFound.read === aiFound.of ? "every block" : aiFound.read + " of " + aiFound.of + " blocks, the ones that use its words"} in the bins in use. Send puts it where your cursor is.` : "Your library is empty: import blocks to search them."}</p>
+          </div>
+        </aside>
       )}
       {aiPanel && (
         <div className="rm-scrim top rm-palscrim" onPointerDown={(e) => { if (e.target === e.currentTarget) aiClose(); }} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); aiClose(); } }}>
@@ -3554,48 +3617,22 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                     onChange={(e) => setAiPanel({ ...aiPanel, url: e.target.value, err: "" })} />
                   <kbd>Enter</kbd>
                 </label>
-                {aiPanel.busy && <p className="rm-aimsg">Reading the page and writing the cite…</p>}
                 {aiPanel.err && <p className="rm-aimsg bad">{aiPanel.err}</p>}
-                <p className="rm-ainote">The cite goes on the empty line you&apos;re on, or the card&apos;s empty cite line — in your cite format: {citeFormat}</p>
+                <p className="rm-ainote">Keep working while Claude writes it. It goes on the empty line you&apos;re on now, or the card&apos;s empty cite line, in your cite format: {citeFormat}</p>
               </form>
             )}
             {aiPanel.kind === "blocks" && (
-              <div>
+              <form className="rm-aiwant" onSubmit={(e) => { e.preventDefault(); void aiBlocksNow(); }}>
                 <div className="rm-aihead">{I.spark}<b>Find blocks</b><span>{K("ai-blocks")}</span></div>
-                <form className="rm-aiwant" onSubmit={(e) => { e.preventDefault(); void aiBlocksNow(); }}>
-                  <textarea value={aiPanel.want} rows={4} autoFocus spellCheck={false} placeholder="Their card, a claim, or what you need — “a link turn to their econ impact”…" aria-label="What you need"
-                    onChange={(e) => setAiPanel({ ...aiPanel, want: e.target.value })}
-                    onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void aiBlocksNow(); } }} />
-                  <div className="rm-airow">
-                    <button type="submit" className="pri" disabled={aiPanel.busy}>{aiPanel.busy ? "Looking…" : "Find blocks"}</button>
-                    <span className="rm-ainote">Ctrl+Enter · your library first, the caselist only if it has nothing</span>
-                  </div>
-                </form>
+                <textarea value={aiPanel.want} rows={4} autoFocus spellCheck={false} placeholder="Their argument: select their cards in the doc, or paste them in" aria-label="Their argument"
+                  onChange={(e) => setAiPanel({ ...aiPanel, want: e.target.value, err: "" })}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void aiBlocksNow(); } }} />
                 {aiPanel.err && <p className="rm-aimsg bad">{aiPanel.err}</p>}
-                {aiPanel.found && (
-                  <div className="rm-aifound">
-                    <p className="rm-aineed">{aiPanel.found.need}</p>
-                    {aiPanel.found.picks.map((p) => (
-                      <div key={p.id} className="rm-aipick">
-                        <div className="lt"><b>{p.title}</b>{p.where && <small>{p.where}</small>}{p.cardTag && <span className="card">Card: {p.cardTag}</span>}<span className="why">{p.why}</span></div>
-                        <span className="fit" title={"How well it fits: " + p.fit + " of 10"}><i style={{ width: p.fit * 10 + "%" }} /></span>
-                        <button type="button" className="pri" onClick={async () => { const EV = (window as any).EV; await EV?.quickSend?.(p.id, p.card === null ? undefined : p.card); toast("Sent: " + (p.cardTag || p.title)); }}>Send{p.card === null ? " block" : " card"}</button>
-                      </div>
-                    ))}
-                    {aiPanel.found.caselist.length > 0 && <h4>From the caselist</h4>}
-                    {aiPanel.found.caselist.map((c, i) => (
-                      <div key={i} className="rm-aipick">
-                        <div className="lt"><b>{c.tag}</b><small>{c.cite} · {c.team}</small><span className="why">{c.why}</span></div>
-                        <span className="fit" title={"How well it fits: " + c.fit + " of 10"}><i style={{ width: c.fit * 10 + "%" }} /></span>
-                        <button type="button" onClick={() => showInCaselist(c.tag)}>Find it</button>
-                      </div>
-                    ))}
-                    {!aiPanel.found.picks.length && !aiPanel.found.caselist.length && <p className="rm-aimsg">Nothing in your library does this{aiPanel.found.note ? " — " + aiPanel.found.note : "."}</p>}
-                    {aiPanel.found.picks.length > 0 && aiPanel.found.note && <p className="rm-ainote">Still missing: {aiPanel.found.note}</p>}
-                    <p className="rm-ainote">Searched: {aiPanel.found.searched.join(" · ")}</p>
-                  </div>
-                )}
-              </div>
+                <div className="rm-airow">
+                  <button type="submit" className="pri">Find answers</button>
+                  <span className="rm-ainote">Ctrl+Enter · Claude breaks it into uniqueness, link and impact, then reads your cards for answers to each. Keep working meanwhile.</span>
+                </div>
+              </form>
             )}
           </div>
         </div>

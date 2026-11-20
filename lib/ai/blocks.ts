@@ -1,118 +1,254 @@
 /**
- * Find blocks: the best one to three blocks in your library — and the best
- * card in each — for what you need, chosen by Claude; the caselist looked
- * through only when the library has nothing that does the job.
+ * Find blocks: answers to their argument, read out of your library.
  *
- *   1. Claude reads what's needed (their card, a claim, "a link turn to
- *      their econ impact") and writes the searches a debater would type.
- *   2. coda's own library search runs them (EV.quickFind): the bins in use,
- *      what each block's cards say — nothing is sent anywhere but Claude.
- *   3. Claude picks from what came back, with a line on why each, or says
- *      nothing fits. Only blocks that were found can be picked.
- *   4. Nothing fits, and the caselist is there: the same, over the caselist's
- *      cards (only wikis already switched on and downloaded).
+ *   1. Claude breaks their argument into its parts: the uniqueness, the
+ *      link(s), the internal link, the impact. Each part gets the claim
+ *      it makes and what an answer to it would say.
+ *   2. coda chooses which blocks to hand over. If the whole library fits,
+ *      Claude gets all of it. Otherwise it gets the blocks whose cards use
+ *      the argument's words, taking the best few for each part in turn.
+ *      This is a shortlist. Nothing is decided by titles.
+ *   3. Claude reads the cards themselves (tag, cite, and the words that are
+ *      read) and says which ones answer which part, and how: no link, link
+ *      turn, non-unique, no impact, and so on. A card on the same topic
+ *      doesn't count, and neither does one that agrees with them.
+ *   4. For a part your library can't answer, coda looks in the caselist
+ *      (only wikis already switched on and downloaded), the same way.
+ *
+ * Nothing leaves the browser except to Claude, on your own key.
  */
 import { z } from "zod";
 import { askJson, AiError } from "./claude";
+import { stem, STOP } from "../caselist/search";
 
-export interface LibHit { id: string; title: string; where: string; args: string[] }
+export interface LibCard { tag: string; cite: string; read: string }
+export interface LibBlock { id: string; title: string; where: string; cards: LibCard[] }
 export interface ClHit { tag: string; cite: string; block: string; team: string }
 
-export interface LibPick { id: string; title: string; where: string; card: number | null; cardTag: string; why: string; fit: number }
-export interface ClPick { tag: string; cite: string; team: string; why: string; fit: number }
-export interface Found { need: string; picks: LibPick[]; caselist: ClPick[]; note: string; searched: string[] }
+export interface LibPick { id: string; title: string; where: string; card: number | null; cardTag: string; how: string; why: string; fit: number }
+export interface ClPick { tag: string; cite: string; team: string; how: string; why: string; fit: number }
+export interface Part { kind: string; says: string; picks: LibPick[]; caselist: ClPick[] }
+export interface Found { claim: string; parts: Part[]; read: number; of: number }
 
 export interface Sources {
-  /** the library search: EV.quickFind */
-  library: (q: string, max: number) => LibHit[];
+  /** every block in use, with its cards' words: EV.libraryText */
+  library: () => Promise<LibBlock[]>;
   /** the caselist's cards for a search, or null when the caselist isn't there */
   caselist: ((q: string) => Promise<ClHit[]>) | null;
 }
 
-const Searches = z.object({ need: z.string(), searches: z.array(z.string()) });
-const Picks = z.object({
-  picks: z.array(z.object({ n: z.number(), card: z.number(), why: z.string(), fit: z.number() })),
-  note: z.string(),
+const KINDS = ["uniqueness", "link", "internal link", "impact", "solvency", "framework", "other"] as const;
+const Breakdown = z.object({
+  claim: z.string(),
+  parts: z.array(z.object({
+    kind: z.enum(KINDS),
+    says: z.string(),
+    answers: z.array(z.string()),
+    words: z.array(z.string()),
+  })),
+});
+type Broken = z.infer<typeof Breakdown>;
+const Answers = z.object({
+  answers: z.array(z.object({ part: z.number(), block: z.number(), card: z.number(), how: z.string(), why: z.string(), fit: z.number() })),
 });
 
-const GOOD = 6;          // a pick at least this good means the library has it
+const GOOD = 6;              // an answer at least this good means the library has it
+const PER_PART = 4;          // answers shown for each part
+const BATCH_CHARS = 200_000; // one read of the library: about 60K tokens, under Haiku's cheaper 100K-token price tier
+const BATCHES = 3;           // at most this many reads, side by side
+const CARDS_SHOWN = 14;      // a block's cards Claude sees
+const READ_SHOWN = 450;      // a card's read words Claude sees
 
-function searchPrompt(want: string): string {
-  return `A debater needs evidence from their own library of blocks. Here is what they're working with — usually the other team's argument, which they want to answer, or a request in their own words:
+function breakPrompt(arg: string): string {
+  return `You're helping a policy debater answer the other team's argument. Here it is (their card or cards, a claim, or a note in the debater's own words):
 
 """
-${want.slice(0, 6000)}
+${arg.slice(0, 8000)}
 """
 
-Write:
-- "need": one line saying what evidence would do the job (e.g. "answers to: econ decline causes war", or "a link turn: growth makes war less likely").
-- "searches": 4–6 short searches they'd type into their library to find it, 1–4 words each: the block titles debaters write ("AT: econ decline", "econ resilient", "no war"), the key nouns, the impact, the opposite claim. Most likely first.`;
+Break it into its parts, the way a debater flows it: the uniqueness, each link, any internal link, and the impact (or solvency or framework, if that's what it is). List only the parts it actually makes. A single link card is one part. Don't invent the rest. If the debater asked for something specific ("a link turn to their econ impact"), the part is what they want answered.
+
+For each part:
+- "kind": what the part is.
+- "says": the claim it makes, in one short line.
+- "answers": 2 to 4 lines, each one an answer a card could make, labeled the way debaters label them ("No link: the plan doesn't touch X", "Link turn: the plan increases Y", "Non-unique: Z is already happening", "No impact: ...", "Impact turn: ...", "Alt cause: ...").
+- "words": 6 to 12 words or short phrases a card answering it would use: the argument's nouns, with their synonyms and opposites.
+
+"claim": the whole argument in one line.`;
 }
 
-function libPrompt(need: string, hits: LibHit[]): string {
-  return `A debater needs: ${need}
-
-Here are blocks from their library. Each has a number, a title, where it is filed, and its cards (taglines, numbered from 1):
-${hits.map((h, i) => `${i + 1}. "${h.title}"${h.where ? ` (${h.where})` : ""}\n${h.args.slice(0, 12).map((a, k) => `   ${k + 1}) ${a.slice(0, 140)}`).join("\n")}`).join("\n")}
-
-Pick the blocks that best do the job — at most 3, best first, and only ones that really do it (return none if none does). For each: "n" its number; "card" the number of its single best card for this, or 0 if the whole block is what's needed; "why" one short line a debater would want ("answers the link: growth reduces conflict risk"); "fit" 0–10 for how well it does the job. "note": one line on what's still missing, or "" if nothing is.`;
+function blockText(b: LibBlock, n: number): string {
+  const cards = b.cards.slice(0, CARDS_SHOWN).map((c, k) => {
+    const read = c.read.length > READ_SHOWN ? c.read.slice(0, READ_SHOWN) + "…" : c.read;
+    return `  ${k + 1}) ${c.tag.slice(0, 200)}${c.cite ? ` [${c.cite.slice(0, 70)}]` : ""}${read ? `\n     ${read}` : ""}`;
+  });
+  return `B${n}. "${b.title.slice(0, 120)}"${b.where ? ` (${b.where})` : ""}\n${cards.join("\n")}`;
 }
 
-function clPrompt(need: string, hits: ClHit[]): string {
-  return `A debater needs: ${need}
-
-Their own library has nothing that does it. Here are cards from the open caselist — other teams' disclosed evidence — each with a number, its tag, cite, block and team:
-${hits.map((h, i) => `${i + 1}. ${h.tag.slice(0, 160)} — ${h.cite.slice(0, 80)}${h.block ? ` [block: ${h.block.slice(0, 60)}]` : ""} (${h.team})`).join("\n")}
-
-Pick the cards that best do the job — at most 3, best first, only ones that really do it. For each: "n" its number, "card" 0, "why" one short line, "fit" 0–10. "note": one line on what's still missing, or "".`;
+function partsText(br: Broken): string {
+  return br.parts.map((p, i) => `P${i + 1} (${p.kind}): ${p.says}\n   An answer would say: ${p.answers.join(" / ")}`).join("\n");
 }
 
-export async function findBlocks(key: string, want: string, src: Sources, signal?: AbortSignal): Promise<Found> {
-  if (!want.trim()) throw new AiError("Select their card or a claim — or type what you need — first.");
-  const s = await askJson(key, searchPrompt(want), Searches, signal);
-  const searched = s.searches.map((q) => q.trim()).filter(Boolean).slice(0, 6);
+function judgePrompt(br: Broken, blocks: string): string {
+  return `A policy debater has to answer this argument: ${br.claim}
 
-  // the library, by every search: each block once, ranked by how early and how often it came up
-  const score = new Map<string, { hit: LibHit; score: number }>();
-  for (const [qi, q] of [s.need, ...searched].entries()) {
-    src.library(q, 8).forEach((h, rank) => {
-      const add = (8 - rank) * (qi === 0 ? 1 : 1.5 - qi * 0.1);
-      const was = score.get(h.id);
-      if (was) was.score += add; else score.set(h.id, { hit: h, score: add });
-    });
-  }
-  const hits = [...score.values()].sort((a, b) => b.score - a.score).slice(0, 24).map((x) => x.hit);
+Its parts:
+${partsText(br)}
 
-  const out: Found = { need: s.need, picks: [], caselist: [], note: "", searched };
-  if (hits.length) {
-    const p = await askJson(key, libPrompt(s.need, hits), Picks, signal);
-    for (const x of p.picks.slice(0, 3)) {
-      const h = hits[Math.round(x.n) - 1];
-      if (!h || out.picks.some((y) => y.id === h.id)) continue;
-      const c = Math.round(x.card) - 1;
-      const card = c >= 0 && c < h.args.length ? c : null;
-      out.picks.push({ id: h.id, title: h.title, where: h.where, card, cardTag: card === null ? "" : h.args[card], why: x.why, fit: Math.max(0, Math.min(10, Math.round(x.fit))) });
+Below are blocks from the debater's own library: each block's title, then its cards, numbered from 1, each with its tag, its cite, and the words of it that get read.
+
+${blocks}
+
+Read the cards' words, not only the tags. A card answers a part only if what it says, read out in the round, answers that claim: it denies it, turns it, shows it's non-unique, mitigates or outweighs the impact, gives an alternate cause, and so on. A card that is only on the same topic doesn't count. A card that makes the same claim as the other team never counts.
+
+"answers": every card here that answers a part, best first. Give at most ${PER_PART} for each part, and none for a part when nothing here answers it. For each one:
+- "part": the part's P number.
+- "block": the block's B number.
+- "card": the card's number in that block. Use 0 only when the block as a whole is the answer (a block of answers to exactly this).
+- "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause", "Defense").
+- "why": one short line on what the card says that answers it.
+- "fit": 0 to 10, how well it answers.`;
+}
+
+function clPrompt(br: Broken, parts: number[], hits: ClHit[]): string {
+  return `A policy debater has to answer this argument: ${br.claim}
+
+The parts their own library has no answer to:
+${parts.map((i) => `P${i + 1} (${br.parts[i].kind}): ${br.parts[i].says}\n   An answer would say: ${br.parts[i].answers.join(" / ")}`).join("\n")}
+
+Here are cards from the open caselist (other teams' disclosed evidence), each with a number, its tag, its cite, its block, and its team:
+${hits.map((h, i) => `B${i + 1}. ${h.tag.slice(0, 180)} [${h.cite.slice(0, 80)}]${h.block ? ` (block: ${h.block.slice(0, 60)})` : ""} (${h.team})`).join("\n")}
+
+"answers": the cards whose tags show they answer a part. Give at most 3 for each part, best first, and only cards that really answer it. For each one: "part" its P number, "block" the card's B number, "card" 0, "how" the kind of answer in 1 to 3 words, "why" one short line, "fit" 0 to 10.`;
+}
+
+/* ------------------------------------------------------------ the shortlist, when the library is more than Claude reads at once */
+
+const wordsOf = (s: string): string[] =>
+  (s.toLowerCase().match(/[a-z0-9]+(?:'[a-z]+)?/g) || []).filter((w) => w.length > 2 && !STOP.has(w)).map(stem);
+
+/** Each block scored against each part, by the argument's words in its cards. Words in titles and tags count double, and rare words count for more. */
+function rank(blocks: LibBlock[], br: Broken): number[][] {
+  const parts = br.parts.map((p) => {
+    const w = new Map<string, number>();
+    for (const x of wordsOf(p.says + " " + p.answers.join(" "))) w.set(x, Math.max(w.get(x) || 0, 1));
+    for (const x of wordsOf(p.words.join(" "))) w.set(x, 1.5);
+    return w;
+  });
+  const asked = new Set(parts.flatMap((m) => [...m.keys()]));
+  const seen = blocks.map((b) => {
+    const head = new Set<string>(), body = new Set<string>();
+    for (const x of wordsOf(b.title + " " + b.cards.map((c) => c.tag).join(" "))) if (asked.has(x)) head.add(x);
+    for (const x of wordsOf(b.cards.map((c) => c.read).join(" "))) if (asked.has(x)) body.add(x);
+    return { head, body };
+  });
+  const df = new Map<string, number>();
+  for (const s of seen) for (const x of new Set([...s.head, ...s.body])) df.set(x, (df.get(x) || 0) + 1);
+  const idf = (x: string) => Math.log(1 + blocks.length / (df.get(x) || 1));
+  return parts.map((w) => seen.map((s) => {
+    let score = 0;
+    for (const [x, wt] of w) score += s.head.has(x) ? 2 * wt * idf(x) : s.body.has(x) ? wt * idf(x) : 0;
+    return score;
+  }));
+}
+
+/** The blocks Claude reads: all of them if they fit, else the best for each part in turn, as many as fit. */
+function shortlist(blocks: LibBlock[], br: Broken): LibBlock[] {
+  const size = blocks.map((b, i) => blockText(b, i + 1).length + 2);
+  const room = BATCH_CHARS * BATCHES;
+  if (size.reduce((a, b) => a + b, 0) <= room) return blocks;
+  const scores = rank(blocks, br);
+  const orders = scores.map((s) => s.map((v, i) => [v, i] as const).filter(([v]) => v > 0).sort((a, b) => b[0] - a[0]).map(([, i]) => i));
+  const take = new Set<number>();
+  let used = 0;
+  for (let k = 0, more = true; more; k++) {
+    more = false;
+    for (const o of orders) {
+      if (k >= o.length) continue;
+      more = true;
+      const i = o[k];
+      if (take.has(i) || used + size[i] > room) continue;
+      take.add(i); used += size[i];
     }
-    out.note = p.note;
+  }
+  return [...take].map((i) => blocks[i]);
+}
+
+/** The shortlist cut into reads that each fit. */
+function batches(blocks: LibBlock[]): LibBlock[][] {
+  const out: LibBlock[][] = [];
+  let cur: LibBlock[] = [], used = 0;
+  for (const b of blocks) {
+    const n = blockText(b, cur.length + 1).length + 2;
+    if (cur.length && used + n > BATCH_CHARS) { out.push(cur); cur = []; used = 0; }
+    cur.push(b); used += n;
+  }
+  if (cur.length) out.push(cur);
+  return out.slice(0, BATCHES);
+}
+
+const clamp = (x: number) => Math.max(0, Math.min(10, Math.round(x)));
+
+export async function findBlocks(
+  key: string, arg: string, src: Sources, signal?: AbortSignal,
+  onStage?: (s: string) => void,
+): Promise<Found> {
+  if (!arg.trim()) throw new AiError("Select their argument, or paste it in, first.");
+  onStage?.("Breaking down their argument…");
+  const libP = src.library();
+  const br = await askJson(key, breakPrompt(arg), Breakdown, signal);
+  if (!br.parts.length) throw new AiError("Claude couldn't find an argument in that. Select their cards, or say what you need answered.");
+  const all = await libP;
+  const out: Found = { claim: br.claim, parts: br.parts.map((p) => ({ kind: p.kind, says: p.says, picks: [], caselist: [] })), read: 0, of: all.length };
+
+  // the library, read
+  if (all.length) {
+    const list = batches(shortlist(all, br));
+    out.read = list.reduce((n, b) => n + b.length, 0);
+    onStage?.(`Reading ${out.read === all.length ? "all " : ""}${out.read} block${out.read === 1 ? "" : "s"}${out.read < all.length ? " of " + all.length : ""}…`);
+    const runs = await Promise.allSettled(list.map((bs) =>
+      askJson(key, judgePrompt(br, bs.map((b, i) => blockText(b, i + 1)).join("\n\n")), Answers, signal).then((r) => ({ bs, r }))));
+    if (signal?.aborted) throw new AiError("Stopped.");
+    const ok = runs.filter((x): x is PromiseFulfilledResult<{ bs: LibBlock[]; r: z.infer<typeof Answers> }> => x.status === "fulfilled");
+    if (!ok.length) throw (runs[0] as PromiseRejectedResult).reason;
+    for (const { value: { bs, r } } of ok) {
+      for (const a of r.answers) {
+        const part = out.parts[Math.round(a.part) - 1], b = bs[Math.round(a.block) - 1];
+        if (!part || !b) continue;
+        const c = Math.round(a.card) - 1;
+        const card = c >= 0 && c < Math.min(b.cards.length, CARDS_SHOWN) ? c : null;
+        if (part.picks.some((p) => p.id === b.id && p.card === card)) continue;
+        part.picks.push({ id: b.id, title: b.title, where: b.where, card, cardTag: card === null ? "" : b.cards[card].tag, how: a.how, why: a.why, fit: clamp(a.fit) });
+      }
+    }
+    for (const p of out.parts) p.picks = p.picks.sort((a, b) => b.fit - a.fit).slice(0, PER_PART);
   }
 
-  // nothing good enough in the library: the caselist, if it's there
-  if (src.caselist && !out.picks.some((x) => x.fit >= GOOD)) {
+  // the parts the library has no good answer to: the caselist, if it's there
+  const open = out.parts.map((p, i) => (p.picks.some((x) => x.fit >= GOOD) ? -1 : i)).filter((i) => i >= 0);
+  if (src.caselist && open.length) {
+    onStage?.("Looking in the caselist…");
     const seen = new Set<string>(), cards: ClHit[] = [];
-    for (const q of searched.slice(0, 3)) {
-      for (const c of await src.caselist(q)) {
-        const k = c.tag + "|" + c.cite;
-        if (seen.has(k)) continue;
-        seen.add(k); cards.push(c);
+    for (const i of open) {
+      const p = br.parts[i];
+      for (const q of [p.words.slice(0, 3).join(" "), p.answers[0]?.replace(/^[^:]{1,20}:\s*/, "").split(/\s+/).slice(0, 5).join(" ")]) {
+        if (!q?.trim()) continue;
+        for (const c of await src.caselist(q)) {
+          const k = c.tag + "|" + c.cite;
+          if (seen.has(k)) continue;
+          seen.add(k); cards.push(c);
+        }
       }
     }
     if (cards.length) {
-      const p = await askJson(key, clPrompt(s.need, cards.slice(0, 24)), Picks, signal);
-      for (const x of p.picks.slice(0, 3)) {
-        const c = cards[Math.round(x.n) - 1];
-        if (c) out.caselist.push({ tag: c.tag, cite: c.cite, team: c.team, why: x.why, fit: Math.max(0, Math.min(10, Math.round(x.fit))) });
+      const hits = cards.slice(0, 40);
+      const r = await askJson(key, clPrompt(br, open, hits), Answers, signal);
+      for (const a of r.answers) {
+        const i = Math.round(a.part) - 1, c = hits[Math.round(a.block) - 1];
+        if (!open.includes(i) || !c) continue;
+        const part = out.parts[i];
+        if (part.caselist.length < 3) part.caselist.push({ tag: c.tag, cite: c.cite, team: c.team, how: a.how, why: a.why, fit: clamp(a.fit) });
       }
-      if (!out.picks.length) out.note = p.note || out.note;
     }
   }
   return out;
