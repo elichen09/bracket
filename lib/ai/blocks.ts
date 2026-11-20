@@ -208,6 +208,14 @@ function batches(blocks: LibBlock[]): LibBlock[][] {
 
 const clamp = (x: number) => Math.max(0, Math.min(10, Math.round(x)));
 
+/** A tag as a key for "the same card": lower case, punctuation gone, and the numbering a block puts in front
+ *  ("1.", "[3]", "6)", "A---", "#2", "3]") left off, so the same card from two teams is one card. */
+export function sameCard(tag: string): string {
+  let t = String(tag || "").trim();
+  for (let i = 0; i < 3; i++) t = t.replace(/^(\[?#?\d{1,3}[\].):-]*|[A-Za-z][).]|[A-Za-z]\s*[-–—]{1,3}|\d{1,3}\s*[-–—]{1,3}|[-–—•*]+)\s*/, "");
+  return t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+}
+
 export async function findBlocks(
   key: string, arg: string, src: Sources, signal?: AbortSignal,
   onStage?: (s: string) => void,
@@ -306,7 +314,7 @@ export async function findBlocks(
     }
     for (const p of br.parts) lists.push(await cl(p.says, true));
     const seen = new Set<string>(), cards: ClHit[] = [];
-    const same = (c: ClHit) => c.tag.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+    const same = (c: ClHit) => sameCard(c.tag);
     for (let k = 0, more = true; more && cards.length < CASELIST_MAX; k++) {
       more = false;
       for (const l of lists) {
@@ -348,7 +356,7 @@ export async function findBlocks(
     // the picks: the best answer to every step first, then the strongest of the rest, at most two a step;
     // a card disclosed by several teams once
     const byFit = [...ok.values()].sort((a, b) => b.fit - a.fit);
-    const sameTag = (x: Best) => (x.from === "library" ? x.cardTag || x.title : x.tag).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+    const sameTag = (x: Best) => sameCard(x.from === "library" ? x.cardTag || x.title : x.tag);
     const picks: Best[] = [], tags = new Set<string>(), perStep = new Map<string, number>();
     const take = (x: Best) => {
       const t = sameTag(x), n = perStep.get(x.kind) || 0;
@@ -401,10 +409,15 @@ ${cands.map((c, i) => `C${i + 1}.${c.from === "library" ? ` (block: "${c.title.s
 
 Check each candidate the way a good judge would, on logic rather than wording:
 - Which step of their argument does the card's reasoning break, and does that break the assumption the step rests on? An answer to their wording that leaves their logic standing isn't an answer.
-- Does the card's reasoning carry over to their case? A card from another context counts when its reasoning applies here (a general "growth isn't scalar" card answers a claim that India's growth is scalar). So does a broader card: one against the whole technology, policy or theory answers a claim about one use of it (a card that quantum technology is overhyped or won't work answers a claim that quantum sensing arrives by 2027), with a lower fit when it's indirect. A card about a closely related technology or case counts as an indirect answer when its reasoning plausibly reaches theirs (quantum computing being impossible, read against quantum sensing): mark it as answering, give it a low fit, and say in "why" what it assumes. It doesn't count when its reasoning depends on facts that only hold elsewhere, or when it only shares words with their argument (a US bill called the "Forward Deterrence Act" says nothing about France's deterrence).
+- Does the card's reasoning carry over to their case? A card from another context counts when its reasoning applies here (a general "growth isn't scalar" card answers a claim that India's growth is scalar). So does a broader card: one against the whole field answers a claim about one use of it (a card that quantum technology is impossible, or decades away, answers a claim that quantum sensing arrives by 2027). It doesn't count when its reasoning depends on facts that only hold elsewhere, or when it only shares words with their argument (a US bill called the "Forward Deterrence Act" says nothing about France's deterrence).
 - A card that agrees with them, makes their argument, or only describes the topic doesn't answer it.
 - Judge by what the card's words argue, not by its tag alone.
-- Specific beats generic. A card about their actual subject (here: ${br.about}) beats a general theory card that would answer any argument with the same impact ("preventive war is wrong", "nuclear stability causes conflict", "cascades are empirically false"). A general card can still answer, but give it a fit of 5 at most.
+- The closer to their subject, the better. Score in tiers:
+  1. About their exact subject (here: ${br.about}): fit up to 10.
+  2. About the whole field it belongs to ("quantum is impossible", "quantum is decades away", "qubit tech is impossible", read against quantum sensing): fit 6 to 8. These are good answers, not indirect ones.
+  3. About a broad category the field is one of ("emerging tech is all hype", "new military tech never delivers"): fit 4 to 5.
+  4. General theory that answers any argument with the same impact ("preventive war is wrong", "nuclear stability causes conflict", "cascades are empirically false"): fit 3 to 5.
+  Within a tier, a card whose words directly make the answer beats one that only implies it.
 
 "checks": one for each candidate that answers. Leave out the ones that don't; there's no need to explain them.
 - "n": its C number.
@@ -508,7 +521,7 @@ async function backAnalytics(key: string, list: Analytic[], all: LibBlock[], src
   if (src.caselist) {
     for (const [i, a] of list.entries()) {
       for (const q of a.searches) for (const c of (await src.caselist(q, false)).slice(0, BACK_EACH)) {
-        push(i, { ...c, from: "caselist", how: a.how, why: "", fit: 5, kind: a.kind, says: a.text }, "cl:" + c.tag.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60));
+        push(i, { ...c, from: "caselist", how: a.how, why: "", fit: 5, kind: a.kind, says: a.text }, "cl:" + sameCard(c.tag));
       }
     }
   }

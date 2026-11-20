@@ -3021,7 +3021,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             <button type="button" className="rm-b rm-room web-only" data-act="room" data-tip="Room — share the speech doc with your partner">
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
-            <button type="button" className={"rm-b rm-i rm-menubtn rm-aibtn" + (menu?.id === "ai" || aiRun ? " on" : "")} data-tip={aiK ? "AI — cite from link, reformat, rehighlight for indicts, find blocks" : "AI — add your Anthropic key to use it"} aria-label="AI" aria-expanded={menu?.id === "ai"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("ai", e)}>{I.spark}</button>
+            {/* AI at work: beside its button, small; the whole step on hover */}
+            {aiRun && (
+              <span className="rm-aibusy" role="status" title={aiRun.label + (aiRun.of ? ` · ${aiRun.done} of ${aiRun.of}` : "")}>
+                <span className="lb">{aiRun.label}{aiRun.of ? ` · ${aiRun.done}/${aiRun.of}` : "…"}</span>
+                <button type="button" aria-label="Stop the AI" onMouseDown={(e) => e.preventDefault()} onClick={() => aiStop.current?.abort()}>{I.x}</button>
+              </span>
+            )}
+            <button type="button" className={"rm-b rm-i rm-menubtn rm-aibtn" + (menu?.id === "ai" || aiRun ? " on" : "") + (aiRun ? " busy" : "")} data-tip={aiK ? "AI — cite from link, reformat, rehighlight for indicts, find blocks" : "AI — add your Anthropic key to use it"} aria-label="AI" aria-expanded={menu?.id === "ai"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("ai", e)}>{I.spark}</button>
             <button type="button" className={"rm-b rm-i" + (timer.open ? " on" : "")} data-tip={tip("timer", "Speech timer")} aria-label="Speech timer" aria-pressed={timer.open} onClick={() => run("timer")}>{I.timer}</button>
             <button type="button" className={"rm-b rm-i rm-menubtn rm-palbtn" + (menu?.id === "palette" ? " on" : "")} data-tip={"Colours and layout" + (K("layout") ? " · " + K("layout") + " next layout" : "")} aria-label="Colours and layout" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
               {I.theme}
@@ -3490,13 +3497,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       <footer className="rm-status">
         <span className="rm-crumb">{headsOf === "speech" ? "Speech doc" : cur?.name || ""}{crumb ? " › " + crumb : ""}</span>
         <span className="rm-grow" />
-        {/* AI at work: here in the status line, where it covers nothing */}
-        {aiRun && (
-          <span className="rm-aibusy" role="status">
-            {I.spark}<span>{aiRun.label}{aiRun.of ? ` · ${aiRun.done} of ${aiRun.of}` : "…"}</span>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => aiStop.current?.abort()}>Stop</button>
-          </span>
-        )}
         {docStat.cards > 0 && <span>Card {Math.max(cardNo, 0)} of {docStat.cards}</span>}
         <span>{docStat.read.toLocaleString()} words to read · <b className="rm-accent">{clock((docStat.read / Math.max(60, wpm)) * 60)}</b> at {wpm} wpm</span>
         <span className="evi rm-libstat" title="Your library"><span className="stat" id="stat" /></span>

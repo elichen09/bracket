@@ -1753,3 +1753,16 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm-arow .gl.fmt { background: var(--hl, #5df542); color: #111; font-weight: 700; }
 .rm-arow .gl.on { color: var(--hi); font-weight: 700; }
 @media (max-width: 560px) { .rm-arows { grid-template-columns: 1fr; } }
+/* AI at work, in the top bar beside ✦: a short label (the full step on hover) and a × to stop; the ✦ turns */
+.rm .rm-bar .rm-aibusy, .rm-aibusy {
+  position: static; transform: none; left: auto; right: auto; bottom: auto; z-index: auto; animation: none; box-shadow: none;
+  display: inline-flex; align-items: center; gap: 2px; height: 26px; max-width: 170px; margin-right: 2px; padding: 0 2px 0 8px;
+  background: transparent; border: 1px solid var(--chrome-line); color: var(--mut); font: 500 11.5px var(--rm-sans);
+}
+.rm-aibusy .lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-aibusy button { flex: none; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; background: transparent; border: 0; color: var(--mut); cursor: pointer; }
+.rm-aibusy button:hover { color: var(--hi); }
+.rm-aibusy button svg { width: 11px; height: 11px; }
+.rm .rm-aibtn.busy svg { animation: rmAiSpin 1.6s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .rm .rm-aibtn.busy svg { animation: none; } }
+@media (max-width: 1100px) { .rm-aibusy .lb { display: none; } .rm-aibusy { padding-left: 2px; } }

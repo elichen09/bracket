@@ -1,6 +1,6 @@
 [package]
 name = "coda"
-version = "1.4.9"
+version = "1.4.10"
 description = "coda — the debate round, in one window"
 edition = "2021"
 
