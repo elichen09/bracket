@@ -36,9 +36,51 @@ const Shape = z.object({
   tag: z.string(),
 });
 
-function prompt(tag: string, cite: string, body: Body): string {
+/**
+ * The argument the card is part of: the other cards in its block (under the same block heading, or
+ * the whole file if there are none). Each has its tag, and the nearest ones also the words they read.
+ */
+function argumentAround(doc: PMNode, tagPos: number): { block: string; cards: string[] } {
+  const top: { node: PMNode; pos: number }[] = [];
+  doc.forEach((node, pos) => top.push({ node, pos }));
+  const H = schema.nodes.heading;
+  const isHead = (n: PMNode, max: number) => n.type === H && n.attrs.level <= max;
+  let a = 0, z = top.length;
+  const me = top.findIndex((t) => t.pos === tagPos);
+  for (let i = me - 1; i >= 0; i--) if (isHead(top[i].node, 3)) { a = i; break; }
+  for (let i = me + 1; i < top.length; i++) if (isHead(top[i].node, 3)) { z = i; break; }
+  const block = a < me && isHead(top[a].node, 3) ? top[a].node.textContent.trim() : "";
+  const cards: { at: number; tag: string; read: string }[] = [];
+  let cur: { at: number; tag: string; read: string } | null = null;
+  for (let i = a; i < z; i++) {
+    const n = top[i].node;
+    if (n.type === H && n.attrs.level === 4) {
+      cur = i === me ? null : { at: i, tag: n.textContent.trim(), read: "" };
+      if (cur) cards.push(cur);
+      continue;
+    }
+    if (!cur || isHead(n, 3)) continue;
+    n.descendants((c) => { if (c.isText && c.marks.some((m) => m.type === M.highlight)) cur!.read += c.text + " "; });
+  }
+  // the nearest first, so a long block keeps the cards around this one
+  cards.sort((x, y) => Math.abs(x.at - me) - Math.abs(y.at - me));
+  const out = cards.slice(0, 16).sort((x, y) => x.at - y.at).map((c) => {
+    const near = Math.abs(c.at - me) <= 3 && c.read.trim();
+    const side = c.at < me ? "before" : "after";
+    return `- (${side}) ${c.tag.slice(0, 220)}${near ? `\n  read: ${c.read.replace(/\s+/g, " ").trim().slice(0, 400)}` : ""}`;
+  });
+  return { block, cards: out };
+}
+
+function prompt(tag: string, cite: string, body: Body, arg: { block: string; cards: string[] }): string {
+  const rest = arg.cards.length
+    ? `The rest of their argument, the other cards they read with this one${arg.block ? ` (block: "${arg.block}")` : ""}:\n${arg.cards.join("\n")}`
+    : `(No other cards of theirs are near this one. Assume the argument it is part of is the one its tag implies, link and all.)`;
   return `You're helping a policy debater answer the other team's evidence by rehighlighting it: reading the card's own words, often ones the other team didn't read, to show that it doesn't say what they claim, or that it helps the debater instead.
 
+${rest}
+
+The card to rehighlight:
 Their tag: ${tag || "(none)"}
 Cite: ${cite || "(none)"}
 The card, with what they highlighted marked [[like this]]:
@@ -48,9 +90,11 @@ ${marked(body).slice(0, 14000)}
 
 Find the indicts: places where the author undercuts the tag. These include a concession, a hedge or a probability ("could", "may", "in the long term", "unlikely"), a condition the claim depends on, a limit on its scope, a counter-example, an alternate cause, or the author arguing the other way. Only real ones. A card that says what its tag says has none.
 
+Every indict must assume the link. Grant the other team everything their other cards claim, especially that the plan (or whatever they're answering) causes what their links say it causes. An indict counts only if it still holds then. When the author says the impact happens only under some condition, and their link says the plan brings that condition about, then "that condition is unlikely" or "that won't happen" is NOT an indict: their link already answers it. For example, if the card says a leader would attack only if his economy collapsed, and their link says the plan collapses the economy, then "a collapse is unlikely" doesn't assume the link. Look instead for what survives it: even if the economy collapsed, the author says an attack would be unlikely, delayed, limited, deterred, or would depend on something else they haven't proven. When you're unsure whether an indict assumes the link, leave it out. Fewer, airtight indicts are better than many weak ones.
+
 For each indict, up to 3 and strongest first:
 - "phrases": the card's words that say the indict, copied exactly as they appear in the card (spelling, punctuation and order), each 1 to 20 words, in the order they appear. Read in order, they should make a sentence or two a debater could read out loud, the way debaters highlight: skip the filler, keep what makes it make sense.
-- "says": one short line on what the indict proves ("the author concedes NFU doesn't change targeting").
+- "says": one short line on what the indict proves, even granting their link ("even with a collapse, the author says an attack is unlikely").
 
 "tag": a new tag for the card as rehighlighted, said as an answer to theirs, in a debater's voice ("Their own author concedes pledges don't change targeting: deterrence holds regardless"). Use "" if there are no indicts.`;
 }
@@ -91,7 +135,8 @@ export async function aiIndict(view: EditorView, key: string, o: IndictOptions, 
     if (!card || !card.tag || card.bodyFrom >= card.bodyTo) { rep.skipped.push(name(k) + " (no card text)"); return; }
     const body = readBody(view.state.doc, card.bodyFrom, card.bodyTo);
     if (!body.s.trim()) { rep.skipped.push(name(k) + " (no card text)"); return; }
-    const r = await askJson(key, prompt(card.tag.node.textContent, card.cite?.node.textContent || "", body), Shape, signal);
+    const arg = argumentAround(view.state.doc, card.tag.pos);
+    const r = await askJson(key, prompt(card.tag.node.textContent, card.cite?.node.textContent || "", body, arg), Shape, signal);
 
     // the card as it is now: still the same words, or left alone
     const st = view.state;
