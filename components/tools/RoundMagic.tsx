@@ -325,7 +325,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [olFold, setOlFold] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<null | { id: string; x: number; y: number; up?: number }>(null);
   // the ribbon: folded to one line, or with some of its groups folded into a button each
-  const [ribMin, setRibMin] = useState(false);
+  // one line by default: the cutting buttons are on the keys and in ⋯, and Alt+M brings their row back
+  const [ribMin, setRibMin] = useState(true);
   const [layoutMode, setLayoutMode] = useState<LayoutId>("classic");
   // Focus: the side is a drawer, out of sight until the pointer reaches the edge or a key asks for it
   const [drawer, setDrawer] = useState(false);
