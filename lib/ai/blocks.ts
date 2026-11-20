@@ -12,8 +12,10 @@
  *      read) and says which ones answer which part, and how: no link, link
  *      turn, non-unique, no impact, and so on. A card on the same topic
  *      doesn't count, and neither does one that agrees with them.
- *   4. For a part your library can't answer, coda looks in the caselist
- *      (only wikis already switched on and downloaded), the same way.
+ *   4. Claude reads each candidate's whole card, quotes the words that
+ *      answer, and coda checks the quote is in the card.
+ *   5. Whatever the library can't answer, coda looks for in the caselist
+ *      (the wikis chosen in its search), checked the same way.
  *
  * Nothing leaves the browser except to Claude, on your own key.
  */
@@ -31,13 +33,17 @@ export interface ClPick { tag: string; cite: string; team: string; how: string; 
 export interface Part { kind: string; says: string; picks: LibPick[]; caselist: ClPick[] }
 /** One of the answers to read: from the library (a LibPick) or the caselist (a ClPick), with the part of their argument it answers. */
 export type Best = ((LibPick & { from: "library" }) | (ClPick & { from: "caselist" })) & { kind: string; says: string; quote?: string };
-export interface Found { claim: string; parts: Part[]; best: Best[]; unanswered: string[]; read: number; of: number }
+export interface Found {
+  claim: string; parts: Part[]; best: Best[]; unanswered: string[]; read: number; of: number;
+  /** the caselist, when the library fell short: looked through, looked through with nothing found, or not there (not signed in) */
+  caselist?: "searched" | "nothing" | "off";
+}
 
 export interface Sources {
   /** every block in use, with its cards' words: EV.libraryText */
   library: () => Promise<LibBlock[]>;
-  /** the caselist's cards for a search, or null when the caselist isn't there */
-  caselist: ((q: string) => Promise<ClHit[]>) | null;
+  /** the caselist's cards for a search (answer: cards that argue against q), or null when the caselist isn't there */
+  caselist: ((q: string, answer: boolean) => Promise<ClHit[]>) | null;
 }
 
 const KINDS = ["uniqueness", "link", "internal link", "impact", "solvency", "framework", "other"] as const;
@@ -56,7 +62,6 @@ const Answers = z.object({
   answers: z.array(z.object({ part: z.number(), block: z.number(), card: z.number(), how: z.string(), why: z.string(), fit: z.number() })),
 });
 
-const GOOD = 6;              // an answer at least this good means the library has it
 const PER_PART = 6;          // candidates kept for each part, for the careful check
 const BATCH_CHARS = 200_000; // one read of the library: about 60K tokens, under Haiku's cheaper 100K-token price tier
 const BATCHES = 3;           // at most this many reads, side by side
@@ -114,18 +119,6 @@ This is a first pass: every candidate gets checked again closely, so list the ca
 - "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause", "Defense").
 - "why": one short line on what the card says that answers it.
 - "fit": 0 to 10, how well it answers.`;
-}
-
-function clPrompt(br: Broken, parts: number[], hits: ClHit[]): string {
-  return `A policy debater has to answer this argument: ${br.claim}
-
-The parts their own library has no answer to:
-${parts.map((i) => `P${i + 1} (${br.parts[i].kind}): ${br.parts[i].says}\n   An answer would say: ${br.parts[i].answers.join(" / ")}`).join("\n")}
-
-Here are cards from the open caselist (other teams' disclosed evidence), each with a number, its tag, its cite, its block, and its team:
-${hits.map((h, i) => `B${i + 1}. ${h.tag.slice(0, 180)} [${h.cite.slice(0, 80)}]${h.block ? ` (block: ${h.block.slice(0, 60)})` : ""} (${h.team})`).join("\n")}
-
-"answers": the cards whose tags show they answer a part. Give at most 3 for each part, best first, and only cards that really answer it. For each one: "part" its P number, "block" the card's B number, "card" 0, "how" the kind of answer in 1 to 3 words, "why" one short line, "fit" 0 to 10.`;
 }
 
 /* ------------------------------------------------------------ the shortlist, when the library is more than Claude reads at once */
@@ -230,40 +223,42 @@ export async function findBlocks(
     for (const p of out.parts) p.picks = p.picks.sort((a, b) => b.fit - a.fit).slice(0, PER_PART);
   }
 
-  // the parts the library has no good answer to: the caselist, if it's there
-  const open = out.parts.map((p, i) => (p.picks.some((x) => x.fit >= GOOD) ? -1 : i)).filter((i) => i >= 0);
-  if (src.caselist && open.length) {
-    onStage?.("Looking in the caselist…");
-    const seen = new Set<string>(), cards: ClHit[] = [];
-    for (const i of open) {
-      const p = br.parts[i];
-      for (const q of [p.words.slice(0, 3).join(" "), p.answers[0]?.replace(/^[^:]{1,20}:\s*/, "").split(/\s+/).slice(0, 5).join(" ")]) {
-        if (!q?.trim()) continue;
-        for (const c of await src.caselist(q)) {
-          const k = c.tag + "|" + c.cite;
-          if (seen.has(k)) continue;
-          seen.add(k); cards.push(c);
-        }
+  // the library's candidates, each checked against its card
+  const fromLib: Best[] = out.parts.flatMap((p) => p.picks.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "library" as const })))
+    .sort((a, b) => b.fit - a.fit).slice(0, VERIFY_MAX);
+  const lib = fromLib.length ? await check(fromLib) : { ok: [] as Best[], picks: [] as Best[] };
+  out.best = lib.picks;
+
+  // what the library couldn't answer — all of it, or some parts — looked for in the caselist, and checked the same way
+  const answered = new Set(lib.ok.map((x) => x.kind));
+  const open = br.parts.map((p, i) => i).filter((i) => !answered.has(br.parts[i].kind));
+  if (open.length && out.best.length < 3) {
+    if (!src.caselist) out.caselist = "off";
+    else {
+      onStage?.("Looking in the caselist…");
+      const seen = new Set<string>(), cards: ClHit[] = [];
+      const add = (list: ClHit[]) => { for (const c of list) { const k = c.tag + "|" + c.cite; if (!seen.has(k)) { seen.add(k); cards.push(c); } } };
+      for (const i of open) {
+        const p = br.parts[i];
+        // the caselist's own Answer search (cards that argue against the claim), then the words an answer would use
+        add(await src.caselist(p.says, true));
+        for (const q of [p.words.slice(0, 3).join(" "), p.answers[0]?.replace(/^[^:]{1,20}:\s*/, "").split(/\s+/).slice(0, 5).join(" ")]) if (q?.trim()) add(await src.caselist(q, false));
       }
-    }
-    if (cards.length) {
-      const hits = cards.slice(0, 40);
-      const r = await askJson(key, clPrompt(br, open, hits), Answers, signal);
-      for (const a of r.answers) {
-        const i = Math.round(a.part) - 1, c = hits[Math.round(a.block) - 1];
-        if (!open.includes(i) || !c) continue;
-        const part = out.parts[i];
-        if (part.caselist.length < 3) part.caselist.push({ tag: c.tag, cite: c.cite, team: c.team, how: a.how, why: a.why, fit: clamp(a.fit) });
+      out.caselist = cards.length ? "searched" : "nothing";
+      if (cards.length) {
+        const fromCl: Best[] = cards.slice(0, VERIFY_MAX).map((c) => ({ ...c, how: "", why: "", fit: 5, kind: br.parts[open[0]].kind, says: br.parts[open[0]].says, from: "caselist" as const }));
+        const cl = await check(fromCl);
+        lib.ok.push(...cl.ok);
+        for (const x of cl.picks) if (out.best.length < 3) out.best.push(x);
       }
     }
   }
+  const got = new Set(lib.ok.map((x) => x.kind));
+  out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => !got.has(k) && a.indexOf(k) === i);
+  return out;
 
-  // every candidate checked, with its whole card in front of Claude, and the best few chosen
-  const cands: Best[] = out.parts.flatMap((p) => [
-    ...p.picks.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "library" as const })),
-    ...p.caselist.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "caselist" as const })),
-  ]).sort((a, b) => b.fit - a.fit).slice(0, VERIFY_MAX);
-  if (cands.length) {
+  /** Candidates checked closely against their cards: the ones whose quoted words are really there, and the best few to read. */
+  async function check(cands: Best[]): Promise<{ ok: Best[]; picks: Best[] }> {
     onStage?.(`Checking ${cands.length} answer${cands.length === 1 ? "" : "s"} against the cards…`);
     const texts = cands.map((c) => candidateText(c, all));
     const r = await askJson(key, verifyPrompt(br, cands, texts), Verified, signal, "medium");
@@ -277,14 +272,10 @@ export async function findBlocks(
       ok.set(i, { ...c, kind: part ? part.kind : c.kind, says: part ? part.says : c.says, how: v.how || c.how, why: v.why || c.why, quote: v.quote.trim(), fit: clamp(v.fit) });
     }
     const seen = new Set<number>();
-    out.best = r.picks.map((n) => Math.round(n) - 1).filter((i) => ok.has(i) && !seen.has(i) && (seen.add(i), true)).slice(0, 4).map((i) => ok.get(i)!);
-    if (!out.best.length) out.best = [...ok.values()].sort((a, b) => b.fit - a.fit).slice(0, 3);
-    const answered = new Set([...ok.values()].map((x) => x.kind));
-    out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => !answered.has(k) && a.indexOf(k) === i);
-  } else {
-    out.unanswered = out.parts.map((p) => p.kind).filter((k, i, a) => a.indexOf(k) === i);
+    let picks = r.picks.map((n) => Math.round(n) - 1).filter((i) => ok.has(i) && !seen.has(i) && (seen.add(i), true)).slice(0, 4).map((i) => ok.get(i)!);
+    if (!picks.length) picks = [...ok.values()].sort((a, b) => b.fit - a.fit).slice(0, 3);
+    return { ok: [...ok.values()], picks };
   }
-  return out;
 }
 
 const VERIFY_MAX = 20;         // candidates checked closely

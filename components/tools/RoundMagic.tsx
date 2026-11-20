@@ -2026,13 +2026,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const cl = clOn ? (caselistClient(owner, scoped) as any) : null;
     const src: Sources = {
       library: () => EV.libraryText(),
-      caselist: cl ? async (q: string) => {
-        let fams: string[] = [];
-        try { fams = JSON.parse(localStorage.getItem(scoped("caselist.wikis", owner)) || "[]"); } catch { /* none chosen */ }
+      caselist: cl ? async (q: string, answer: boolean) => {
+        // the wikis chosen in the caselist search, with its own default (high school policy) when none have been
+        let fams: string[] = ["hspf"];
+        try { const v = JSON.parse(localStorage.getItem(scoped("caselist.wikis", owner)) || "null"); if (Array.isArray(v) && v.length) fams = v; } catch { /* the default */ }
         if (!fams.length) return [];
         const metas = ((await cl.metas()) || []) as { wiki: string }[];
         for (const m of metas) if (fams.includes(familyOf(m.wiki))) { try { await cl.loadIndex(m.wiki); } catch { /* that wiki not now */ } }
-        const r = await cl.find(q, fams);
+        const r = await cl.find(q, fams, { answer });
         return ((r && r.groups) || []).flatMap((g: any) => g.cards.slice(0, 3).map((c: any) => ({ tag: String(c.tag || ""), cite: String(c.cite || ""), block: String(c.block || ""), team: String(g.name || "") }))).slice(0, 12);
       } : null,
     };
@@ -3614,7 +3615,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   <small className="src">{p.from === "library" ? [p.cardTag ? p.title : "", ...p.where.split(" › ")].filter(Boolean).join(" › ") : `Caselist › ${p.team} › ${p.cite}`}</small>
                 </li>
               ))}
-              {!aiFound.best.length && <li className="rm-aians-none">Nothing in your library answers this.</li>}
+              {!aiFound.best.length && <li className="rm-aians-none">{aiFound.caselist === "off" ? "Nothing in your library answers this, and the caselist isn't on: sign in to openCaselist (Search › Caselist) to look there too." : aiFound.caselist ? "Nothing in your library or the caselist answers this." : "Nothing in your library answers this."}</li>}
             </ol>
             {aiFound.best.length > 0 && aiFound.unanswered.length > 0 && <p className="rm-aiopen">Nothing answers their {aiFound.unanswered.join(" or ")}.</p>}
             <p className="rm-ainote">{aiFound.of ? `Read ${aiFound.read === aiFound.of ? "every block" : aiFound.read + " of " + aiFound.of + " blocks, the ones that use its words"} across all your bins. Send puts it where your cursor is.` : "Your library is empty: import blocks to search them."}</p>
