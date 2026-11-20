@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { signOut as signOutOfCoda } from "@/lib/account";
 import { EditorState, TextSelection, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { DOMParser as PMParser, DOMSerializer, Fragment as PMFragment, type Node as PMNode } from "prosemirror-model";
@@ -257,6 +258,12 @@ const I = {
   unfold: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>,
   share: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8v6M14 11h6" /></svg>,
   wide: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M3 12h18" /></svg>,
+  /** the coda sign: an oval, heavy at its sides, crossed */
+  coda: <svg width="18" height="18" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M32 14a13 18 0 1 0 0.001 0ZM32 18.6a7.6 13.4 0 1 1 -0.001 0Z" /><rect x="30.7" y="6" width="2.6" height="52" /><rect x="12" y="30.7" width="40" height="2.6" /></svg>,
+  theme: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5a8.5 8.5 0 010 17z" fill="currentColor" stroke="none" /></svg>,
+  more: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>,
+  bolt: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M13 3L5 13h6l-1 8 8-10h-6z" /></svg>,
+  file: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8zM14 3v5h5" /></svg>,
 };
 
 export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { owner?: string; me?: string; room?: string; sd?: string; doc?: string }) {
@@ -401,6 +408,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const keysRef = useRef(keys);
   keysRef.current = keys;
   const [keysOpen, setKeysOpen] = useState(false);
+  // the command menu: one box for every command, every file, and both searches
+  const [pal, setPal] = useState<null | { q: string; sel: number }>(null);
+  const palIn = useRef<HTMLInputElement>(null);
+  const palList = useRef<HTMLUListElement>(null);
   const [listening, setListening] = useState<string | null>(null);
   const listeningRef = useRef(listening);
   listeningRef.current = listening;
@@ -1555,6 +1566,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       if (layoutMode === "focus") { setSide(true); setDrawer((d) => !d); return; }
       setSide((s) => !s); return;
     }
+    if (id === "palette") { setMenu(null); setPal((p) => (p ? null : { q: "", sel: 0 })); return; }
     if (id === "command") {
       // the search, with every command after a >
       focusLibrary();
@@ -2017,7 +2029,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openMenu = (id: string, e: React.MouseEvent<HTMLElement>, anchor?: HTMLElement | null) => {
     if (menu?.id === id) { setMenu(null); return; }
     const r = (anchor || e.currentTarget).getBoundingClientRect();
-    const w = id === "palette" ? 600 : id === "pages" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
+    const w = id === "palette" ? 600 : id === "all" ? 560 : id === "pages" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
     const inRib = !!(anchor || e.currentTarget).closest(".rm-rib");
     // from the dock a menu opens upwards
     if (inRib && layoutMode === "dock") { setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: 0, up: window.innerHeight - r.top + 6 }); return; }
@@ -2489,6 +2501,79 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   ];
   const openGroup = menu?.id.startsWith("g:") ? ribbon.find((g) => "g:" + g.id === menu.id) || null : null;
 
+  // ---- the command menu ----------------------------------------------------------
+  /** A library action (the engine listens for data-act clicks), run without its menu being open. */
+  const act = (name: string) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.hidden = true; b.dataset.act = name;
+    root.current?.appendChild(b); b.click(); b.remove();
+  };
+  /** A menu of the bar's, opened as if its button were clicked. */
+  const press = (sel: string) => (root.current?.querySelector(sel) as HTMLElement | null)?.click();
+  type PalItem = { id: string; label: string; sub: string; key?: string; icon: React.ReactNode; go: () => void };
+  const palItems: PalItem[] = (() => {
+    if (!pal) return [];
+    const q = pal.q.trim();
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const extra: PalItem[] = [
+      { id: "x:open", label: "Open a file…", sub: ".docx, web page, text or PDF", icon: I.file, go: () => fileIn.current?.click() },
+      { id: "x:download", label: "Download this file as .docx", sub: "File", icon: I.down, go: () => { const fid = viewFile.current.get(activeRef.current); if (fid && !isTheirs(fid) && !isTemp(fid)) void download(fid); else toast("Keep it as yours first — then it downloads"); } },
+      { id: "x:keys", label: "Keys and cite format", sub: "Change any key", icon: I.keys, go: () => { setKeysOpen(true); setKeyNote(""); } },
+      { id: "x:share", label: "Share this file…", sub: "A link your partner edits with you", icon: I.share, go: () => press(".rm-share") },
+      { id: "x:room", label: "Room — the speech doc with your partner", sub: "Round", icon: I.share, go: () => act("room") },
+      { id: "x:colours", label: "Colours and layout…", sub: "View", icon: I.pages, go: () => press(".rm-palbtn") },
+      { id: "x:pages", label: "Pages…", sub: "Read view beside, two places in a file", icon: I.pages, go: () => press(".rm-pagesbtn") },
+      { id: "x:full", label: full ? "Leave full screen" : "Full screen", sub: "View", icon: I.full, go: toggleFull },
+      { id: "x:import", label: "Import an evidence file…", sub: "Library", icon: I.down, go: () => act("import") },
+      { id: "x:case", label: "Your case…", sub: "Library", icon: I.file, go: () => act("case") },
+      { id: "x:export", label: "Export the library", sub: "Library", icon: I.down, go: () => act("export") },
+      { id: "x:settings", label: "Library settings", sub: "Library", icon: I.keys, go: () => act("settings") },
+      { id: "x:format", label: "Format the speech doc for sending…", sub: "Speech doc", icon: I.send, go: () => act("format") },
+      { id: "x:copysend", label: "Copy the speech doc", sub: "Speech doc", icon: I.send, go: () => act("copySend") },
+      { id: "x:senddocx", label: "Download the speech doc", sub: "Speech doc", icon: I.down, go: () => speechApi.current?.saveDocx() },
+      { id: "x:speechdrop", label: "Send the speech doc to SpeechDrop…", sub: "Speech doc", icon: I.send, go: () => speechApi.current?.speechDrop() },
+      { id: "x:popsend", label: "Pop out the speech doc", sub: "A window that stays on top", icon: I.full, go: () => { if (!popOut("send")) toast("The browser blocked the window — allow pop-ups for this site"); } },
+      { id: "x:tutorial", label: "Open the tutorial", sub: "How coda works", icon: I.bolt, go: () => window.open("/tools/tutorial", "_blank") },
+      { id: "x:signout", label: "Sign out", sub: "Account", icon: I.x, go: async () => { await flush(true); await signOutOfCoda(); window.location.assign("/"); } },
+    ];
+    const cmds: PalItem[] = [
+      ...commands.filter((c) => c.id !== "palette" && !["mode:split", "mode:speech", "mode:read"].includes(c.id)).map((c) => ({ id: c.id, label: c.label, sub: ACTION.get(c.id)?.group || c.label.split(":")[0], key: c.key, icon: I.bolt, go: c.go })),
+      ...extra,
+    ];
+    if (!words.length) {
+      // nothing typed: the few things reached for most
+      const want = ["library", "find", "send", "mode-split", "mode-read", "new-file", "x:open", "timer", "x:keys", "x:colours"];
+      return want.map((w) => cmds.find((c) => c.id === w)).filter(Boolean) as PalItem[];
+    }
+    const score = (label: string) => {
+      const l = label.toLowerCase(), lw = l.split(/[^a-z0-9]+/);
+      if (!words.every((w) => l.includes(w))) return -1;
+      return words.reduce((n, w) => n + (lw.some((x) => x.startsWith(w)) ? 2 : 1), 0) + (l.startsWith(words[0]) ? 3 : 0);
+    };
+    const hitCmds = cmds.map((c) => ({ c, s: score(c.label + " " + c.sub) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s).slice(0, 7).map((x) => x.c);
+    const hitFiles = files.map((f) => ({ f, s: score(f.name) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s).slice(0, 4)
+      .map(({ f }) => ({ id: "f:" + f.id, label: f.name, sub: `File · ${f.cards.length} card${f.cards.length === 1 ? "" : "s"}`, icon: I.file, go: () => void open(f.id, (v) => v.focus()) }));
+    const searches: PalItem[] = [
+      { id: "s:lib", label: `Search the library for “${q}”`, sub: "Library and caselist — Enter sends a card", key: "Enter", icon: I.search, go: () => {
+        focusLibrary();
+        requestAnimationFrame(() => requestAnimationFrame(() => { const el = root.current?.querySelector("#q") as HTMLInputElement | null; if (el) { el.value = q; el.dispatchEvent(new Event("input", { bubbles: true })); el.focus(); } }));
+      } },
+      { id: "s:files", label: `Search your files for “${q}”`, sub: "Tags, cites, blocks and what is read", icon: I.search, go: () => { setTab("files"); setQ(q); requestAnimationFrame(() => qIn.current?.focus()); } },
+    ];
+    // a command or a file by its name first; with neither, what was typed is a search
+    return hitCmds.length || hitFiles.length ? [...hitCmds, ...hitFiles, ...searches] : searches;
+  })();
+  const palGo = (it: PalItem) => {
+    setPal(null);
+    const isSearch = it.id.startsWith("s:") || it.id === "library" || it.id === "find";
+    // the page gets the cursor back first: most commands work on it
+    if (!isSearch) target()?.focus();
+    requestAnimationFrame(() => it.go());
+  };
+  const palOpen = !!pal;
+  useEffect(() => { if (palOpen) requestAnimationFrame(() => palIn.current?.focus()); }, [palOpen]);
+  useEffect(() => { (palList.current?.querySelector("li.on") as HTMLElement | null)?.scrollIntoView({ block: "nearest" }); }, [pal?.sel]);
+
   return (
     <div className={"rm" + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
@@ -2496,48 +2581,30 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
 
       {/* ------------------------------------------------------------ the ribbon */}
-      <div className="rm-rib" role="toolbar" aria-label="Round Magic">
-        <div className="rm-brand">
-          <Link className="rm-back" href="/tools" title="Back to the tools" aria-label="Back to the tools">←</Link>
-          <span className="rm-logo" aria-label="Round Magic">ROUND<br />MAGIC</span>
-        </div>
-        {ribbon.map((g) => {
-          const shut = ribSmall || folded.includes(g.id);
-          if (shut) return (
-            <div key={g.id} className="rm-g rm-gmini">
-              {g.mini}
-              <button type="button" className={"rm-b rm-menubtn rm-gcar" + (menu?.id === "g:" + g.id ? " on" : "")} data-tip={`All of ${g.name}: ${g.sub}`} aria-label={`All of ${g.name}`}
-                aria-expanded={menu?.id === "g:" + g.id} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("g:" + g.id, e, e.currentTarget.parentElement)}>▾</button>
-            </div>
-          );
-          return (
-            <div key={g.id} className={"rm-g " + g.cols}>
-              {g.body}
-              <button type="button" className="rm-gfold" onMouseDown={(e) => e.preventDefault()} onClick={() => setFolded((f) => [...f.filter((x) => x !== g.id), g.id])}
-                aria-label={`Fold ${g.name}`} title={`Fold ${g.name} into one button`}>{I.fold}</button>
-            </div>
-          );
-        })}
-
-        <div className="rm-spacer" />
-        <div className="rm-titlebox">
-          <div className="rm-trow">
-            {mode === "speech" && <span className="rm-title rm-titlefix" title="The speech doc — SPLIT or EDIT for your files">Speech doc</span>}
+      <div className={"rm-rib v2" + (ribSmall ? " slim" : "")} role="toolbar" aria-label="coda">
+        {/* the bar: where you are, the one box for everything, and how you are looking at it */}
+        <div className="rm-bar">
+          <Link className="rm-home" href="/" title="coda — home" aria-label="coda — home">{I.coda}<span>coda</span></Link>
+          <div className="rm-tbox">
+            {mode === "speech" && <span className="rm-fname fixed" title="The speech doc — Split or Edit for your files">Speech doc</span>}
             {curTheirs && mode !== "speech" && (isTemp(cur!.id)
-              ? <span className="rm-badge" title="Library blocks, opened as a page: edits save to those blocks in the library search, not to your files. Keep as mine makes it a file">LIBRARY</span>
-              : <span className="rm-badge" title="A doc of theirs — kept apart from your library">THEIRS</span>)}
-            <input className="rm-title" hidden={mode === "speech"} value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
+              ? <span className="rm-badge" title="Library blocks, opened as a page: edits save to those blocks in the library search, not to your files. Keep as mine makes it a file">Library</span>
+              : <span className="rm-badge" title="A doc of theirs — kept apart from your library">Theirs</span>)}
+            <input className="rm-fname" hidden={mode === "speech"} value={name} style={{ width: `${Math.min(Math.max(name.length, 6), 34) + 2}ch` }} onChange={(e) => setName(e.target.value)} aria-label="File name" spellCheck={false}
               onBlur={(e) => void rename(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); view.current?.focus(); } if (e.key === "Escape") { setName(cur?.name || ""); view.current?.focus(); } }} />
-            <span className="rm-meta">{state === "saved" ? "SAVED" : state === "saving" ? "SAVING…" : "EDITING"} · {docStat.cards} CARD{docStat.cards === 1 ? "" : "S"}</span>
+            <span className={"rm-state " + state}>{state === "saved" ? "Saved" : state === "saving" ? "Saving…" : "Editing"}<i>·</i>{docStat.cards} card{docStat.cards === 1 ? "" : "s"}</span>
           </div>
-          <div className="rm-trow end">
-            <div className="rm-modes" role="group" aria-label="View">
-              <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode("edit")} data-tip={"Just the file"}>EDIT</button>
-              <button type="button" aria-pressed={mode === "split"} onClick={() => setMode("split")} data-tip={tip("mode-split", "The speech doc beside")} className={sentPulse && mode !== "split" && mode !== "speech" ? "pulse" : ""} key={"s" + sentPulse}>SPLIT</button>
-              <button type="button" aria-pressed={mode === "speech"} onClick={() => setMode("speech")} data-tip={tip("mode-speech", "Just the speech doc")}>SPEECH</button>
-              <button type="button" aria-pressed={mode === "read"} onClick={() => setMode("read")} data-tip={tip("mode-read", "Read it, timed")}>READ</button>
-            </div>
+          <button type="button" className="rm-cmdbtn" onClick={() => run("palette")} aria-label="Search, or run a command" aria-keyshortcuts={K("palette") || undefined}>
+            {I.search}<span>Search, or run a command</span>{K("palette") && <kbd>{K("palette")}</kbd>}
+          </button>
+          <div className="rm-modes" role="group" aria-label="View">
+            <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode("edit")} data-tip={"Just the file"}>Edit</button>
+            <button type="button" aria-pressed={mode === "split"} onClick={() => setMode("split")} data-tip={tip("mode-split", "The speech doc beside")} className={sentPulse && mode !== "split" && mode !== "speech" ? "pulse" : ""} key={"s" + sentPulse}>Split</button>
+            <button type="button" aria-pressed={mode === "speech"} onClick={() => setMode("speech")} data-tip={tip("mode-speech", "Just the speech doc")}>Speech</button>
+            <button type="button" aria-pressed={mode === "read"} onClick={() => setMode("read")} data-tip={tip("mode-read", "Read it, timed")}>Read</button>
+          </div>
+          <div className="rm-acts">
             <button type="button" className={"rm-b rm-share rm-menubtn" + (cur?.share && !curTheirs ? " on" : "")} aria-expanded={menu?.id === "share"}
               data-tip={cur?.share ? "Shared — the link, and who is in it" : "Share this file: a link your partner opens to edit it with you"} aria-label="Share this file"
               onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("share", e)}>
@@ -2547,13 +2614,59 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
             <button type="button" className={"rm-b rm-i" + (timer.open ? " on" : "")} data-tip={tip("timer", "Speech timer")} aria-label="Speech timer" aria-pressed={timer.open} onClick={() => run("timer")}>{I.timer}</button>
-            <button type="button" className={"rm-b rm-i rm-menubtn" + (menu?.id === "palette" ? " on" : "")} data-tip={"Colours and layout" + (K("layout") ? " · " + K("layout") + " next layout" : "")} aria-label="Colours and layout" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
-              <span className="rm-palsw" aria-hidden="true"><i /><i /></span>
+            <button type="button" className={"rm-b rm-i rm-menubtn rm-palbtn" + (menu?.id === "palette" ? " on" : "")} data-tip={"Colours and layout" + (K("layout") ? " · " + K("layout") + " next layout" : "")} aria-label="Colours and layout" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
+              {I.theme}
             </button>
             <button type="button" className={"rm-b rm-i" + (full ? " on" : "")} data-tip={full ? "Leave full screen" : "Full screen — every key is yours"} aria-label="Full screen" onClick={toggleFull}>{I.full}</button>
-            <button type="button" className="rm-b rm-i" data-tip={tip("ribbon", ribMin ? "Unfold the ribbon" : "Fold the ribbon to one line")} aria-label={ribMin ? "Unfold the ribbon" : "Fold the ribbon"} aria-pressed={ribMin} onClick={() => run("ribbon")}>{ribMin ? I.unfold : I.fold}</button>
+            <button type="button" className={"rm-b rm-me rm-menubtn" + (menu?.id === "me" ? " on" : "")} data-tip={me ? me + " — home, the tutorial, sign out" : "Home, the tutorial, sign out"} aria-label="You" aria-expanded={menu?.id === "me"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("me", e)}>
+              <i aria-hidden="true">{(me?.trim()[0] || "·").toUpperCase()}</i>
+            </button>
+            {ribSmall && (
+              <>
+                <button type="button" className={"rm-b rm-i rm-menubtn rm-pagesbtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-label="Pages" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}</button>
+                <button type="button" className={"rm-b rm-i rm-menubtn" + (menu?.id === "all" ? " on" : "")} data-tip="Every button" aria-label="Every button" aria-expanded={menu?.id === "all"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("all", e)}>{I.more}</button>
+              </>
+            )}
           </div>
         </div>
+
+        {/* the format bar: the buttons a card is cut with, and nothing else */}
+        {!ribSmall && (
+          <div className="rm-fmt">
+            <div className="rm-fmtin" role="group" aria-label="Formatting">
+              <div className="rm-fg" role="group" aria-label="Headings">
+                <B id="pocket"><span className="s-pocket">Pocket</span></B>
+                <B id="hat"><span className="s-hat">Hat</span></B>
+                <B id="block"><span className="s-block">Block</span></B>
+                <B id="tag"><span className="s-tag">Tag</span></B>
+                <B id="cite"><span className="s-cite">Cite</span></B>
+              </div>
+              <div className="rm-fg" role="group" aria-label="Cutting">
+                <B id="underline"><span className="s-u">Cut</span></B>
+                <B id="emphasis"><span className="s-emph">Emphasis</span></B>
+                <B id="shrink"><span className="s-big">A</span><span className="s-small">a</span></B>
+                <span className="rm-split2">
+                  <B id="highlight"><span className="rm-sw" /><span className="lbl">Highlight</span></B>
+                  <button type="button" className={"rm-b rm-menubtn rm-car" + (menu?.id === "hl" ? " on" : "")} data-tip="Highlighter colour" aria-label="Highlighter colour" aria-expanded={menu?.id === "hl"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("hl", e)}>▾</button>
+                </span>
+                <B id="clear">Clear</B>
+              </div>
+              <div className="rm-fg" role="group" aria-label="Card">
+                <B id="send" cls="send"><span className="rm-sendic">{I.send}</span><span>Send</span></B>
+                <B id="reformat"><span className="s-reformat">Reformat</span></B>
+                <B id="new-card" cls="rm-i" label="New card">{I.plus}</B>
+              </div>
+              <div className="rm-fg" role="group" aria-label="History">
+                <B id="undo" cls="rm-i" label="Undo · Ctrl+Z">{I.undo}</B>
+                <B id="redo" cls="rm-i" label="Redo · Ctrl+Y">{I.redo}</B>
+              </div>
+              <div className="rm-fg" role="group" aria-label="More">
+                <button type="button" className={"rm-b rm-menubtn rm-pagesbtn" + (menu?.id === "pages" || many ? " on" : "")} data-tip="Pages — the read view beside you, two places in a file, another file beside" aria-expanded={menu?.id === "pages"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("pages", e)}>{I.pages}<span className="lbl">Pages</span></button>
+                <button type="button" className={"rm-b rm-i rm-menubtn" + (menu?.id === "all" ? " on" : "")} data-tip="Every button — analytic, reference, condense, the library, this file" aria-label="Every button" aria-expanded={menu?.id === "all"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("all", e)}>{I.more}</button>
+              </div>
+            </div>
+          </div>
+        )}
         <input ref={fileIn} type="file" accept=".docx,.html,.htm,.txt,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void openFile(f); }} />
         <input ref={theirIn} type="file" accept=".docx,.pdf,.html,.htm,.txt" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void openTheirFile(f); }} />
       </div>
@@ -2562,10 +2675,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         {/* ------------------------------------------------------------ the side */}
         <aside className="rm-side" aria-label="Sidebar">
           <div className="rm-shead" role="tablist">
-            <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "outline"} onClick={() => setTab("outline")}>OUTLINE</button>
-            <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "files"} onClick={() => setTab("files")}>FILES</button>
-            <button type="button" role="tab" className="rm-tabbtn tb-search" aria-selected={tab === "search"} onClick={focusLibrary} title={tip("library")}>SEARCH</button>
-            <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "round"} onClick={() => setTab("round")}>ROUND</button>
+            <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "outline"} onClick={() => setTab("outline")}>Outline</button>
+            <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "files"} onClick={() => setTab("files")}>Files</button>
+            <button type="button" role="tab" className="rm-tabbtn tb-search" aria-selected={tab === "search"} onClick={focusLibrary} title={tip("library")}>Search</button>
+            <button type="button" role="tab" className="rm-tabbtn" aria-selected={tab === "round"} onClick={() => setTab("round")}>Round</button>
             <span className="rm-grow" />
             <button type="button" className={"rm-sico" + (sideW > 420 ? " on" : "")} onClick={() => setSideW((w) => (w > 420 ? SIDE_W : SIDE_WIDE))} aria-label={sideW > 420 ? "Narrower" : "Wider"} title={sideW > 420 ? "Narrower — or drag the edge" : "Wider — or drag the edge"}>{I.wide}</button>
             <button type="button" className="rm-sico" onClick={() => setSide(false)} aria-label="Hide the side" title={tip("sidebar", "Hide the side")}>{I.x}</button>
@@ -2626,8 +2739,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 }} />
             </label>
             <div className="rm-fileacts">
-              <button type="button" onClick={() => void create("Untitled file")} title={tip("new-file", "New file")}>+ NEW FILE</button>
-              <button type="button" onClick={() => fileIn.current?.click()} disabled={busy}>{busy ? "OPENING…" : "OPEN .DOCX"}</button>
+              <button type="button" onClick={() => void create("Untitled file")} title={tip("new-file", "New file")}>{I.plus}New file</button>
+              <button type="button" onClick={() => fileIn.current?.click()} disabled={busy}>{I.file}{busy ? "Opening…" : "Open .docx"}</button>
             </div>
             <div className="rm-slist">
               {results ? (
@@ -2948,10 +3061,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
       {/* ------------------------------------------------------------ the status line */}
       <footer className="rm-status">
-        <span className="rm-crumb">{headsOf === "speech" ? "SPEECH DOC" : (cur?.name || "").toUpperCase()}{crumb ? " › " + crumb.toUpperCase() : ""}</span>
+        <span className="rm-crumb">{headsOf === "speech" ? "Speech doc" : cur?.name || ""}{crumb ? " › " + crumb : ""}</span>
         <span className="rm-grow" />
-        {docStat.cards > 0 && <span>CARD {Math.max(cardNo, 0)} / {docStat.cards}</span>}
-        <span>{docStat.read.toLocaleString()} WORDS TO READ · <b className="rm-accent">{clock((docStat.read / Math.max(60, wpm)) * 60)}</b> AT {wpm}</span>
+        {docStat.cards > 0 && <span>Card {Math.max(cardNo, 0)} of {docStat.cards}</span>}
+        <span>{docStat.read.toLocaleString()} words to read · <b className="rm-accent">{clock((docStat.read / Math.max(60, wpm)) * 60)}</b> at {wpm} wpm</span>
         <span className="evi rm-libstat" title="Your library"><span className="stat" id="stat" /></span>
       </footer>
 
@@ -3060,6 +3173,16 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-mnote">It edits like any page: every ribbon button and key works in it — Reformat, Clean up, Condense, the headings, move up and down.</div>
         </div>
       )}
+      {menu?.id === "me" && (
+        <div className="rm-menu" style={menuAt(menu)} role="menu">
+          {me && <h4>{me.toUpperCase()}</h4>}
+          <a className="rm-mb" role="menuitem" href="/">Home</a>
+          <a className="rm-mb" role="menuitem" href="/tools/tutorial" target="_blank" rel="noopener">The tutorial</a>
+          <button type="button" className="rm-mb" role="menuitem" onClick={() => { setMenu(null); setKeysOpen(true); setKeyNote(""); }}>Keys and cite format</button>
+          <div className="rm-sep" />
+          <button type="button" className="rm-mb" role="menuitem" onClick={async () => { setMenu(null); await flush(true); await signOutOfCoda(); window.location.assign("/"); }}>Sign out</button>
+        </div>
+      )}
       {menu?.id === "hl" && (
         <div className="rm-menu" style={menuAt(menu)} role="menu">
           <h4>HIGHLIGHTER</h4>
@@ -3090,8 +3213,18 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); setRefPick({ q: "", sel: 0 }); }}>Reference a card…<span className="k">{K("insert-reference")}</span></button>
         </div>
       )}
-      {menu?.id === "more" && (
-        <div className="rm-menu" style={menuAt(menu)} role="menu">
+      {(menu?.id === "more" || menu?.id === "all") && (
+        <div className={"rm-menu" + (menu.id === "all" ? " wide rm-allpop" : "")} style={menuAt(menu)} role="menu">
+          {menu.id === "all" && (
+            <>
+              <div className="rm-allgrid">
+                {ribbon.filter((g) => g.id !== "view").map((g) => (
+                  <section key={g.id} className="rm-allg"><h4>{g.name.toUpperCase()}</h4><div className={"rm-g " + g.cols}>{g.body}</div></section>
+                ))}
+              </div>
+              <div className="rm-sep" />
+            </>
+          )}
           <h4>LIBRARY</h4>
           <button type="button" className="rm-mb" data-act="import" onClick={() => setMenu(null)}>Import an evidence file…</button>
           <button type="button" className="rm-mb" data-act="case" onClick={() => setMenu(null)}>Your case…</button>
@@ -3115,6 +3248,38 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); run("paste"); }}>Paste as text</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); run("page-break"); }}>Page break<span className="k">{K("page-break")}</span></button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); void flush(true); }}>Save now<span className="k">{K("save")}</span></button>
+        </div>
+      )}
+
+      {pal && (
+        <div className="rm-scrim top rm-palscrim" onPointerDown={(e) => { if (e.target === e.currentTarget) { setPal(null); target()?.focus(); } }}>
+          <div className="rm-pal" role="dialog" aria-label="Command menu">
+            <label className="rm-palq">{I.search}
+              <input ref={palIn} value={pal.q} placeholder="Search the library, open a file, or run a command…" spellCheck={false} aria-label="Search, or run a command"
+                role="combobox" aria-expanded="true" aria-controls="rm-pal-list" aria-activedescendant={palItems[pal.sel] ? "rm-pal-" + pal.sel : undefined}
+                onChange={(e) => setPal({ q: e.target.value, sel: 0 })}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setPal(null); target()?.focus(); }
+                  else if (e.key === "ArrowDown") { e.preventDefault(); setPal((p) => p && { ...p, sel: Math.min(palItems.length - 1, p.sel + 1) }); }
+                  else if (e.key === "ArrowUp") { e.preventDefault(); setPal((p) => p && { ...p, sel: Math.max(0, p.sel - 1) }); }
+                  else if (e.key === "Enter") { e.preventDefault(); const it = palItems[pal.sel]; if (it) palGo(it); }
+                }} />
+              <kbd>Esc</kbd>
+            </label>
+            <ul ref={palList} id="rm-pal-list" role="listbox" aria-label="Results">
+              {!pal.q.trim() && <li className="rm-palh" role="presentation">Suggested</li>}
+              {palItems.map((it, n) => (
+                <li key={it.id} id={"rm-pal-" + n} role="option" aria-selected={n === pal.sel} className={n === pal.sel ? "on" : ""}
+                  onMouseMove={() => { if (pal.sel !== n) setPal((p) => p && { ...p, sel: n }); }}
+                  onMouseDown={(e) => e.preventDefault()} onClick={() => palGo(it)}>
+                  <span className="ic">{it.icon}</span>
+                  <span className="lt"><b>{it.label}</b><small>{it.sub}</small></span>
+                  {it.key && <kbd>{it.key}</kbd>}
+                </li>
+              ))}
+            </ul>
+            <div className="rm-palfoot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span>Type anything to search the library</span></div>
+          </div>
         </div>
       )}
 
