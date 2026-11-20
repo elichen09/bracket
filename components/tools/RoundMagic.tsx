@@ -23,7 +23,7 @@ import { aiKey, setAiKey, checkKey, AI_MODEL } from "@/lib/ai/claude";
 import { citeFromLink } from "@/lib/ai/cite";
 import { aiReformat, cardsToDo } from "@/lib/ai/reformat";
 import { aiIndict, type Rehighlight } from "@/lib/ai/indict";
-import { findBlocks, type Found, type Sources } from "@/lib/ai/blocks";
+import { findBlocks, type Found, type Sources, type Analytic } from "@/lib/ai/blocks";
 import { spotPlugin, holdSpot, takeSpot, type Spot } from "@/lib/ai/spot";
 import { caselistClient, familyOf } from "@/lib/caselist/client";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
@@ -1940,15 +1940,21 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return sent;
   };
   /** Analytics, to the speech doc as tags with no card under them. */
-  const sendAnalytics = async (texts: string[]) => {
+  /** Analytics, to the speech doc as tags, each with the card from your library that proves it right under it. */
+  const sendAnalytics = async (items: Analytic[]) => {
     const EV = (window as any).EV;
-    if (!texts.length || !EV?.parseHtml || !EV?.sendParsed) { toast("The speech doc is still starting — a moment"); return; }
-    const parsed = EV.parseHtml("<h3>Analytics</h3>" + texts.map((t) => `<h4>${esc(t)}</h4>`).join(""), {});
-    for (const b of (parsed.blocks || []).filter((x: any) => (x.args || []).length)) {
-      await EV.sendParsed({ ...b, id: `rm:analytic:${Date.now()}` }, texts.length === 1 ? 0 : null, "analytics");
+    if (!items.length || !EV?.parseHtml || !EV?.sendParsed) { toast("The speech doc is still starting — a moment"); return; }
+    let cards = 0;
+    for (const [k, a] of items.entries()) {
+      const parsed = EV.parseHtml(`<h3>Analytics</h3><h4>${esc(a.text)}</h4>`, {});
+      for (const b of (parsed.blocks || []).filter((x: any) => (x.args || []).length)) {
+        await EV.sendParsed({ ...b, id: `rm:analytic:${Date.now()}:${k}` }, 0, "analytic");
+      }
+      if (a.card && a.card.from === "library" && EV.quickSend) { await EV.quickSend(a.card.id, a.card.card === null ? undefined : a.card.card); cards++; }
     }
     setSentPulse((x) => x + 1);
-    toast(texts.length === 1 ? "Sent the analytic" : `Sent ${texts.length} analytics`);
+    const n = items.length;
+    toast((n === 1 ? "Sent the analytic" : `Sent ${n} analytics`) + (cards ? (cards === 1 ? " and its card" : ` and ${cards} cards`) : ""));
   };
   const aiIndictNow = async () => {
     const v = target();
@@ -3678,14 +3684,22 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   <div className="top">
                     {a.kind && <span className="part">{a.kind}</span>}
                     <span className={"how" + (/turn/i.test(a.how) ? " turn" : "")}>{a.how || "Analytic"}</span>
-                    <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics([a.text])}>Send</button>
+                    <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics([a])}>{a.card && a.card.from === "library" ? "Send with card" : "Send"}</button>
                   </div>
                   <b className="ttl">{a.text}</b>
-                  <small className="src">Analytic: no card</small>
+                  {a.card ? (
+                    <div className="rm-aiback">
+                      <span className="lbl">Card</span>
+                      <b>{a.card.from === "library" ? a.card.cardTag || a.card.title : a.card.tag}</b>
+                      {a.card.quote && <q className="quote">{a.card.quote}</q>}
+                      <small className="src">{a.card.from === "library" ? [a.card.cardTag ? a.card.title : "", ...a.card.where.split(" › ")].filter(Boolean).join(" › ") : `Caselist › ${a.card.team} › ${a.card.cite}`}</small>
+                      {a.card.from === "caselist" && <button type="button" className="send" onClick={() => showInCaselist((a.card as any).tag)}>Find it</button>}
+                    </div>
+                  ) : <small className="src">Analytic: no card proves it</small>}
                 </li>
               ))}
               {!aiFound.best.length && (aiFound.analytics || []).length > 1 && (
-                <li className="rm-aians-all"><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics((aiFound.analytics || []).map((a) => a.text))}>Send all {(aiFound.analytics || []).length} analytics</button></li>
+                <li className="rm-aians-all"><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void sendAnalytics(aiFound.analytics || [])}>Send all {(aiFound.analytics || []).length} analytics{(aiFound.analytics || []).some((a) => a.card && a.card.from === "library") ? " with their cards" : ""}</button></li>
               )}
             </ol>
             {aiFound.best.length > 0 && aiFound.unanswered.length > 0 && <p className="rm-aiopen">Nothing answers their {aiFound.unanswered.join(" or ")}.</p>}

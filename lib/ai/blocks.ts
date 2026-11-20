@@ -43,7 +43,13 @@ export interface Found {
   analytics?: Analytic[];
 }
 /** An argument to make without a card: the part of theirs it answers, how, and what to say. */
-export interface Analytic { kind: string; how: string; text: string }
+export interface Analytic {
+  kind: string; how: string; text: string;
+  /** what a debater would type to find a card that proves it: specific, then broad */
+  searches: string[];
+  /** the card that proves it, when one does: from the library or the caselist, its warrant quoted */
+  card?: Best;
+}
 
 export interface Sources {
   /** every block in use, with its cards' words: EV.libraryText */
@@ -288,6 +294,12 @@ export async function findBlocks(
     onStage?.("Writing analytics…");
     try { out.analytics = await writeAnalytics(key, br, arg, signal); }
     catch (e) { if (signal?.aborted) throw e; out.analytics = []; }
+    // each analytic stands on its own, and gets a card behind it where one proves it
+    if (out.analytics.length) {
+      onStage?.("Finding cards for the analytics…");
+      try { await backAnalytics(key, out.analytics, all, src, signal); }
+      catch (e) { if (signal?.aborted) throw e; /* the analytics stand without cards */ }
+    }
   }
   return out;
 
@@ -361,7 +373,7 @@ Check each candidate the way a good judge would, on logic rather than wording:
 "picks": of the candidates that answer, the C numbers of the 3 the debater should actually read, as a set, best first. Prefer a set that does more together (offense with defense, or different parts) over two that make the same point. Add a 4th only if the set would be clearly weaker without it. Pick fewer if fewer answer.`;
 }
 
-const Analytics = z.object({ analytics: z.array(z.object({ part: z.number(), how: z.string(), text: z.string() })) });
+const Analytics = z.object({ analytics: z.array(z.object({ part: z.number(), how: z.string(), text: z.string(), searches: z.array(z.string()) })) });
 
 /** Nothing in the library or the caselist answers it: the arguments a debater can make without a card. */
 async function writeAnalytics(key: string, br: Broken, arg: string, signal?: AbortSignal): Promise<Analytic[]> {
@@ -383,9 +395,107 @@ Write 3 to 5 analytics, strongest first. Attack the logic, not the wording: each
 "analytics": for each:
 - "part": the P number of the part it answers.
 - "how": the kind of answer, in 1 to 3 words ("No link", "Link turn", "Non-unique", "No impact", "Impact turn", "Alt cause", "Indict", "Defense").
-- "text": the analytic as the debater would say it in the round: one or two sentences, under 35 words. No filler and no "they say".`, Analytics, signal, "medium");
+- "text": the analytic as the debater would say it in the round: one or two sentences, under 35 words, standing on its own as a tag would. No filler and no "they say".
+- "searches": 2 searches, 2 or 3 words each, that a debater would type to find a card proving this analytic: one specific, one broad. Each one names the topic (the technology, weapon, country or policy) and states the analytic's point, in the words debaters tag with ("quantum not ready", "quantum lab stage", "submarines undetectable", "nuclear triad redundant", "growth not scalar"). A search without the topic finds cards about anything. Leave out their card's program names, numbers and dates: those find their evidence, not yours.`, Analytics, signal, "medium");
   return r.analytics.filter((a) => a.text.trim()).slice(0, 5).map((a) => {
     const p = br.parts[Math.round(a.part) - 1];
-    return { kind: p ? p.kind : "", how: a.how.trim(), text: a.text.trim() };
+    return { kind: p ? p.kind : "", how: a.how.trim(), text: a.text.trim(), searches: a.searches.map((q) => q.trim()).filter(Boolean).slice(0, 2) };
   });
+}
+
+const Backing = z.object({ backs: z.array(z.object({ a: z.number(), c: z.number(), quote: z.string(), fit: z.number() })) });
+const BACK_EACH = 5;      // candidate cards per analytic, from the library and from the caselist each
+const BACK_MAX = 40;      // candidates in all
+
+/** The library's cards that use an analytic's words most: tags count double, rare words count for more. */
+function libraryCardsFor(all: LibBlock[], seen: Map<string, { tag: Set<string>; read: Set<string> }[]>, idf: (w: string) => number, searches: string[], text: string, n: number) {
+  const lead = new Set(wordsOf(searches.join(" ")));
+  const want = [...new Set([...lead, ...wordsOf(text)])];
+  const scored: { b: LibBlock; k: number; score: number }[] = [];
+  for (const b of all) {
+    const cards = seen.get(b.id);
+    if (!cards) continue;
+    cards.forEach((c, k) => {
+      let score = 0, hits = 0;
+      let led = 0, ledTag = false;
+      for (const w of want) {
+        const wt = lead.has(w) ? 2 : 1;
+        if (c.tag.has(w)) { score += 2 * wt * idf(w); hits++; if (lead.has(w)) { led++; ledTag = true; } }
+        else if (c.read.has(w)) { score += wt * idf(w); hits++; if (lead.has(w)) led++; }
+      }
+      // a search's word in the tag is enough; in the text, it takes another word with it
+      if (ledTag || (led >= 1 && hits >= 2)) scored.push({ b, k, score });
+    });
+  }
+  return scored.sort((x, y) => y.score - x.score).slice(0, n);
+}
+
+/** A card behind each analytic: candidates from the library and the caselist, then Claude picks the one whose reasoning proves it, quoted. */
+async function backAnalytics(key: string, list: Analytic[], all: LibBlock[], src: Sources, signal?: AbortSignal) {
+  // the library's words, read once for every analytic
+  const asked = new Set(list.flatMap((a) => wordsOf(a.text + " " + a.searches.join(" "))));
+  const seen = new Map<string, { tag: Set<string>; read: Set<string> }[]>();
+  const df = new Map<string, number>();
+  let total = 0;
+  for (const b of all) {
+    seen.set(b.id, b.cards.map((c) => {
+      const tag = new Set(wordsOf(c.tag).filter((w) => asked.has(w))), read = new Set(wordsOf(c.read).filter((w) => asked.has(w)));
+      for (const w of new Set([...tag, ...read])) df.set(w, (df.get(w) || 0) + 1);
+      total++;
+      return { tag, read };
+    }));
+  }
+  const idf = (w: string) => Math.log(1 + total / (df.get(w) || 1));
+
+  const cands: Best[] = [], forA: number[][] = list.map(() => []), at = new Map<string, number>();
+  const push = (i: number, b: Best, k: string) => {
+    let n = at.get(k);
+    if (n === undefined) { if (cands.length >= BACK_MAX) return; n = cands.push(b) - 1; at.set(k, n); }
+    if (!forA[i].includes(n)) forA[i].push(n);
+  };
+  list.forEach((a, i) => {
+    for (const h of libraryCardsFor(all, seen, idf, a.searches, a.text, BACK_EACH)) {
+      push(i, { from: "library", id: h.b.id, title: h.b.title, where: h.b.where, card: h.k, cardTag: h.b.cards[h.k].tag, how: a.how, why: "", fit: 5, kind: a.kind, says: a.text }, h.b.id + ":" + h.k);
+    }
+  });
+  if (src.caselist) {
+    for (const [i, a] of list.entries()) {
+      for (const q of a.searches) for (const c of (await src.caselist(q, false)).slice(0, BACK_EACH)) {
+        push(i, { ...c, from: "caselist", how: a.how, why: "", fit: 5, kind: a.kind, says: a.text }, "cl:" + c.tag.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60));
+      }
+    }
+  }
+  if (!cands.length) return;
+  const texts = cands.map((c) => candidateText(c, all));
+  const r = await askJson(key, `A policy debater is answering the other team with analytics, and wants a card behind each one: evidence whose reasoning proves the analytic's point.
+
+The analytics, each with the candidate cards found for it:
+${list.map((a, i) => `A${i + 1}. (${a.kind || "answer"}, ${a.how}) ${a.text}\n    Candidates: ${forA[i].length ? forA[i].map((n) => "C" + (n + 1)).join(", ") : "none"}`).join("\n")}
+
+The candidate cards, numbered, each with the block it's filed in (for the debater's own cards), its tag, its cite, and the words of it that get read:
+
+${cands.map((c, n) => `C${n + 1}.${c.from === "library" ? ` (block: "${c.title.slice(0, 100)}")` : ""}\n${texts[n]}`).join("\n\n")}
+
+For each analytic, choose from its candidates the card that best proves it, if one does. Its reasoning must make the analytic's point about the same subject, not just share its topic. An analogy from another field doesn't count: a card about AI or business pilots doesn't prove a point about quantum sensing. A card that only says something nearby doesn't count, and a card making the other team's argument never counts. Leave an analytic without a card rather than give it a weak one.
+
+"backs": exactly ${list.length}, one for each analytic, in order (A1 first):
+- "a": the analytic's A number.
+- "c": the C number of its card, or 0 when none of its candidates proves it.
+- "quote": the card's warrant, the words that prove the analytic, copied exactly from the text above as one unbroken stretch of 5 to 40 words. For a caselist card, which shows only its tag, quote the tag.
+- "fit": 8 to 10 when it makes the analytic's exact point; 5 to 7 when it makes the same point more broadly (a card that quantum technology is still at the lab stage, behind an analytic that quantum sensing isn't fielded by 2027); below 5 when it doesn't really prove it, and then leave it out.`, Backing, signal, "medium");
+  for (const [pos, b] of r.backs.entries()) {
+    const n = Math.round(b.c) - 1;
+    // which analytic: its number when that makes sense, else its place in the answer (one per analytic, in order),
+    // else the one the card was found for
+    let i = Math.round(b.a) - 1;
+    if (!list[i] && r.backs.length === list.length) i = pos;
+    if (!list[i] && cands[n]) { const of = forA.map((l, k) => (l.includes(n) ? k : -1)).filter((k) => k >= 0); if (of.length === 1) i = of[0]; }
+    const a = list[i], c = cands[n];
+    if (!a || !c || !b.quote.trim()) continue;
+    // the quote has to be in the card, word for word
+    if (!find({ s: texts[n] }, [b.quote]).ranges.length) continue;
+    const fit = clamp(b.fit);
+    if (fit < 5) continue;   // a weak card is worse than none
+    if (!a.card || fit > a.card.fit) a.card = { ...c, quote: b.quote.trim(), fit, why: "" };
+  }
 }
