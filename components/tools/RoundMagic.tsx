@@ -3578,7 +3578,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 {!pt.picks.length && !pt.caselist.length && <p className="rm-ainote">Nothing in your library answers this.</p>}
               </section>
             ))}
-            <p className="rm-ainote">{aiFound.of ? `Read ${aiFound.read === aiFound.of ? "every block" : aiFound.read + " of " + aiFound.of + " blocks, the ones that use its words"} in the bins in use. Send puts it where your cursor is.` : "Your library is empty: import blocks to search them."}</p>
+            <p className="rm-ainote">{aiFound.of ? `Read ${aiFound.read === aiFound.of ? "every block" : aiFound.read + " of " + aiFound.of + " blocks, the ones that use its words"} across all your bins. Send puts it where your cursor is.` : "Your library is empty: import blocks to search them."}</p>
           </div>
         </aside>
       )}
