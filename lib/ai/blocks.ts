@@ -311,14 +311,25 @@ export async function findBlocks(
       ok.set(i, { ...c, kind: part ? part.kind : c.kind, says: part ? part.says : c.says, how: v.how || c.how, why: v.why || c.why, quote: v.quote.trim(), fit: clamp(v.fit) });
     }
     const seen = new Set<number>();
-    let picks = r.picks.map((n) => Math.round(n) - 1).filter((i) => ok.has(i) && !seen.has(i) && (seen.add(i), true)).slice(0, 4).map((i) => ok.get(i)!);
-    if (!picks.length) picks = [...ok.values()].sort((a, b) => b.fit - a.fit).slice(0, 3);
+    // Claude's picks, at most two for any one step, so no step crowds out the rest
+    const perStep = new Map<string, number>();
+    let picks = r.picks.map((n) => Math.round(n) - 1).filter((i) => ok.has(i) && !seen.has(i) && (seen.add(i), true)).map((i) => ok.get(i)!)
+      .filter((x) => { const n = perStep.get(x.kind) || 0; if (n >= 2) return false; perStep.set(x.kind, n + 1); return true; })
+      .slice(0, PICKS_MAX);
+    // every step with an answer gets one, even if the picks left it out
+    const byFit = [...ok.values()].sort((a, b) => b.fit - a.fit);
+    for (const x of byFit) if (picks.length < PICKS_MAX && !picks.some((p) => p.kind === x.kind)) picks.push(x);
+    // and in the order of their argument: uniqueness, link, internal link, impact
+    const order: string[] = br.parts.map((p) => p.kind);
+    const rank = (k: string) => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
+    picks = picks.map((x, i) => ({ x, i })).sort((a, b) => rank(a.x.kind) - rank(b.x.kind) || a.i - b.i).map((p) => p.x);
     return { ok: [...ok.values()], picks };
   }
 }
 
 const VERIFY_MAX = 20;         // library candidates checked closely
 const CASELIST_MAX = 40;       // caselist cards checked closely (tags only, so more fit)
+const PICKS_MAX = 8;           // answers shown: one or two for every step of their argument
 const VERIFY_READ = 1400;      // a candidate card's read words, in full or nearly
 
 const Verified = z.object({
@@ -364,7 +375,7 @@ Check each candidate the way a good judge would, on logic rather than wording:
 - "why": one short line: which assumption of theirs it breaks, and how.
 - "fit": 0 to 10, weighing how directly it breaks the step and how well its reasoning carries over.
 
-"picks": of the candidates that answer, the C numbers of the 3 the debater should actually read, as a set, best first. Pick answers about their specific subject first; pick a general theory card only when the specific answers are missing or clearly weaker. Prefer a set that does more together (offense with defense, or different parts) over two that make the same point. Add a 4th only if the set would be clearly weaker without it. Pick fewer if fewer answer.`;
+"picks": of the candidates that answer, the C numbers the debater should read: a full answer to the whole argument, not just one step. Cover every step that has an answer here: the uniqueness (cards saying it isn't coming, or isn't new, such as "no quantum" or "quantum is decades away"), each link, the internal link and the impact. Take the best one or two for each step, 5 to 8 in all when that many answer. Within a step, prefer answers about their specific subject, offense alongside defense, and two that make different points over two that make the same one. Pick a general theory card only when the specific answers for that step are missing or clearly weaker. Pick fewer if fewer answer.`;
 }
 
 const Analytics = z.object({ analytics: z.array(z.object({ part: z.number(), how: z.string(), text: z.string(), searches: z.array(z.string()) })) });
