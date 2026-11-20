@@ -28,7 +28,9 @@ export interface ClHit { tag: string; cite: string; block: string; team: string 
 export interface LibPick { id: string; title: string; where: string; card: number | null; cardTag: string; how: string; why: string; fit: number }
 export interface ClPick { tag: string; cite: string; team: string; how: string; why: string; fit: number }
 export interface Part { kind: string; says: string; picks: LibPick[]; caselist: ClPick[] }
-export interface Found { claim: string; parts: Part[]; read: number; of: number }
+/** One of the answers to read: from the library (a LibPick) or the caselist (a ClPick), with the part of their argument it answers. */
+export type Best = ((LibPick & { from: "library" }) | (ClPick & { from: "caselist" })) & { kind: string; says: string };
+export interface Found { claim: string; parts: Part[]; best: Best[]; unanswered: string[]; read: number; of: number }
 
 export interface Sources {
   /** every block in use, with its cards' words: EV.libraryText */
@@ -199,7 +201,7 @@ export async function findBlocks(
   const br = await askJson(key, breakPrompt(arg), Breakdown, signal);
   if (!br.parts.length) throw new AiError("Claude couldn't find an argument in that. Select their cards, or say what you need answered.");
   const all = await libP;
-  const out: Found = { claim: br.claim, parts: br.parts.map((p) => ({ kind: p.kind, says: p.says, picks: [], caselist: [] })), read: 0, of: all.length };
+  const out: Found = { claim: br.claim, parts: br.parts.map((p) => ({ kind: p.kind, says: p.says, picks: [], caselist: [] })), best: [], unanswered: [], read: 0, of: all.length };
 
   // the library, read
   if (all.length) {
@@ -251,5 +253,44 @@ export async function findBlocks(
       }
     }
   }
+
+  // of everything found, the few to read: the best 3, a 4th only when it's key
+  const found: Best[] = out.parts.flatMap((p) => [
+    ...p.picks.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "library" as const })),
+    ...p.caselist.map((x) => ({ ...x, kind: p.kind, says: p.says, from: "caselist" as const })),
+  ]);
+  out.unanswered = out.parts.filter((p) => !p.picks.length && !p.caselist.length).map((p) => p.kind);
+  if (found.length <= 3) { out.best = found.sort((a, b) => b.fit - a.fit); return out; }
+  onStage?.("Choosing the best answers…");
+  try {
+    const r = await askJson(key, choosePrompt(br, found), Choice, signal);
+    const seen = new Set<number>();
+    out.best = r.picks.map((n) => Math.round(n) - 1).filter((i) => found[i] && !seen.has(i) && (seen.add(i), true)).slice(0, 4).map((i) => found[i]);
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    out.best = [];
+  }
+  // Claude chose none, or couldn't be asked: the strongest, one per part first
+  if (!out.best.length) {
+    const byFit = [...found].sort((a, b) => b.fit - a.fit), kinds = new Set<string>();
+    for (const x of byFit) if (!kinds.has(x.kind) && out.best.length < 3) { kinds.add(x.kind); out.best.push(x); }
+    for (const x of byFit) if (out.best.length < 3 && !out.best.includes(x)) out.best.push(x);
+  }
   return out;
+}
+
+const Choice = z.object({ picks: z.array(z.number()) });
+
+function choosePrompt(br: Broken, found: Best[]): string {
+  return `A policy debater has to answer this argument: ${br.claim}
+
+Its parts:
+${partsText(br)}
+
+These answers were found in their evidence, numbered:
+${found.map((a, i) => `${i + 1}. [${a.kind}] ${a.how}: "${(a.from === "library" ? a.cardTag || a.title : a.tag).slice(0, 180)}" (${a.why}; fit ${a.fit}/10${a.from === "caselist" ? "; from the caselist" : ""})`).join("\n")}
+
+Choose what they should actually read: the best 3, as a set. Pick the strongest answers. Prefer a set that does more together: offense (a turn) alongside defense, or answers to different parts, over two answers that make the same point. Choose a 4th only if it's a key answer the set would be clearly weaker without. Otherwise choose exactly 3.
+
+"picks": their numbers, best first.`;
 }

@@ -1863,7 +1863,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [aiRun, setAiRun] = useState<null | { label: string; done?: number; of?: number }>(null);
   /** Find blocks' answers, docked in the corner: the doc stays yours while they're up. */
   const [aiFound, setAiFound] = useState<Found | null>(null);
-  const [aiShut, setAiShut] = useState<Set<number>>(new Set());
   const aiWant = useRef("");
   const aiBusy = () => { if (aiStop.current) { toast("AI is still working on the last one — Stop it first"); return true; } return false; };
   /** What the block finder starts from: the selection, else the card you're in (its tag and what's read), else the line. */
@@ -2040,7 +2039,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const want = aiPanel.want;
     aiWant.current = want;
     const ctl = new AbortController(); aiStop.current = ctl;
-    setAiPanel(null); setAiFound(null); setAiShut(new Set()); target()?.focus();
+    setAiPanel(null); setAiFound(null); target()?.focus();
     setAiRun({ label: "Finding answers" });
     try {
       const found = await findBlocks(aiKey(owner), want, src, ctl.signal, (stage) => setAiRun({ label: stage.replace(/…$/, "") }));
@@ -3599,50 +3598,24 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
           <p className="rm-aiclaim" title={aiFound.claim}>{aiFound.claim}</p>
           <div className="rm-aifound">
-            {aiFound.parts.map((pt, pi) => {
-              const shut = aiShut.has(pi), n = pt.picks.length + pt.caselist.length;
-              const src = (p: { title: string; where: string; cardTag: string }) => [p.cardTag ? p.title : "", ...p.where.split(" › ")].filter(Boolean).join(" › ");
-              return (
-                <section key={pi} className={"rm-aipart" + (shut ? " shut" : "")}>
-                  <button type="button" className="rm-aiparth" aria-expanded={!shut} onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setAiShut((s) => { const t = new Set(s); if (t.has(pi)) t.delete(pi); else t.add(pi); return t; })}>
-                    <span className="k">{pt.kind}</span>
-                    <span className="n">{n ? n + (n === 1 ? " answer" : " answers") : "no answer"}</span>
-                    <svg className="car" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
-                    <span className="says">{pt.says}</span>
-                  </button>
-                  {!shut && (
-                    <ol className="rm-aians">
-                      {pt.picks.map((p) => (
-                        <li key={p.id + ":" + p.card} className="rm-aians-i">
-                          <div className="top">
-                            <span className={"how" + (/turn/i.test(p.how) ? " turn" : "")}>{p.how}</span>
-                            <span className="fit" title="How well it answers">{p.fit}/10</span>
-                            <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const EV = (window as any).EV; await EV?.quickSend?.(p.id, p.card === null ? undefined : p.card); toast("Sent: " + (p.cardTag || p.title)); }}>{p.card === null ? "Send block" : "Send"}</button>
-                          </div>
-                          <b className="ttl">{p.cardTag || p.title}</b>
-                          <p className="why">{p.why}</p>
-                          {src(p) && <small className="src">{src(p)}</small>}
-                        </li>
-                      ))}
-                      {pt.caselist.map((c, i) => (
-                        <li key={"cl" + i} className="rm-aians-i">
-                          <div className="top">
-                            <span className={"how" + (/turn/i.test(c.how) ? " turn" : "")}>{c.how}</span>
-                            <span className="fit" title="How well it answers">{c.fit}/10</span>
-                            <button type="button" className="send" onClick={() => showInCaselist(c.tag)}>Find it</button>
-                          </div>
-                          <b className="ttl">{c.tag}</b>
-                          <p className="why">{c.why}</p>
-                          <small className="src">Caselist › {c.team} › {c.cite}</small>
-                        </li>
-                      ))}
-                      {!n && <li className="rm-aians-none">Nothing in your library answers this.</li>}
-                    </ol>
-                  )}
-                </section>
-              );
-            })}
+            <ol className="rm-aians">
+              {aiFound.best.map((p, i) => (
+                <li key={i} className="rm-aians-i">
+                  <div className="top">
+                    <span className="part" title={p.says}>{p.kind}</span>
+                    <span className={"how" + (/turn/i.test(p.how) ? " turn" : "")}>{p.how}</span>
+                    {p.from === "library"
+                      ? <button type="button" className="send" onMouseDown={(e) => e.preventDefault()} onClick={async () => { const EV = (window as any).EV; await EV?.quickSend?.(p.id, p.card === null ? undefined : p.card); toast("Sent: " + (p.cardTag || p.title)); }}>{p.card === null ? "Send block" : "Send"}</button>
+                      : <button type="button" className="send" onClick={() => showInCaselist(p.tag)}>Find it</button>}
+                  </div>
+                  <b className="ttl">{p.from === "library" ? p.cardTag || p.title : p.tag}</b>
+                  <p className="why">{p.why}</p>
+                  <small className="src">{p.from === "library" ? [p.cardTag ? p.title : "", ...p.where.split(" › ")].filter(Boolean).join(" › ") : `Caselist › ${p.team} › ${p.cite}`}</small>
+                </li>
+              ))}
+              {!aiFound.best.length && <li className="rm-aians-none">Nothing in your library answers this.</li>}
+            </ol>
+            {aiFound.best.length > 0 && aiFound.unanswered.length > 0 && <p className="rm-aiopen">Nothing answers their {aiFound.unanswered.join(" or ")}.</p>}
             <p className="rm-ainote">{aiFound.of ? `Read ${aiFound.read === aiFound.of ? "every block" : aiFound.read + " of " + aiFound.of + " blocks, the ones that use its words"} across all your bins. Send puts it where your cursor is.` : "Your library is empty: import blocks to search them."}</p>
           </div>
         </aside>
