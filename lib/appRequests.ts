@@ -10,7 +10,11 @@
  *   - the caselist (/api/tools/caselist): for whoever signs into openCaselist
  *     with their own Tabroom account — the app sends that account's token, it
  *     is checked with openCaselist, and anything fetched from openCaselist for
- *     the app is fetched as that account, never as coda's.
+ *     the app is fetched as that account, never as coda's;
+ *   - shared files (/api/tools/share): the link is the key, as with "anyone
+ *     with the link"; a file the app shares is the app's to stop by a private
+ *     key it keeps (SHARE_HEADER);
+ *   - the relay's public address (/api/tools/realtime), for partners' rooms.
  * The browser only lets the app read the answers because of the CORS headers
  * set here; middleware.ts lets these requests past the sign-in.
  */
@@ -21,6 +25,8 @@ import { APP_ORIGINS } from "@/lib/desktop";
 export { APP_ORIGINS };
 /** The caselist token header the app sends. */
 export const CL_HEADER = "x-caselist-token";
+/** The key the app keeps for a file it shared: the proof it is the one who can stop the sharing. */
+export const SHARE_HEADER = "x-share-key";
 
 export function fromApp(req: Request): boolean {
   return APP_ORIGINS.includes(req.headers.get("origin") || "");
@@ -32,7 +38,7 @@ export function withCors<T extends Response>(req: Request, res: T): T {
   if (APP_ORIGINS.includes(o)) {
     res.headers.set("access-control-allow-origin", o);
     res.headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
-    res.headers.set("access-control-allow-headers", "content-type, " + CL_HEADER);
+    res.headers.set("access-control-allow-headers", "content-type, " + CL_HEADER + ", " + SHARE_HEADER);
     res.headers.set("access-control-max-age", "86400");
     res.headers.append("vary", "Origin");
   }

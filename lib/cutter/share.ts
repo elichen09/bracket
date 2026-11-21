@@ -3,6 +3,7 @@ import { Awareness } from "y-protocols/awareness";
 import { prosemirrorToYXmlFragment } from "y-prosemirror";
 import type { Node as PMNode } from "prosemirror-model";
 import { openRoom, MATE_COLORS, type Mate, type Room, type RoomStatus } from "../docflow/room";
+import { isDesktop, apiBase, CODA_WEB } from "../desktop";
 
 /**
  * A file shared the way a Google Doc is.
@@ -25,6 +26,11 @@ import { openRoom, MATE_COLORS, type Mate, type Room, type RoomStatus } from "..
  * Something too big for the realtime channel — a whole file pasted in — goes
  * by way of the save instead: it is saved at once, and the others are told
  * to fetch it.
+ *
+ * The desktop app has no account: it reaches the site at its address, opens
+ * and saves by the link alone, and a file it shares is owned by a key it
+ * makes and keeps here (KEYS) — the only way, without an account, to stop
+ * the sharing later.
  */
 
 export interface Shared {
@@ -64,23 +70,52 @@ export interface ShareHooks {
 
 export class NotShared extends Error {}
 
-export const shareLink = (id: string) => `${location.origin}/tools/magic?doc=${id}`;
+/** The link: always the site's, so it opens for anyone — from the app too. */
+export const shareLink = (id: string) => `${isDesktop() ? CODA_WEB : location.origin}/tools/magic?doc=${id}`;
+
+/** A link, or just its id, pasted in: the id, or "". */
+export function linkId(text: string): string {
+  const t = String(text || "").trim();
+  const m = t.match(/[?&]doc=([a-z0-9]{20,40})/i) || t.match(/^([a-z0-9]{20,40})$/i);
+  return m ? m[1].toLowerCase() : "";
+}
+
+const URL_ = () => apiBase() + "/api/tools/share";
+const KEYS = "coda.sharekeys";
+function keys(): Record<string, string> { try { return JSON.parse(localStorage.getItem(KEYS) || "{}") || {}; } catch { return {}; } }
+function keepKey(id: string, k: string) { try { localStorage.setItem(KEYS, JSON.stringify({ ...keys(), [id]: k })); } catch { /* the sharing still works; stopping it would need this browser's key */ } }
+function headers(id?: string): Record<string, string> {
+  const h: Record<string, string> = { "content-type": "application/json" };
+  const k = id ? keys()[id] : "";
+  if (k) h["x-share-key"] = k;
+  return h;
+}
+function newKey() {
+  const b = new Uint8Array(32); crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
 async function api(body: Record<string, unknown>) {
-  const r = await fetch("/api/tools/share", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const r = await fetch(URL_(), { method: "POST", headers: headers(typeof body.id === "string" ? body.id : undefined), body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (r.status === 404) throw new NotShared(j.error || "That doc is not shared any more");
   if (!r.ok) throw new Error(j.error || `the server said ${r.status}`);
   return j;
 }
 
-/** Make a file a shared one: the id its link carries. */
-export const createShare = async (title: string): Promise<string> => (await api({ op: "create", title })).id;
+/** Make a file a shared one: the id its link carries. From the app, owned by a key kept here; `name` says who shared it. */
+export async function createShare(title: string, name = ""): Promise<string> {
+  if (!isDesktop()) return (await api({ op: "create", title })).id;
+  const key = newKey();
+  const id = (await api({ op: "create", title, key, name })).id as string;
+  keepKey(id, key);
+  return id;
+}
 /** Stop sharing (its owner): the link stops opening it; every copy already opened stays where it is. */
 export const stopShare = (id: string) => api({ op: "stop", id });
 /** What a link points at, before opening it. */
 export async function peekShare(id: string): Promise<{ title: string; owner: string; mine: boolean }> {
-  const r = await fetch(`/api/tools/share?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+  const r = await fetch(`${URL_()}?id=${encodeURIComponent(id)}`, { cache: "no-store", headers: headers(id) });
   const j = await r.json().catch(() => ({}));
   if (r.status === 404) throw new NotShared(j.error || "That doc is not shared any more");
   if (!r.ok) throw new Error(j.error || `the server said ${r.status}`);
@@ -99,7 +134,7 @@ export async function openShare(id: string, hooks: ShareHooks): Promise<Shared> 
   /** What the site has, merged into this. */
   let pulled = 0;
   const pull = async (): Promise<{ mine: boolean; owner: string; had: boolean }> => {
-    const r = await fetch(`/api/tools/share?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+    const r = await fetch(`${URL_()}?id=${encodeURIComponent(id)}`, { cache: "no-store", headers: headers(id) });
     const j = await r.json().catch(() => ({}));
     if (r.status === 404) throw new NotShared(j.error || "That doc is not shared any more");
     if (!r.ok) throw new Error(j.error || `the server said ${r.status}`);

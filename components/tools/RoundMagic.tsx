@@ -11,7 +11,7 @@ import { history, undo, redo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { undoCommand, redoCommand, ySyncPlugin, yCursorPlugin, yUndoPlugin, initProseMirrorDoc, prosemirrorToYXmlFragment } from "y-prosemirror";
-import { openShare, createShare, stopShare, peekShare, shareLink, NotShared, type Shared } from "@/lib/cutter/share";
+import { openShare, createShare, stopShare, peekShare, shareLink, linkId, NotShared, type Shared } from "@/lib/cutter/share";
 import { schema } from "@/lib/evidence/docSchema";
 import { listFiles, getFile, putFile, dropFile, newFileId, type CutMeta, type CutFile } from "@/lib/cutter/store";
 import * as C from "@/lib/cutter/commands";
@@ -1089,15 +1089,21 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
   // a shared file's link: the file is opened — made a file of yours first, if this browser has not had it before
   const linked = useRef(false);
+  const [linkIn, setLinkIn] = useState("");
+  const openLinkRef = useRef<(id: string) => Promise<void>>(async () => {});
   useEffect(() => {
     if (!sharedLink || linked.current || !panes.length) return;
     linked.current = true;
-    (async () => {
+    void openLinkRef.current(sharedLink).then(() => {
+      try { const u = new URL(location.href); u.searchParams.delete("doc"); window.history.replaceState(null, "", u.pathname + u.search); } catch { /* the address keeps it */ }
+    });
+  }, [sharedLink, panes.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  openLinkRef.current = async (link: string) => {
       try {
-        let f = filesRef.current.find((x) => x.share === sharedLink) || null;
+        let f = filesRef.current.find((x) => x.share === link) || null;
         if (!f) {
-          const info = await peekShare(sharedLink);
-          const made = await newFile(info.title || "Shared doc", "<p></p>", sharedLink);
+          const info = await peekShare(link);
+          const made = await newFile(info.title || "Shared doc", "<p></p>", link);
           f = stripDoc(made);
           toast(`“${made.name}”${info.owner ? ", shared by " + info.owner : ""} — it is in your files now, and you are in it together`);
         }
@@ -1106,9 +1112,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       } catch (e) {
         toast(e instanceof NotShared ? "That link's doc is not shared any more" : "The shared doc would not open: " + String((e as Error)?.message || e));
       }
-      try { const u = new URL(location.href); u.searchParams.delete("doc"); window.history.replaceState(null, "", u.pathname + u.search); } catch { /* the address keeps it */ }
-    })();
-  }, [sharedLink, panes.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+  /** A link pasted into the Share menu. */
+  const openPasted = () => {
+    const id = linkId(linkIn);
+    if (!id) { toast("That isn't a coda share link"); return; }
+    setLinkIn(""); setMenu(null);
+    void openLinkRef.current(id);
+  };
 
   const rename = useCallback(async (n: string) => {
     const fid = viewFile.current.get(activeRef.current);
@@ -1169,6 +1180,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [owner, newFile, setPaneFile, toast, setFiles]);
 
   // ---- sharing a file: a link, and everyone with it in the same document --------------
+  /** Your name over your cursor: the account's, or — in the app, with no account — the one you gave the Room. */
+  const myName = () => { if (me) return me; try { return localStorage.getItem(scoped("evidence.me", owner)) || ""; } catch { return ""; } };
   const copyLink = useCallback(async (id: string) => {
     try { await navigator.clipboard.writeText(shareLink(id)); toast("Link copied — whoever opens it is in the file with you"); }
     catch { toast("The browser would not copy it — the link is in the Share menu to copy by hand"); }
@@ -1182,10 +1195,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     setBusy(true);
     try {
       await flush();
-      const id = await createShare(base.name);
+      const id = await createShare(base.name, myName());
       const doc = v.state.doc;
       const sh = await openShare(id, {
-        name: me || "Partner", first: true,
+        name: myName() || "Partner", first: true,
         title: () => loaded.current.get(fid)?.name || base.name,
         seed: () => doc,
         onChange: () => setShareTick((n) => n + 1),
@@ -3064,7 +3077,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             <button type="button" aria-pressed={mode === "flow"} onClick={() => setMode("flow")} data-tip={tip("mode-flow", "Flow the round")}>Flow</button>
           </div>
           <div className="rm-acts">
-            <button type="button" className={"rm-b rm-share rm-menubtn web-only" + (cur?.share && !curTheirs ? " on" : "")} aria-expanded={menu?.id === "share"}
+            <button type="button" className={"rm-b rm-share rm-menubtn" + (cur?.share && !curTheirs ? " on" : "")} aria-expanded={menu?.id === "share"}
               data-tip={cur?.share ? "Shared — the link, and who is in it" : "Share this file: a link your partner opens to edit it with you"} aria-label="Share this file"
               onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("share", e)}>
               {I.share}<span>{cur?.share && !curTheirs ? (curShare?.mates.length ? `Shared · ${curShare.mates.length + 1}` : "Shared") : "Share"}</span>
@@ -3617,7 +3630,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             <div className="rm-mnote">{cur ? "A doc of theirs is kept apart from your files — Keep as mine makes it one, and then it can be shared." : "Open a file to share it."}</div>
           ) : !cur.share ? (
             <>
-              <div className="rm-mnote top">Share “{cur.name}” and it has a link. Whoever is signed in and opens the link is in the file with you: you both type in it at once, see each other&apos;s cursor, and it is there for each of you whether or not the other is.</div>
+              <div className="rm-mnote top">Share “{cur.name}” and it has a link. Whoever opens the link — on coda&apos;s site or in the app — is in the file with you: you both type in it at once, see each other&apos;s cursor, and it is there for each of you whether or not the other is.</div>
               <button type="button" className="rm-mb pri" disabled={busy} onClick={() => { void startShare(cur.id); }}>{busy ? "Sharing…" : "Share it, and copy the link"}</button>
             </>
           ) : (
@@ -3631,12 +3644,19 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 {(curShare?.mates || []).map((m) => <span key={m.client}><i style={{ background: m.color }}>{(m.name[0] || "?").toUpperCase()}</i>{m.name}</span>)}
                 {!curShare?.mates.length && <em>{curShare?.status === "error" ? "Not connected right now" : "Nobody else is in it right now"}</em>}
               </div>
-              <div className="rm-mnote">Anyone signed in with the link can open and edit it. It saves by itself, for everyone.</div>
+              <div className="rm-mnote">Anyone with the link can open and edit it. It saves by itself, for everyone.</div>
               {curShare?.mine
                 ? <button type="button" className="rm-mb" onClick={() => { setMenu(null); if (window.confirm(`Stop sharing “${cur.name}”? The link stops working; everyone keeps the copy they have.`)) void unshare(cur.id, "stop"); }}>Stop sharing</button>
                 : <button type="button" className="rm-mb" onClick={() => { setMenu(null); void unshare(cur.id, "leave"); }}>Leave it — keep a copy of my own</button>}
             </>
           )}
+          <div className="rm-sep" />
+          <h4>OPEN A SHARED FILE</h4>
+          <label className="rm-linkrow">
+            <input value={linkIn} placeholder="Paste its link" spellCheck={false} aria-label="A shared file's link"
+              onChange={(e) => setLinkIn(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") openPasted(); }} />
+            <button type="button" disabled={!linkIn.trim()} onClick={openPasted}>OPEN</button>
+          </label>
           <div className="rm-sep" />
           <h4>THE SPEECH DOC</h4>
           <button type="button" className="rm-mb" onClick={() => openRoomPanel()}>Room — one speech doc for you and your partner…</button>
