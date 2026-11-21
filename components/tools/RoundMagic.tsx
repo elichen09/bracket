@@ -45,6 +45,7 @@ import { readFlow, writeRows, isStale, getToken, hasToken, wasConnected, warmUp,
 import { buildSearch, searchCards } from "@/lib/caselist/search.js";
 import { openBus, type Bus } from "@/lib/toolsBus";
 import { scoped } from "@/lib/owner";
+import { newCode, tidyCode } from "@/lib/flow/share";
 import { useFullscreen } from "./FullBtn";
 import { popOut } from "./PopBtn";
 import DocEditor, { type DocApi } from "./DocEditor";
@@ -333,6 +334,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // the outline's folds, the way Word's navigation pane has them: a heading opened or shut by hand, over what the depth buttons say
   const [olFold, setOlFold] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<null | { id: string; x: number; y: number; up?: number }>(null);
+  /** the speech doc's room, as the engine has it (EV.room()), and the Room panel's fields */
+  const [roomInfo, setRoomInfo] = useState<null | { code: string; status: string; name: string; suggested: string; flows: { name: string; kind: string }[]; mates: { name: string; color: string }[] }>(null);
+  const [roomNameIn, setRoomNameIn] = useState("");
+  const [roomCodeIn, setRoomCodeIn] = useState("");
   // the ribbon: folded to one line, or with some of its groups folded into a button each
   // one line by default: the cutting buttons are on the keys and in ⋯, and Alt+M brings their row back
   const [ribMin, setRibMin] = useState(true);
@@ -1476,6 +1481,16 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     }
   }, [toast]);
 
+  // the speech doc's room: the engine says when it changes, and the Room panel follows
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const on = () => { const ev = (window as any).EV; if (ev?.room) setRoomInfo(ev.room()); };
+    el.addEventListener("evi:room", on);
+    on();
+    return () => el.removeEventListener("evi:room", on);
+  }, []);
+
   // the library search's sends, too: the Split button says where they went
   useEffect(() => {
     const el = root.current;
@@ -2447,11 +2462,28 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const openMenu = (id: string, e: React.MouseEvent<HTMLElement>, anchor?: HTMLElement | null) => {
     if (menu?.id === id) { setMenu(null); return; }
     const r = (anchor || e.currentTarget).getBoundingClientRect();
-    const w = id === "palette" ? 600 : id === "all" ? 560 : id === "pages" || id === "share" ? 330 : id.startsWith("g:") ? 360 : 240;
+    const w = id === "palette" ? 600 : id === "all" ? 560 : id === "pages" || id === "share" || id === "room" ? 330 : id.startsWith("g:") ? 360 : 240;
     const inRib = !!(anchor || e.currentTarget).closest(".rm-rib");
     // from the dock a menu opens upwards
     if (inRib && layoutMode === "dock") { setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: 0, up: window.innerHeight - r.top + 6 }); return; }
     setMenu({ id, x: Math.min(window.innerWidth - w - 8, Math.max(8, r.left)), y: r.bottom + 6 });
+  };
+
+  /** The Room panel, under the Room button: its fields filled from the room (the code from your flow). */
+  const openRoomPanel = (e?: React.MouseEvent<HTMLElement>) => {
+    const ev = (window as any).EV;
+    const info = ev?.room ? ev.room() : null;
+    if (info) { setRoomInfo(info); setRoomNameIn(info.name || ""); setRoomCodeIn(info.code || info.suggested || ""); }
+    const btn = root.current?.querySelector(".rm-room") as HTMLElement | null;
+    if (e && menu?.id !== "room") { openMenu("room", e, btn || undefined); return; }
+    if (menu?.id === "room") { setMenu(null); return; }
+    const r = btn?.getBoundingClientRect();
+    setMenu({ id: "room", x: r ? Math.min(window.innerWidth - 338, Math.max(8, r.left)) : Math.max(8, window.innerWidth / 2 - 165), y: r ? r.bottom + 6 : 80 });
+  };
+  const joinRoomNow = () => {
+    const c = tidyCode(roomCodeIn);
+    if (c.length < 4) { toast("A room code is at least 4 letters"); return; }
+    (window as any).EV?.joinRoom(c, roomNameIn);
   };
 
   /** Where a menu sits: under its button, or — opened from the dock — over it, kept on screen. */
@@ -2942,7 +2974,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       { id: "x:ai", label: "AI settings", sub: aiK ? "Your Anthropic key, and how cards are reformatted" : "Add your Anthropic key to use AI", icon: I.spark, go: () => aiOpen("settings") },
       { id: "x:keys", label: "Keys and cite format", sub: "Change any key", icon: I.keys, go: () => { setKeysOpen(true); setKeyNote(""); } },
       { id: "x:share", label: "Share this file…", sub: "A link your partner edits with you", icon: I.share, go: () => press(".rm-share") },
-      { id: "x:room", label: "Room — the speech doc with your partner", sub: "Round", icon: I.share, go: () => act("room") },
+      { id: "x:room", label: "Room — the speech doc with your partner", sub: "Round", icon: I.share, go: () => openRoomPanel() },
       { id: "x:colours", label: "Colours and layout…", sub: "View", icon: I.pages, go: () => press(".rm-palbtn") },
       { id: "x:pages", label: "Pages…", sub: "Read view beside, two places in a file", icon: I.pages, go: () => press(".rm-pagesbtn") },
       { id: "x:full", label: full ? "Leave full screen" : "Full screen", sub: "View", icon: I.full, go: toggleFull },
@@ -3037,7 +3069,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("share", e)}>
               {I.share}<span>{cur?.share && !curTheirs ? (curShare?.mates.length ? `Shared · ${curShare.mates.length + 1}` : "Shared") : "Share"}</span>
             </button>
-            <button type="button" className="rm-b rm-room" data-act="room" data-tip="Room — share the speech doc with your partner">
+            <button type="button" className="rm-b rm-room rm-menubtn" data-tip="Room — share the speech doc with your partner" aria-expanded={menu?.id === "room"}
+              onMouseDown={(e) => e.preventDefault()} onClick={(e) => openRoomPanel(e)}>
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
             {/* AI at work: beside its button, small; the whole step on hover */}
@@ -3594,7 +3627,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <button type="button" onClick={() => void copyLink(cur.share!)}>COPY</button>
               </label>
               <div className="rm-who">
-                <span><i style={{ background: "var(--acc)" }}>{(me?.[0] || "Y").toUpperCase()}</i>You</span>
+                <span><i style={{ background: "var(--acc)", color: "var(--on-acc)" }}>{(me?.[0] || "Y").toUpperCase()}</i>You</span>
                 {(curShare?.mates || []).map((m) => <span key={m.client}><i style={{ background: m.color }}>{(m.name[0] || "?").toUpperCase()}</i>{m.name}</span>)}
                 {!curShare?.mates.length && <em>{curShare?.status === "error" ? "Not connected right now" : "Nobody else is in it right now"}</em>}
               </div>
@@ -3606,7 +3639,43 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           )}
           <div className="rm-sep" />
           <h4>THE SPEECH DOC</h4>
-          <button type="button" className="rm-mb" data-act="room" onClick={() => setMenu(null)}>Room — one speech doc for you and your partner…</button>
+          <button type="button" className="rm-mb" onClick={() => openRoomPanel()}>Room — one speech doc for you and your partner…</button>
+        </div>
+      )}
+      {menu?.id === "room" && (
+        <div className="rm-menu wide rm-sharemenu rm-roommenu" style={menuAt(menu)} role="dialog" aria-label="Room">
+          <h4>ROOM · THE SPEECH DOC</h4>
+          {!roomInfo?.code ? (
+            <>
+              <div className="rm-mnote top">One speech doc for you and your partner: either of you can send a card, cut, reorder or type in it, and the other sees it as it happens. Use the code from your Flow. If the room already has a speech doc you take it, and cards you had sent are added.</div>
+              <label className="rm-field"><span>You are</span>
+                <input value={roomNameIn} maxLength={24} placeholder="Your name" onChange={(e) => setRoomNameIn(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") joinRoomNow(); }} />
+              </label>
+              <label className="rm-field"><span>Code{roomInfo?.suggested && roomCodeIn === roomInfo.suggested ? <small>from your flow</small> : null}</span>
+                <input className="code" value={roomCodeIn} maxLength={8} placeholder="ABCDE" spellCheck={false} autoFocus
+                  onChange={(e) => setRoomCodeIn(tidyCode(e.target.value))} onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") joinRoomNow(); }} />
+              </label>
+              <button type="button" className="rm-mb pri" disabled={tidyCode(roomCodeIn).length < 4} onClick={joinRoomNow}>Join the room</button>
+              <button type="button" className="rm-mb" onClick={() => setRoomCodeIn(newCode(5))}>New code<small>start a room, then read it out</small></button>
+            </>
+          ) : (
+            <>
+              <label className="rm-linkrow">
+                <input readOnly value={roomInfo.code} className="code" onFocus={(e) => e.currentTarget.select()} aria-label="The room's code" spellCheck={false} />
+                <button type="button" onClick={() => { void navigator.clipboard?.writeText(roomInfo.code).then(() => toast("Code copied")).catch(() => toast("Couldn't copy — it's " + roomInfo.code)); }}>COPY</button>
+              </label>
+              <div className="rm-who">
+                <span><i style={{ background: "var(--acc)", color: "var(--on-acc)" }}>{((roomInfo.name || me || "Y")[0] || "Y").toUpperCase()}</i>You</span>
+                {roomInfo.mates.map((m, i) => <span key={"m" + i}><i style={{ background: m.color }}>{(m.name[0] || "?").toUpperCase()}</i>{m.name}</span>)}
+                {roomInfo.flows.filter((f) => !roomInfo.mates.some((m) => m.name === f.name)).map((f, i) => <span key={"f" + i}><i style={{ background: "var(--mut)" }}>{(f.name[0] || "?").toUpperCase()}</i>{f.name}<em>{f.kind === "viewer" ? "reading" : "flowing"}</em></span>)}
+              </div>
+              <div className="rm-mnote">{roomInfo.status === "error" ? "Can't reach the room right now — it keeps trying."
+                : roomInfo.mates.length ? "One speech doc: either of you can send, cut, reorder and type in it."
+                : roomInfo.flows.length ? "They see every change to your speech doc as you make it."
+                : "Waiting for your partner. Give them the code, or have them join from their Flow."}</div>
+              <button type="button" className="rm-mb" onClick={() => { (window as any).EV?.leaveRoom(); setMenu(null); }}>Leave the room<small>the speech doc stays here as yours</small></button>
+            </>
+          )}
         </div>
       )}
       {menu?.id === "speech" && (

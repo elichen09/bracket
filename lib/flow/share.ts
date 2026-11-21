@@ -66,6 +66,9 @@ export const tidyCode = (s: string) => String(s || "").toUpperCase().replace(/[^
 
 const HUES = [18, 210, 145, 275, 340, 45];
 
+/** This page's own sessions: Flow and the speech doc's Room can be in the same room, and neither is the other's partner. */
+const local = new Set<string>();
+
 /**
  * Into a room. A flow tab takes part in the flow; an Evidence tab only
  * publishes its send doc there, so it never answers a newcomer's ask for the
@@ -73,6 +76,7 @@ const HUES = [18, 210, 145, 275, 340, 45];
  */
 export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "flow"): Session {
   const me = newCode(8);
+  local.add(me);
   const hue = HUES[Math.floor(Math.random() * HUES.length)];
   let channel: RoomChannel | null = null;
   let gone = false;
@@ -92,10 +96,10 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
     const state = channel.presenceState() as Record<string, any[]>;
     peers = Object.entries(state)
       .flatMap(([, entries]) => entries)
-      .filter((e: any) => e && e.id && e.id !== me)
+      .filter((e: any) => e && e.id && e.id !== me && !local.has(e.id))
       .map((e: any) => ({ id: e.id, name: e.name || "Partner", hue: e.hue ?? 210, kind: (e.kind || "flow") as Kind, caret: carets.get(e.id) || null }));
     if (kind === "flow" && !gotFull) {
-      const earlier = Object.values(state).flat().some((e: any) => e && e.id && e.id !== me && !met.has(e.id) && (e.kind || "flow") === "flow" && typeof e.at === "number" && e.at < joinedAt);
+      const earlier = Object.values(state).flat().some((e: any) => e && e.id && e.id !== me && !local.has(e.id) && !met.has(e.id) && (e.kind || "flow") === "flow" && typeof e.at === "number" && e.at < joinedAt);
       Object.values(state).flat().forEach((e: any) => { if (e && e.id) met.add(e.id); });
       if (earlier && Date.now() - askedAt > 1500) send("ask", null);
     }
@@ -170,6 +174,7 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
     send,
     leave() {
       gone = true;
+      local.delete(me);
       try { channel?.untrack(); } catch { /* already gone */ }
       const ch = channel;
       if (ch) realtime().then((sb) => sb.removeChannel(ch)).catch(() => { /* already gone */ });

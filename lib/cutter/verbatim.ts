@@ -43,8 +43,9 @@ function build(doc: PMNode): DecorationSet {
       if (!t.isText) return;
       const from = pos + 1 + p, to = from + t.nodeSize;
       if (isHl(t)) {
-        // a space where hidden words stood between two read ones, unless one is there already
-        if (hiddenSince && shown && !/\s$/.test(shown) && !/^\s/.test(t.text || "")) decos.push(Decoration.widget(from, gap, { side: -1, key: "vgap" }));
+        // a space where hidden words stood between two read ones, unless one is there already —
+        // drawn outside every mark, so a box round the words never boxes the space
+        if (hiddenSince && shown && !/\s$/.test(shown) && !/^\s/.test(t.text || "")) decos.push(Decoration.widget(from, gap, { side: -1, key: "vgap", marks: [] }));
         shown += t.text || "";
         hiddenSince = false;
       } else {

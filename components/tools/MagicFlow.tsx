@@ -18,6 +18,7 @@ import { roundXlsx } from "@/lib/mflow/xlsx";
 import { FLOW_KEYS } from "@/lib/mflow/keys";
 import { diff, patch as patchRound, type Patch } from "@/lib/mflow/sync";
 import { joinFlow, newCode, tidyCode, type Session, type Peer, type Status } from "@/lib/flow/share";
+import { scoped } from "@/lib/owner";
 import "./mflow.css";
 
 export interface Outline { block: string; tags: string[] }
@@ -108,6 +109,8 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
       },
     }, "flow");
     sess.current = s; setCode(c);
+    // the speech doc's Room fills in the same code
+    try { localStorage.setItem(scoped("flow.room", owner), c); } catch { /* not kept */ }
   };
   const invite = () => { if (!roundRef.current) return; connect(newCode(5)); synced.current = roundRef.current; };
   const joinCode = (raw: string) => { const c = tidyCode(raw); if (c.length < 4) { toast("That code is too short"); return; } setJoinAsk(false); connect(c); };

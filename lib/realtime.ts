@@ -43,7 +43,7 @@ export interface RoomClient {
 
 const KEPT = "coda.realtime";
 
-async function relayClient(): Promise<SupabaseClient> {
+async function relayClient(): Promise<RoomClient> {
   let cfg: { url: string; key: string } | null = null;
   try { cfg = JSON.parse(localStorage.getItem(KEPT) || "null"); } catch { /* fetched below */ }
   const fetched = fetch(CODA_WEB + "/api/tools/realtime").then(async (r) => {
@@ -54,12 +54,48 @@ async function relayClient(): Promise<SupabaseClient> {
   });
   if (!cfg) cfg = await fetched;
   else fetched.catch(() => { /* the kept one will do */ });
-  return createClient(cfg.url, cfg.key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+  const { url, key } = cfg;
+  const make = () => anonClient(url, key);
+  return pooled(make(), make);
 }
 
-/** The app's relay client, made once it can be; offline with nothing kept, tried again by the next room. */
-let relay: Promise<SupabaseClient> | null = null;
-function appRelay(): Promise<SupabaseClient | null> {
+/** A client of the relay with no sign-in of its own: rooms need none. */
+let extras = 0;
+const anonClient = (url: string, key: string) =>
+  createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "coda-room-" + extras++ } });
+
+/**
+ * Rooms on a relay, one connection per room name at a time. supabase-js hands
+ * back the channel already open when a name is asked for twice, and that one
+ * takes no new listeners — but one page can be in a room twice: Flow, and the
+ * speech doc's Room, on the same code. The second gets a connection of its own,
+ * just as two tabs would.
+ */
+function pooled(first: SupabaseClient, make: () => SupabaseClient): RoomClient {
+  const pool: { c: SupabaseClient; names: Set<string> }[] = [{ c: first, names: new Set() }];
+  const whose = new Map<unknown, { e: (typeof pool)[number]; name: string }>();
+  return {
+    channel(name, opts) {
+      let e = pool.find((p) => !p.names.has(name));
+      if (!e) { e = { c: make(), names: new Set() }; pool.push(e); }
+      e.names.add(name);
+      const ch = e.c.channel(name, opts);
+      whose.set(ch, { e, name });
+      return ch as unknown as RoomChannel;
+    },
+    async removeChannel(ch) {
+      const o = whose.get(ch);
+      if (!o) return "ok";
+      whose.delete(ch);
+      o.e.names.delete(o.name);
+      return o.e.c.removeChannel(ch as unknown as RealtimeChannel);
+    },
+  };
+}
+
+/** The app's relay, made once it can be; offline with nothing kept, tried again by the next room. */
+let relay: Promise<RoomClient> | null = null;
+function appRelay(): Promise<RoomClient | null> {
   if (!relay) {
     relay = relayClient();
     relay.catch(() => { relay = null; });
@@ -125,7 +161,7 @@ class BothRoads implements RoomChannel {
     appRelay().then((client) => {
       if (this.gone) return;
       if (!client) { this.relayFailed = true; this.failIfBoth(new Error("no internet")); return; }
-      const ch = client.channel(this.name, { config: { broadcast: { self: false }, presence: { key: this.key } } });
+      const ch = client.channel(this.name, { config: { broadcast: { self: false }, presence: { key: this.key } } }) as unknown as RealtimeChannel;
       this.sb = ch;
       for (const ev of this.bc.keys()) ch.on("broadcast", { event: ev }, ({ payload }: any) => this.deliver(ev, payload));
       const sync = () => { this.sbState = ch.presenceState() as Record<string, any[]>; this.dialFromRelay(); this.firePresence(); };
@@ -175,10 +211,10 @@ class BothRoads implements RoomChannel {
     return out;
   }
 
-  close(client: SupabaseClient | null) {
+  close(client: RoomClient | null) {
     this.gone = true;
     this.p2p.then((p) => p.p2pLeave(this.name, this.hearDirect)).catch(() => { /* never joined */ });
-    if (this.sb && client) client.removeChannel(this.sb);
+    if (this.sb && client) client.removeChannel(this.sb as unknown as RoomChannel);
     this.sb = null;
   }
 
@@ -255,8 +291,18 @@ const appRooms: RoomClient = {
   },
 };
 
+/** On the site: the signed-in client first, and a plain one for a second room on the same name. */
+let siteRooms: RoomClient | null = null;
+function webRooms(): RoomClient {
+  if (!siteRooms) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "", key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    siteRooms = pooled(supabaseBrowser(), () => anonClient(url, key));
+  }
+  return siteRooms;
+}
+
 /** The client to open a room's channel on. Shared: one per page. */
 export function realtime(): Promise<RoomClient> {
   if (isDesktop()) return Promise.resolve(appRooms);
-  return Promise.resolve(supabaseBrowser() as unknown as RoomClient);
+  return Promise.resolve(webRooms());
 }
