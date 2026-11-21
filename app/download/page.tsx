@@ -109,8 +109,8 @@ export default async function Download() {
           <li><b>With the internet, SpeechDrop and the caselist work too.</b> SpeechDrop needs nothing more. The caselist asks you,
             the first time, to sign into openCaselist with your own Tabroom email and password — it searches as you, and keeps the
             sign-in on your computer for two weeks.</li>
-          <li><b>Rooms with your partner, sharing a file by link, and your partner&apos;s Google Doc stay on the web</b> — they need a
-            coda account. Use coda here for those.</li>
+          <li><b>Your partner, by code, app to app</b> — Flow&apos;s Invite and the speech doc&apos;s Room work in the app with no account: one of you reads out the code, the other types it in. Two apps on the same Wi-Fi connect straight to each other, <b>even when the Wi-Fi has no internet</b>; anywhere else they connect over the internet. The first time, Windows asks whether coda may use the network (allow it on public networks too, for tournament Wi-Fi) and a Mac asks to find devices on your network. Nothing about the round is stored.</li>
+          <li><b>Sharing a file by link and your partner&apos;s Google Doc stay on the web</b> — they need a coda account. Use coda here for those.</li>
           <li><b>A new version is a new download</b> from this page; install it over the old one and your files stay.</li>
           <li><b>On a Mac it runs on Safari&apos;s engine</b>, so it may differ from Chrome in small ways.</li>
         </ul>

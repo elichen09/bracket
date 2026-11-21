@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- merged into the app's own Info.plist by Tauri: macOS asks once before an app looks for others on the network -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>coda connects straight to your partner's coda on the same Wi-Fi, so you can flow together even without internet.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_coda._udp</string>
+  </array>
+</dict>
+</plist>

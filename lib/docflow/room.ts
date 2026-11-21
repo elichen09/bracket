@@ -1,7 +1,6 @@
 import * as Y from "yjs";
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from "y-protocols/awareness";
-import type { RealtimeChannel } from "@supabase/supabase-js";
-import { supabaseBrowser } from "@/lib/supabase";
+import { realtime, type RoomChannel } from "@/lib/realtime";
 
 /**
  * Flowing one document with your partner.
@@ -65,10 +64,13 @@ const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 export function openRoom(o: RoomOptions): Room {
   const { ydoc, awareness } = o;
   const me = Math.random().toString(36).slice(2, 10);
-  let channel: RealtimeChannel | null = null;
+  let channel: RoomChannel | null = null;
   let gone = false;
   let synced = !o.fresh;
   let others = 0;
+  /** when this one came into the room, and whether anyone here came before it */
+  const joinedAt = Date.now();
+  let earlier = false;
   /** presence id → Yjs client, so a departure takes its caret with it */
   const clients = new Map<string, number>();
 
@@ -129,14 +131,19 @@ export function openRoom(o: RoomOptions): Room {
 
   const hello = () => send("hello", { sv: b64(Y.encodeStateVector(ydoc)) });
 
-  const supabase = supabaseBrowser();
-  channel = supabase.channel(`${o.channel || "docflow"}-${o.code}`, { config: { broadcast: { self: false }, presence: { key: me } } });
 
   const readPresence = () => {
     if (!channel) return;
-    const state = channel.presenceState() as Record<string, { id?: string; client?: number }[]>;
+    const state = channel.presenceState() as Record<string, { id?: string; client?: number; at?: number }[]>;
     const seen = new Map<string, number>();
-    Object.values(state).flat().forEach((e) => { if (e && e.id && e.id !== me && typeof e.client === "number") seen.set(e.id, e.client); });
+    earlier = false;
+    Object.values(state).flat().forEach((e) => {
+      if (e && e.id && e.id !== me && typeof e.client === "number") {
+        seen.set(e.id, e.client);
+        // no time (an older coda) counts as earlier: wait for them, as before
+        if (typeof e.at !== "number" || e.at < joinedAt) earlier = true;
+      }
+    });
     const left = [...clients.keys()].filter((id) => !seen.has(id)).map((id) => clients.get(id)!);
     clients.clear(); seen.forEach((c, id) => clients.set(id, c));
     if (left.length) removeAwarenessStates(awareness, left, REMOTE);
@@ -144,6 +151,10 @@ export function openRoom(o: RoomOptions): Room {
     o.onStatus(others ? "live" : "alone");
   };
 
+  // the relay, then the room on it (in the desktop app, the relay client is made the first time)
+  realtime().then((supabase) => {
+  if (gone) return;
+  channel = supabase.channel(`${o.channel || "docflow"}-${o.code}`, { config: { broadcast: { self: false }, presence: { key: me } } });
   channel
     .on("broadcast", { event: "docflow" }, ({ payload }: { payload: any }) => {
       if (!payload || payload.from === me || gone) return;
@@ -180,7 +191,7 @@ export function openRoom(o: RoomOptions): Room {
     .subscribe(async (status: string, err?: Error) => {
       if (gone) return;
       if (status === "SUBSCRIBED") {
-        await channel!.track({ id: me, client: ydoc.clientID });
+        await channel!.track({ id: me, client: ydoc.clientID, at: joinedAt });
         o.onStatus(others ? "live" : "alone");
         hello();
         pendingAw.add(ydoc.clientID); soon();
@@ -189,13 +200,16 @@ export function openRoom(o: RoomOptions): Room {
       }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") o.onStatus("error", err?.message || status);
     });
+  }).catch((e) => { if (!gone) o.onStatus("error", e?.message || "no connection"); });
 
   // A fresh joiner waits for the room to send its flow; if the room turns
   // out to be empty, this browser's blank flow becomes the room's.
   function waitForFlow(tries: number) {
     setTimeout(() => {
       if (gone || synced) return;
-      if (others && tries < 4) { hello(); waitForFlow(tries + 1); return; }
+      // someone was here first: wait for their flow. Everyone here came after this
+      // one (they turned up while it was still waiting): this one's is the room's.
+      if (others && earlier && tries < 4) { hello(); waitForFlow(tries + 1); return; }
       synced = true;
       o.onSeed();
       o.onSynced(null);
@@ -214,7 +228,8 @@ export function openRoom(o: RoomOptions): Room {
       awareness.off("update", onAware);
       awareness.off("change", mates);
       try { channel?.untrack(); } catch { /* already gone */ }
-      try { if (channel) supabase.removeChannel(channel); } catch { /* already gone */ }
+      const ch = channel;
+      if (ch) realtime().then((sb) => sb.removeChannel(ch)).catch(() => { /* already gone */ });
       channel = null;
     },
   };

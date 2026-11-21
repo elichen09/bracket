@@ -4,9 +4,9 @@
  * The app carries coda inside it (desktop/ builds it), so it runs offline and
  * with no account: everything is kept on the computer. Its window sets
  * window.__CODA_DESKTOP__ before the page runs, and the page leaves out what
- * needs a server or an account — the caselist, SpeechDrop, rooms, sharing, a
- * partner's Google Doc, pop-outs (marked web-only in RoundMagic) — and the
- * "get the desktop app" links.
+ * needs a server or an account — sharing a file by link, a partner's Google
+ * Doc, pop-outs (marked web-only in RoundMagic) — and the "get the desktop
+ * app" links. Rooms with a partner work in the app by code (lib/realtime.ts).
  */
 /** Where the app's pages come from: tauri://localhost on a Mac, http://tauri.localhost on Windows. */
 export const APP_ORIGINS = ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"];

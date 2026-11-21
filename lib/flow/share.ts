@@ -19,8 +19,7 @@
  * later keystroke is the one that should survive.
  */
 
-import { supabaseBrowser } from "@/lib/supabase";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import { realtime, type RoomChannel } from "@/lib/realtime";
 
 export type Status = "joining" | "live" | "alone" | "error";
 
@@ -75,11 +74,18 @@ const HUES = [18, 210, 145, 275, 340, 45];
 export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "flow"): Session {
   const me = newCode(8);
   const hue = HUES[Math.floor(Math.random() * HUES.length)];
-  let channel: RealtimeChannel | null = null;
+  let channel: RoomChannel | null = null;
   let gone = false;
   let peers: Peer[] = [];
 
   const carets = new Map<string, Caret | null>();
+  // A partner can turn up after the ask went out (in the desktop app, found on the
+  // network a moment later). Then the later of the two asks again — only the later,
+  // since a whole flow arriving replaces yours.
+  const joinedAt = Date.now();
+  let gotFull = false;
+  let askedAt = 0;
+  const met = new Set<string>();
 
   const readPresence = () => {
     if (!channel) return;
@@ -88,11 +94,18 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
       .flatMap(([, entries]) => entries)
       .filter((e: any) => e && e.id && e.id !== me)
       .map((e: any) => ({ id: e.id, name: e.name || "Partner", hue: e.hue ?? 210, kind: (e.kind || "flow") as Kind, caret: carets.get(e.id) || null }));
+    if (kind === "flow" && !gotFull) {
+      const earlier = Object.values(state).flat().some((e: any) => e && e.id && e.id !== me && !met.has(e.id) && (e.kind || "flow") === "flow" && typeof e.at === "number" && e.at < joinedAt);
+      Object.values(state).flat().forEach((e: any) => { if (e && e.id) met.add(e.id); });
+      if (earlier && Date.now() - askedAt > 1500) send("ask", null);
+    }
     h.onPeers(peers);
     h.onStatus(peers.length ? "live" : "alone");
   };
 
-  const supabase = supabaseBrowser();
+  // the relay, then the room on it (the desktop app's relay client is made the first time)
+  realtime().then((supabase) => {
+  if (gone) return;
   channel = supabase.channel(`flow-${code}`, {
     config: { broadcast: { self: false }, presence: { key: me } },
   });
@@ -115,6 +128,7 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
         return;
       }
       if (type === "full" && data?.to !== me) return;
+      if (type === "full") gotFull = true;
       if (type === "caret") {
         carets.set(payload.from, data || null);
         peers = peers.map((p) => (p.id === payload.from ? { ...p, caret: data || null } : p));
@@ -129,7 +143,7 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
     .subscribe(async (status: string, err?: Error) => {
       if (gone) return;
       if (status === "SUBSCRIBED") {
-        await channel!.track({ id: me, name: who || "Partner", hue, kind });
+        await channel!.track({ id: me, name: who || "Partner", hue, kind, at: joinedAt });
         h.onStatus("alone");
         // Ask for the room's flow. If nobody answers, this browser's copy is
         // the room's copy and the ask cost nothing.
@@ -142,9 +156,11 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
         h.onStatus("error", err?.message || status);
       }
     });
+  }).catch((e) => { if (!gone) h.onStatus("error", e?.message || "no connection"); });
 
   function send(type: string, data?: any) {
     if (gone || !channel) return;
+    if (type === "ask") askedAt = Date.now();
     channel.send({ type: "broadcast", event: "flow", payload: { from: me, type, data } });
   }
 
@@ -155,7 +171,8 @@ export function joinFlow(code: string, who: string, h: Handlers, kind: Kind = "f
     leave() {
       gone = true;
       try { channel?.untrack(); } catch { /* already gone */ }
-      try { if (channel) supabaseBrowser().removeChannel(channel); } catch { /* already gone */ }
+      const ch = channel;
+      if (ch) realtime().then((sb) => sb.removeChannel(ch)).catch(() => { /* already gone */ });
       channel = null;
     },
   };

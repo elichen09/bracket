@@ -3037,7 +3037,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("share", e)}>
               {I.share}<span>{cur?.share && !curTheirs ? (curShare?.mates.length ? `Shared · ${curShare.mates.length + 1}` : "Shared") : "Share"}</span>
             </button>
-            <button type="button" className="rm-b rm-room web-only" data-act="room" data-tip="Room — share the speech doc with your partner">
+            <button type="button" className="rm-b rm-room" data-act="room" data-tip="Room — share the speech doc with your partner">
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
             {/* AI at work: beside its button, small; the whole step on hover */}
@@ -3275,7 +3275,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the round: their docs, SpeechDrop, your partner */}
           <div className="rm-tabpane tp-round" hidden={tab !== "round"}>
-            {desktop && <p className="rm-sempty rm-webnote">SpeechDrop and the caselist need the internet; the rest of coda doesn&apos;t. Rooms, shared files and your partner&apos;s Google Doc are in coda on the web.</p>}
+            {desktop && <p className="rm-sempty rm-webnote">SpeechDrop and the caselist need the internet; the rest of coda doesn&apos;t. Your partner&apos;s app on the same Wi-Fi connects straight to yours, internet or not. Shared files and your partner&apos;s Google Doc are in coda on the web.</p>}
             <div className="rm-rsec web-only">
               <div className="rm-cap">PARTNER&apos;S FLOW · GOOGLE DOC</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); gfWatch(); }}>
@@ -3345,7 +3345,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 {!theirs.length && <p className="rm-sempty">Their speech docs open here — off SpeechDrop, from a .docx or PDF, or pasted. Each opens in the editor to rehighlight and send from, and never goes in your library.</p>}
               </div>
             </div>
-            <div className="rm-rsec web-only">
+            <div className="rm-rsec">
               <div className="rm-cap">YOUR PARTNER</div>
               <p className="rm-sempty">Room, top right, puts you and your partner in one speech doc: you both write it, and every card either of you sends lands in it.</p>
             </div>

@@ -1,7 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The window opens the live site, which calls nothing of the app's: no permissions beyond the core defaults.",
-  "windows": ["main"],
-  "permissions": ["core:default"]
+  "description": "The window is coda itself, from inside the app. Its only calls into the app are the partner road (p2p_* commands, allowed by default) and the events they send back.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
 }

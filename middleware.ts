@@ -9,7 +9,7 @@ import { APP_ORIGINS } from "@/lib/desktop";
  */
 const PUBLIC = [/^\/$/, /^\/login$/, /^\/download$/,/^\/api\/tools\/caselist\/index$/, /^\/api\/auth\//];
 /** What the desktop app may ask for with no account (lib/appRequests.ts). */
-const APP_ROUTES = /^\/api\/tools\/(caselist|speechdrop|page)$/;
+const APP_ROUTES = /^\/api\/tools\/(caselist|speechdrop|page|realtime)$/;
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: { headers: req.headers } });
