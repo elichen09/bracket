@@ -232,19 +232,28 @@ export function extend(r: Round, sheet: string, col: number, rows: [number, numb
  * Move: a block of cells (columns × rows) lifted out and put back `by` rows
  * down (or up), the cells around closing up and making room.
  */
-export function moveBlock(r: Round, sheet: string, cols: [number, number], rows: [number, number], by: number): Round {
-  if (!by) return r;
+export function moveBlock(r: Round, sheet: string, cols: [number, number], rows: [number, number], by: number, byCol = 0): Round {
+  if (!by && !byCol) return r;
   const s = r.sheets.find((x) => x.id === sheet);
   if (!s) return r;
+  const n = columnsOf(r, s).length;
+  // never off the sheet's sides
+  byCol = Math.max(-cols[0], Math.min(n - 1 - cols[1], byCol));
   const h = rows[1] - rows[0] + 1;
+  // every column's run lifted first, so moving sideways onto a column being lifted from takes what's left there
+  const lifted = new Map<number, (Cell | undefined)[]>();
   let out = r;
   for (let c = cols[0]; c <= cols[1]; c++) {
-    const lifted: (Cell | undefined)[] = [];
-    for (let w = rows[0]; w <= rows[1]; w++) lifted.push(cellAt(s, c, w));
+    const run: (Cell | undefined)[] = [];
+    for (let w = rows[0]; w <= rows[1]; w++) run.push(cellAt(s, c, w));
+    lifted.set(c, run);
     out = deleteCell(out, sheet, c, rows[0], h);
-    const at = Math.max(0, rows[0] + by);
-    out = insertCell(out, sheet, c, at, h);
-    lifted.forEach((cell, i) => { if (cell) out = setCell(out, sheet, c, at + i, cell); });
+  }
+  const at = Math.max(0, rows[0] + by);
+  for (let c = cols[0]; c <= cols[1]; c++) {
+    const to = c + byCol;
+    out = insertCell(out, sheet, to, at, h);
+    lifted.get(c)!.forEach((cell, i) => { if (cell) out = setCell(out, sheet, to, at + i, cell); });
   }
   return out;
 }

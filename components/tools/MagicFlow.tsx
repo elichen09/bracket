@@ -57,7 +57,8 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
   const [sel, setSel] = useState<Pos>({ c: 0, r: 0 });
   const [anchor, setAnchor] = useState<Pos>({ c: 0, r: 0 });
   const [editing, setEditing] = useState<null | { text: string }>(null);
-  const [moving, setMoving] = useState<null | { by: number }>(null);
+  /** cells on the move (Alt+M, or dragged): how far down and across they'll land */
+  const [moving, setMoving] = useState<null | { by: number; byCol: number; drag?: Pos }>(null);
   const [zoom, setZoomState] = useState(1);
   const [sideOpen, setSideOpen] = useState(true);
   const [panel, setPanel] = useState<null | "info" | "help" | "from">(null);
@@ -302,6 +303,28 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
     return () => window.removeEventListener("coda:sent", on);
   }, [sendTo, sheetId, apply]);
 
+  /** The cells on the move put down: lifted out (their columns close up) and set in at the new place. */
+  const drop = (by: number, byCol: number) => {
+    if (!sheet) return;
+    const q = rect();
+    const bc = Math.max(-q.c0, Math.min(cols.length - 1 - q.c1, byCol));
+    if (by || bc) apply((r) => moveBlock(r, sheet.id, [q.c0, q.c1], [q.r0, q.r1], by, bc));
+    setMoving(null);
+    setAnchor({ c: q.c0 + bc, r: Math.max(0, q.r0 + by) }); setSel({ c: q.c1 + bc, r: Math.max(0, q.r1 + by) });
+    requestAnimationFrame(() => gridRef.current?.focus());
+  };
+  // a drag let go of anywhere: put the cells down where they are
+  useEffect(() => {
+    if (!moving?.drag) return;
+    const up = () => {
+      // pressed and let go without moving: a click on that cell
+      if (!moving.by && !moving.byCol && moving.drag) { setMoving(null); setSel(moving.drag); setAnchor(moving.drag); return; }
+      drop(moving.by, moving.byCol);
+    };
+    window.addEventListener("mouseup", up);
+    return () => window.removeEventListener("mouseup", up);
+  }, [moving]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ------------------------------------------------------------ keys */
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -313,16 +336,11 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
     const take = () => { e.preventDefault(); e.stopPropagation(); };
 
     if (moving) {
-      if (spec === "↑") { take(); setMoving({ by: Math.max(-q.r0, moving.by - 1) }); return; }
-      if (spec === "↓") { take(); setMoving({ by: moving.by + 1 }); return; }
-      if (spec === "Enter") {
-        take();
-        const by = moving.by;
-        apply((r) => moveBlock(r, sheet.id, [q.c0, q.c1], [q.r0, q.r1], by));
-        setMoving(null);
-        setAnchor({ c: q.c0, r: Math.max(0, q.r0 + by) }); setSel({ c: q.c1, r: Math.max(0, q.r1 + by) });
-        return;
-      }
+      if (spec === "↑") { take(); setMoving({ ...moving, by: Math.max(-q.r0, moving.by - 1) }); return; }
+      if (spec === "↓") { take(); setMoving({ ...moving, by: moving.by + 1 }); return; }
+      if (spec === "←") { take(); setMoving({ ...moving, byCol: Math.max(-q.c0, moving.byCol - 1) }); return; }
+      if (spec === "→") { take(); setMoving({ ...moving, byCol: Math.min(cols.length - 1 - q.c1, moving.byCol + 1) }); return; }
+      if (spec === "Enter") { take(); drop(moving.by, moving.byCol); return; }
       if (spec === "Escape") { take(); setMoving(null); return; }
       take(); return;
     }
@@ -352,7 +370,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
       case "mod+Enter": take(); beginEdit(nextMarker(round, sheet, sel.c, sel.r) + textAt(sheet, sel.c, sel.r)); return;
       case "mod+shift+Enter": take(); go({ c: sel.c, r: sel.r + 3 }); return;
       case "mod+E": take(); doExtend(); return;
-      case "alt+M": take(); setMoving({ by: 0 }); return;
+      case "alt+M": take(); setMoving({ by: 0, byCol: 0 }); return;
       case "mod+Z": take(); undo(); return;
       case "mod+Y": case "mod+shift+Z": take(); redo(); return;
       case "mod+B": take(); mark("b"); return;
@@ -477,7 +495,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
             <button type="button" onClick={() => start("aff")}><b>New round</b><span>Aff speaks first</span></button>
             <button type="button" onClick={() => start("neg")}><b>New round</b><span>Neg speaks first</span></button>
           </div>
-          <div className="mf-joinrow web-only">
+          <div className="mf-joinrow">
             {joinAsk
               ? <input autoFocus placeholder="Your partner's code" onKeyDown={(e) => { if (e.key === "Enter") joinCode(e.currentTarget.value); if (e.key === "Escape") setJoinAsk(false); }} />
               : <button type="button" onClick={() => setJoinAsk(true)}>Join your partner's round</button>}
@@ -507,7 +525,8 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
   const inRange = (c: number, r: number) => c >= q.c0 && c <= q.c1 && r >= q.r0 && r <= q.r1;
   const mates = new Map<string, Peer>();
   for (const p of peers) if (p.caret && p.caret.sheet === sheet?.id) mates.set(cellKey(p.caret.col, Number(p.caret.row)), p);
-  const movedTo = (r: number) => moving && r >= q.r0 + moving.by && r <= q.r1 + moving.by;
+  const movedTo = (c: number, r: number) => !!moving && c >= q.c0 + moving.byCol && c <= q.c1 + moving.byCol && r >= q.r0 + moving.by && r <= q.r1 + moving.by;
+  const many = q.c0 !== q.c1 || q.r0 !== q.r1;
   const colWords = sheet && sheet.kind !== "cx" ? wordsIn(round, sel.c) : 0;
   const us = round.info.us;
   const ourSpeeches = sps.map((s, i) => ({ s, i })).filter((x) => !us || x.s.side === us);
@@ -546,7 +565,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
             </li>
           ))}
         </ul>
-        <div className="mf-partner web-only">
+        <div className="mf-partner">
           {code ? (
             <>
               <span className={"mf-dot " + status} />
@@ -689,7 +708,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
                 const cell = cellAt(sheet, c, r);
                 const isSel = c === sel.c && r === sel.r;
                 const cls = "mf-c" + (cell?.b ? " b" : "") + (cell?.h ? " h" : "") + (cell?.c ? " cd" : "") + (cell?.g ? " g" : "") + (cell?.k ? " k" : "") +
-                  (cell?.src ? " src" : "") + (isSel ? " sel" : "") + (inRange(c, r) && !isSel ? " rng" : "") + (moving && c >= q.c0 && c <= q.c1 && movedTo(r) ? " movto" : "");
+                  (cell?.src ? " src" : "") + (isSel ? " sel" : "") + (inRange(c, r) && !isSel ? " rng" : "") + (movedTo(c, r) ? " movto" : "") + (moving && inRange(c, r) ? " lifting" : "") + (many && inRange(c, r) && !moving && !editing ? " grab" : "");
                 const mate = mates.get(cellKey(c, r));
                 return (
                   <div key={cellKey(c, r)} className={cls + (mate ? " mate" : "")} data-cell={cellKey(c, r)} title={cell?.src ? "From " + cell.src : undefined}
@@ -698,10 +717,17 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
                       if (editing && !isSel) commitEdit();
                       if (editing && isSel) return;
                       e.preventDefault(); gridRef.current?.focus();
+                      if (many && inRange(c, r) && !e.shiftKey && e.button === 0) { setMoving({ by: 0, byCol: 0, drag: { c, r } }); return; }
                       setSel({ c, r }); if (!e.shiftKey) setAnchor({ c, r });
                       dragSel.current = true;
                     }}
-                    onMouseEnter={() => { if (dragSel.current) setSel({ c, r }); }}
+                    onMouseEnter={() => {
+                      if (moving?.drag) {
+                        setMoving({ ...moving, by: Math.max(-q.r0, r - moving.drag.r), byCol: Math.max(-q.c0, Math.min(cols.length - 1 - q.c1, c - moving.drag.c)) });
+                        return;
+                      }
+                      if (dragSel.current) setSel({ c, r });
+                    }}
                     onDoubleClick={() => { setSel({ c, r }); setAnchor({ c, r }); beginEdit(); }}>
                     {isSel && editing ? (
                       <textarea ref={edRef} className="mf-ed" value={editing.text} spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off"
@@ -733,7 +759,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
         )}
 
         <footer className="mf-foot">
-          {moving ? <span className="mf-moving">Moving · ↑ ↓ to place, Enter to drop, Esc to cancel</span>
+          {moving ? <span className="mf-moving">{moving.drag ? "Moving · let go to put them down" : "Moving · arrows to place, Enter to drop, Esc to cancel"}</span>
             : <span>{sheet?.kind === "cx" ? "Cross-examination" : `${cols[sel.c]?.name || ""} · ${colWords.toLocaleString()} words · ${fmtTime((colWords / Math.max(60, wpm)) * 60)} at ${wpm} wpm`}</span>}
           <span className="mf-grow" />
           <span className="mf-hint">Type to flow · Enter down · Tab across · {keyLabel("mod+P")} find · ? keys</span>

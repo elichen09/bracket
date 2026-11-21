@@ -87,10 +87,15 @@
 .mf-c.cd.g { box-shadow: inset 0 -2px 0 var(--ink), inset 3px 0 0 #8a8a90; }
 .mf-c.k { color: #8a8a90; background-image: linear-gradient(to top right, transparent calc(50% - 1px), #b4b4b8 calc(50% - .5px), #b4b4b8 calc(50% + .5px), transparent calc(50% + 1px)); }
 .mf-c.src::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; background: #2c9a8b; }
-.mf-c.rng { background: rgba(20, 20, 22, .06); }
+/* a selection of several cells: a blue tint, each cell keeping its own edge so they read as separate cells */
+.mf-c.rng { background: rgba(46, 95, 174, .09); outline: 1px solid rgba(46, 95, 174, .32); outline-offset: -1px; }
 .mf-c.h.rng { background: #f2e78c; }
 .mf-c.sel { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 1; }
-.mf-c.movto { outline: 2px dashed #8a8a90; outline-offset: -2px; }
+/* press inside a selection and drag: the cells go together */
+.mf-c.grab { cursor: grab; }
+.mf-c.lifting { opacity: .45; }
+.mf-c.lifting, .mf-c.movto { cursor: grabbing; }
+.mf-c.movto { outline: 2px dashed #2e5fae; outline-offset: -2px; background: rgba(46, 95, 174, .05); opacity: 1; }
 .mf-ed {
   display: block; width: 100%; min-height: calc(20px * var(--z)); margin: 0; padding: 0; border: 0; outline: none; resize: none; overflow: hidden;
   background: transparent; color: inherit; font: inherit; line-height: inherit; white-space: pre-wrap;

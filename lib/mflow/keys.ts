@@ -18,7 +18,7 @@ export const FLOW_KEYS: FlowKey[] = [
   { id: "marker", group: "Writing", label: "Argument number (\"AR #3\")", key: "mod+Enter" },
   { id: "skip", group: "Writing", label: "Save and skip down three", key: "mod+shift+Enter" },
   { id: "extend", group: "Writing", label: "Extend to your next speech", key: "mod+E" },
-  { id: "move", group: "Writing", label: "Move cells (↑ ↓, Enter to drop, Esc to cancel)", key: "alt+M" },
+  { id: "move", group: "Writing", label: "Move cells (arrows, Enter to drop, Esc to cancel; or drag a selection)", key: "alt+M" },
   { id: "cell-above", group: "Writing", label: "New cell above", key: "alt+↑" },
   { id: "cell-below", group: "Writing", label: "New cell below", key: "alt+↓" },
   { id: "row-above", group: "Writing", label: "New row above", key: "alt+shift+↑" },
