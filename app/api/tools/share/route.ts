@@ -84,6 +84,9 @@ async function bucket() {
 }
 
 async function note(db: ReturnType<typeof supabaseAdmin>, id: string): Promise<Note | null> {
+  // asked of the listing first: a download can still be served for a little while after a stop deleted it
+  const { data: there } = await db.storage.from(BUCKET).list("", { search: `${id}.json`, limit: 1 });
+  if (!there?.length) return null;
   const { data, error } = await db.storage.from(BUCKET).download(`${id}.json`);
   if (error || !data) return null;
   try { return JSON.parse(await data.text()) as Note; } catch { return null; }

@@ -3321,7 +3321,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the round: their docs, SpeechDrop, your partner */}
           <div className="rm-tabpane tp-round" hidden={tab !== "round"}>
-            {desktop && <p className="rm-sempty rm-webnote">SpeechDrop and the caselist need the internet; the rest of coda doesn&apos;t. Your partner&apos;s app on the same Wi-Fi connects straight to yours, internet or not. Shared files and your partner&apos;s Google Doc are in coda on the web.</p>}
+            {desktop && <p className="rm-sempty rm-webnote">SpeechDrop and the caselist need the internet; the rest of coda doesn&apos;t. Your partner&apos;s app on the same Wi-Fi connects straight to yours, internet or not. Your partner&apos;s Google Doc is in coda on the web.</p>}
             <div className="rm-rsec web-only">
               <div className="rm-cap">PARTNER&apos;S FLOW · GOOGLE DOC</div>
               <form className="rm-sdform" onSubmit={(e) => { e.preventDefault(); gfWatch(); }}>
