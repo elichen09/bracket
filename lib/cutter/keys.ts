@@ -57,7 +57,7 @@ export const ACTIONS: Action[] = [
   { id: "send", group: "Round", label: "Send to speech doc", key: "alt+Enter", hint: "The card the cursor is in — or the whole block, on a block heading — into the speech doc, where its cursor is (after the card it's in; at the end until you've clicked in it)" },
   { id: "mode-split", group: "Round", label: "Speech doc beside", key: "alt+B", hint: "Your file and the speech doc side by side (again: just the file)" },
   { id: "mode-speech", group: "Round", label: "Just the speech doc", key: "alt+shift+B", hint: "The speech doc alone, the whole width — the ribbon, outline and keys work in it (again: a file beside it)" },
-  { id: "mode-read", group: "Round", label: "Read mode", key: "alt+shift+R", hint: "The speech doc or this file as you'll read it, with the time it takes (again, or Esc: back)" },
+  { id: "mode-flow", group: "Round", label: "Flow", key: "alt+shift+R", hint: "Flow the round: sheets with a column per speech, flowed from the keyboard (again: back to the page)" },
   { id: "library", group: "Round", label: "Search the library", key: "alt+/", hint: "Every card in your library and the caselist — Enter sends it to the speech doc. / does it too when you're not typing" },
   { id: "timer", group: "Round", label: "Speech timer", key: "alt+T", hint: "A clock for the speech, prep or cross-ex" },
   { id: "ai-cite", group: "AI", label: "Cite from link", key: "alt+shift+L", hint: "Paste an article's link: Claude reads the page and writes the cite in your cite format — author, credentials, title, date, link" },

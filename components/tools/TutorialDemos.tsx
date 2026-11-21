@@ -385,7 +385,7 @@ export function WindowDemo({ onDone, done }: { onDone: () => void; done: boolean
 const PAL_CMDS = [
   { label: "Search the library", key: "Alt+/", say: "The side's Search tab opens with the cursor in it." },
   { label: "Speech doc beside", key: "Alt+B", say: "Split: your file on the left, the speech doc on the right." },
-  { label: "Read mode", key: "Alt+Shift+R", say: "The speech doc as you'll read it, timed." },
+  { label: "Flow", key: "Alt+Shift+R", say: "Your flow of the round, a column per speech." },
   { label: "Reformat", key: "Alt+Shift+W", say: "Cards cut anywhere now look cut here." },
   { label: "Condense", key: "Alt+Q", say: "The card's paragraphs, joined into one." },
   { label: "Tags only", key: "Alt+H", say: "Every card folded to its tag, to reorder the doc." },

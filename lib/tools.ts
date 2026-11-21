@@ -26,7 +26,7 @@ export const TOOLS: Tool[] = [
     about:
       "The card cutter, the library and the speech doc as one window. Your files in the middle, cut by key; the library and the " +
       "caselist down the side, Enter to send; the speech doc beside them, shared with your partner; the other team's docs opened " +
-      "in the same editor to rehighlight; and Read mode, the speech as you will read it, timed.",
+      "in the same editor to rehighlight; and Flow, a Public Forum flower wired to all of it.",
     storage: "This browser, kept apart per account — IndexedDB. Your files, your library, their docs; nothing is uploaded unless you share it. A room passes the speech doc straight between browsers; a file you share by link is kept on the site so the link opens it.",
   },
   {

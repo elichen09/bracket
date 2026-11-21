@@ -48,7 +48,8 @@ import { scoped } from "@/lib/owner";
 import { useFullscreen } from "./FullBtn";
 import { popOut } from "./PopBtn";
 import DocEditor, { type DocApi } from "./DocEditor";
-import MagicRead, { clock } from "./MagicRead";
+import { clock } from "./MagicRead";
+import MagicFlow, { type Outline } from "./MagicFlow";
 import SlashFind, { slashFor, slashStep, type SlashRow, type SlashMenu } from "./SlashFind";
 import "./evidence.css";
 import "./finish.css";
@@ -71,7 +72,7 @@ import "./magic.css";
  *  - down the side, the outline of whatever you are in, your files, the
  *    library search (Evidence's engine, mounted here: Enter sends), and the
  *    round — SpeechDrop and the docs you have opened of theirs;
- *  - Read mode, the speech doc or the file as you will read it, timed.
+ *  - Flow, a Public Forum flower (MagicFlow): what you send lands on it, and partners flow together.
  *
  * Evidence's engine draws its own DOM, found by id under the element it is
  * booted on — so it is booted on this whole tool, and its pieces (the search,
@@ -162,7 +163,7 @@ const kindOf = (name: string, type = ""): DocKind => {
 interface Head { level: number; text: string; pos: number }
 /** One page of the workspace: which file (or doc of theirs), and whether it is for editing or reading. */
 interface Pane { key: string; fileId: string; read: boolean; follow: boolean }
-type Mode = "edit" | "split" | "speech" | "read";
+type Mode = "edit" | "split" | "speech" | "flow";
 type Tab = "outline" | "files" | "search" | "round";
 interface SdFile { i: number; name: string; ctime: number }
 
@@ -172,6 +173,8 @@ const newKey = () => "p" + (++paneSeq) + "_" + Date.now().toString(36);
 
 /** What only makes sense with the cursor in a document. */
 const IN_DOC = new Set(["pocket", "hat", "block", "tag", "cite", "underline", "emphasis", "highlight", "clear", "shrink", "condense", "paste", "new-card", "move-up", "move-down", "new-extension", "analytic", "page-break", "clean-up", "reference", "insert-reference", "reformat", "send", "condense-omitted"]);
+/** coda's keys that still work while you're flowing: the modes, the command menu, the timer, the library. */
+const IN_FLOW_TOO = new Set(["mode-split", "mode-speech", "mode-flow", "palette", "timer", "library"]);
 /** What still works in a read page. */
 const IN_READ = new Set(["move-up", "move-down", "send"]);
 
@@ -323,8 +326,6 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [speechOutline, setSpeechOutline] = useState(false);
   const [speechWidth, setSpeechWidth] = useState(700);
   const [sentPulse, setSentPulse] = useState(0);
-  const [readSrc, setReadSrc] = useState<"speech" | "file">("file");
-  const [readDoc, setReadDoc] = useState<PMNode | null>(null);
   const [wpm, setWpm] = useState(230);
   const [hideDim, setHideDim] = useState(false);
   const [depth, setDepth] = useState(4);
@@ -532,7 +533,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [palette, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "read" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink, gfOn, gfPos })); } catch { /* private */ }
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "flow" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink, gfOn, gfPos })); } catch { /* private */ }
   }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, gfOn, gfPos, UI_KEY, uiReady]);
   // the site's nav steps aside in Focus (magic.css), set on <html> so it can
   useEffect(() => {
@@ -1095,7 +1096,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           f = stripDoc(made);
           toast(`“${made.name}”${info.owner ? ", shared by " + info.owner : ""} — it is in your files now, and you are in it together`);
         }
-        if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+        if (modeRef.current === "flow") { modeRef.current = "edit"; setModeState("edit"); }
         await open(f.id, (v) => v.focus());
       } catch (e) {
         toast(e instanceof NotShared ? "That link's doc is not shared any more" : "The shared doc would not open: " + String((e as Error)?.message || e));
@@ -1381,15 +1382,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const body = root.current?.querySelector("#docbody .ProseMirror");
     return body ? fromHtml(body.innerHTML) : null;
   };
-  const readFrom = useRef<Mode>("edit");                   // where Read mode was opened from, to go back to
   const setMode = useCallback((m: Mode) => {
-    if (m === "read") {
-      const prefer = modeRef.current === "speech" || (modeRef.current === "split" && inSpeech.current) ? "speech" : readSrc;
-      readFrom.current = modeRef.current;
-      const d = prefer === "speech" ? speechDoc() : view.current?.state.doc || null;
-      setReadSrc(prefer);
-      setReadDoc(d);
-    }
     modeRef.current = m;
     setModeState(m);
     if (m === "speech") inSpeech.current = true;
@@ -1397,26 +1390,50 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     requestAnimationFrame(() => {
       if (m === "split" || m === "speech") (window as any).EV?.renderDoc?.();
       if (m === "speech") speechView.current?.focus();
-      else if (m !== "read") view.current?.focus();
+      else if (m === "flow") (document.querySelector(".mf-grid") as HTMLElement | null)?.focus();
+      else view.current?.focus();
       readHeads();
     });
-  }, [readSrc, readHeads]); // eslint-disable-line react-hooks/exhaustive-deps
-  const chooseReadSrc = useCallback((s: "speech" | "file") => {
-    setReadSrc(s);
-    setReadDoc(s === "speech" ? speechDoc() : view.current?.state.doc || null);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [readHeads]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** From Read mode, a tag clicked: back to editing it. */
-  const editAt = useCallback((pos: number) => {
-    const speech = readSrc === "speech";
-    setMode(speech ? (readFrom.current === "speech" ? "speech" : "split") : "edit");
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const v = speech ? speechView.current : view.current;
-      if (!v) return;
-      if (speech) inSpeech.current = true;
-      goPos(v, pos);
-    }));
-  }, [readSrc, setMode, goPos]);
+  /* ---- Flow: what it reads from coda, and how it asks the library */
+  /** A document's blocks and the tags under each, for Flow to take down. */
+  const outlineOf = (doc: PMNode | null | undefined, fallback: string): Outline[] => {
+    if (!doc) return [];
+    const out: Outline[] = [];
+    let cur: Outline | null = null;
+    doc.forEach((n) => {
+      if (n.type !== schema.nodes.heading) return;
+      const t = n.textContent.replace(/\s+/g, " ").trim();
+      if (!t) return;
+      if (n.attrs.level === 3) { cur = { block: t, tags: [] }; out.push(cur); }
+      else if (n.attrs.level === 4) { if (!cur) { cur = { block: fallback, tags: [] }; out.push(cur); } cur.tags.push(t); }
+    });
+    return out.filter((b) => b.tags.length);
+  };
+  const flowSpeechOutline = () => outlineOf(speechView.current?.state.doc || speechDoc(), "Speech doc");
+  const flowFileOutline = () => {
+    const v = view.current;
+    if (!v || !cur) return null;
+    return { name: cur.name, theirs: curTheirs, blocks: outlineOf(v.state.doc, cur.name) };
+  };
+  /** A cell of the flow, answered from your library: the search, in Answer mode, Enter still sending. */
+  const flowAnswer = (text: string) => {
+    const EV = (window as any).EV;
+    setSide(true); setTab("search");
+    requestAnimationFrame(() => {
+      (root.current?.querySelector('#srcsw [data-src="lib"]') as HTMLElement | null)?.click();
+      const q = root.current?.querySelector("#q") as HTMLInputElement | null;
+      if (!q) return;
+      q.value = text.slice(0, 200);
+      q.dispatchEvent(new Event("input", { bubbles: true }));
+      EV?.setAnswer?.({ claim: text, under: false });
+      q.focus();
+      // typing something else in the search leaves Answer mode
+      const off = () => { if (q.value !== text.slice(0, 200)) { EV?.setAnswer?.(null); q.removeEventListener("input", off); } };
+      q.addEventListener("input", off);
+    });
+  };
 
   // ---- sending a card to the speech doc ---------------------------------------
   const sendCard = useCallback(async () => {
@@ -1478,7 +1495,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         v.state.doc.forEach((n, p) => { if (pos < 0 && n.type === schema.nodes.heading && n.textContent.replace(/\s+/g, " ").trim().toLowerCase() === want) pos = p; });
         if (pos >= 0) goPos(v, pos); else v.focus();
       });
-      if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+      if (modeRef.current === "flow") { modeRef.current = "edit"; setModeState("edit"); }
       return;
     }
     if (d.how === "page") {
@@ -1532,7 +1549,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
     const have = (d.file && filesRef.current.find((f) => f.id === d.file)) || filesRef.current.find((f) => norm(f.name) === norm(d.name));
     if (!have && !d.html) { d.none?.(); return; }
-    if (modeRef.current === "read") { modeRef.current = "edit"; setModeState("edit"); }
+    if (modeRef.current === "flow") { modeRef.current = "edit"; setModeState("edit"); }
     if (have) { await open(have.id, (v) => v.focus()); return; }
     const id = TEMP + norm(d.name);
     tempOf.current.set(id, { name: d.name, hatPocket: !!d.hatPocket });
@@ -1621,7 +1638,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (id === "new-file") { void create("Untitled file"); return; }
     if (id === "mode-split") { setMode(modeRef.current === "split" ? "edit" : "split"); return; }
     if (id === "mode-speech") { setMode(modeRef.current === "speech" ? "split" : "speech"); return; }
-    if (id === "mode-read") { setMode(modeRef.current === "read" ? "edit" : "read"); return; }
+    if (id === "mode-flow") { setMode(modeRef.current === "flow" ? "edit" : "flow"); return; }
     if (id === "timer") { setTimer((t) => ({ ...t, open: !t.open })); return; }
     if (id === "ribbon") { setMenu(null); setRibMin((r) => !r); return; }
     if (id === "tags-only") { toggleTags(target()); return; }
@@ -1640,7 +1657,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       toast(`Highlighter: ${n.name}`);
       return;
     }
-    if (modeRef.current === "read" && IN_DOC.has(id)) { toast("Read mode — Esc to edit"); return; }
+    if (modeRef.current === "flow" && IN_DOC.has(id)) { toast("That's for the page — Edit to get back to it"); return; }
     const v = target();
     if (!v) return;
     const speech = v === speechView.current;
@@ -1752,7 +1769,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   useEffect(() => {
     if (layoutMode !== "twin") return;
     // the speech doc is the whole of the work area: no file pages beside it
-    if (mode !== "speech" && mode !== "read") setMode("speech");
+    if (mode !== "speech" && mode !== "flow") setMode("speech");
   }, [layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const host = twinBox.current;
@@ -2305,7 +2322,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const commands = (() => {
     const out: { id: string; label: string; key: string; go: () => void }[] = [];
     ACTIONS.forEach((a) => { if (a.id !== "command") out.push({ id: a.id, label: a.label, key: K(a.id), go: () => run(a.id) }); });
-    ([["edit", "Just the file"], ["split", "Speech doc beside"], ["speech", "Just the speech doc"], ["read", "Read mode"]] as const)
+    ([["edit", "Just the file"], ["split", "Speech doc beside"], ["speech", "Just the speech doc"], ["flow", "Flow"]] as const)
       .forEach(([m, l]) => out.push({ id: "mode:" + m, label: "Mode: " + l, key: "", go: () => setMode(m) }));
     LAYOUT_MODES.forEach((l) => out.push({ id: "layout:" + l.id, label: "Layout: " + l.name, key: "", go: () => setLayoutMode(l.id) }));
     PALETTES.forEach((p) => out.push({ id: "pal:" + p.id, label: "Colours: " + p.name, key: "", go: () => setPalette(p.id) }));
@@ -2355,8 +2372,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       const t = e.target as HTMLElement | null;
       const typing = !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
       // / with nothing being typed in: the library search, wherever it is
-      if (e.key === "/" && !typing && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); e.stopPropagation(); focusLibrary(); return; }
-      if (e.key === "Escape" && modeRef.current === "read") { e.preventDefault(); setMode("edit"); return; }
+      // in Flow, its keys are its own: only coda's few round-wide ones get through
+      const inFlow = !!t?.closest?.(".mf");
+      if (e.key === "/" && !typing && !inFlow && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); e.stopPropagation(); focusLibrary(); return; }
       // Esc in the search with nothing typed: back to the page
       if (e.key === "Escape" && t && t.id === "q" && !(t as HTMLInputElement).value) {
         e.preventDefault(); e.stopPropagation();
@@ -2367,6 +2385,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       if (!spec) return;
       const id = actionFor(keysRef.current, spec);
       if (!id) return;
+      if (inFlow && !IN_FLOW_TOO.has(id)) return;
       if (IN_DOC.has(id) && !inDoc()) return;
       e.preventDefault();
       e.stopPropagation();
@@ -2948,7 +2967,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     ]);
     if (!words.length) {
       // nothing typed: the few things reached for most
-      const want = ["library", "find", "send", "mode-split", "mode-read", "new-file", "x:open", "timer", "x:keys", "x:colours"];
+      const want = ["library", "find", "send", "mode-split", "mode-flow", "new-file", "x:open", "timer", "x:keys", "x:colours"];
       return want.map((w) => cmds.find((c) => c.id === w)).filter(Boolean) as PalItem[];
     }
     const score = (label: string) => {
@@ -3010,7 +3029,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode("edit")} data-tip={"Just the file"}>Edit</button>
             <button type="button" aria-pressed={mode === "split"} onClick={() => setMode("split")} data-tip={tip("mode-split", "The speech doc beside")} className={sentPulse && mode !== "split" && mode !== "speech" ? "pulse" : ""} key={"s" + sentPulse}>Split</button>
             <button type="button" aria-pressed={mode === "speech"} onClick={() => setMode("speech")} data-tip={tip("mode-speech", "Just the speech doc")}>Speech</button>
-            <button type="button" aria-pressed={mode === "read"} onClick={() => setMode("read")} data-tip={tip("mode-read", "Read it, timed")}>Read</button>
+            <button type="button" aria-pressed={mode === "flow"} onClick={() => setMode("flow")} data-tip={tip("mode-flow", "Flow the round")}>Flow</button>
           </div>
           <div className="rm-acts">
             <button type="button" className={"rm-b rm-share rm-menubtn web-only" + (cur?.share && !curTheirs ? " on" : "")} aria-expanded={menu?.id === "share"}
@@ -3486,10 +3505,9 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             </section>
           </div>
 
-          {mode === "read" && (
-            <MagicRead doc={readDoc} source={readSrc} setSource={chooseReadSrc} hasSpeech={!!speechView.current || !!root.current?.querySelector("#docbody .ProseMirror")}
-              wpm={wpm} setWpm={setWpm} hideDim={hideDim} setHideDim={setHideDim} onEdit={editAt} onExit={() => setMode("edit")} />
-          )}
+          {/* Flow: always there, so what you send reaches the round even from Edit or Split; drawn in Flow mode */}
+          <MagicFlow owner={owner ?? null} shown={mode === "flow"} wpm={wpm} toast={toast} who={me || ""}
+            speechOutline={flowSpeechOutline} fileOutline={flowFileOutline} answer={flowAnswer} />
         </div>
       </div>
 

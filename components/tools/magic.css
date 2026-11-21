@@ -429,7 +429,7 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm-showside { position: absolute; left: 8px; top: 8px; z-index: 6; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 1px solid #d0d0d0; background: #fff; cursor: pointer; }
 .rm-showside:hover { border-color: #111; }
 .rm-work { flex: 1; display: flex; min-height: 0; }
-.rm[data-mode="read"] .rm-work { display: none; }
+.rm[data-mode="flow"] .rm-work { display: none; }
 .rm-panes { flex: 1; min-width: 0; display: flex; }
 .rm-pane { position: relative; min-width: 240px; display: flex; flex-direction: column; background: #fff; container-type: inline-size; }
 .rm-psplit { width: 7px; flex-shrink: 0; cursor: col-resize; position: relative; background: #fff; }
@@ -1766,3 +1766,5 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm .rm-aibtn.busy svg { animation: rmAiSpin 1.6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .rm .rm-aibtn.busy svg { animation: none; } }
 @media (max-width: 1100px) { .rm-aibusy .lb { display: none; } .rm-aibusy { padding-left: 2px; } }
+/* Flow has its own foot: coda's status line steps aside */
+.rm[data-mode="flow"] .rm-status { display: none; }

@@ -104,7 +104,7 @@ export default async function Download() {
         <ul className={s.diff}>
           <li><b>It works offline.</b> coda is inside the app, and everything you make is on your computer — no internet, no account.</li>
           <li><b>Every key works.</b> Ctrl+K, Ctrl+N and the rest reach coda — nothing in a browser or an extension takes them first.</li>
-          <li><b>Cutting, the library and the speech doc are all there</b> — searching, sending, Read mode, their docs from a .docx,
+          <li><b>Cutting, the library and the speech doc are all there</b> — searching, sending, Flow, their docs from a .docx,
             PDF or paste, export and import.</li>
           <li><b>With the internet, SpeechDrop and the caselist work too.</b> SpeechDrop needs nothing more. The caselist asks you,
             the first time, to sign into openCaselist with your own Tabroom email and password — it searches as you, and keeps the

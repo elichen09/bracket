@@ -40,7 +40,7 @@ const CHAPTERS: Chapter[] = [
     line: "One window for the round: your files, the library, the speech doc and their docs.",
     idea: <p>Everything happens in one place. Across the top, <b>the bar</b>; under it, <b>the format bar</b> with only what a card is cut with; down the side, your <b>outline</b>, <b>files</b>, the library <b>search</b> and the <b>round</b>; in the middle, the page. Every button and key works in whichever document has the cursor, the speech doc included.</p>,
     moves: [
-      <><b>Edit</b> is just your file. <b>Split</b> ({K("Alt+B")}) puts the speech doc beside it. <b>Speech</b> ({K("Alt+Shift+B")}) is the speech doc alone, the whole width. <b>Read</b> ({K("Alt+Shift+R")}) shows it the way you&apos;ll read it, timed. {K("Esc")} goes back.</>,
+      <><b>Edit</b> is just your file. <b>Split</b> ({K("Alt+B")}) puts the speech doc beside it. <b>Speech</b> ({K("Alt+Shift+B")}) is the speech doc alone, the whole width. <b>Flow</b> ({K("Alt+Shift+R")}) is your flow of the round: Public Forum sheets with a column per speech, flowed from the keyboard, and with your partner.</>,
       <>The box in the middle of the bar is the <b>command menu</b> ({K("Ctrl+Shift+K")}): any command, any file, or a search. It has a chapter of its own.</>,
       <>Your initial, top right, has home, this tutorial, Keys and sign out.</>,
     ],
@@ -140,13 +140,13 @@ const CHAPTERS: Chapter[] = [
       <><b>Share</b> gives the file you&apos;re in a link — whoever opens it is in it with you, like a Google Doc.</>,
       <><b>Read</b> ({K("Alt+Shift+R")}) shows it as you&apos;ll read it, with how long it takes; {K("Alt+T")} opens the speech timer.</>,
     ],
-    keys: [["Alt+B", "Speech doc beside"], ["Alt+Shift+B", "Just the speech doc"], ["Alt+H", "Tags only"], ["Alt+Shift+R", "Read mode"], ["Alt+T", "Speech timer"]],
+    keys: [["Alt+B", "Speech doc beside"], ["Alt+Shift+B", "Just the speech doc"], ["Alt+H", "Tags only"], ["Alt+Shift+R", "Flow"], ["Alt+T", "Speech timer"]],
   },
   {
     id: "theirs",
     name: "Their docs",
     line: "The other team's doc off SpeechDrop, a .docx, a PDF or a paste — opened to rehighlight and send from.",
-    idea: <p>A doc of theirs opens in the same editor as your files, marked <b>Theirs</b>, with the same outline, keys and Read mode. It&apos;s kept with your recent docs, never in your library.</p>,
+    idea: <p>A doc of theirs opens in the same editor as your files, marked <b>Theirs</b>, with the same outline and keys, and Flow can take it down in one go. It&apos;s kept with your recent docs, never in your library.</p>,
     moves: [
       <>In the <b>Round</b> tab, type their <b>SpeechDrop</b> room and press <b>Look</b>, then click a file. Or open a .docx or PDF, or paste a Google Doc.</>,
       <>Rehighlight a card: {K("Alt+G")} greys their highlighting, {K("Alt+Z")} marks your own words, {K("Alt+Enter")} sends it to your speech doc.</>,
