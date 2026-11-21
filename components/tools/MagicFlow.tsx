@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { comboOf, keyLabel } from "@/lib/cutter/keys";
 import {
-  newRound, title, columnsOf, speeches, cellAt, textAt, lastRow, rowsToShow, setCell, insertCell, deleteCell, insertRow, deleteRow,
+  newRound, title, columnsOf, firstCol, speeches, cellAt, textAt, lastRow, rowsToShow, setCell, insertCell, deleteCell, insertRow, deleteRow,
   toggleMark, clearRange, nextMarker, extend, moveBlock, addSheet, renameSheet, removeSheet, moveSheet, swapOrder, wordsIn,
   appendLines, sheetFor, key as cellKey, type Round, type Sheet, type Cell, type Marks, type Side, type Order,
 } from "@/lib/mflow/model";
@@ -34,6 +34,8 @@ interface Props {
   answer: (text: string) => void;
   /** your name, for your partner's flow */
   who: string;
+  /** coda's own side is hidden: a way to bring it back, drawn in Flow's own row */
+  showSide?: () => void;
 }
 
 type Pos = { c: number; r: number };
@@ -44,11 +46,12 @@ const I = {
   back: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>,
   plus: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>,
   x: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>,
+  menu: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>,
   side: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" /><path d="M9 4v16" /></svg>,
   down: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>,
 };
 
-export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fileOutline, answer, who }: Props) {
+export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fileOutline, answer, who, showSide }: Props) {
   const [rows, setRows] = useState<RoundRow[]>([]);
   const [round, setRound] = useState<Round | null>(null);
   const roundRef = useRef<Round | null>(null);
@@ -136,6 +139,12 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
 
   const sheet: Sheet | null = useMemo(() => round?.sheets.find((s) => s.id === sheetId) || round?.sheets[0] || null, [round, sheetId]);
   const cols = round && sheet ? columnsOf(round, sheet) : [];
+  /** the sheet's first column: an aff sheet from the AC, a neg sheet from the NC */
+  const c0 = round && sheet ? firstCol(round, sheet) : 0;
+  // on a sheet that starts further right (a neg sheet), the cursor starts there too
+  useEffect(() => {
+    if (sel.c < c0) { setSel((p) => ({ ...p, c: c0 })); setAnchor((p) => ({ ...p, c: c0 })); }
+  }, [c0, sheet?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const sps = round ? speeches(round.order) : [];
   const nRows = sheet ? rowsToShow(sheet) : 0;
 
@@ -167,7 +176,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
 
   const rect = () => ({ c0: Math.min(sel.c, anchor.c), c1: Math.max(sel.c, anchor.c), r0: Math.min(sel.r, anchor.r), r1: Math.max(sel.r, anchor.r) });
   const go = (p: Pos, extendSel = false) => {
-    const c = Math.max(0, Math.min(cols.length - 1, p.c)), r = Math.max(0, p.r);
+    const c = Math.max(c0, Math.min(cols.length - 1, p.c)), r = Math.max(0, p.r);
     setSel({ c, r });
     if (!extendSel) setAnchor({ c, r });
     // the cell kept in view
@@ -184,7 +193,9 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
 
   const toSheet = (id: string) => {
     if (editing) commitEdit();
-    setSheetId(id); setSel((p) => ({ c: Math.min(p.c, (round && round.sheets.find((s) => s.id === id)?.kind === "cx") ? 2 : 7), r: 0 })); setAnchor({ c: 0, r: 0 });
+    const to = round?.sheets.find((s) => s.id === id);
+    const from = round && to ? firstCol(round, to) : 0;
+    setSheetId(id); setSel((p) => ({ c: Math.max(from, Math.min(p.c, to?.kind === "cx" ? 2 : 7)), r: 0 })); setAnchor({ c: from, r: 0 });
     requestAnimationFrame(() => gridRef.current?.focus());
   };
 
@@ -307,7 +318,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
   const drop = (by: number, byCol: number) => {
     if (!sheet) return;
     const q = rect();
-    const bc = Math.max(-q.c0, Math.min(cols.length - 1 - q.c1, byCol));
+    const bc = Math.max(c0 - q.c0, Math.min(cols.length - 1 - q.c1, byCol));
     if (by || bc) apply((r) => moveBlock(r, sheet.id, [q.c0, q.c1], [q.r0, q.r1], by, bc));
     setMoving(null);
     setAnchor({ c: q.c0 + bc, r: Math.max(0, q.r0 + by) }); setSel({ c: q.c1 + bc, r: Math.max(0, q.r1 + by) });
@@ -338,7 +349,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
     if (moving) {
       if (spec === "↑") { take(); setMoving({ ...moving, by: Math.max(-q.r0, moving.by - 1) }); return; }
       if (spec === "↓") { take(); setMoving({ ...moving, by: moving.by + 1 }); return; }
-      if (spec === "←") { take(); setMoving({ ...moving, byCol: Math.max(-q.c0, moving.byCol - 1) }); return; }
+      if (spec === "←") { take(); setMoving({ ...moving, byCol: Math.max(c0 - q.c0, moving.byCol - 1) }); return; }
       if (spec === "→") { take(); setMoving({ ...moving, byCol: Math.min(cols.length - 1 - q.c1, moving.byCol + 1) }); return; }
       if (spec === "Enter") { take(); drop(moving.by, moving.byCol); return; }
       if (spec === "Escape") { take(); setMoving(null); return; }
@@ -536,6 +547,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
       {/* ---- the sheets */}
       <aside className="mf-side" aria-label="Sheets">
         <div className="mf-addrow">
+          {showSide && <button type="button" className="mf-icon" onClick={showSide} aria-label="Show coda's side" title="Show coda's side">{I.menu}</button>}
           <button type="button" className="aff" onClick={() => newSheet("aff")} title={"New aff sheet · " + keyLabel("mod+alt+A")}>{I.plus}Aff</button>
           <button type="button" className="neg" onClick={() => newSheet("neg")} title={"New neg sheet · " + keyLabel("mod+alt+N")}>{I.plus}Neg</button>
           <button type="button" className="mf-icon" onClick={() => setSideOpen(false)} aria-label="Hide the sheets" title={"Hide the sheets · " + keyLabel("mod+\\")}>{I.side}</button>
@@ -587,6 +599,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
       {/* ---- the round */}
       <section className="mf-main">
         <header className="mf-bar">
+          {!sideOpen && showSide && <button type="button" className="mf-icon" onClick={showSide} aria-label="Show coda's side" title="Show coda's side">{I.menu}</button>}
           {!sideOpen && <button type="button" className="mf-icon" onClick={() => setSideOpen(true)} aria-label="Show the sheets">{I.side}</button>}
           <button type="button" className="mf-back" onClick={close} title="Your rounds">{I.back}Rounds</button>
           <button type="button" className="mf-title" onClick={() => setPanel(panel === "info" ? null : "info")} title="Round info">{title(round)}</button>
@@ -699,15 +712,17 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
             onPaste={(e) => { if (editing) return; e.preventDefault(); paste(e.clipboardData.getData("text/plain")); }}
             onWheel={(e) => { if (e.ctrlKey) { e.preventDefault(); setZoom(zoom - Math.sign(e.deltaY) * 0.1); } }}
             onMouseUp={() => { dragSel.current = false; }}>
-            <div className="mf-table" style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(calc(300px * var(--z)), 1fr))` }}>
+            <div className="mf-table" style={{ gridTemplateColumns: `repeat(${cols.length - c0}, minmax(calc(300px * var(--z)), 1fr))` }}>
               {cols.map((c, i) => {
+                if (i < c0) return null;
                 const side = sheet.kind === "cx" ? "cx" : sps[i]?.side;
                 return <div key={c.id} className={"mf-h " + side + (i === sel.c ? " cur" : "") + (i === sendTo && sheet.kind !== "cx" ? " sends" : "")}>{c.name}</div>;
               })}
               {Array.from({ length: nRows }).map((_, r) => cols.map((_, c) => {
+                if (c < c0) return null;
                 const cell = cellAt(sheet, c, r);
                 const isSel = c === sel.c && r === sel.r;
-                const cls = "mf-c" + (cell?.b ? " b" : "") + (cell?.h ? " h" : "") + (cell?.c ? " cd" : "") + (cell?.g ? " g" : "") + (cell?.k ? " k" : "") +
+                const cls = "mf-c" + (sheet.kind !== "cx" && sps[c] ? " " + sps[c].side : "") + (cell?.b ? " b" : "") + (cell?.h ? " h" : "") + (cell?.c ? " cd" : "") + (cell?.g ? " g" : "") + (cell?.k ? " k" : "") +
                   (cell?.src ? " src" : "") + (isSel ? " sel" : "") + (inRange(c, r) && !isSel ? " rng" : "") + (movedTo(c, r) ? " movto" : "") + (moving && inRange(c, r) ? " lifting" : "") + (many && inRange(c, r) && !moving && !editing ? " grab" : "");
                 const mate = mates.get(cellKey(c, r));
                 return (
@@ -723,7 +738,7 @@ export default function MagicFlow({ owner, shown, wpm, toast, speechOutline, fil
                     }}
                     onMouseEnter={() => {
                       if (moving?.drag) {
-                        setMoving({ ...moving, by: Math.max(-q.r0, r - moving.drag.r), byCol: Math.max(-q.c0, Math.min(cols.length - 1 - q.c1, c - moving.drag.c)) });
+                        setMoving({ ...moving, by: Math.max(-q.r0, r - moving.drag.r), byCol: Math.max(c0 - q.c0, Math.min(cols.length - 1 - q.c1, c - moving.drag.c)) });
                         return;
                       }
                       if (dragSel.current) setSel({ c, r });

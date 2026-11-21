@@ -3506,7 +3506,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           </div>
 
           {/* Flow: always there, so what you send reaches the round even from Edit or Split; drawn in Flow mode */}
-          <MagicFlow owner={owner ?? null} shown={mode === "flow"} wpm={wpm} toast={toast} who={me || ""}
+          <MagicFlow owner={owner ?? null} shown={mode === "flow"} wpm={wpm} toast={toast} who={me || ""} showSide={!side && !focusLayout ? () => setSide(true) : undefined}
             speechOutline={flowSpeechOutline} fileOutline={flowFileOutline} answer={flowAnswer} />
         </div>
       </div>

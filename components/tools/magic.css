@@ -428,6 +428,8 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm-main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
 .rm-showside { position: absolute; left: 8px; top: 8px; z-index: 6; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 1px solid #d0d0d0; background: #fff; cursor: pointer; }
 .rm-showside:hover { border-color: #111; }
+/* in Flow it would sit on Flow's sheets; Flow draws it in its own row instead */
+.rm[data-mode="flow"] .rm-showside { display: none; }
 .rm-work { flex: 1; display: flex; min-height: 0; }
 .rm[data-mode="flow"] .rm-work { display: none; }
 .rm-panes { flex: 1; min-width: 0; display: flex; }

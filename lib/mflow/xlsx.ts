@@ -4,7 +4,7 @@
  * RFD, as ebb exports. Written by hand on jszip; nothing else needed.
  */
 import JSZip from "jszip";
-import { columnsOf, lastRow, cellAt, title, type Round, type Cell } from "./model";
+import { columnsOf, firstCol, lastRow, cellAt, title, type Round, type Cell } from "./model";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
   // characters XML can't hold
@@ -88,10 +88,12 @@ export async function roundXlsx(r: Round): Promise<Blob> {
   const sheetNames = names([...r.sheets.map((s) => (s.kind === "cx" ? "CX" : (s.kind === "aff" ? "Aff " : "Neg ") + s.name)), "Info", "RFD"]);
 
   r.sheets.forEach((s, i) => {
-    const cols = columnsOf(r, s);
+    // the columns the sheet shows (a neg sheet from the NC)
+    const c0 = firstCol(r, s);
+    const cols = columnsOf(r, s).slice(c0);
     const rows: { cells: { text: string; style: number }[] }[] = [{ cells: cols.map((c) => ({ text: c.name, style: 1 })) }];
     const last = lastRow(s);
-    for (let w = 0; w <= last; w++) rows.push({ cells: cols.map((_, c) => { const cell = cellAt(s, c, w); return { text: cell?.t || "", style: st.of(cell) }; }) });
+    for (let w = 0; w <= last; w++) rows.push({ cells: cols.map((_, i) => { const cell = cellAt(s, c0 + i, w); return { text: cell?.t || "", style: st.of(cell) }; }) });
     books.push({ name: sheetNames[i], xml: sheetXml(rows, cols.map(() => 34)) });
   });
 

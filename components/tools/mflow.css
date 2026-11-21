@@ -67,6 +67,8 @@
 .mf-zoom .pct { min-width: 46px; font: 500 11.5px var(--rm-mono); color: var(--mut); }
 
 /* ---- the paper */
+/* the site-wide focus ring (app/globals.css) would frame the whole grid every time you type; the selected cell shows where you are */
+.mf :is(.mf-grid, .mf-ed, .mf-rfdtext):focus-visible { outline: none; }
 .mf-grid { flex: 1; min-height: 0; overflow: auto; background: var(--paper); color: var(--ink); outline: none; scrollbar-width: thin; scrollbar-color: #c9c9c6 transparent; }
 .mf-table { display: grid; min-width: 100%; font-size: calc(14px * var(--z)); }
 .mf-h {
@@ -80,6 +82,9 @@
   position: relative; min-height: calc(32px * var(--z)); padding: calc(6px * var(--z)) calc(9px * var(--z));
   border-right: 1px solid var(--rule2); border-bottom: 1px solid var(--rule2); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.38; cursor: cell;
 }
+/* the words in a cell in their side's colour, as the column heads are */
+.mf-c.aff { color: var(--aff); }
+.mf-c.neg { color: var(--neg); }
 .mf-c.b { font-weight: 700; }
 .mf-c.h { background: #fff59d; }
 .mf-c.cd { box-shadow: inset 0 -2px 0 var(--ink); }

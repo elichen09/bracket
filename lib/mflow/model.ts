@@ -64,6 +64,19 @@ export const CX: { id: string; name: string }[] = [
 
 export const columnsOf = (r: Round, s: Sheet) => (s.kind === "cx" ? CX : speeches(r.order));
 
+/**
+ * The first column a sheet shows: an aff sheet starts at the AC, a neg sheet at
+ * the NC (when the neg speaks first, nothing comes before it). Cells keep their
+ * place in the round's order — so sends, word counts and swapping who speaks
+ * first don't change — and anything already written further left still shows.
+ */
+export function firstCol(r: Round, s: Sheet): number {
+  if (s.kind === "cx") return 0;
+  let c0 = Math.max(0, speeches(r.order).findIndex((x) => x.id === (s.kind === "aff" ? "ac" : "nc")));
+  for (const k in s.cells) { const c = Number(k.split(":")[0]); if (c < c0 && s.cells[k].t.trim()) c0 = c; }
+  return c0;
+}
+
 export const key = (col: number, row: number) => col + ":" + row;
 export const uid = (p = "s") => p + Math.random().toString(36).slice(2, 10);
 
