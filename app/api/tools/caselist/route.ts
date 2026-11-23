@@ -24,6 +24,7 @@ export const maxDuration = 30;
  *
  *   GET  ?op=indexes                 which wikis have an index, and how fresh
  *   GET  ?op=index&wiki=hspf26       a short-lived link to download one
+ *   GET  ?op=team&wiki=&school=&team=  a team's rounds (when, side, opponent, report) and each round's positions
  *   GET  ?op=card&zip=…&off=&len=&m=&nl=&path=&tag=
  *                                    one card, as HTML: its document read out of
  *                                    the weekly archive with a single ranged
@@ -77,6 +78,22 @@ async function viaApi(path: string, app: string | null) {
   return { body: await r.arrayBuffer(), set: t.fresh ? t.token + "|" + t.until : null };
 }
 
+/** openCaselist's own answer, as JSON: asked as the app's account, or the site's. */
+async function apiJson(path: string, app: string | null): Promise<any> {
+  const fail = (r: Response) => new CaselistError(r.status === 401 ? "sign in to openCaselist" : "openCaselist said " + r.status, r.status === 401 ? 401 : r.status === 404 ? 404 : 502);
+  if (app) {
+    const r = await call(path, app);
+    if (!r.ok) throw fail(r);
+    return r.json();
+  }
+  const jar = { tok: cookies().get(TOKEN_COOKIE)?.value };
+  let t = await token(jar.tok);
+  let r = await call(path, t.token);
+  if (r.status === 401) { forget(); t = await token(null); r = await call(path, t.token); }
+  if (!r.ok) throw fail(r);
+  return r.json();
+}
+
 export async function GET(req: Request) { return withCors(req, await get(req)); }
 export async function POST(req: Request) { return withCors(req, await post(req)); }
 
@@ -105,6 +122,23 @@ async function get(req: Request): Promise<NextResponse> {
       const { data, error } = await db.storage.from(BUCKET).createSignedUrl(`${wiki}.json.gz`, 3600);
       if (error || !data) throw new CaselistError("storage: " + (error?.message || "no link"), 502);
       return NextResponse.json({ meta, url: data.signedUrl });
+    }
+
+    // a team's rounds and the positions each lists: the scout card's "recent rounds" and "what they went for"
+    if (op === "team") {
+      const wiki = String(u.get("wiki") || ""), school = String(u.get("school") || ""), team = String(u.get("team") || "");
+      const NAME = /^[\w.'() -]{1,80}$/;
+      if (!WIKI.test(wiki) || !NAME.test(school) || !NAME.test(team)) return bad("which team?");
+      const base = "/caselists/" + wiki + "/schools/" + encodeURIComponent(school) + "/teams/" + encodeURIComponent(team);
+      const [rounds, cites] = await Promise.all([apiJson(base + "/rounds", app), apiJson(base + "/cites", app).catch(() => [])]);
+      const clip = (s: unknown, n: number) => String(s || "").replace(/\s+/g, " ").trim().slice(0, n);
+      return NextResponse.json({
+        rounds: (Array.isArray(rounds) ? rounds : []).map((r: any) => ({
+          id: r.round_id, side: r.side, tournament: clip(r.tournament, 80), round: clip(r.round, 30), opponent: clip(r.opponent, 80),
+          judge: clip(r.judge, 80), report: clip(r.report, 1500), at: r.created_at || null, file: r.opensource || null,
+        })),
+        cites: (Array.isArray(cites) ? cites : []).map((c: any) => ({ round: c.round_id, title: clip(c.title, 120), side: c.side })),
+      }, { headers: { "cache-control": "private, max-age=600" } });
     }
 
     if (op === "card") {

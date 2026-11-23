@@ -24,7 +24,8 @@ import { aiKey, setAiKey, checkKey, AI_MODEL } from "@/lib/ai/claude";
 import { citeFromLink } from "@/lib/ai/cite";
 import { aiReformat, cardsToDo, cardAt } from "@/lib/ai/reformat";
 import { aiIndict, type Rehighlight } from "@/lib/ai/indict";
-import { findBlocks, type Found, type Sources, type Analytic } from "@/lib/ai/blocks";
+import { findBlocks, type Found, type Sources, type Analytic, type Best } from "@/lib/ai/blocks";
+import Scout, { type PrepTarget } from "./Scout";
 import { spotPlugin, holdSpot, takeSpot, type Spot } from "@/lib/ai/spot";
 import { caselistClient, familyOf, haveKept } from "@/lib/caselist/client";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
@@ -2180,15 +2181,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       aiStop.current = null; setAiRun(null);
     }
   };
-  const aiBlocksNow = async () => {
-    if (!aiPanel || aiPanel.kind !== "blocks") return;
-    const EV = (window as any).EV;
-    if (!EV?.libraryText) { setAiPanel({ ...aiPanel, err: "The library is still loading — try again in a moment." }); return; }
-    if (!aiPanel.want.trim()) { setAiPanel({ ...aiPanel, err: "Select their argument, or paste it in, first." }); return; }
-    if (aiBusy()) return;
+  /** Where Find blocks (and Prep) look: the library, and the caselist — the events chosen in its search — when it's there. */
+  const blockSources = (EV: any): Sources => {
     const clOn = desktop ? !!caselistLogin() || haveKept() : true;
     const cl = clOn ? (caselistClient(owner, scoped) as any) : null;
-    const src: Sources = {
+    return {
       library: () => EV.libraryText(),
       caselist: cl ? async (q: string, answer: boolean) => {
         // the wikis chosen in the caselist search, with its own default (high school policy) when none have been
@@ -2201,6 +2198,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         return ((r && r.groups) || []).flatMap((g: any) => g.cards.slice(0, 3).map((c: any) => ({ tag: String(c.tag || ""), cite: String(c.cite || ""), block: String(c.block || ""), team: String(g.name || ""), raw: c }))).slice(0, 12);
       } : null,
     };
+  };
+  const aiBlocksNow = async () => {
+    if (!aiPanel || aiPanel.kind !== "blocks") return;
+    const EV = (window as any).EV;
+    if (!EV?.libraryText) { setAiPanel({ ...aiPanel, err: "The library is still loading — try again in a moment." }); return; }
+    if (!aiPanel.want.trim()) { setAiPanel({ ...aiPanel, err: "Select their argument, or paste it in, first." }); return; }
+    if (aiBusy()) return;
+    const src = blockSources(EV);
     const want = aiPanel.want;
     aiWant.current = want;
     const ctl = new AbortController(); aiStop.current = ctl;
@@ -2227,6 +2232,79 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       setAiFound({ ...found, rehi, rehiSays }); setAiDockMin(false);
     } catch (e) {
       toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
+    } finally {
+      aiStop.current = null; setAiRun(null);
+    }
+  };
+  /** An answer as a card in a file: the library's block (one card, or the whole block), or the caselist's card. */
+  const bestHtml = async (b: Best): Promise<string> => {
+    const EV = (window as any).EV;
+    try {
+      if (b.from === "library") {
+        const block = await EV.DB.get("blocks", b.id);
+        if (!block) return "";
+        return EV.toHtml(EV.blockToElements(block, b.card === null ? { head: false } : { head: false, argIndex: b.card }));
+      }
+      const blk = await readyCl(b.raw);
+      return EV.toHtml(EV.blockToElements(blk, { head: false, argIndex: 0 }));
+    } catch { return ""; }
+  };
+  /** Their card's words, from its HTML. */
+  const htmlText = (html: string) => { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("p,h1,h2,h3,h4,li").forEach((e) => e.append("\n")); return (d.textContent || "").replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n").trim(); };
+  /**
+   * Prep against a position of theirs (from the scout card): their cards read
+   * (from the caselist, or the archive kept here), Find blocks over each of
+   * their arguments — two at a time, in the background — and the answers put
+   * together as a file: their argument's heading, then your best cards against
+   * it, and analytics when asked for.
+   */
+  const prepAgainst = async (p: PrepTarget) => {
+    const EV = (window as any).EV;
+    if (!EV?.libraryText || !EV?.DB) { toast("The library is still loading — try again in a moment"); return; }
+    if (!aiKey(owner)) { toast("Add your Anthropic key first — ✦, top right"); return; }
+    if (aiBusy()) return;
+    const cl = caselistClient(owner, scoped) as any;
+    const src = blockSources(EV);
+    const ctl = new AbortController(); aiStop.current = ctl;
+    const of = p.groups.length;
+    let done = 0;
+    const label = "Prepping " + (p.title.length > 22 ? p.title.slice(0, 21) + "…" : p.title);
+    setAiRun({ label, done, of });
+    try {
+      const found: (Found | null)[] = new Array(of).fill(null);
+      const one = async (gi: number) => {
+        const g = p.groups[gi];
+        const texts: string[] = [];
+        for (const c of g.cards.slice(0, 6)) {
+          if (ctl.signal.aborted) return;
+          try { texts.push(htmlText(await cl.cardHtml(c))); } catch { texts.push(c.tag + (c.cite ? "\n" + c.cite : "")); }
+        }
+        const arg = (g.title ? g.title + "\n\n" : "") + texts.join("\n\n");
+        try { found[gi] = await findBlocks(aiKey(owner), arg, src, ctl.signal, () => {}, { analytics: p.analytics }); }
+        catch (e) { if (ctl.signal.aborted) throw e; found[gi] = null; }
+        done++; setAiRun({ label, done, of });
+      };
+      let next = 0;
+      await Promise.all([0, 1].map(async () => { while (next < of) { const k = next++; await one(k); } }));
+      if (ctl.signal.aborted) throw new Error("stopped");
+      let html = `<h2>${esc("AT: " + p.team + " — " + p.title)}</h2>`;
+      let cards = 0;
+      for (let k = 0; k < of; k++) {
+        const g = p.groups[k], fd = found[k];
+        html += `<h3>${esc("AT: " + g.title)}</h3>`;
+        if (!fd) { html += "<p>This one didn't come back — prep it again, or use Find blocks on their cards.</p>"; continue; }
+        if (fd.claim) html += `<p><i>${esc("They say: " + fd.claim)}</i></p>`;
+        for (const b of fd.best) { const h = await bestHtml(b); if (h) { html += h; cards++; } }
+        for (const a of fd.analytics || []) {
+          html += `<h4>${esc(a.text)}</h4>`;
+          if (a.card) { const h = await bestHtml(a.card); if (h) { html += h; cards++; } }
+        }
+        if (!fd.best.length && !(fd.analytics || []).length) html += "<p>Nothing in your library or the caselist answers this yet.</p>";
+      }
+      const made = await newFile(("AT " + p.team + " " + p.title).slice(0, 80), html);
+      toast(`“${made.name}” is in your files — ${cards} ${cards === 1 ? "card" : "cards"} against ${of} ${of === 1 ? "argument" : "arguments"}`);
+    } catch (e) {
+      toast(ctl.signal.aborted ? "Stopped" : "Prep stopped: " + (e as Error).message);
     } finally {
       aiStop.current = null; setAiRun(null);
     }
@@ -3355,6 +3433,11 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
 
           {/* the round: their docs, SpeechDrop, your partner */}
           <div className="rm-tabpane tp-round" hidden={tab !== "round"}>
+            <div className="rm-rsec">
+              <div className="rm-cap">THE TEAM YOU&apos;RE HITTING</div>
+              <Scout owner={owner ?? null} ready={desktop ? !!clLogin || haveKept() : true} aiReady={!!aiK} toast={toast}
+                onPrep={(p) => void prepAgainst(p)} onSend={(c, team) => void sendCl(c, team).then((ok) => { if (ok) toast("Sent: " + c.tag.slice(0, 60)); })} />
+            </div>
             {desktop && <p className="rm-sempty rm-webnote">SpeechDrop and the caselist need the internet; the rest of coda doesn&apos;t. Your partner&apos;s app on the same Wi-Fi connects straight to yours, internet or not. Your partner&apos;s Google Doc is in coda on the web.</p>}
             <div className="rm-rsec web-only">
               <div className="rm-cap">PARTNER&apos;S FLOW · GOOGLE DOC</div>

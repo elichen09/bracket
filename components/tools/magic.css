@@ -1784,3 +1784,41 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 @media (max-width: 1100px) { .rm-aibusy .lb { display: none; } .rm-aibusy { padding-left: 2px; } }
 /* Flow has its own foot: coda's status line steps aside */
 .rm[data-mode="flow"] .rm-status { display: none; }
+
+/* the scout card (Scout.tsx): the team you're hitting, in the Round tab */
+.rm-scout { position: relative; }
+.rm-scoutq { padding-bottom: 6px; }
+.rm-scouthits { margin: 0 10px 8px; border: 1px solid var(--well-b); background: var(--well); max-height: 260px; overflow: auto; }
+.rm-scouthits .rm-hit.on { background: var(--side-h); border-left-color: var(--acc); }
+.rm-scoutcard { margin: 0 10px; border: 1px solid var(--side-line); }
+.rm-scouthead { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 9px 30px 9px 10px; border-bottom: 1px solid var(--side-line); }
+.rm-scouthead b { font-size: 14px; color: var(--side-txt); }
+.rm-scouthead span { font: 500 10.5px var(--rm-mono); letter-spacing: .08em; color: var(--side-mut); }
+.rm-scoutx { position: absolute; top: 6px; right: 4px; width: 24px; height: 24px; border: 0; background: transparent; color: var(--side-mut); font-size: 16px; cursor: pointer; }
+.rm-scoutx:hover { color: var(--hi); }
+.rm-scout .new { margin-left: 8px; padding: 0 5px; font: 600 9.5px var(--rm-mono); letter-spacing: .08em; font-style: normal; color: var(--on-acc); background: var(--acc); }
+.rm-scoutside { padding: 6px 0 4px; border-bottom: 1px solid var(--side-line); }
+.rm-scoutside:last-child { border-bottom: 0; }
+.rm-scoutcap { display: flex; align-items: center; justify-content: space-between; padding: 2px 10px; font: 500 10px var(--rm-mono); letter-spacing: .12em; color: var(--side-mut); }
+.rm-scoutcap .rm-linkbtn { padding: 2px 0; }
+.rm-scoutpos, .rm-scoutcardrow { display: flex; align-items: center; gap: 8px; padding: 3px 10px; font-size: 12.5px; color: var(--side-txt); }
+.rm-scoutpos:hover, .rm-scoutcardrow:hover { background: var(--side-h); }
+.rm-scoutpos .t, .rm-scoutcardrow .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-scoutcardrow .t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rm-scoutpos .n, .rm-scoutcardrow .n { flex: none; font: 500 10.5px var(--rm-mono); color: var(--side-mut); font-variant-numeric: tabular-nums; }
+.rm-scoutpos .rm-linkbtn, .rm-scoutcardrow .rm-linkbtn { flex: none; padding: 2px 0 2px 4px; opacity: 0; }
+.rm-scoutpos:hover .rm-linkbtn, .rm-scoutcardrow:hover .rm-linkbtn, .rm-scoutpos .rm-linkbtn:focus-visible, .rm-scoutcardrow .rm-linkbtn:focus-visible { opacity: 1; }
+.rm-scoutfold { border: 0; background: transparent; padding: 2px 10px; font: 500 10px var(--rm-mono); letter-spacing: .12em; color: var(--side-mut); cursor: pointer; }
+.rm-scoutfold:hover { color: var(--hi); }
+.rm-scoutround { padding: 4px 10px 6px; font-size: 12px; color: var(--side-txt); }
+.rm-scoutround .h { display: flex; align-items: center; gap: 6px; }
+.rm-scoutround .h .new { margin-left: 0; }
+.rm-scoutround .c { margin-top: 1px; font-size: 11.5px; color: var(--side-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-scoutround .rep { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 100%; margin-top: 3px; padding: 4px 6px; border: 0; border-left: 2px solid var(--well-b); background: var(--well); color: var(--side-txt); font: 12px/1.4 var(--rm-sans); text-align: left; cursor: pointer; }
+.rm-scoutround .rep.open { display: block; -webkit-line-clamp: unset; }
+.rm-scoutask { padding: 8px 10px; border-bottom: 1px solid var(--side-line); background: var(--side-h); font-size: 12px; color: var(--side-txt); line-height: 1.45; }
+.rm-scoutask p { margin: 0 0 6px; }
+.rm-scoutask label { display: flex; align-items: center; gap: 6px; color: var(--side-mut); }
+.rm-scoutacts { display: flex; gap: 6px; margin-top: 8px; }
+.rm-scoutacts button { height: 28px; padding: 0 12px; border: 1px solid var(--well-b); background: transparent; color: var(--side-txt); font: 500 10.5px var(--rm-mono); letter-spacing: .1em; cursor: pointer; }
+.rm-scoutacts button.pri { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
