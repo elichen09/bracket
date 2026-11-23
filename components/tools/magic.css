@@ -1785,6 +1785,16 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 /* Flow has its own foot: coda's status line steps aside */
 .rm[data-mode="flow"] .rm-status { display: none; }
 
+/* the back half's panel: extensions or for reference, the side and the speech */
+.rm-aiseg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 2px 0 8px; }
+.rm-aiseg button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; border: 1px solid var(--well-b); background: transparent; color: var(--txt); text-align: left; cursor: pointer; }
+.rm-aiseg button b { font: 600 13px var(--rm-sans); }
+.rm-aiseg button small { font-size: 11.5px; color: var(--mut); }
+.rm-aiseg button.on { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+.rm-airow { display: flex; gap: 14px; margin: 0 0 8px; }
+.rm-airow label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mut); }
+.rm-airow select { height: 28px; padding: 0 6px; background: var(--well); border: 1px solid var(--well-b); color: var(--txt); font: 13px var(--rm-sans); }
+
 /* the scout card (Scout.tsx): the team you're hitting, in the Round tab */
 .rm-scout { position: relative; }
 .rm-scoutq { padding-bottom: 6px; }

@@ -25,6 +25,7 @@ import { citeFromLink } from "@/lib/ai/cite";
 import { aiReformat, cardsToDo, cardAt } from "@/lib/ai/reformat";
 import { aiIndict, type Rehighlight } from "@/lib/ai/indict";
 import { findBlocks, type Found, type Sources, type Analytic, type Best } from "@/lib/ai/blocks";
+import { readFile as readBackFile, writeBackHalf, type BackKind, type Side as BackSide } from "@/lib/ai/extend";
 import Scout, { type PrepTarget } from "./Scout";
 import { spotPlugin, holdSpot, takeSpot, type Spot } from "@/lib/ai/spot";
 import { caselistClient, familyOf, haveKept } from "@/lib/caselist/client";
@@ -426,7 +427,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const keysRef = useRef(keys);
   keysRef.current = keys;
   const [keysOpen, setKeysOpen] = useState(false);
-  const aiOpenRef = useRef<(what: "cite" | "reformat" | "indict" | "blocks" | "settings") => void>(() => {});
+  const aiOpenRef = useRef<(what: "cite" | "reformat" | "indict" | "blocks" | "back" | "settings") => void>(() => {});
   // the command menu: one box for every command, every file, and both searches
   const [pal, setPal] = useState<null | { q: string; sel: number }>(null);
   const palIn = useRef<HTMLInputElement>(null);
@@ -1644,6 +1645,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (id === "ai-cite") { aiOpenRef.current("cite"); return; }
     if (id === "ai-reformat") { aiOpenRef.current("reformat"); return; }
     if (id === "ai-blocks") { aiOpenRef.current("blocks"); return; }
+    if (id === "ai-extend") { aiOpenRef.current("back"); return; }
     if (id === "ai-indict") { aiOpenRef.current("indict"); return; }
     if (id === "command") {
       // the search, with every command after a >
@@ -1927,9 +1929,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem(AI_OPTS) || "null"); if (v) setAiOptsState((o) => ({ ...o, ...v })); } catch { /* first time */ } }, [AI_OPTS]);
   const setAiOpts = (p: Partial<typeof aiOpts>) => setAiOptsState((o) => { const n = { ...o, ...p }; try { localStorage.setItem(AI_OPTS, JSON.stringify(n)); } catch { /* private */ } return n; });
   type AiPanel =
-    | { kind: "settings"; draft: string; busy: boolean; msg: string; bad: boolean; then?: "cite" | "reformat" | "indict" | "blocks" }
+    | { kind: "settings"; draft: string; busy: boolean; msg: string; bad: boolean; then?: "cite" | "reformat" | "indict" | "blocks" | "back" }
     | { kind: "cite"; url: string; err: string }
-    | { kind: "blocks"; want: string; err: string };
+    | { kind: "blocks"; want: string; err: string }
+    | { kind: "back"; mode: BackKind; side: BackSide; speech: string; want: string; weighing: boolean; err: string; cards: number; selected: boolean };
   const [aiPanel, setAiPanel] = useState<AiPanel | null>(null);
   const aiStop = useRef<AbortController | null>(null);
   /** AI at work, in the background: what it's doing, for the chip in the corner. */
@@ -1974,13 +1977,19 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     return v.state.selection.$from.parent.textContent.slice(0, 2000);
   };
   /** A feature asked for: its panel — or with no key yet, AI settings first, and then it. */
-  const aiOpen = (what: "cite" | "reformat" | "indict" | "blocks" | "settings") => {
+  const aiOpen = (what: "cite" | "reformat" | "indict" | "blocks" | "back" | "settings") => {
     setMenu(null);
     if (what === "settings" || !aiKey(owner)) {
       setAiPanel({ kind: "settings", draft: "", busy: false, bad: false, msg: aiKey(owner) ? "" : "Paste your Anthropic API key to use AI in coda.", then: what === "settings" ? undefined : what });
       return;
     }
     if (what === "cite") setAiPanel({ kind: "cite", url: "", err: "" });
+    else if (what === "back") {
+      const v = target();
+      const f = v ? readBackFile(v.state) : null;
+      const side: BackSide = f?.side || "aff";
+      setAiPanel({ kind: "back", mode: "extend", side, speech: backSpeech("extend", side), want: "", weighing: true, err: "", cards: f?.cards.length || 0, selected: !!f?.selected });
+    }
     else if (what === "blocks") {
       const here = wantFromHere();
       for (const sp of aiWantFrom.current?.spots || []) { const v0 = aiWantFrom.current!.view; if (!v0.isDestroyed) takeSpot(v0.state, sp); }
@@ -1998,6 +2007,31 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     else void aiReformatNow();
   };
   aiOpenRef.current = aiOpen;
+  /** The speech a back half is for, unless it's chosen: the 1AR or 1NR's extensions, the 2AC or 2NC's blocks. */
+  const backSpeech = (mode: BackKind, side: BackSide) => (mode === "extend" ? (side === "aff" ? "1AR" : "1NR") : side === "aff" ? "2AC" : "2NC");
+  /** The back half, written from this file's cards and put at the end of it (one step: Ctrl+Z takes it back out). */
+  const aiBackNow = async () => {
+    if (!aiPanel || aiPanel.kind !== "back") return;
+    const v = target();
+    if (!v) { setAiPanel({ ...aiPanel, err: "Open the file with the case or the position in it first." }); return; }
+    const f = readBackFile(v.state);
+    if (!f.cards.length) { setAiPanel({ ...aiPanel, err: "No cards in this file to work from." }); return; }
+    if (aiBusy()) return;
+    const o = { kind: aiPanel.mode, side: aiPanel.side, speech: aiPanel.speech, want: aiPanel.want, weighing: aiPanel.weighing };
+    const ctl = new AbortController(); aiStop.current = ctl;
+    setAiPanel(null); v.focus();
+    setAiRun({ label: o.kind === "extend" ? "Writing extensions" : "Finding what to reference" });
+    try {
+      const r = await writeBackHalf(aiKey(owner), f, o, ctl.signal);
+      if (v.isDestroyed) throw new Error("The file was closed before it was done");
+      v.dispatch(v.state.tr.insert(v.state.doc.content.size, r.nodes));
+      toast(`At the end of the file: ${r.what} (Ctrl+End to see it, Ctrl+Z to take it back)`);
+    } catch (e) {
+      toast(ctl.signal.aborted ? "Stopped" : (e as Error).message);
+    } finally {
+      aiStop.current = null; setAiRun(null);
+    }
+  };
   const aiSaveKey = async () => {
     if (!aiPanel || aiPanel.kind !== "settings") return;
     const k = aiPanel.draft.trim();
@@ -3205,7 +3239,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 <button type="button" aria-label="Stop the AI" onMouseDown={(e) => e.preventDefault()} onClick={() => aiStop.current?.abort()}>{I.x}</button>
               </span>
             )}
-            <button type="button" className={"rm-b rm-i rm-menubtn rm-aibtn" + (menu?.id === "ai" || aiRun ? " on" : "") + (aiRun ? " busy" : "")} data-tip={aiK ? "AI — cite from link, reformat, rehighlight for indicts, find blocks" : "AI — add your Anthropic key to use it"} aria-label="AI" aria-expanded={menu?.id === "ai"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("ai", e)}>{I.spark}</button>
+            <button type="button" className={"rm-b rm-i rm-menubtn rm-aibtn" + (menu?.id === "ai" || aiRun ? " on" : "") + (aiRun ? " busy" : "")} data-tip={aiK ? "AI — cite from link, reformat, rehighlight for indicts, find blocks, the back half" : "AI — add your Anthropic key to use it"} aria-label="AI" aria-expanded={menu?.id === "ai"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("ai", e)}>{I.spark}</button>
             <button type="button" className={"rm-b rm-i" + (timer.open ? " on" : "")} data-tip={tip("timer", "Speech timer")} aria-label="Speech timer" aria-pressed={timer.open} onClick={() => run("timer")}>{I.timer}</button>
             <button type="button" className={"rm-b rm-i rm-menubtn rm-palbtn" + (menu?.id === "palette" ? " on" : "")} data-tip={"Colours and layout" + (K("layout") ? " · " + K("layout") + " next layout" : "")} aria-label="Colours and layout" aria-expanded={menu?.id === "palette"} onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("palette", e)}>
               {I.theme}
@@ -3851,6 +3885,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("reformat")}>Reformat with AI<span className="k">{K("ai-reformat")}</span></button>
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("indict")}>Rehighlight for indicts<span className="k">{K("ai-indict")}</span></button>
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("blocks")}>Find blocks…<span className="k">{K("ai-blocks")}</span></button>
+          <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("back")}>Back half: extensions, for reference…<span className="k">{K("ai-extend")}</span></button>
           <div className="rm-sep" />
           <button type="button" className="rm-mb" role="menuitem" onClick={() => aiOpen("settings")}>AI settings…<span className="k">{aiK ? "key added" : "no key yet"}</span></button>
         </div>
@@ -4065,7 +4100,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       )}
       {aiPanel && (
         <div className="rm-scrim top rm-palscrim" onPointerDown={(e) => { if (e.target === e.currentTarget) aiClose(); }} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); aiClose(); } }}>
-          <div className="rm-pal rm-aipanel" role="dialog" aria-label={aiPanel.kind === "settings" ? "AI settings" : aiPanel.kind === "cite" ? "Cite from link" : "Find blocks"}>
+          <div className="rm-pal rm-aipanel" role="dialog" aria-label={aiPanel.kind === "settings" ? "AI settings" : aiPanel.kind === "cite" ? "Cite from link" : aiPanel.kind === "back" ? "Back half" : "Find blocks"}>
             {aiPanel.kind === "settings" && (
               <form onSubmit={(e) => { e.preventDefault(); void aiSaveKey(); }}>
                 <div className="rm-aihead">{I.spark}<b>AI settings</b><span>Claude Haiku 5.5</span></div>
@@ -4102,6 +4137,39 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                 </label>
                 {aiPanel.err && <p className="rm-aimsg bad">{aiPanel.err}</p>}
                 <p className="rm-ainote">Keep working while Claude writes it. It goes on the empty line you&apos;re on now, or the card&apos;s empty cite line, in your cite format: {citeFormat}</p>
+              </form>
+            )}
+            {aiPanel.kind === "back" && (
+              <form className="rm-aiwant rm-aiback2" onSubmit={(e) => { e.preventDefault(); void aiBackNow(); }}>
+                <div className="rm-aihead">{I.spark}<b>Back half</b><span>{K("ai-extend")}</span></div>
+                <div className="rm-aiseg" role="radiogroup" aria-label="What to write">
+                  {([["extend", "Extensions", "what to say in the " + (aiPanel.side === "aff" ? "1AR" : "1NR")], ["reference", "For reference", (aiPanel.side === "aff" ? "2AC" : "2NC") + " blocks from your cards"]] as [BackKind, string, string][]).map(([m, label, sub]) => (
+                    <button key={m} type="button" role="radio" aria-checked={aiPanel.mode === m} className={aiPanel.mode === m ? "on" : ""}
+                      onClick={() => setAiPanel({ ...aiPanel, mode: m, speech: backSpeech(m, aiPanel.side), err: "" })}><b>{label}</b><small>{sub}</small></button>
+                  ))}
+                </div>
+                <div className="rm-airow">
+                  <label>Side
+                    <select value={aiPanel.side} onChange={(e) => { const sd = e.target.value as BackSide; setAiPanel({ ...aiPanel, side: sd, speech: backSpeech(aiPanel.mode, sd) }); }}>
+                      <option value="aff">Aff</option><option value="neg">Neg</option>
+                    </select>
+                  </label>
+                  <label>Speech
+                    <select value={aiPanel.speech} onChange={(e) => setAiPanel({ ...aiPanel, speech: e.target.value })}>
+                      {(aiPanel.mode === "extend" ? (aiPanel.side === "aff" ? ["1AR", "2AR"] : ["1NR", "2NR"]) : (aiPanel.side === "aff" ? ["2AC", "1AR"] : ["2NC", "1NR"])).map((sp) => <option key={sp}>{sp}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <textarea value={aiPanel.want} rows={3} spellCheck={false} aria-label="What you need"
+                  placeholder={aiPanel.mode === "extend" ? "What to extend (optional) — leave blank and every story in the file gets one" : "What you need (optional): Yes Russia war; AT: Ukraine thumps — leave blank and Claude picks the blocks this file needs"}
+                  onChange={(e) => setAiPanel({ ...aiPanel, want: e.target.value, err: "" })}
+                  onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void aiBackNow(); } }} />
+                {aiPanel.mode === "extend" && <label className="rm-aicheck"><input type="checkbox" checked={aiPanel.weighing} onChange={(e) => setAiPanel({ ...aiPanel, weighing: e.target.checked })} /> Weighing after the extensions</label>}
+                {aiPanel.err && <p className="rm-aimsg bad">{aiPanel.err}</p>}
+                <div className="rm-aifoot">
+                  <span>From {aiPanel.cards} {aiPanel.cards === 1 ? "card" : "cards"} {aiPanel.selected ? "you selected" : "in this file"} · it goes at the end of the file</span>
+                  <button type="submit" className="pri" disabled={!aiPanel.cards}>Write it <kbd>Ctrl+Enter</kbd></button>
+                </div>
               </form>
             )}
             {aiPanel.kind === "blocks" && (

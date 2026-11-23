@@ -63,6 +63,7 @@ export const ACTIONS: Action[] = [
   { id: "ai-cite", group: "AI", label: "Cite from link", key: "alt+shift+L", hint: "Paste an article's link: Claude reads the page and writes the cite in your cite format — author, credentials, title, date, link" },
   { id: "ai-reformat", group: "AI", label: "Reformat with AI", key: "alt+shift+F", hint: "The card you're in, or every card selected, in the house format: underlining around what's read, emphasis on what matters, the rest small, the cite rewritten — no word or highlight changed" },
   { id: "ai-indict", group: "AI", label: "Rehighlight for indicts", key: "alt+shift+I", hint: "Their card, or every card selected: Claude finds where the author undercuts the tag, and a copy goes to the speech doc with their highlighting greyed and the indicts in cyan. Your file stays as it is" },
+  { id: "ai-extend", group: "AI", label: "Back half: extensions, for reference", key: "alt+shift+E", hint: "From the cards in this file: extensions for the 1AR or 1NR (each story extended, the words a judge must hear underlined, weighing after), or 2AC/2NC blocks of their cards for reference, highlighting greyed. It all goes at the end of the file" },
   { id: "ai-blocks", group: "AI", label: "Find blocks", key: "alt+shift+A", hint: "The best blocks in your library for their card or a claim — and the caselist when your library has nothing" },
 ];
 export const ACTION = new Map(ACTIONS.map((a) => [a.id, a]));
