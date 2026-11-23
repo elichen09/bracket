@@ -39,6 +39,8 @@ import { spellPlugin, spellKey, SPELL_MODES, type SpellMode } from "@/lib/cutter
 import { placePlugin, placeCard, placeKey, removeCards } from "@/lib/cutter/place";
 import { slashPlugin, type SlashAt } from "@/lib/cutter/slash";
 import { gripPlugin } from "@/lib/cutter/grips";
+import { scrollMapPlugin } from "@/lib/cutter/scrollmap";
+import { cardFocusPlugin } from "@/lib/cutter/cardfocus";
 import { foldPlugin, setFolded as foldTags, isFolded } from "@/lib/cutter/fold";
 import { RM_PALETTE_KEY } from "@/lib/toolTheme";
 import { parseFlow, gdocId, type FlowItem } from "@/lib/gflow";
@@ -169,6 +171,8 @@ interface Head { level: number; text: string; pos: number }
 interface Pane { key: string; fileId: string; read: boolean; follow: boolean }
 type Mode = "edit" | "split" | "speech" | "flow";
 type Tab = "outline" | "files" | "search" | "round";
+/** The speech doc's widths at which its head folds a button into DOC ▾ (the same numbers as magic.css's container queries). */
+const SH_ONLY = 570, SH_OL = 470, SH_TAGS = 390, SH_VERB = 300;
 interface SdFile { i: number; name: string; ctime: number }
 
 const MAX_PANES = 3;
@@ -332,6 +336,12 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   const [sentPulse, setSentPulse] = useState(0);
   const [wpm, setWpm] = useState(230);
   const [hideDim, setHideDim] = useState(false);
+  /** Focus on the card: the rest of the page fades while you cut, and the bars while you type. */
+  const [cardFocus, setCardFocus] = useState(false);
+  /** The scroll map down each page's right edge. */
+  const [scrollMap, setScrollMap] = useState(true);
+  /** Outline sections folded shut, when it shows every file that's open. */
+  const [olShut, setOlShut] = useState<Record<string, boolean>>({});
   const [depth, setDepth] = useState(4);
   const [olFilter, setOlFilter] = useState("");
   // the outline's folds, the way Word's navigation pane has them: a heading opened or shut by hand, over what the depth buttons say
@@ -505,6 +515,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         if (u.gfOn === true && typeof u.gfLink === "string" && u.gfLink) setGfOn(true);
         if (typeof u.wpm === "number") setWpm(u.wpm);
         if (typeof u.hideDim === "boolean") setHideDim(u.hideDim);
+        if (typeof u.cardFocus === "boolean") setCardFocus(u.cardFocus);
+        if (typeof u.scrollMap === "boolean") setScrollMap(u.scrollMap);
         if (typeof u.speechOutline === "boolean") setSpeechOutline(u.speechOutline);
         if (typeof u.depth === "number") setDepth(u.depth);
         if (typeof u.limit === "number") setTimer((t) => ({ ...t, limit: u.limit }));
@@ -541,8 +553,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   }, [palette, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "flow" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink, gfOn, gfPos })); } catch { /* private */ }
-  }, [mode, tab, speechW, speechH, wpm, hideDim, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, gfOn, gfPos, UI_KEY, uiReady]);
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ mode: mode === "flow" ? "edit" : mode, tab, speechW, speechH, wpm, hideDim, cardFocus, scrollMap, speechOutline, depth, limit: timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layout: layoutMode, gfLink, gfOn, gfPos })); } catch { /* private */ }
+  }, [mode, tab, speechW, speechH, wpm, hideDim, cardFocus, scrollMap, speechOutline, depth, timer.limit, ribMin, folded, palette, sideW, spell, speechTags, layoutMode, gfLink, gfOn, gfPos, UI_KEY, uiReady]);
   // the site's nav steps aside in Focus (magic.css), set on <html> so it can
   useEffect(() => {
     if (!uiReady) return;
@@ -587,6 +599,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           gripPlugin(),
           foldPlugin(),
           spotPlugin(),
+          scrollMapPlugin(),
+          cardFocusPlugin(),
         ],
       });
     }
@@ -601,6 +615,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
         gripPlugin(),
         foldPlugin(),
         spotPlugin(),
+        scrollMapPlugin(),
+        cardFocusPlugin(),
       ],
     });
   }, []);
@@ -1672,6 +1688,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (id === "mode-speech") { setMode(modeRef.current === "speech" ? "split" : "speech"); return; }
     if (id === "mode-flow") { setMode(modeRef.current === "flow" ? "edit" : "flow"); return; }
     if (id === "timer") { setTimer((t) => ({ ...t, open: !t.open })); return; }
+    if (id === "card-focus") { setCardFocus((on) => { toast(on ? "Focus off: the whole page, and the bars, stay as they are" : "Focus on the card: the rest fades while you cut, the bars while you type (move the mouse to get them back)"); return !on; }); return; }
+    if (id === "scroll-map") { setScrollMap((on) => { toast(on ? "Scroll map off" : "Scroll map: the whole file down the right of the page — click or drag on it to go there"); return !on; }); return; }
     if (id === "ribbon") { setMenu(null); setRibMin((r) => !r); return; }
     if (id === "tags-only") { toggleTags(target()); return; }
     if (id === "spelling") {
@@ -2845,6 +2863,27 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     });
     return () => { dead = true; if (off) off(); };
   }, [owner, me, room]);
+  // Focus on the card: typing in a page fades the bars and the side away; the mouse moving brings them back.
+  // A data attribute, not a class, so React drawing the root again doesn't take it off.
+  useEffect(() => {
+    const el = root.current;
+    if (!el || !cardFocus) return;
+    let x = -1, y = -1;
+    const key = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (!(e.target as HTMLElement | null)?.closest?.(".ProseMirror")) return;
+      if (e.key.length !== 1 && e.key !== "Backspace" && e.key !== "Delete" && e.key !== "Enter") return;
+      el.dataset.typing = "1"; x = -1;
+    };
+    const move = (e: MouseEvent) => {
+      if (!el.dataset.typing) return;
+      if (x < 0) { x = e.clientX; y = e.clientY; return; }
+      if (Math.abs(e.clientX - x) + Math.abs(e.clientY - y) > 8) delete el.dataset.typing;
+    };
+    document.addEventListener("keydown", key, true);
+    document.addEventListener("mousemove", move, { passive: true });
+    return () => { document.removeEventListener("keydown", key, true); document.removeEventListener("mousemove", move); delete el.dataset.typing; };
+  }, [cardFocus]);
   // the speech doc's width, for its page to fit
   useEffect(() => {
     const el = speechBox.current;
@@ -2915,6 +2954,8 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     foldPlugin(speechTagsRef.current),
     spotPlugin(),
     verbatimPlugin(false),
+    scrollMapPlugin(),
+    cardFocusPlugin(),
   ], []);
   // a card sent from the search (or Alt+Enter in a file) goes where the speech doc's cursor is
   useEffect(() => {
@@ -2975,27 +3016,62 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // Indented from the biggest heading the doc has, so a file with no pocket starts at the edge.
   const olWhose = (headsOf === "speech" ? "speech" : cur?.id || "") + "|";
   const olTop = heads.length ? Math.min(...heads.map((h) => h.level)) : 1;
-  const olTree = (() => {
+  const treeOf = (hs: Head[], whose: string) => {
     const seen = new Map<string, number>();
     const out: { h: Head; i: number; key: string; kids: boolean; open: boolean; show: boolean; parent: number }[] = [];
     const stack: number[] = [];                       // indices into out of the open path
-    heads.forEach((h, i) => {
+    hs.forEach((h, i) => {
       const base = h.level + ":" + h.text;
       const n = (seen.get(base) || 0) + 1;
       seen.set(base, n);
-      const key = olWhose + base + ":" + n;
+      const key = whose + base + ":" + n;
       while (stack.length && out[stack[stack.length - 1]].h.level >= h.level) stack.pop();
       const parent = stack.length ? stack[stack.length - 1] : -1;
-      const kids = i + 1 < heads.length && heads[i + 1].level > h.level;
+      const kids = i + 1 < hs.length && hs[i + 1].level > h.level;
       const open = key in olFold ? olFold[key] : h.level < depth;
       const show = parent < 0 || (out[parent].show && out[parent].open);
       out.push({ h, i, key, kids, open, show, parent });
       stack.push(out.length - 1);
     });
     return out;
-  })();
+  };
+  const olTree = treeOf(heads, olWhose);
   const olQ = olFilter.trim().toLowerCase();
-  const olRows = olQ ? olTree.filter((r) => r.h.text.toLowerCase().includes(olQ)) : olTree.filter((r) => r.show);
+  const olPick = <R extends { h: Head; show: boolean }>(t: R[]) => (olQ ? t.filter((r) => r.h.text.toLowerCase().includes(olQ)) : t.filter((r) => r.show));
+  const olRows = olPick(olTree);
+  // Every file showing gets its own part of the outline — the pages side by side, and the speech doc in Split —
+  // the one with the cursor in it working as the outline always has (drag, ×), the others to click and go to.
+  const olDocs = (() => {
+    const out: { id: string; name: string; v: EditorView; speech: boolean; paneKey: string }[] = [];
+    if (mode === "flow" || layoutMode === "deck") return out;
+    if (mode !== "speech") {
+      const seen = new Set<string>();
+      // the same file in two pages is one part: the page with the cursor's
+      const order = [...panes].sort((a, b) => (a.key === activeKey ? -1 : b.key === activeKey ? 1 : 0));
+      const keep = new Set<string>();
+      for (const p of order) {
+        if (p.read || seen.has(p.fileId) || pdfs[p.fileId] || !views.current.get(p.key)) continue;
+        seen.add(p.fileId); keep.add(p.key);
+      }
+      for (const p of panes) if (keep.has(p.key)) out.push({ id: p.fileId, name: loaded.current.get(p.fileId)?.name || "Untitled", v: views.current.get(p.key)!, speech: false, paneKey: p.key });
+    }
+    if ((mode === "split" || mode === "speech") && speechView.current) out.push({ id: "speech", name: "Speech doc", v: speechView.current, speech: true, paneKey: "" });
+    return out;
+  })();
+  const olActive = headsOf === "speech" ? "speech" : (panes.find((p) => p.key === activeKey)?.fileId || "");
+  const olMulti = olDocs.length > 1 && olDocs.some((d) => d.id === olActive);
+  /** A file's headings, read from it as it is (for a part of the outline that isn't the one with the cursor). */
+  const headsIn = (v: EditorView): Head[] => {
+    const out: Head[] = [];
+    v.state.doc.forEach((n, pos) => { if (n.type === schema.nodes.heading) out.push({ level: n.attrs.level, text: n.textContent.trim() || "(empty)", pos }); });
+    return out;
+  };
+  /** A heading in another file of the outline: into that file, there. */
+  const olGo = (d: { v: EditorView; speech: boolean; paneKey: string }, pos: number) => {
+    if (d.speech) inSpeech.current = true; else activate(d.paneKey);
+    goPos(d.v, pos);
+    readHeads();
+  };
   // the heading the cursor is in — or, folded away, the nearest one over it that shows
   const olAt = (() => {
     let k = at >= 0 && at < olTree.length ? at : -1;
@@ -3184,7 +3260,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   useEffect(() => { (palList.current?.querySelector("li.on") as HTMLElement | null)?.scrollIntoView({ block: "nearest" }); }, [pal?.sel]);
 
   return (
-    <div className={"rm" + (desktop ? " desktop" : "") + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
+    <div className={"rm" + (desktop ? " desktop" : "") + (side ? "" : " side-hidden") + (full ? " full" : "") + (ribSmall ? " ribmin" : "") + (menu ? " menuopen" : "") + (drawer ? " drawer" : "") + (cardFocus ? " cardfocus" : "") + (scrollMap ? "" : " nomap")} ref={root} data-mode={mode} data-palette={palette} data-layout={layoutMode} data-sidetab={tab} data-heads={headsOf}
       style={{ ["--rm-hl" as string]: hl, ["--rm-speech" as string]: `${Math.round(speechW * 1000) / 10}%`, ["--rm-speech-h" as string]: `${Math.round(speechH * 1000) / 10}%`, ["--rm-side" as string]: `${sideW}px` }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void openFile(f); } }}>
@@ -3317,13 +3393,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               {[1, 2, 3, 4].map((n) => (
                 <button key={n} type="button" aria-pressed={depth === n} onClick={() => { setDepth(n); setOlFold({}); }} title={["Pockets", "Hats", "Blocks", "Tags"][n - 1]}>{n}</button>
               ))}
-              <span className="rm-olof">{headsOf === "speech" ? "SPEECH DOC" : "THIS FILE"}</span>
+              <span className="rm-olof">{olMulti ? olDocs.length + " OPEN" : headsOf === "speech" ? "SPEECH DOC" : "THIS FILE"}</span>
             </div>
             <label className="rm-sfilter">{I.search}<input value={olFilter} onChange={(e) => setOlFilter(e.target.value)} placeholder="Filter headings" aria-label="Filter headings" spellCheck={false} /></label>
             <nav className={"rm-slist" + (drag !== null ? " dragging" : "")} aria-label="Outline"
               onDragOver={(e) => { if (drag !== null && e.target === e.currentTarget) { e.preventDefault(); const ok = dropTarget(drag, heads.length) !== null; setDropAt(ok ? heads.length : null); } }}
               onDrop={(e) => { e.preventDefault(); dropRow(); }}>
-              {olRows.length ? olRows.map(({ h, i, key, kids, open }) => (
+              {(() => {
+              const activeRows = () => (olRows.length ? olRows.map(({ h, i, key, kids, open }) => (
                 <button key={i} type="button" draggable
                   className={`rm-ol k${h.level} r${h.level - olTop}` + (i === olAt ? " on" : "") + (drag === i ? " lifted" : "") + (dropAt === i ? " drop" : "") + (dropAt === heads.length && i === heads.length - 1 ? " drop-after" : "")}
                   style={{ ["--d" as string]: h.level - olTop }}
@@ -3347,7 +3424,41 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
                   <span className="x" role="button" aria-label={`Delete “${h.text}” and everything under it`} title="Delete this, and everything under it — Ctrl+Z brings it back"
                     onClick={(e) => { e.stopPropagation(); removeSection(h.pos); }}>×</span>
                 </button>
-              )) : <p className="rm-sempty">{heads.length ? "No heading here says that." : `No headings yet. ${K("tag")} makes a line a tag, ${K("block")} a block.`}</p>}
+              )) : <p className="rm-sempty">{heads.length ? "No heading here says that." : `No headings yet. ${K("tag")} makes a line a tag, ${K("block")} a block.`}</p>);
+              if (!olMulti) return activeRows();
+              return olDocs.map((d) => {
+                const on = d.id === olActive;
+                const shut = !!olShut[d.id];
+                const hs = on ? heads : headsIn(d.v);
+                const cards = hs.filter((h) => h.level === 4).length;
+                const head = (
+                  <button type="button" className={"rm-olsec" + (on ? " on" : "")} aria-expanded={!shut}
+                    onClick={() => setOlShut((s) => ({ ...s, [d.id]: !shut }))} title={shut ? "Show its outline" : "Fold its outline away"}>
+                    <span className={"tw " + (shut ? "shut" : "open")} aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 2l3 3-3 3" /></svg></span>
+                    {d.speech && <i>★</i>}<b>{d.name}</b><small>{cards} {cards === 1 ? "CARD" : "CARDS"}</small>
+                  </button>
+                );
+                if (shut) return <Fragment key={d.id}>{head}</Fragment>;
+                if (on) return <Fragment key={d.id}>{head}{activeRows()}</Fragment>;
+                const top = hs.length ? Math.min(...hs.map((h) => h.level)) : 1;
+                const rows = olPick(treeOf(hs, (d.speech ? "speech" : d.id) + "|"));
+                return (
+                  <Fragment key={d.id}>
+                    {head}
+                    {rows.length ? rows.map(({ h, i, key, kids, open }) => (
+                      <button key={d.id + ":" + i} type="button" className={`rm-ol other k${h.level} r${h.level - top}`} style={{ ["--d" as string]: h.level - top }} title={h.text}
+                        aria-expanded={kids && !olQ ? open : undefined} onClick={() => olGo(d, h.pos)} onDoubleClick={() => { if (kids) olToggle(key, open); }}>
+                        <span className={"tw" + (kids && !olQ ? (open ? " open" : " shut") : "")} aria-hidden="true"
+                          onClick={kids && !olQ ? (e) => { e.stopPropagation(); olToggle(key, open); } : undefined}>
+                          {kids && !olQ && <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 2l3 3-3 3" /></svg>}
+                        </span>
+                        <span className="lab">{h.text}</span>
+                      </button>
+                    )) : <p className="rm-sempty">{hs.length ? "No heading here says that." : "No headings yet."}</p>}
+                  </Fragment>
+                );
+              });
+              })()}
             </nav>
             <div className="rm-sfoot">{headsOf === "speech" ? "The speech doc, as a list: " : ""}Drag a heading to move it, and everything under it; × takes it out. {K("move-up")} / {K("move-down")} move the one you&apos;re in.</div>
           </div>
@@ -3668,20 +3779,20 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             {/* the speech doc: Evidence's send doc, its editor, its outline */}
             <section className={"evi withdoc rm-speech" + (headsOf === "speech" && mode === "split" ? " active" : "")} ref={speechBox} aria-label="Speech doc">
               <div className="rm-phead speech">
-                <span className="rm-acc">SPEECH</span>
+                <span className="rm-acc sh-acc">SPEECH</span>
                 <b>Speech doc</b>
                 <span className="rm-pmeta" id="sendCount" title="Blocks sent to it" />
                 <span className="rm-grow" />
-                <button type="button" className={"rm-pbtn" + (speechVerb ? " on" : "")} aria-pressed={speechVerb} onMouseDown={(e) => e.preventDefault()}
+                <button type="button" className={"rm-pbtn sh-verb" + (speechVerb ? " on" : "")} aria-pressed={speechVerb} onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { inSpeech.current = true; toggleVerb(); }} title={tip("verbatim", "Verbatimise the speech doc: just what you'll read")}>VERBATIM</button>
-                <button type="button" className={"rm-pbtn" + (speechTags ? " on" : "")} aria-pressed={speechTags} onMouseDown={(e) => e.preventDefault()}
+                <button type="button" className={"rm-pbtn sh-tags" + (speechTags ? " on" : "")} aria-pressed={speechTags} onMouseDown={(e) => e.preventDefault()}
                   onClick={() => toggleTags(speechView.current)} title={tip("tags-only", "Tags only: every card folded to its tag, to see the doc as an outline and reorder it")}>TAGS ONLY</button>
-                <button type="button" className={"rm-pbtn" + (side && tab === "outline" && headsOf === "speech" ? " on" : "")}
+                <button type="button" className={"rm-pbtn sh-ol" + (side && tab === "outline" && headsOf === "speech" ? " on" : "")}
                   onClick={() => { inSpeech.current = true; setTab("outline"); speechView.current?.focus(); readHeads(); }}
                   title="Its outline, in the side: click a heading to go there, drag one to move it and everything under it">OUTLINE</button>
                 <button type="button" className={"rm-pbtn rm-menubtn" + (menu?.id === "speech" ? " on" : "")} aria-expanded={menu?.id === "speech"}
                   onMouseDown={(e) => e.preventDefault()} onClick={(e) => openMenu("speech", e)} title="Format, copy, download, SpeechDrop, clear">DOC ▾</button>
-                <button type="button" className="rm-pbtn" onClick={() => setMode(mode === "speech" ? "split" : "speech")} title={tip("mode-speech", mode === "speech" ? "A file beside it again" : "Just the speech doc")}>{mode === "speech" ? "FILE BESIDE" : "SPEECH ONLY"}</button>
+                <button type="button" className="rm-pbtn sh-only" onClick={() => setMode(mode === "speech" ? "split" : "speech")} title={tip("mode-speech", mode === "speech" ? "A file beside it again" : "Just the speech doc")}>{mode === "speech" ? "FILE BESIDE" : "SPEECH ONLY"}</button>
                 <button type="button" className="rm-pbtn sq" onClick={() => setMode("edit")} title="Close the speech doc — just the file" aria-label="Close the speech doc">×</button>
               </div>
               <div className="pane docpane rm-docpane">
@@ -3852,6 +3963,19 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
       {menu?.id === "speech" && (
         <div className="rm-menu" style={menuAt(menu)} role="menu">
           <h4>THE SPEECH DOC</h4>
+          {(() => {
+            // a narrow speech doc folds its head's buttons away (magic.css, by the same widths): they are here instead
+            const w = speechBox.current?.clientWidth || 9999;
+            const hid = { only: w <= SH_ONLY, ol: w <= SH_OL, tags: w <= SH_TAGS, verb: w <= SH_VERB };
+            if (!hid.only) return null;
+            return (<>
+              {hid.verb && <button type="button" className="rm-mb" onClick={() => { setMenu(null); inSpeech.current = true; toggleVerb(); }}>{speechVerb ? "Stop verbatimising" : "Verbatimise: just what you'll read"}<span className="k">{K("verbatim")}</span></button>}
+              {hid.tags && <button type="button" className="rm-mb" onClick={() => { setMenu(null); toggleTags(speechView.current); }}>{speechTags ? "Show the cards again" : "Tags only"}<span className="k">{K("tags-only")}</span></button>}
+              {hid.ol && <button type="button" className="rm-mb" onClick={() => { setMenu(null); inSpeech.current = true; setSide(true); setTab("outline"); speechView.current?.focus(); readHeads(); }}>Its outline, in the side</button>}
+              <button type="button" className="rm-mb" onClick={() => { setMenu(null); setMode(mode === "speech" ? "split" : "speech"); }}>{mode === "speech" ? "A file beside it again" : "Just the speech doc"}<span className="k">{K("mode-speech")}</span></button>
+              <div className="rm-sep" />
+            </>);
+          })()}
           <button type="button" className="rm-mb" data-act="format" onClick={() => setMenu(null)} title="Title it, drop the analytics, renumber, take out the white space">Format for sending…</button>
           <button type="button" className="rm-mb" data-act="copySend" onClick={() => setMenu(null)}>Copy it</button>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); speechApi.current?.saveDocx(); }}>Download as .docx</button>
@@ -4018,6 +4142,10 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
             </button>
           ))}
           <div className="rm-mnote">Right-click a red underline for what it should be, or to add the word to the dictionary.</div>
+          <div className="rm-sep" />
+          <h4>VIEW</h4>
+          <button type="button" role="menuitemcheckbox" aria-checked={cardFocus} className="rm-mb" onClick={() => { setMenu(null); run("card-focus"); }}>Focus on the card<span className="k">{cardFocus ? "✓ " : ""}{K("card-focus")}</span></button>
+          <button type="button" role="menuitemcheckbox" aria-checked={scrollMap} className="rm-mb" onClick={() => { setMenu(null); run("scroll-map"); }}>Scroll map<span className="k">{scrollMap ? "✓" : ""}</span></button>
           <div className="rm-sep" />
           <h4>THIS FILE</h4>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); run("clean-up"); }}>Clean up<span className="k">{K("clean-up")}</span></button>

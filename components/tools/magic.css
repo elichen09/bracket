@@ -521,6 +521,13 @@ button.rm-frow { flex-direction: column; gap: 3px; padding: 9px 12px; cursor: po
 .rm .evi .rm-phead button.rm-pbtn.on { border-color: var(--accD); color: var(--accD); }
 .rm .evi .rm-phead button.rm-pbtn.sq { padding: 0; font-size: 13px; }
 .rm .evi .droprow { flex-shrink: 0; }
+/* a narrow speech doc: its head folds a button at a time into DOC ▾ (RoundMagic's SH_* widths), the × always there */
+.rm .rm-phead.speech b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@container (max-width: 640px) { .rm .evi.rm-speech .sh-acc { display: none; } }
+@container (max-width: 570px) { .rm .evi.rm-speech .sh-only { display: none; } }
+@container (max-width: 470px) { .rm .evi.rm-speech .sh-ol { display: none; } }
+@container (max-width: 390px) { .rm .evi.rm-speech .sh-tags { display: none; } }
+@container (max-width: 300px) { .rm .evi.rm-speech .sh-verb { display: none; } }
 
 /* ------------------------------------------------------------ the status line */
 .rm-status {
@@ -1832,3 +1839,47 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm-scoutacts { display: flex; gap: 6px; margin-top: 8px; }
 .rm-scoutacts button { height: 28px; padding: 0 12px; border: 1px solid var(--well-b); background: transparent; color: var(--side-txt); font: 500 10.5px var(--rm-mono); letter-spacing: .1em; cursor: pointer; }
 .rm-scoutacts button.pri { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
+
+/* ------------------------------------------------------------ the outline, every file open (Split, pages side by side) */
+.rm-slist .rm-olsec {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px; width: 100%; min-height: 30px; margin-top: 6px;
+  padding: 0 10px 0 6px; border: 0; border-top: 1px solid var(--side-line); background: var(--side); color: var(--side-mut);
+  font: 600 12.5px var(--rm-sans); text-align: left; cursor: pointer;
+}
+.rm-slist .rm-olsec:first-child { margin-top: 0; border-top: 0; }
+.rm-slist .rm-olsec:hover { color: var(--hi); }
+.rm-slist .rm-olsec.on { color: var(--hi); box-shadow: inset 3px 0 0 var(--acc); }
+.rm-slist .rm-olsec .tw { flex: 0 0 16px; display: grid; place-items: center; }
+.rm-slist .rm-olsec .tw svg { transition: transform .12s ease; }
+.rm-slist .rm-olsec .tw.open svg { transform: rotate(90deg); }
+.rm-slist .rm-olsec i { font-style: normal; color: var(--acc); }
+.rm-slist .rm-olsec b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rm-slist .rm-olsec small { flex-shrink: 0; font: 500 9.5px var(--rm-mono); letter-spacing: .1em; color: var(--side-mut); }
+.rm-slist .rm-ol.other { opacity: .78; }
+.rm-slist .rm-ol.other:hover { opacity: 1; }
+
+/* ------------------------------------------------------------ the scroll map (lib/cutter/scrollmap.ts) */
+.rm-map {
+  position: absolute; z-index: 3; width: 12px; cursor: pointer; opacity: .55; transition: opacity .15s;
+  --map-ink: #1a1a1a; --map-faint: #b8b8b8; --map-acc: var(--accD, #1F5E8C);
+}
+.rm-map:hover, .rm-map.held { opacity: 1; }
+.rm-map[hidden], .rm.nomap .rm-map { display: none; }
+.rm-map canvas { display: block; width: 12px; }
+.rm-map-port { position: absolute; left: -1px; right: -1px; background: rgba(0, 0, 0, .06); border: 1px solid rgba(0, 0, 0, .22); pointer-events: none; }
+.rm-map-tip {
+  position: absolute; right: 18px; max-width: 260px; padding: 3px 8px; background: #111; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font: 500 12px/1.4 var(--rm-sans); pointer-events: none; opacity: 0; transition: opacity .1s;
+}
+.rm-map-tip.on { opacity: 1; }
+.rm-map-tip[data-level="4"] { font-weight: 400; color: #ddd; }
+@media print { .rm-map { display: none; } }
+
+/* ------------------------------------------------------------ focus on the card (lib/cutter/cardfocus.ts) */
+.rm.cardfocus .ProseMirror > * { transition: opacity .18s ease; }
+.rm.cardfocus .ProseMirror.ProseMirror-focused.rm-cardon > :not(.rm-here) { opacity: .32; }
+/* typing: the bars and the side fade; the mouse moving brings them back. Only opacity, so nothing moves */
+.rm.cardfocus :is(.rm-rib, .rm-side, .rm-sgrab, .rm-status, .rm-phead, .rm-deck, .rm-map) { transition: opacity .2s ease; }
+.rm.cardfocus[data-typing] :is(.rm-rib, .rm-side, .rm-sgrab, .rm-status, .rm-phead, .rm-deck) { opacity: 0; transition: opacity .5s ease .15s; }
+.rm.cardfocus[data-typing] .rm-map { opacity: .2; }
+@media (prefers-reduced-motion: reduce) { .rm.cardfocus .ProseMirror > *, .rm.cardfocus :is(.rm-rib, .rm-side, .rm-status, .rm-phead, .rm-deck, .rm-map) { transition: none; } }

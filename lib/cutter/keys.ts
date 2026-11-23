@@ -43,6 +43,8 @@ export const ACTIONS: Action[] = [
   { id: "tab-prev", group: "View", label: "Previous tab", key: "alt+[", hint: "Deck: the tab to the left" },
   { id: "tab-next", group: "View", label: "Next tab", key: "alt+]", hint: "Deck: the tab to the right" },
   { id: "layout", group: "View", label: "Next layout", key: "alt+L", hint: "Classic, Desk (pages laid on the desk), Mirror (speech doc left, side right), Stack (the speech doc under the file), Focus (one-line ribbon, the side a drawer from the left edge), Cockpit (outline and search both open), Stage (the page you're in front and centre), Dock (the ribbon floating at the bottom), Twin (the speech doc, and beside it a second look: verbatimised or tags only), Deck (one page at a time, in tabs) — or pick one in Colours" },
+  { id: "card-focus", group: "View", label: "Focus on the card", key: "alt+J", hint: "The card you're in at full strength and the rest of the page faded back while you cut; the bars fade while you type and come back when the mouse moves (again: off)" },
+  { id: "scroll-map", group: "View", label: "Scroll map", key: null, hint: "A strip down the right of each page with the whole file on it — blocks, cards, what's highlighted, where you are. Click or drag on it to go there (again: off)" },
   { id: "ribbon", group: "View", label: "Hide the format bar", key: "alt+M", hint: "The bar of cutting buttons out of the way — the keys still work, and ⋯ or the command menu has every button (again: back)" },
   { id: "tag", group: "Headings", label: "Tag", key: "alt+4", hint: "A card's tag" },
   { id: "block", group: "Headings", label: "Block", key: "alt+3", hint: "A block — “AT: Econ”" },
