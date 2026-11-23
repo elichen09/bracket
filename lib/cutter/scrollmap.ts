@@ -14,6 +14,7 @@ import { schema } from "../evidence/docSchema";
  * - a box for what is on the screen now.
  *
  * Click or drag on it to go there; point at it to see which heading is there.
+ * Its × (or a right-click) hides it, on every page, until it's turned back on.
  * The strip is drawn on a canvas and measured again only when the file
  * changes (a beat after typing stops), so it costs nothing while you type.
  * It shows only when there is something to scroll.
@@ -71,7 +72,14 @@ class ScrollMap {
     const cv = document.createElement("canvas");
     const port = document.createElement("div"); port.className = "rm-map-port";
     const tip = document.createElement("div"); tip.className = "rm-map-tip";
-    el.append(cv, port, tip);
+    // hiding it: a × when pointed at, or a right-click — the page (RoundMagic) hears "rm-map-hide"
+    const x = document.createElement("button");
+    x.type = "button"; x.className = "rm-map-x"; x.textContent = "×";
+    x.title = "Hide the scroll map"; x.setAttribute("aria-label", "Hide the scroll map");
+    x.addEventListener("pointerdown", (e) => { e.stopPropagation(); e.preventDefault(); });
+    x.addEventListener("click", (e) => { e.stopPropagation(); this.hide(); });
+    el.addEventListener("contextmenu", (e) => { e.preventDefault(); this.hide(); });
+    el.append(cv, port, tip, x);
     host.appendChild(el);
     this.el = el; this.cv = cv; this.port = port; this.tip = tip;
     sc.addEventListener("scroll", this.onScroll, { passive: true });
@@ -214,6 +222,8 @@ class ScrollMap {
     tip.classList.add("on");
   };
   private onLeave = () => { this.tip?.classList.remove("on"); };
+
+  private hide() { this.tip?.classList.remove("on"); this.el?.dispatchEvent(new CustomEvent("rm-map-hide", { bubbles: true })); }
 
   destroy() {
     this.dead = true;

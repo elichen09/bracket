@@ -2863,6 +2863,14 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     });
     return () => { dead = true; if (off) off(); };
   }, [owner, me, room]);
+  // the scroll map's own × (or a right-click on it): off everywhere, and how to get it back
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const hide = () => { setScrollMap(false); toast(`Scroll map hidden — ${K("scroll-map") || "More ▾ › View"} brings it back`); };
+    el.addEventListener("rm-map-hide", hide);
+    return () => el.removeEventListener("rm-map-hide", hide);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
   // Focus on the card: typing in a page fades the bars and the side away; the mouse moving brings them back.
   // A data attribute, not a class, so React drawing the root again doesn't take it off.
   useEffect(() => {
@@ -4145,7 +4153,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
           <div className="rm-sep" />
           <h4>VIEW</h4>
           <button type="button" role="menuitemcheckbox" aria-checked={cardFocus} className="rm-mb" onClick={() => { setMenu(null); run("card-focus"); }}>Focus on the card<span className="k">{cardFocus ? "✓ " : ""}{K("card-focus")}</span></button>
-          <button type="button" role="menuitemcheckbox" aria-checked={scrollMap} className="rm-mb" onClick={() => { setMenu(null); run("scroll-map"); }}>Scroll map<span className="k">{scrollMap ? "✓" : ""}</span></button>
+          <button type="button" role="menuitemcheckbox" aria-checked={scrollMap} className="rm-mb" onClick={() => { setMenu(null); run("scroll-map"); }}>Scroll map<span className="k">{scrollMap ? "✓ " : ""}{K("scroll-map")}</span></button>
           <div className="rm-sep" />
           <h4>THIS FILE</h4>
           <button type="button" className="rm-mb" onClick={() => { setMenu(null); run("clean-up"); }}>Clean up<span className="k">{K("clean-up")}</span></button>
