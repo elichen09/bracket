@@ -96,7 +96,8 @@ export function readFile(state: EditorState): FileRead {
   });
   const real = all.filter((c) => !c.ref && c.paras.length);
   const picked = cardsToDo(state);
-  const sel = !state.selection.empty && picked.length > 1;
+  // a selection is the cards it touches, even one; a bare cursor is the whole file
+  const sel = !state.selection.empty && picked.length > 0;
   let cards: FileCard[] = sel ? real.filter((c) => picked.includes(c.k)) : real.filter((c) => !c.back);
   if (!cards.length) cards = real;
   const joined = heads.join(" ");
@@ -136,17 +137,19 @@ The file's headings: ${f.heads.join(" · ").slice(0, 1500)}
 Its cards, in order (name, block, tag, and the words read):
 ${cards.slice(0, 60000)}
 
-${want.trim() ? `What the debater wants extended: ${want.trim()}\n\n` : ""}Find the distinct stories the file tells: the main chain (what's true now → the link → the internal links → the impact), and each separate scenario or internal link that reaches the impact a different way. For each, write one extension, the way it's read in the ${speech}:
-- "scenario": a short name for the story, as debaters label it ("Main", "France", "Space", "Trump v NATO"). The first is "Main".
-- "text": 3 to 6 short, dense sentences that extend that story step by step, in the cards' own reasoning (each step's warrant, not just its claim), in a confident debater's voice. Use the names debaters use ("the AFF", "the NEG", "squo") and the card's mechanism words. No card names, no quotes, no hedging, no "their evidence says". End on the impact.
-- "underline": the 4 to 10 words or short phrases (1 to 3 words each, copied exactly from your text) a judge has to hear: the mechanism words and the impact ("structurally", "miscalculation", "nuclear").
+${want.trim() ? `What the debater wants extended: ${want.trim()}\n\n` : ""}Extensions are short: the ${speech} has little time. Write ONE extension per story, and most files tell one story: their cards are links in one chain (what's true now → the link → the internal links → the impact), not separate stories, so write exactly one, "Main". Write another only for a scenario the file's own headings set apart (a heading like "Scenario 2---Space", or a second advantage) or one the debater asks for, and never more than 3.
+- "scenario": "Main", or the name the file's heading gives that scenario ("Space", "Trump v NATO").
+- "text": 2 to 4 short sentences, about 40 to 60 words, that extend the story step by step, each step's warrant in a few words, in a confident debater's voice. Use the names debaters use ("the AFF", "the NEG", "squo") and the cards' mechanism words. No card names, no quotes, no hedging, no "their evidence says", no saying a point twice. End on the impact.
+- "underline": 3 to 6 words or short phrases (1 to 3 words each, copied exactly from your text) a judge has to hear: the mechanism words and the impact.
 
-${weighing ? `"weighing": 2 or 3 numbered weighing points for the ${speech}, the strongest for this file: each "label" one word or two ("Magnitude", "Try or Die", "Timeframe", "Turns Case", "Probability") and "text" 2 to 4 sentences comparing this file's impact to what the other side will say, with its "underline" words likewise.` : `"weighing": [].`}
+${weighing ? `"weighing": 2 or 3 numbered weighing points for the ${speech}, the strongest for this file: each "label" one word or two ("Magnitude", "Try or Die", "Timeframe", "Turns Case", "Probability") and "text" 1 or 2 short sentences comparing this file's impact to what the other side will say, with 1 to 3 "underline" words likewise.` : `"weighing": [].`}
 
 "name": the position's short name, as its headings name it ("Escalation", "Collapse").
 
 An example of the voice, on a different topic:
-scenario "Main", text "Warming is locked in now. Absent the plan, methane feedbacks trigger runaway heating. That collapses agriculture, causing famine and resource wars that go nuclear.", underline ["locked in", "runaway", "nuclear"].`;
+scenario "Main", text "Warming is locked in now. Absent the plan, methane feedbacks trigger runaway heating. That collapses agriculture, causing famine and resource wars that go nuclear.", underline ["locked in", "runaway", "nuclear"].${f.cards.length === 1 ? `
+
+The debater picked one card: write one extension of just that card.` : ""}`;
 }
 
 /* ------------------------------------------------------------------ for reference */
@@ -197,7 +200,10 @@ Use only these cards. A tag no paragraph proves is left out. The same card can b
 const T = (s: string, marks: readonly Mark[] = []) => schema.text(s, marks);
 const heading = (level: number, s: string) => N.heading.create({ level }, T(s));
 
-/** Bold words, with these phrases also underlined (each where it first appears). */
+/** The size extensions and "for reference" lines come in at: Verbatim's 13 pt bold. */
+const SIZE13 = () => M.fontSize.create({ size: "13pt" });
+
+/** Bold 13 pt words, with these phrases also underlined (each where it first appears). */
 function boldPara(text: string, under: string[]): PMNode {
   const ranges: [number, number][] = [];
   const low = text.toLowerCase();
@@ -211,7 +217,7 @@ function boldPara(text: string, under: string[]): PMNode {
   ranges.sort((a, b) => a[0] - b[0]);
   const merged: [number, number][] = [];
   for (const r of ranges) { const l = merged[merged.length - 1]; if (l && r[0] <= l[1]) l[1] = Math.max(l[1], r[1]); else merged.push([...r]); }
-  const B = [M.strong.create()], BU = [M.strong.create(), M.underline.create()];
+  const B = [M.strong.create(), SIZE13()], BU = [M.strong.create(), M.underline.create(), SIZE13()];
   const kids: PMNode[] = [];
   let i = 0;
   for (const [a, z2] of merged) {
@@ -277,7 +283,7 @@ export async function writeBackHalf(key: string, f: FileRead, o: { kind: BackKin
     if (!kept.length) continue;
     const items: PMNode[] = kept.flatMap(({ tag, c, idx }, i) => [
       heading(4, kept.length > 1 ? `${String.fromCharCode(65 + (i % 26))}---${tag}` : tag),
-      N.paragraph.create(null, T(`<<FOR REFERENCE---${c.name}>>`)),
+      N.paragraph.create(null, T(`<<FOR REFERENCE---${c.name}>>`, [M.strong.create(), SIZE13()])),
       ...idx.map((j) => greyed(c.paras[j])),
     ]);
     made += kept.length;
