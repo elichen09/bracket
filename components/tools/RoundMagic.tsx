@@ -26,7 +26,7 @@ import { aiReformat, cardsToDo, cardAt } from "@/lib/ai/reformat";
 import { aiIndict, type Rehighlight } from "@/lib/ai/indict";
 import { findBlocks, type Found, type Sources, type Analytic } from "@/lib/ai/blocks";
 import { spotPlugin, holdSpot, takeSpot, type Spot } from "@/lib/ai/spot";
-import { caselistClient, familyOf } from "@/lib/caselist/client";
+import { caselistClient, familyOf, haveKept } from "@/lib/caselist/client";
 import { ACTIONS, ACTION, comboOf, keyLabel, keyFor, actionFor, bind, refuse, caveat, loadKeys, saveKeys, watchChords, type Overrides } from "@/lib/cutter/keys";
 import { docxToHtml } from "@/lib/cutter/docxIn";
 import { sanitize, readTime } from "@/lib/viewer/doc";
@@ -1892,7 +1892,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     // Caselist pressed with no sign-in: the sign-in, not a failed search
     const el = root.current;
     const gate = (e: MouseEvent) => {
-      if (!(e.target as Element).closest?.('#srcsw [data-src="cl"]') || caselistLogin()) return;
+      if (!(e.target as Element).closest?.('#srcsw [data-src="cl"]') || caselistLogin() || haveKept()) return;
       e.preventDefault(); e.stopPropagation();
       setClAsk((a) => a || { user: "", pass: "", busy: false, err: "" });
     };
@@ -2186,7 +2186,7 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
     if (!EV?.libraryText) { setAiPanel({ ...aiPanel, err: "The library is still loading — try again in a moment." }); return; }
     if (!aiPanel.want.trim()) { setAiPanel({ ...aiPanel, err: "Select their argument, or paste it in, first." }); return; }
     if (aiBusy()) return;
-    const clOn = desktop ? !!caselistLogin() : true;
+    const clOn = desktop ? !!caselistLogin() || haveKept() : true;
     const cl = clOn ? (caselistClient(owner, scoped) as any) : null;
     const src: Sources = {
       library: () => EV.libraryText(),

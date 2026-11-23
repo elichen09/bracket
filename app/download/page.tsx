@@ -109,9 +109,13 @@ export default async function Download() {
           <li><b>With the internet, SpeechDrop and the caselist work too.</b> SpeechDrop needs nothing more. The caselist asks you,
             the first time, to sign into openCaselist with your own Tabroom email and password — it searches as you, and keeps the
             sign-in on your computer for two weeks.</li>
+          <li><b>The caselist with no internet.</b> Once its index has loaded, searching the caselist works offline. Press
+            <b>Keep offline</b> in the caselist bar and the week&apos;s whole caselist for your event is kept on your computer (its size is
+            shown first — about 3 GB for PF), so its cards open with no internet too. A new week&apos;s comes down by itself.</li>
+          <li><b>It updates itself.</b> When there&apos;s a newer coda, an <b>Update</b> button appears at the top; one click
+            installs it and starts coda again. Your files stay.</li>
           <li><b>Your partner, by code, app to app</b> — Flow&apos;s Invite and the speech doc&apos;s Room work in the app with no account: one of you reads out the code, the other types it in. Two apps on the same Wi-Fi connect straight to each other, <b>even when the Wi-Fi has no internet</b>; anywhere else they connect over the internet. The first time, Windows asks whether coda may use the network (allow it on public networks too, for tournament Wi-Fi) and a Mac asks to find devices on your network. Nothing about the round is stored.</li>
           <li><b>Sharing a file by link works here too</b>, with no account: Share gives a link that opens on coda&apos;s site or in the app, and a link someone sends you opens from Share → Open a shared file. Only you can stop a file you shared. Your partner&apos;s Google Doc stays on the web.</li>
-          <li><b>A new version is a new download</b> from this page; install it over the old one and your files stay.</li>
           <li><b>On a Mac it runs on Safari&apos;s engine</b>, so it may differ from Chrome in small ways.</li>
         </ul>
 

@@ -510,12 +510,15 @@ dependencies = [
 
 [[package]]
 name = "coda"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
+ "futures-util",
  "hex",
  "iroh",
  "iroh-mdns-address-lookup",
  "n0-future",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.10.9",

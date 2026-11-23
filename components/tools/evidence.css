@@ -866,7 +866,9 @@
   border-bottom: 1px solid var(--line-soft); font-size: 10px;
 }
 .evi .clbar[hidden] { display: none; }
-.evi .clws { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.evi .clws { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; min-width: min(100%, 220px); }
+/* narrow (the side): the events on one line, what is kept and how fresh on the next */
+.evi .clbar { flex-wrap: wrap; row-gap: 8px; }
 .evi .clw {
   display: inline-flex; align-items: center; gap: 7px; padding: 4px 9px;
   border: 1px dashed var(--line); color: var(--dim); background: transparent;
@@ -878,6 +880,12 @@
 .evi .clst.n { color: var(--ink); }
 .evi .clst.wait { color: var(--acc); font-variant-numeric: tabular-nums; }
 .evi .clst.err { color: var(--acc); font-weight: 700; }
+/* the caselist kept on this computer (the app) */
+.evi .cloff { flex: none; margin-left: auto; padding: 4px 9px; border: 1px solid var(--line); background: transparent; color: var(--dim); font: inherit; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.evi .cloff:hover { color: var(--ink); border-color: var(--ink); }
+.evi .cloff.on { color: var(--ink); border-color: var(--ink); }
+.evi .cloff.wait { color: var(--acc); border-color: var(--acc); font-variant-numeric: tabular-nums; }
+.evi .clfresh.cloffline { color: var(--acc); }
 .evi .clst.spin { width: 9px; height: 9px; border: 1.5px solid var(--line); border-top-color: var(--ink); border-radius: 50% !important; animation: clSpin .7s linear infinite; }
 @keyframes clSpin { to { transform: rotate(360deg); } }
 
