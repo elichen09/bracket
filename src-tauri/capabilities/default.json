@@ -1,11 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The window is coda itself, from inside the app. Its only calls into the app are the partner road (p2p_* commands, allowed by default) and the events they send back.",
+  "description": "The window is coda itself, from inside the app. Its calls into the app: the partner road (p2p_* commands, allowed by default) and its events, and updating itself (the updater, and restarting after).",
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

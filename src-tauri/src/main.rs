@@ -8,7 +8,9 @@
 // The one thing the app adds to the page is a direct road to a partner's app
 // (p2p.rs, iroh): the page's rooms — Flow's shared round, the speech doc's
 // Room — ride it beside the relay, so two apps on the same Wi-Fi keep working
-// with no internet at all (lib/p2p.ts is the page's side).
+// with no internet at all (lib/p2p.ts is the page's side). And it updates
+// itself: the updater asks the newest release for a newer, signed version
+// (lib/update.ts), and the process plugin starts the app again after.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod p2p;
@@ -62,6 +64,8 @@ async fn p2p_dial(s: State<'_, P2p>, room: String, addr: String) -> Result<(), S
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(P2p::default())
         .invoke_handler(tauri::generate_handler![p2p_join, p2p_leave, p2p_send, p2p_dial])
         .setup(|app| {

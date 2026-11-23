@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut as signOutOfCoda } from "@/lib/account";
+import { checkUpdate, type Ready } from "@/lib/update";
 import { isDesktop, apiBase, CODA_WEB, caselistLogin, setCaselistLogin, type CaselistLogin } from "@/lib/desktop";
 import { EditorState, TextSelection, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
@@ -1853,6 +1854,32 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
   // the desktop app (src-tauri/, lib/desktop): Google will not sign in inside it, so the
   // partner's flow is read from its shared link there, and nothing asks for Google
   const [desktop, setDesktop] = useState(false);
+  // the app's own updates: asked a little after it opens, then every six hours
+  const [update, setUpdate] = useState<Ready | null>(null);
+  const [updating, setUpdating] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isDesktop()) return;
+    let told = "";
+    const ask = () => { void checkUpdate().then((u) => {
+      if (!u) return;
+      setUpdate(u);
+      if (told !== u.version) { told = u.version; toast("coda " + u.version + " is ready — Update, top right, when you have a moment"); }
+    }); };
+    const first = setTimeout(ask, 8000);
+    const every = setInterval(ask, 6 * 3600_000);
+    return () => { clearTimeout(first); clearInterval(every); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const installUpdate = async () => {
+    if (!update || updating !== null) return;
+    setUpdating(0);
+    try {
+      await flush();                                   // what you have open, saved first
+      await update.install((p) => setUpdating(p));
+    } catch (e) {
+      setUpdating(null);
+      toast("The update didn't install: " + String((e as Error)?.message || e));
+    }
+  };
   useEffect(() => { setDesktop(isDesktop()); }, []);
   // the caselist in the app: the user's own openCaselist (Tabroom) sign-in, asked for when Caselist is first pressed
   const [clLogin, setClLoginState] = useState<CaselistLogin | null>(null);
@@ -3086,6 +3113,13 @@ export default function RoundMagic({ owner, me, room, sd, doc: sharedLink }: { o
               onMouseDown={(e) => e.preventDefault()} onClick={(e) => openRoomPanel(e)}>
               <span className="dot" id="roomdot" /><span id="roomstate">Room</span>
             </button>
+            {/* a newer coda (the app): only there when there is one */}
+            {update && (
+              <button type="button" className="rm-b rm-update" disabled={updating !== null} onClick={() => void installUpdate()}
+                data-tip={"coda " + update.version + " — downloads, installs and starts again; your files stay"}>
+                {updating === null ? "Update" : updating < 1 ? `Updating ${Math.round(updating * 100)}%` : "Restarting…"}
+              </button>
+            )}
             {/* AI at work: beside its button, small; the whole step on hover */}
             {aiRun && (
               <span className="rm-aibusy" role="status" title={aiRun.label + (aiRun.of ? ` · ${aiRun.done} of ${aiRun.of}` : "")}>

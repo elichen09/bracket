@@ -1,6 +1,6 @@
 [package]
 name = "coda"
-version = "1.5.4"
+version = "1.6.0"
 description = "coda — the debate round, in one window"
 edition = "2021"
 
@@ -10,6 +10,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
+# updating itself (lib/update.ts): the newest release's latest.json, signed with coda's updater key
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 serde_json = "1"
 tokio = { version = "1", features = ["sync", "time", "io-util", "macros"] }
 # partners, app to app (src/p2p.rs)

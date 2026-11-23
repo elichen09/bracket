@@ -1767,6 +1767,9 @@ a.rm-mb { text-decoration: none; display: flex; align-items: center; }
 .rm-arow .gl.on { color: var(--hi); font-weight: 700; }
 @media (max-width: 560px) { .rm-arows { grid-template-columns: 1fr; } }
 /* AI at work, in the top bar beside ✦: a short label (the full step on hover) and a × to stop; the ✦ turns */
+/* the app's update, waiting: quiet, but not easy to miss */
+.rm .rm-update { height: 26px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--hi) 55%, transparent); color: var(--hi); font: 600 11.5px var(--rm-sans); }
+.rm .rm-update:disabled { opacity: .75; cursor: default; }
 .rm .rm-bar .rm-aibusy, .rm-aibusy {
   position: static; transform: none; left: auto; right: auto; bottom: auto; z-index: auto; animation: none; box-shadow: none;
   display: inline-flex; align-items: center; gap: 2px; height: 26px; max-width: 170px; margin-right: 2px; padding: 0 2px 0 8px;

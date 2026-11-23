@@ -50,9 +50,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           tauriScript: npx --yes @tauri-apps/cli@2
-          args: --bundles nsis
+          # with the updater key (a repository secret), the installer is signed and latest.json says so
+          args: --bundles nsis ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && '--config src-tauri/tauri.updater.conf.json' || '' }}
           tagName: ${{ github.ref_name }}
           releaseName: "coda desktop ${{ github.ref_name }}"
           releaseBody: "Windows: download the `-setup.exe`. Mac: download the `.dmg`. Works offline, no account. Full instructions, including the first-open warnings: https://bracket-ashy.vercel.app/download"
@@ -90,9 +93,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           tauriScript: npx --yes @tauri-apps/cli@2
-          args: --target universal-apple-darwin --bundles dmg
+          # the updater replaces the .app itself, so with the key the app bundle is published too
+          args: --target universal-apple-darwin ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && '--bundles app,dmg --config src-tauri/tauri.updater.conf.json' || '--bundles dmg' }}
           tagName: ${{ github.ref_name }}
           releaseName: "coda desktop ${{ github.ref_name }}"
           releaseBody: "Windows: download the `-setup.exe`. Mac: download the `.dmg`. Works offline, no account. Full instructions, including the first-open warnings: https://bracket-ashy.vercel.app/download"
